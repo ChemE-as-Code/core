@@ -103,6 +103,7 @@ function applyCustom(): void {
       <RouterLink :to="{ name: 'maturity', query: withRev() }" title="Evidence-based calculation maturity (cheme maturity): the four levels and their requirements">Maturity</RouterLink>
       <RouterLink v-if="hasReviewData(store.status)" :to="{ name: 'reviews', query: withRev() }" title="Open review findings and stage sign-offs">Reviews</RouterLink>
       <RouterLink v-if="store.hasInterlocks" :to="{ name: 'cause-effect', query: withRev() }" title="Cause and effect matrix of the interlocks (control/cause-effect.yaml)">C&amp;E</RouterLink>
+      <RouterLink v-if="store.hasHazop" :to="{ name: 'hazop', query: withRev() }" title="HAZOP studies as worksheets (safety/hazop/)">HAZOP</RouterLink>
       <RouterLink v-if="store.repo?.has_control" :to="{ name: 'control', query: withRev() }" title="Control loops, sequences, narrative and control philosophy (cheme control report)">Control</RouterLink>
       <RouterLink v-if="store.repo?.has_issues" :to="{ name: 'issues', query: withRev() }" title="Action items, engineering holds, technical queries and design changes (GitHub issues, cheme issues)">Issues</RouterLink>
       <RouterLink v-if="store.repo?.has_reactions" :to="{ name: 'reactions', query: withRev() }" title="Reactions and reactors (process/reactions.yaml)">Reactions</RouterLink>
