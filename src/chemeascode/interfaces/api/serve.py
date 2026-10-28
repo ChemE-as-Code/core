@@ -509,6 +509,40 @@ def _cross_site(request: Request, host: str) -> str | None:
     return None
 
 
+#: The pyDEXPI modules cheme-as-code imports where it uses them. :func:`create_app` imports them
+#: all before the server answers requests in its thread pool: pyDEXPI's first import is not safe
+#: from several threads at once (one of them sees a partially initialised module), and the P&ID a
+#: concurrent request was drawing then answered 422 although it loads.
+PYDEXPI_MODULES = (
+    "pydexpi",
+    "pydexpi.diff",
+    "pydexpi.exports.svg_export",
+    "pydexpi.loaders.compat",
+    "pydexpi.loaders.error_registry",
+    "pydexpi.loaders.public",
+    "pydexpi.loaders.xml_serializer",
+    "pydexpi.pydexpi_classes.core.diagram",
+    "pydexpi.pydexpi_classes.plant",
+    "pydexpi.pydexpi_classes.pydexpi_classes",
+    "pydexpi.toolkits.base_model_utils",
+    "pydexpi.toolkits.display_name",
+    "pydexpi.toolkits.label_toolkit",
+    "pydexpi.toolkits.model_summary",
+    "pydexpi.toolkits.model_toolkit",
+    "pydexpi.validation",
+    "pydexpi.versioning",
+    "pydexpi.versioning.projection",
+)
+
+
+def import_pydexpi() -> None:
+    """Import :data:`PYDEXPI_MODULES` in this thread."""
+    import importlib
+
+    for name in PYDEXPI_MODULES:
+        importlib.import_module(name)
+
+
 def create_app(
     repo_root: Path,
     ui_dir: Path | None = None,
@@ -524,6 +558,7 @@ def create_app(
     (:func:`serve` turns it off on a non-local bind without ``--allow-remote-checks``).
     """
     repo = Repo(Workspace.find(repo_root).root)
+    import_pydexpi()
     ui = ui_dir.resolve() if ui_dir else None
     if ui is not None and not (ui / "index.html").is_file():
         raise FileNotFoundError(f"{ui} has no index.html")

@@ -1,6 +1,8 @@
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -9,7 +11,7 @@ from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from chemeascode.domains.piping.fmt import format_file
-from chemeascode.interfaces.api.serve import create_app
+from chemeascode.interfaces.api.serve import PYDEXPI_MODULES, create_app, import_pydexpi
 from chemeascode.interfaces.cli import app as cli_app
 from chemeascode.templates.install import init
 from tests.conftest import REFERENCE, git
@@ -757,3 +759,41 @@ def test_every_route_is_in_the_readme_table(plant: Path):
         for method in route.methods
     }
     assert routes - rows == set()
+
+
+# A fresh server: create the app, then its first requests at once, as the viewer sends them.
+CONCURRENT_FIRST_REQUESTS = """
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from chemeascode.interfaces.api.serve import create_app
+
+c = TestClient(create_app(Path(sys.argv[1]), None, allowed_hosts=["testserver"]))
+urls = ["/api/pid.svg?path=pid/P-01.xml", "/api/validate"] * 3
+with ThreadPoolExecutor(6) as pool:
+    answers = list(pool.map(lambda u: (u, c.get(u)), urls))
+bad = [(u, r.status_code, r.text[:200]) for u, r in answers if r.status_code != 200]
+sys.exit(f"answers that are not 200: {bad}" if bad else 0)
+"""
+
+
+def test_the_first_concurrent_requests_of_a_fresh_server_draw_the_pid(committed: Path):
+    """pyDEXPI's first import is not safe from several threads at once (one sees a partially
+    initialised module): create_app imports it before requests run in its thread pool, so a P&ID
+    that loads is drawn, not answered 422 (and that 422 cached)."""
+    done = subprocess.run(
+        [sys.executable, "-c", CONCURRENT_FIRST_REQUESTS, str(committed)],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+
+
+def test_the_pydexpi_modules_imported_up_front_exist():
+    import_pydexpi()
+    assert set(PYDEXPI_MODULES) <= set(sys.modules)
