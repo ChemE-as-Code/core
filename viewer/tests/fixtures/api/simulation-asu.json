@@ -1,0 +1,585 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "dwsim",
+    "property_package": "Peng-Robinson (PR)",
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [
+      "PUR",
+      "E3101",
+      "KT3101",
+      "X3101",
+      "C1102"
+    ],
+    "guesses": {},
+    "specs": {
+      "K1101": {
+        "outlet_pressure": {
+          "value": 5.8,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 2"
+        },
+        "pressure_drop": {
+          "value": 0.05,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "per cooler"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 2; intercoolers E-1101, E-1102, aftercooler E-1103"
+        },
+        "efficiency": {
+          "value": 0.82,
+          "provenance": "assumed",
+          "source": "isentropic per stage, centrifugal MAC"
+        },
+        "drive_efficiency": {
+          "value": 0.946,
+          "provenance": "assumed",
+          "source": "D-057: 6.6 kV motor 0.97 x integral gear and bearings 0.975"
+        },
+        "stages": 3
+      },
+      "C1101": {
+        "pressure_drop": {
+          "value": 0.1,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, streams 2 and 3"
+        },
+        "outlet_temperature": {
+          "value": 12.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 3 (DCAC)"
+        }
+      },
+      "X3102": {
+        "split": {
+          "bst": 0.1516
+        }
+      },
+      "K3101": {
+        "outlet_pressure": {
+          "value": 8.45,
+          "provenance": "assumed",
+          "source": "D-061: 5.6 -> 8.45 bara, the compander balances on the shaft"
+        },
+        "efficiency": {
+          "value": 0.8,
+          "provenance": "assumed",
+          "source": "compander booster"
+        }
+      },
+      "E3104": {
+        "pressure_drop": {
+          "value": 0.0,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, streams 4C and 4D"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 4D"
+        }
+      },
+      "C3101": {
+        "outlets": {
+          "n2": "vapor",
+          "ln": "distillate",
+          "crude": "bottoms"
+        },
+        "condenser_pressure": {
+          "value": 5.3,
+          "provenance": "assumed",
+          "source": "DESIGN.md assumptions: HP column top 5.4 bara, less the condenser"
+        },
+        "reboiler_pressure": {
+          "value": 5.5,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 5"
+        },
+        "condenser": "partial",
+        "reboiler": false,
+        "vapor_flow": {
+          "value": 12510.0,
+          "provenance": "given",
+          "source": "GAN product, DESIGN.md 3, stream 9"
+        },
+        "side_draws": {
+          "lin": {
+            "stage": 2,
+            "phase": "liquid",
+            "flow": {
+              "value": 470.0,
+              "provenance": "assumed",
+              "source": "LIN product, DESIGN.md 3, stream 11 (D-017)"
+            }
+          }
+        },
+        "stages": 40,
+        "feed_stage": 40,
+        "condenser_spec": {
+          "flow": {
+            "value": 24530.0,
+            "provenance": "assumed",
+            "source": "LN reflux to the LP column (D-059)"
+          }
+        }
+      },
+      "C3102": {
+        "outlets": {
+          "waste": "vapor",
+          "lox": "bottoms"
+        },
+        "condenser_pressure": {
+          "value": 1.3,
+          "provenance": "assumed",
+          "source": "DESIGN.md assumptions: LP column top 1.3 bara"
+        },
+        "reboiler_pressure": {
+          "value": 1.4,
+          "provenance": "assumed",
+          "source": "ASSUMED: 0.1 bar over the packing"
+        },
+        "condenser": "none",
+        "side_draws": {
+          "gox": {
+            "stage": 59,
+            "phase": "vapor",
+            "flow": {
+              "value": 20860.0,
+              "provenance": "given",
+              "source": "GOX product, 500 t/d"
+            }
+          }
+        },
+        "heat_integration": {
+          "condenser_of": "C3101"
+        },
+        "stages": 59,
+        "feed_stages": {
+          "reflux": 1,
+          "crude": 22,
+          "lachmann": 24
+        },
+        "reboiler_spec": {
+          "flow": {
+            "value": 470.0,
+            "provenance": "assumed",
+            "source": "LOX product, DESIGN.md 3, stream 10 (D-017)"
+          }
+        }
+      },
+      "K4101": {
+        "outlet_pressure": {
+          "value": 31.0,
+          "provenance": "given",
+          "source": "GOX pipeline"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "intercooler package E-4101, aftercooler E-4102"
+        },
+        "efficiency": {
+          "value": 0.78,
+          "provenance": "assumed",
+          "source": "oil-free GOX centrifugal"
+        },
+        "drive_efficiency": {
+          "value": 0.946,
+          "provenance": "assumed",
+          "source": "D-057: motor 0.97 x gear 0.975"
+        },
+        "stages": 4
+      },
+      "K4102": {
+        "outlet_pressure": {
+          "value": 9.0,
+          "provenance": "given",
+          "source": "GAN pipeline"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "aftercooler E-4103"
+        },
+        "efficiency": {
+          "value": 0.8,
+          "provenance": "assumed",
+          "source": "single-stage centrifugal"
+        },
+        "drive_efficiency": {
+          "value": 0.92,
+          "provenance": "assumed",
+          "source": "D-057: LV motor 0.94 x gear 0.98"
+        },
+        "stages": 1
+      }
+    }
+  },
+  "run": null,
+  "stale": null,
+  "staleness": {
+    "model_fingerprint": null,
+    "current_fingerprint": "cf59e8a10782a075",
+    "changed_files": []
+  },
+  "units": [
+    {
+      "id": "K1101",
+      "unit": "compressor",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlet_pressure": {
+          "value": 5.8,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 2"
+        },
+        "pressure_drop": {
+          "value": 0.05,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "per cooler"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 2; intercoolers E-1101, E-1102, aftercooler E-1103"
+        },
+        "efficiency": {
+          "value": 0.82,
+          "provenance": "assumed",
+          "source": "isentropic per stage, centrifugal MAC"
+        },
+        "drive_efficiency": {
+          "value": 0.946,
+          "provenance": "assumed",
+          "source": "D-057: 6.6 kV motor 0.97 x integral gear and bearings 0.975"
+        },
+        "stages": 3
+      },
+      "run": null
+    },
+    {
+      "id": "C1101",
+      "unit": "cooler",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "pressure_drop": {
+          "value": 0.1,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, streams 2 and 3"
+        },
+        "outlet_temperature": {
+          "value": 12.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 3 (DCAC)"
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "C1102",
+      "unit": null,
+      "status": "excluded",
+      "reason": "exclude: in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "V2101",
+      "unit": null,
+      "status": "excluded",
+      "reason": "inside PUR, excluded in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "E2101",
+      "unit": null,
+      "status": "excluded",
+      "reason": "inside PUR, excluded in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "X3102",
+      "unit": "splitter",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "split": {
+          "bst": 0.1516
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "K3101",
+      "unit": "compressor",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlet_pressure": {
+          "value": 8.45,
+          "provenance": "assumed",
+          "source": "D-061: 5.6 -> 8.45 bara, the compander balances on the shaft"
+        },
+        "efficiency": {
+          "value": 0.8,
+          "provenance": "assumed",
+          "source": "compander booster"
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "E3104",
+      "unit": "cooler",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "pressure_drop": {
+          "value": 0.0,
+          "unit": "bar",
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, streams 4C and 4D"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 4D"
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "E3101",
+      "unit": null,
+      "status": "excluded",
+      "reason": "exclude: in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "KT3101",
+      "unit": null,
+      "status": "excluded",
+      "reason": "exclude: in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "C3101",
+      "unit": "distillation_column",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlets": {
+          "n2": "vapor",
+          "ln": "distillate",
+          "crude": "bottoms"
+        },
+        "condenser_pressure": {
+          "value": 5.3,
+          "provenance": "assumed",
+          "source": "DESIGN.md assumptions: HP column top 5.4 bara, less the condenser"
+        },
+        "reboiler_pressure": {
+          "value": 5.5,
+          "provenance": "assumed",
+          "source": "DESIGN.md 3, stream 5"
+        },
+        "condenser": "partial",
+        "reboiler": false,
+        "vapor_flow": {
+          "value": 12510.0,
+          "provenance": "given",
+          "source": "GAN product, DESIGN.md 3, stream 9"
+        },
+        "side_draws": {
+          "lin": {
+            "stage": 2,
+            "phase": "liquid",
+            "flow": {
+              "value": 470.0,
+              "provenance": "assumed",
+              "source": "LIN product, DESIGN.md 3, stream 11 (D-017)"
+            }
+          }
+        },
+        "stages": 40,
+        "feed_stage": 40,
+        "condenser_spec": {
+          "flow": {
+            "value": 24530.0,
+            "provenance": "assumed",
+            "source": "LN reflux to the LP column (D-059)"
+          }
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "C3102",
+      "unit": "distillation_column",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlets": {
+          "waste": "vapor",
+          "lox": "bottoms"
+        },
+        "condenser_pressure": {
+          "value": 1.3,
+          "provenance": "assumed",
+          "source": "DESIGN.md assumptions: LP column top 1.3 bara"
+        },
+        "reboiler_pressure": {
+          "value": 1.4,
+          "provenance": "assumed",
+          "source": "ASSUMED: 0.1 bar over the packing"
+        },
+        "condenser": "none",
+        "side_draws": {
+          "gox": {
+            "stage": 59,
+            "phase": "vapor",
+            "flow": {
+              "value": 20860.0,
+              "provenance": "given",
+              "source": "GOX product, 500 t/d"
+            }
+          }
+        },
+        "heat_integration": {
+          "condenser_of": "C3101"
+        },
+        "stages": 59,
+        "feed_stages": {
+          "reflux": 1,
+          "crude": 22,
+          "lachmann": 24
+        },
+        "reboiler_spec": {
+          "flow": {
+            "value": 470.0,
+            "provenance": "assumed",
+            "source": "LOX product, DESIGN.md 3, stream 10 (D-017)"
+          }
+        }
+      },
+      "run": null
+    },
+    {
+      "id": "X3101",
+      "unit": null,
+      "status": "excluded",
+      "reason": "exclude: in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    },
+    {
+      "id": "K4101",
+      "unit": "compressor",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlet_pressure": {
+          "value": 31.0,
+          "provenance": "given",
+          "source": "GOX pipeline"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "intercooler package E-4101, aftercooler E-4102"
+        },
+        "efficiency": {
+          "value": 0.78,
+          "provenance": "assumed",
+          "source": "oil-free GOX centrifugal"
+        },
+        "drive_efficiency": {
+          "value": 0.946,
+          "provenance": "assumed",
+          "source": "D-057: motor 0.97 x gear 0.975"
+        },
+        "stages": 4
+      },
+      "run": null
+    },
+    {
+      "id": "K4102",
+      "unit": "compressor",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlet_pressure": {
+          "value": 9.0,
+          "provenance": "given",
+          "source": "GAN pipeline"
+        },
+        "outlet_temperature": {
+          "value": 40.0,
+          "provenance": "assumed",
+          "source": "aftercooler E-4103"
+        },
+        "efficiency": {
+          "value": 0.8,
+          "provenance": "assumed",
+          "source": "single-stage centrifugal"
+        },
+        "drive_efficiency": {
+          "value": 0.92,
+          "provenance": "assumed",
+          "source": "D-057: LV motor 0.94 x gear 0.98"
+        },
+        "stages": 1
+      },
+      "run": null
+    },
+    {
+      "id": "PUR",
+      "unit": null,
+      "status": "excluded",
+      "reason": "exclude: in process/simulation.yaml",
+      "spec": null,
+      "run": null
+    }
+  ],
+  "problem": null,
+  "findings": [
+    {
+      "file": "process/flowsheet.yaml",
+      "line": 749,
+      "level": "info",
+      "rule": "cheme.process-sim-energy-ignored",
+      "message": "energy stream E2 at C1101 (cooler): runs into the unit, its duty out of it; not simulated",
+      "ids": [
+        "E2"
+      ],
+      "hint": "the duty of a second service (cooling water of a machine, pump power of a cooler) is not simulated; give it yourself",
+      "id": "process/flowsheet.yaml#process-sim-energy-ignored:E2"
+    }
+  ]
+}

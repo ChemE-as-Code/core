@@ -1,0 +1,118 @@
+<!-- An instrument connection: branch segment from tee PipeTee3 through isolation valve BallValve3 to BlindFlange1, the SensingLocation of ProcessSignalGeneratingFunction1 (PI-4712.01). Under the line's PipingNetworkSystem/Segments. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="PipingNetworkSegment13" type="Plant/Piping.PipingNetworkSegment">
+  <Components property="Connections">
+    <Object id="Pipe16" type="Plant/Piping.Pipe">
+      <References objects="#PipeTee3" property="SourceItem"/>
+      <References objects="#PipingNode33" property="SourceNode"/>
+      <References objects="#BallValve3" property="TargetItem"/>
+      <References objects="#PipingNode34" property="TargetNode"/>
+    </Object>
+    <Object id="PipingNetworkSegment13_Connections1" type="Plant/Piping.DirectPipingConnection">
+      <References objects="#BallValve3" property="SourceItem"/>
+      <References objects="#PipingNode35" property="SourceNode"/>
+      <References objects="#BlindFlange1" property="TargetItem"/>
+      <References objects="#PipingNode36" property="TargetNode"/>
+    </Object>
+  </Components>
+  <Components property="Items">
+    <Object id="BallValve3" type="Plant/Piping.BallValve">
+      <Components property="Nodes">
+        <Object id="PipingNode34" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>25</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 25</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn25"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+        <Object id="PipingNode35" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>25</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 25</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn25"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="FluidCode">
+        <String>MNc</String>
+      </Data>
+      <Data property="PipingClassCode">
+        <String>75HB13</String>
+      </Data>
+      <Data property="PipingComponentName">
+        <String>73KH12</String>
+      </Data>
+      <Data property="PipingComponentNumber">
+        <String>C5</String>
+      </Data>
+    </Object>
+    <Object id="BlindFlange1" type="Plant/Piping.BlindFlange">
+      <Components property="Nodes">
+        <Object id="PipingNode36" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>25</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 25</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn25"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="FluidCode">
+        <String>MNc</String>
+      </Data>
+      <Data property="PipingClassCode">
+        <String>75HB13</String>
+      </Data>
+      <Data property="PipingComponentNumber">
+        <String>C6</String>
+      </Data>
+    </Object>
+  </Components>
+  <References objects="#PipeTee3" property="SourceItem"/>
+  <References objects="#PipingNode33" property="SourceNode"/>
+  <References objects="#BlindFlange1" property="TargetItem"/>
+  <References objects="#PipingNode36" property="TargetNode"/>
+  <Data property="FluidCode">
+    <String>MNc</String>
+  </Data>
+  <Data property="NominalDiameterNumericalValueRepresentation">
+    <String>25</String>
+  </Data>
+  <Data property="NominalDiameterRepresentation">
+    <String>DN 25</String>
+  </Data>
+  <Data property="NominalDiameterStandard">
+    <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn25"/>
+  </Data>
+  <Data property="NominalDiameterTypeRepresentation">
+    <String>DN</String>
+  </Data>
+  <Data property="PipingClassCode">
+    <String>75HB13</String>
+  </Data>
+  <Data property="PrimarySecondaryPipingNetworkSegment">
+    <DataReference data="Plant/Enumerations.PrimarySecondaryPipingNetworkSegmentClassification.SecondaryPipingNetworkSegment"/>
+  </Data>
+  <Data property="SegmentNumber">
+    <String>S5</String>
+  </Data>
+</Object>

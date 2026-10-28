@@ -1,0 +1,626 @@
+{
+  "rev": null,
+  "files": {
+    "site_plan": "layout/site-plan.yaml",
+    "building": "layout/building.yaml",
+    "placement": "layout/equipment-placement.yaml"
+  },
+  "site": {
+    "name": "Demo plot",
+    "width": 60.0,
+    "depth": 40.0
+  },
+  "areas": [
+    {
+      "id": "A-100",
+      "title": "Process area",
+      "box": [
+        10.0,
+        18.0,
+        45.0,
+        38.0
+      ],
+      "kind": "process",
+      "wall_height": null,
+      "clash": false
+    },
+    {
+      "id": "A-200",
+      "title": "Utilities",
+      "box": [
+        2.0,
+        18.0,
+        6.0,
+        38.0
+      ],
+      "kind": "utilities",
+      "wall_height": null,
+      "clash": false
+    },
+    {
+      "id": "A-300",
+      "title": "Storage and truck loading",
+      "box": [
+        49.0,
+        31.0,
+        56.0,
+        38.0
+      ],
+      "kind": "storage",
+      "wall_height": null,
+      "clash": false
+    },
+    {
+      "id": "A-310",
+      "title": "Tank bund T4750",
+      "box": [
+        49.0,
+        18.0,
+        56.0,
+        30.0
+      ],
+      "kind": "storage",
+      "wall_height": null,
+      "clash": false
+    },
+    {
+      "id": "A-900",
+      "title": "Reserved for expansion",
+      "box": [
+        2.0,
+        2.0,
+        58.0,
+        9.0
+      ],
+      "kind": "reserved",
+      "wall_height": null,
+      "clash": false
+    }
+  ],
+  "roads": [
+    {
+      "id": "R-1",
+      "title": "Main access road",
+      "points": [
+        [
+          0.0,
+          13.0
+        ],
+        [
+          60.0,
+          13.0
+        ]
+      ],
+      "width": 6.0,
+      "clash": false
+    },
+    {
+      "id": "R-2",
+      "title": "Truck road to loading",
+      "points": [
+        [
+          58.0,
+          13.0
+        ],
+        [
+          58.0,
+          39.0
+        ]
+      ],
+      "width": 4.0,
+      "clash": false
+    },
+    {
+      "id": "R-3",
+      "title": "West fire access road",
+      "points": [
+        [
+          8.0,
+          13.0
+        ],
+        [
+          8.0,
+          39.0
+        ]
+      ],
+      "width": 4.0,
+      "clash": false
+    }
+  ],
+  "racks": [
+    {
+      "id": "PR-1",
+      "title": "Main pipe rack",
+      "points": [
+        [
+          10.0,
+          20.0
+        ],
+        [
+          47.0,
+          20.0
+        ],
+        [
+          47.0,
+          30.0
+        ]
+      ],
+      "width": 4.0,
+      "levels": [
+        5.0,
+        7.0
+      ],
+      "ladders": null,
+      "intermediate_supports": null,
+      "bent_spacing_m": null,
+      "clash": false
+    }
+  ],
+  "buildings": [
+    {
+      "id": "B-1",
+      "title": "Process building (heat exchangers)",
+      "origin": [
+        26.0,
+        26.0
+      ],
+      "width": 14.0,
+      "depth": 10.0,
+      "rotation_deg": 0,
+      "levels": [
+        {
+          "id": "GF",
+          "title": "Ground floor",
+          "elevation": 0.0,
+          "height": 5.0,
+          "kind": "floor",
+          "clear_height": 5.0
+        },
+        {
+          "id": "PF",
+          "title": "Platform",
+          "elevation": 5.0,
+          "height": 4.0,
+          "kind": "platform",
+          "clear_height": 4.0
+        }
+      ],
+      "frame": {
+        "grid_x": [
+          0.0,
+          7.0,
+          14.0
+        ],
+        "grid_y": [
+          0.0,
+          5.0,
+          10.0
+        ]
+      },
+      "walls": "none",
+      "wall_material": "cladding",
+      "openings": [],
+      "crane": null,
+      "use": null,
+      "footprint": [
+        26.0,
+        26.0,
+        40.0,
+        36.0
+      ],
+      "heights": [
+        0.0,
+        9.0
+      ],
+      "clash": false
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "P4711",
+      "type": "CentrifugalPump",
+      "service": "",
+      "position": [
+        16.0,
+        24.5,
+        0.0
+      ],
+      "shape": "box",
+      "family": "pump",
+      "size": [
+        2.0,
+        0.8,
+        1.0
+      ],
+      "size_from": "placement",
+      "rotation_deg": 0.0,
+      "mount": null,
+      "building": null,
+      "level": null,
+      "sheet": "P-01",
+      "sheet_file": "pid/P-01.xml",
+      "bbox": [
+        15.0,
+        24.1,
+        0.0,
+        17.0,
+        24.9,
+        1.0
+      ],
+      "clash": false,
+      "notes": "ASSUMED - centrifugal pump on its baseplate, at grade north of rack PR-1."
+    },
+    {
+      "tag": "P4712",
+      "type": "ReciprocatingPump",
+      "service": "",
+      "position": [
+        47.0,
+        25.0,
+        0.0
+      ],
+      "shape": "box",
+      "family": "pump",
+      "size": [
+        2.5,
+        1.2,
+        1.2
+      ],
+      "size_from": "placement",
+      "rotation_deg": 90.0,
+      "mount": null,
+      "building": null,
+      "level": null,
+      "sheet": "P-01",
+      "sheet_file": "pid/P-01.xml",
+      "bbox": [
+        46.4,
+        23.75,
+        0.0,
+        47.6,
+        26.25,
+        1.2
+      ],
+      "clash": false,
+      "notes": "ASSUMED - reciprocating pump skid at grade under the north branch of rack PR-1, just outside the bund wall, about 2.5 m from the tank shell: a short suction line from T4750 (line 47124) for NPSH and pulsation."
+    },
+    {
+      "tag": "H1007",
+      "type": "PlateHeatExchanger",
+      "service": "",
+      "position": [
+        29.0,
+        30.0,
+        0.0
+      ],
+      "shape": "box",
+      "family": "plate_exchanger",
+      "size": [
+        1.2,
+        0.6,
+        1.8
+      ],
+      "size_from": "placement",
+      "rotation_deg": 0.0,
+      "mount": {
+        "building": "B-1",
+        "level": "GF"
+      },
+      "building": "B-1",
+      "level": "GF",
+      "sheet": "P-01",
+      "sheet_file": "pid/P-01.xml",
+      "bbox": [
+        28.4,
+        29.7,
+        0.0,
+        29.6,
+        30.3,
+        1.8
+      ],
+      "clash": false,
+      "notes": "ASSUMED - plate heat exchanger frame, ground floor of B-1."
+    },
+    {
+      "tag": "H1008",
+      "type": "TubularHeatExchanger",
+      "service": "",
+      "position": [
+        34.0,
+        31.0,
+        5.0
+      ],
+      "shape": "horizontal_cylinder",
+      "family": "shell_tube",
+      "size": [
+        5.0,
+        0.8,
+        0.8
+      ],
+      "size_from": "placement",
+      "rotation_deg": 0.0,
+      "mount": {
+        "building": "B-1",
+        "level": "PF"
+      },
+      "building": "B-1",
+      "level": "PF",
+      "sheet": "P-01",
+      "sheet_file": "pid/P-01.xml",
+      "bbox": [
+        31.5,
+        30.6,
+        5.0,
+        36.5,
+        31.4,
+        5.8
+      ],
+      "clash": false,
+      "notes": "ASSUMED - shell and tube, on the platform, bundle pulled east (x)."
+    },
+    {
+      "tag": "T4750",
+      "type": "Tank",
+      "service": "",
+      "position": [
+        52.5,
+        24.0,
+        0.0
+      ],
+      "shape": "vertical_cylinder",
+      "family": "tank",
+      "size": [
+        6.0,
+        6.0,
+        7.0
+      ],
+      "size_from": "placement",
+      "rotation_deg": 0.0,
+      "mount": null,
+      "building": null,
+      "level": null,
+      "sheet": "P-01",
+      "sheet_file": "pid/P-01.xml",
+      "bbox": [
+        49.5,
+        21.0,
+        0.0,
+        55.5,
+        27.0,
+        7.0
+      ],
+      "clash": false,
+      "notes": "ASSUMED - vertical tank about 190 m3, centred in bund A-310."
+    }
+  ],
+  "notes": [
+    "ASSUMED - the whole layout is illustrative: the DEXPI reference P&ID has no plot plan. Plot 60 x 40 m. Main road R-1 along the south side; truck road R-2 up the east edge to the loading area A-300; fire access road R-3 along the west side of the process area. Pipe rack PR-1 along the south edge of the process area, turning north at x 47 along the west side of the tank bund A-310, so the tank lines 47123, 47124 and 47127 have a route. See DESIGN.md D-001.",
+    "ASSUMED - open steel structure, two levels, 7 x 5 m column grid. See DESIGN.md D-001.",
+    "ASSUMED - sizes and positions are estimates, not vendor data. See DESIGN.md D-001."
+  ],
+  "lines": [
+    {
+      "number": "47121",
+      "from": "FlowInPipeOffPageConnector",
+      "to": "P4711/N1",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47122",
+      "from": "P4711/N2",
+      "to": "H1007/N1",
+      "from_point": [
+        17.0,
+        24.9
+      ],
+      "to_point": [
+        28.4,
+        29.7
+      ],
+      "distance": 12.4,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47123",
+      "from": "H1007/N2",
+      "to": "T4750/N1",
+      "from_point": [
+        29.6,
+        29.7
+      ],
+      "to_point": [
+        49.5,
+        27.0
+      ],
+      "distance": 20.1,
+      "length_est": 31.8,
+      "racks": [
+        "PR-1"
+      ],
+      "finding": "cheme.layout-line-length"
+    },
+    {
+      "number": "47124",
+      "from": "T4750/N2",
+      "to": "P4712/N1",
+      "from_point": [
+        49.5,
+        25.0
+      ],
+      "to_point": [
+        47.6,
+        25.0
+      ],
+      "distance": 1.9,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47125",
+      "from": "C3",
+      "to": "T4750/N5",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": "cheme.layout-line-unrouted"
+    },
+    {
+      "number": "47126",
+      "from": "P4712/N2",
+      "to": "FlowOutPipeOffPageConnector",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47127",
+      "from": "H1008/N2",
+      "to": "T4750/N6",
+      "from_point": [
+        36.5,
+        30.6
+      ],
+      "to_point": [
+        49.5,
+        27.0
+      ],
+      "distance": 13.5,
+      "length_est": 22.0,
+      "racks": [
+        "PR-1"
+      ],
+      "finding": "cheme.layout-line-length"
+    },
+    {
+      "number": "47130",
+      "from": "battery limit",
+      "to": "H1007/N3",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47131",
+      "from": "H1007/N4",
+      "to": "battery limit",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47140",
+      "from": "battery limit",
+      "to": "H1008/N4",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    },
+    {
+      "number": "47141",
+      "from": "H1008/N3",
+      "to": "battery limit",
+      "from_point": null,
+      "to_point": null,
+      "distance": null,
+      "length_est": null,
+      "racks": [],
+      "finding": null
+    }
+  ],
+  "separations": [],
+  "model": null,
+  "zones": [],
+  "model_findings": [],
+  "findings": [
+    {
+      "file": "layout/equipment-placement.yaml",
+      "level": "info",
+      "rule": "cheme.layout-size-from-placement",
+      "message": "5 items take their size from the placement, not from dimensions in the equipment list: P4711, P4712, H1007, H1008, T4750",
+      "line": 7,
+      "ids": [
+        "P4711",
+        "P4712",
+        "H1007",
+        "H1008",
+        "T4750"
+      ],
+      "hint": "move each size into dimensions of equipment/equipment-list.yaml and drop it here",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null
+    },
+    {
+      "file": "piping/line-list.yaml",
+      "level": "info",
+      "rule": "cheme.layout-line-length",
+      "message": "line 47123 H1007 (A-100) to T4750 (A-310): 20 m apart, about 32 m along racks PR-1",
+      "line": 14,
+      "ids": [
+        "47123"
+      ],
+      "hint": "use the estimate for line lengths, pressure drop and velocity checks",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null
+    },
+    {
+      "file": "piping/line-list.yaml",
+      "level": "info",
+      "rule": "cheme.layout-line-unrouted",
+      "message": "line 47125: C3 is not placed, so its route is not checked",
+      "line": 26,
+      "ids": [
+        "47125"
+      ],
+      "hint": "place it in layout/equipment-placement.yaml (a silencer or relief valve drawn on a sheet: list it in piping/special-items.yaml first), or give the line from_area / to_area",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null
+    },
+    {
+      "file": "piping/line-list.yaml",
+      "level": "info",
+      "rule": "cheme.layout-line-length",
+      "message": "line 47127 H1008 (A-100) to T4750 (A-310): 13 m apart, about 22 m along racks PR-1",
+      "line": 38,
+      "ids": [
+        "47127"
+      ],
+      "hint": "use the estimate for line lengths, pressure drop and velocity checks",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null
+    }
+  ]
+}

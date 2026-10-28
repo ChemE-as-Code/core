@@ -1,0 +1,37 @@
+# What DWSIM needs beyond the flowsheet (`cheme process simulate`; schema
+# `cheme schema process-simulation`). Units as in process/flowsheet.yaml unless given.
+schema: cheme/simulation/v1
+kind: simulation
+simulator: dwsim
+property_package: Peng-Robinson (PR)
+# The facts of the thermodynamic model selection (thermodynamic-model-selection, Carlson's
+# tree), checked against property_package on every translation and by `cheme maturity`.
+# They recommend Peng-Robinson (outcome nonpolar_no_pseudocomponents), so PR needs no
+# substitution. Here the tree decides on is_polar and has_pseudocomponents alone; the other
+# facts are recorded so a reviewer can see the regime was considered.
+method_selection:
+  facts:
+    # dry air: N2 and O2 are homonuclear diatomics and Ar is monatomic, no dipole moment
+    # (water is not a component; humid air with condensing water would be polar)
+    is_polar: false
+    # no ions in a dry gas
+    is_electrolyte: false
+    # three pure compounds with CAS numbers in materials.yaml
+    has_pseudocomponents: false
+    # gas throughout: 35 C after the aftercooler is far above the dew point of dry air
+    liquid_liquid_expected: false
+    # no carboxylic acid or HF: no vapour-phase association
+    vapor_association_expected: false
+    # the highest pressure of the flowsheet: the compressor outlet, 800 kPa(a); band
+    # not_extreme, which this branch does not use
+    pressure_value: 800
+    pressure_unit: kPa(a)
+    # interaction_parameters_available left unset: the nonpolar branch does not ask for it
+specs:
+  K1:
+    outlet_pressure: {value: 800, provenance: given, source: instrument air header pressure}
+    efficiency: {value: 0.78, provenance: assumed, source: typical single-stage centrifugal}
+  E1:
+    outlet_temperature: {value: 308.15, provenance: given, source: 35 C after the aftercooler}
+    pressure_drop: {value: 20, unit: kPa, provenance: assumed, source: "shell and tube, gas side"}
+  # X1 splits by its `split:` on the step in the flowsheet.

@@ -1,0 +1,4 @@
+schema: cheme/lines/v1
+lines:
+  - {number: 80-P-101, from: V-101, to: P-101, nominal_diameter: DN80, fluid: Water}
+  - {number: 50-P-102, from: P-101, to: BL, nominal_diameter: DN50, fluid: Water}

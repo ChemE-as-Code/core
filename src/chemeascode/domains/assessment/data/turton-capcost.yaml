@@ -1,0 +1,76 @@
+# Purchased and bare module equipment cost correlations (CAPCOST), transcribed from:
+#   R. Turton, J. A. Shaeiwitz, D. Bhattacharyya, W. B. Whiting, "Analysis, Synthesis, and
+#   Design of Chemical Processes", 5th ed., Prentice Hall, 2018, Appendix A (Tables A.1 to A.4,
+#   Figure A.19).
+# Purchased cost of the base case (carbon steel, near-ambient pressure):
+#   log10 Cp0 = K1 + K2 log10 A + K3 (log10 A)^2     (US dollars at CEPCI 397, 2001)
+# Pressure factor: log10 Fp = C1 + C2 log10 P + C3 (log10 P)^2 (P in barg), Fp = 1 below the
+# row's range; process vessels: Fp = ((P + 1) D / (2 (850 - 0.6 (P + 1))) + 0.00315) / 0.0063,
+# at least 1 (D in m).
+# Bare module cost: CBM = Cp0 (B1 + B2 Fm Fp), or CBM = Cp0 FBM where the source gives FBM
+# directly (compressors).
+#
+# Only the rows and factors below are package data. Each row was cross-checked against a
+# second transcription (`check`); factors whose transcriptions disagree are left out on purpose
+# (horizontal vessel B1/B2, tank and fan bare module factors, most material factors): the
+# project gives them in estimate/cost-basis.yaml with their source, or the item stays
+# uncovered. Check the rows against the printed tables before a contractual use. Outside a
+# row's range of A, or of P, the correlation is not used (a finding), never extrapolated.
+schema: cheme/capcost/v1
+source: "Turton et al., Analysis, Synthesis, and Design of Chemical Processes, 5th ed. (2018), Appendix A"
+base_cepci: {value: 397, year: 2001, basis: "Turton et al. (2018) Appendix A: the cost data are for CEPCI 397 (2001); cross-checked: eqcost catalog.toml (MIT) cepci 2001 = 397"}
+currency: USD
+correlations:
+  # id: {title, A: attribute, unit, min, max, K: [K1, K2, K3], table, check}
+  vessel_vertical:      {title: "Process vessel, vertical", attribute: volume, unit: m3, min: 0.3, max: 520, K: [3.4974, 0.4485, 0.1074], table: A.1, check: "OpenPyTEA cost_correlations.csv vertical_vessel_turton_2001; eqcost vessel_vertical"}
+  vessel_horizontal:    {title: "Process vessel, horizontal", attribute: volume, unit: m3, min: 0.1, max: 628, K: [3.5565, 0.3776, 0.0905], table: A.1, check: "OpenPyTEA horizontal_vessel_turton_2001; eqcost vessel_horizontal"}
+  tower:                {title: "Tower (tray and packed), shell", attribute: volume, unit: m3, min: 0.3, max: 520, K: [3.4974, 0.4485, 0.1074], table: A.1, check: "OpenPyTEA tower_tray_n_packed_turton_2001"}
+  tank_fixed_roof:      {title: "Storage tank, API fixed roof", attribute: volume, unit: m3, min: 90, max: 30000, K: [4.8509, -0.3973, 0.1445], table: A.1, check: "OpenPyTEA api-fixed_roof_tank_turton_2001; eqcost storage_tank_fixed_roof"}
+  tank_floating_roof:   {title: "Storage tank, API floating roof", attribute: volume, unit: m3, min: 1000, max: 40000, K: [5.9567, -0.7585, 0.1749], table: A.1, check: "OpenPyTEA api-floating_roof_tank_turton_2001"}
+  hx_fixed_tube:        {title: "Shell and tube exchanger, fixed tube sheet", attribute: area, unit: m2, min: 10, max: 1000, K: [4.3247, -0.3030, 0.1634], table: A.1, check: "OpenPyTEA fixed_tube_hx_turton_2001; eqcost heat_exchanger_fixed_tube"}
+  hx_floating_head:     {title: "Shell and tube exchanger, floating head", attribute: area, unit: m2, min: 10, max: 1000, K: [4.8306, -0.8509, 0.3187], table: A.1, check: "OpenPyTEA floating_head_hx_turton_2001; eqcost heat_exchanger"}
+  hx_u_tube:            {title: "Shell and tube exchanger, U-tube", attribute: area, unit: m2, min: 10, max: 1000, K: [4.1884, -0.2503, 0.1974], table: A.1, check: "OpenPyTEA u-tube_hx_turton_2001; eqcost heat_exchanger_u_tube"}
+  hx_kettle:            {title: "Kettle reboiler", attribute: area, unit: m2, min: 10, max: 100, K: [4.4646, -0.5277, 0.3955], table: A.1, check: "OpenPyTEA kettle_reboiler_hx_turton_2001"}
+  hx_double_pipe:       {title: "Double pipe exchanger", attribute: area, unit: m2, min: 1, max: 10, K: [3.3444, 0.2745, -0.0472], table: A.1, check: "OpenPyTEA double_pipe_hx_turton_2001"}
+  hx_flat_plate:        {title: "Flat plate exchanger", attribute: area, unit: m2, min: 10, max: 1000, K: [4.6656, -0.1557, 0.1547], table: A.1, check: "OpenPyTEA flat_plate_hx_turton_2001"}
+  hx_spiral_plate:      {title: "Spiral plate exchanger", attribute: area, unit: m2, min: 1, max: 100, K: [4.6561, -0.2947, 0.2207], table: A.1, check: "OpenPyTEA spiral_plate_hx_turton_2001"}
+  hx_air_cooler:        {title: "Air cooler", attribute: area, unit: m2, min: 10, max: 10000, K: [4.0336, 0.2341, 0.0497], table: A.1, check: "OpenPyTEA air_cooler_hx_turton_2001"}
+  pump_centrifugal:     {title: "Pump, centrifugal", attribute: shaft_power, unit: kW, min: 1, max: 300, K: [3.3892, 0.0536, 0.1538], table: A.1, check: "OpenPyTEA centrifugal_pump_turton_2001; eqcost pump_centrifugal"}
+  pump_reciprocating:   {title: "Pump, reciprocating", attribute: shaft_power, unit: kW, min: 0.1, max: 200, K: [3.8696, 0.3161, 0.1220], table: A.1, check: "OpenPyTEA reciprocating_pump_turton_2001"}
+  pump_positive_displacement: {title: "Pump, positive displacement", attribute: shaft_power, unit: kW, min: 1, max: 100, K: [3.4771, 0.1350, 0.1438], table: A.1, check: "OpenPyTEA positive_displacement_pump_turton_2001"}
+  compressor:           {title: "Compressor, centrifugal, axial or reciprocating", attribute: fluid_power, unit: kW, min: 450, max: 3000, K: [2.2897, 1.3604, -0.1027], table: A.1, check: "OpenPyTEA compressor_all_turton_2001; eqcost compressor_centrifugal"}
+  compressor_rotary:    {title: "Compressor, rotary", attribute: fluid_power, unit: kW, min: 18, max: 950, K: [5.0355, -1.8002, 0.8253], table: A.1, check: "OpenPyTEA compressor_rotary_turton_2001"}
+  fan_centrifugal_radial: {title: "Fan, centrifugal radial", attribute: gas_flow, unit: m3/s, min: 1, max: 100, K: [3.5391, -0.3533, 0.4477], table: A.1, check: "OpenPyTEA centrifugal_radial_fan_turton_2001"}
+  expander_radial:      {title: "Radial gas or liquid expander", attribute: fluid_power, unit: kW, min: 100, max: 1500, K: [2.2476, 1.4965, -0.1618], table: A.1, check: "OpenPyTEA radial_gas_liquid_expanders_turton_2001"}
+  turbine_axial_gas:    {title: "Axial gas turbine (expander)", attribute: fluid_power, unit: kW, min: 100, max: 4000, K: [2.7051, 1.4398, -0.1776], table: A.1, check: "OpenPyTEA axial_gas_turbines_turton_2001"}
+  turbine_steam:        {title: "Steam turbine", attribute: shaft_power, unit: kW, min: 70, max: 7500, K: [2.6259, 1.4398, -0.1776], table: A.1, check: "OpenPyTEA steam_turbine_turton_2001"}
+  heater_fired:         {title: "Fired heater, nonreactive", attribute: duty, unit: kW, min: 1000, max: 100000, K: [7.3488, -1.1666, 0.2028], table: A.1, check: "OpenPyTEA nonreactive_fired_heater_turton_2001; eqcost fired_heater"}
+pressure:
+  # by correlation: {range: [Pmin, Pmax] barg, C: [C1, C2, C3]} or {vessel: true}
+  vessel_vertical: {vessel: true, table: A.2, check: "worked example (pdfcoffee 'capital cost estimation', D 3 m, 1.1 barg: Fp 1.09); eqcost pressure_model vessel"}
+  vessel_horizontal: {vessel: true, table: A.2, check: "as vessel_vertical"}
+  tower: {vessel: true, table: A.2, check: "as vessel_vertical"}
+  hx_fixed_tube: {range: [5, 140], C: [0.03881, -0.11272, 0.08183], table: A.2, check: "worked example E-102 (pdfcoffee); eqcost heat_exchanger_fixed_tube"}
+  hx_floating_head: {range: [5, 140], C: [0.03881, -0.11272, 0.08183], table: A.2, check: "eqcost heat_exchanger"}
+  hx_u_tube: {range: [5, 140], C: [0.03881, -0.11272, 0.08183], table: A.2, check: "eqcost heat_exchanger_u_tube"}
+  pump_centrifugal: {range: [10, 100], C: [-0.3935, 0.3957, -0.00226], table: A.2, check: "eqcost pump_centrifugal"}
+material:
+  # Fm by correlation and material (CS, SS): Table A.3 / Figure A.18
+  vessel_vertical: {CS: 1.0, SS: 3.1, check: "worked example (pdfcoffee, identification 18 CS 1.0, 20 SS 3.1); eqcost vessel_vertical"}
+  vessel_horizontal: {CS: 1.0, SS: 3.1, check: "as vessel_vertical"}
+  tower: {CS: 1.0, SS: 3.1, check: "as vessel_vertical"}
+  hx_fixed_tube: {CS: 1.0, SS: 2.73, check: "eqcost heat_exchanger_fixed_tube (CS/CS, SS/SS)"}
+  hx_floating_head: {CS: 1.0, SS: 2.73, check: "eqcost heat_exchanger (CS/CS, SS/SS)"}
+  hx_u_tube: {CS: 1.0, SS: 2.73, check: "eqcost heat_exchanger_u_tube (CS/CS, SS/SS)"}
+  pump_centrifugal: {CS: 1.6, SS: 2.3, check: "eqcost pump_centrifugal (cast iron 1.0)"}
+bare_module:
+  # {B: [B1, B2]} (Table A.4), or {FBM: {CS, SS}} given directly (Figure A.19)
+  vessel_vertical: {B: [2.25, 1.82], table: A.4, check: "worked example (pdfcoffee, vessels and towers); eqcost vessel_vertical"}
+  tower: {B: [2.25, 1.82], table: A.4, check: "as vessel_vertical"}
+  hx_fixed_tube: {B: [1.63, 1.66], table: A.4, check: "worked example (pdfcoffee, heat exchangers); eqcost"}
+  hx_floating_head: {B: [1.63, 1.66], table: A.4, check: "as hx_fixed_tube"}
+  hx_u_tube: {B: [1.63, 1.66], table: A.4, check: "as hx_fixed_tube"}
+  pump_centrifugal: {B: [1.89, 1.35], table: A.4, check: "eqcost pump_centrifugal"}
+  # the cross-checked FBM is the centrifugal compressor's only: an axial or reciprocating
+  # compressor (other FBM in Figure A.19) shares the purchased cost row but not this factor
+  compressor: {FBM: {CS: 2.7, SS: 5.8}, kinds: [centrifugal], table: "Figure A.19", check: "eqcost compressor_centrifugal"}

@@ -1,0 +1,57 @@
+# What the plant must do. Schema: `cheme schema design_basis`.
+# Values marked ASSUMED are engineering estimates, not client data.
+capacity:
+  basis: GOX product to pipeline
+  gox_t_per_d: 500
+  gox_nm3_per_h: 14600              # 20,833 kg/h / 1.429 kg/Nm3
+  gan_nm3_per_h: 10000
+  liquid_production_kg_per_h: {lox: 600, lin: 600}     # ASSUMED, limited by expander refrigeration (D-003); refill LOX ~17 d, LIN ~21 d
+  operating_hours_per_year: 8400    # ASSUMED
+  turndown_percent: 70              # ASSUMED, MAC inlet guide vanes + GOX compressor recycle
+feeds:
+  - name: Atmospheric air
+    composition_mol_percent: {N2: 78.08, O2: 20.95, Ar: 0.93, CO2: 0.042}
+    contaminants_ASSUMED: {H2O: saturated at 30 C, CO2_ppm: 420, total_hydrocarbons_ppm_as_CH4: 5, C2H2_ppb: 50, N2O_ppm: 0.33}
+    flow_nm3_per_h: 76000           # ASSUMED, O2 recovery 94 % (DESIGN.md balance)
+    conditions: {pressure_bara: 1.013, temperature_degc: 30, relative_humidity_percent: 80}   # RH ASSUMED
+products:
+  - name: GOX
+    purity: O2 >= 99.5 mol%
+    flow_nm3_per_h: 14600
+    delivery: {pressure_barg: 30, temperature_degc: 40, battery_limit: pipeline}
+  - name: GAN
+    purity: O2 <= 10 ppm(mol)
+    flow_nm3_per_h: 10000
+    delivery: {pressure_barg: 8, temperature_degc: 40, battery_limit: pipeline}
+  - name: LOX backup storage
+    purity: O2 >= 99.5 mol%
+    sizing: 2 d x 25 % of GOX = 250 t; 250 t / 1.141 t/m3 = 219 m3; tank 250 m3 working (ASSUMED margin)
+    backup_rate_nm3_per_h: 3650
+  - name: LIN backup storage
+    purity: O2 <= 10 ppm(mol)
+    sizing: 2 d x 50 % of GAN = 300 t; 300 t / 0.807 t/m3 = 372 m3; tank 400 m3 working (ASSUMED margin)
+    backup_rate_nm3_per_h: 5000
+  - name: Waste nitrogen (argon-rich)
+    note: no argon column; argon leaves with waste N2 to TSA regeneration, evaporative cooler and vent
+utilities:
+  - {name: Cooling water, supply_degc: 25, return_degc: 35, supply_pressure_barg: 4, note: pressure ASSUMED}
+  - {name: Electric power, voltage_kv: 6.6, note: "MAC, GOX and GAN compressor motors at 6.6 kV; 400 V LV"}
+  - {name: Instrument air, pressure_barg: 6, note: "ASSUMED: dry air after TSA, backup N2 from LIN vaporizers"}
+  - {name: Steam, available: false, note: regeneration heater is electric}
+  - {name: Seal and purge gas, note: dry N2 from GAN header for cold box purge and compressor seals}
+site:
+  location: ASSUMED coastal industrial site
+  design_ambient_degc: 30
+  min_ambient_degc: -5              # ASSUMED
+  atmospheric_pressure_bara: 1.013
+  elevation_m: 5                    # ASSUMED
+  air_quality: ASSUMED moderate industrial; hydrocarbon intake survey required before basic engineering
+  seismic_and_wind: ASSUMED per local code, not yet defined
+assumptions:
+  - "ASSUMED O2 recovery 94 % (no argon column, 99.5 % purity, 15 % Lachmann air)."
+  - "ASSUMED MAC discharge 5.8 bara, HP column top 5.4 bara, LP column top 1.3 bara."
+  - "ASSUMED refrigeration by booster-braked expander, Lachmann air to the LP column, ~11,500 Nm3/h, ~250 kW refrigeration."
+  - "ASSUMED regeneration gas ~13,000 Nm3/h waste N2, heated electrically to 200 C."
+  - "ASSUMED DCAC air outlet 12 C via chilled water from an N2 evaporative cooler; no mechanical chiller."
+  - "ASSUMED GAN taken as pressurized N2 from the HP column top (~5.2 bara) and compressed to 9 bara."
+  - "ASSUMED all flows, pressures, duties and DNs are concept estimates, accuracy about +/-30 %."

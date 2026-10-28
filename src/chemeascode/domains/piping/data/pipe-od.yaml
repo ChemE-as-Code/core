@@ -1,0 +1,59 @@
+# Outside diameter of a pipe by nominal diameter, mm: ISO 4200 / EN 10220 series 1. ASME
+# B36.10M differs at DN 20 (26.7), 25 (33.4), 32 (42.2), 65 (73.0) and 125 (141.3), and by
+# 0.2 mm or less at DN 300 (323.8) and 450 (457.2 in inches); the line-loss calculation takes
+# the ASME OD with an ASME schedule (domains/process/data/hydraulics.yaml). Above DN 600 the
+# ISO/ASME large-bore ODs. Used by cheme-as-code's router when piping/pipe-specs.yaml gives none. A
+# DN not in the table takes the next larger one.
+basis: "ISO 4200 / EN 10220 series 1"
+od_mm:
+  6: 10.2
+  8: 13.5
+  10: 17.2
+  15: 21.3
+  20: 26.9
+  25: 33.7
+  32: 42.4
+  40: 48.3
+  50: 60.3
+  65: 76.1
+  80: 88.9
+  100: 114.3
+  125: 139.7
+  150: 168.3
+  200: 219.1
+  250: 273.0
+  300: 323.9
+  350: 355.6
+  400: 406.4
+  450: 457.0
+  500: 508.0
+  550: 559.0
+  600: 610.0
+  650: 660.0
+  700: 711.0
+  750: 762.0
+  800: 813.0
+  850: 864.0
+  900: 914.0
+  1000: 1016.0
+  1100: 1118.0
+  1200: 1219.0
+  1400: 1422.0
+  1600: 1626.0
+  1800: 1829.0
+  2000: 2032.0
+# Line-list insulation texts that mean the line has no insulation (any case, whitespace
+# collapsed); the whole text must be one of these.
+no_insulation: [none, "no", "n/a", na, nil, "-", "--", "0", "0 mm", bare, uninsulated,
+  not insulated, non-insulated, non insulated, no insulation, without insulation]
+# Insulation thickness by the line list's insulation text when piping/pipe-specs.yaml has no
+# rule for it, mm. ASSUMED screening values; the first entry whose words all occur in the text
+# applies.
+insulation_defaults:
+  - {match: [cold, box], thickness_mm: 0, basis: "inside the cold box casing (perlite fill), no pipe insulation"}
+  - {match: [vacuum], thickness_mm: 50, basis: "vacuum-jacketed pipe: outer jacket about 2 sizes up (ASSUMED)"}
+  - {match: [cold], thickness_mm: 80, basis: "cold insulation, PUR/PIR (ASSUMED)"}
+  - {match: [cryo], thickness_mm: 100, basis: "cryogenic insulation (ASSUMED)"}
+  - {match: [personnel], thickness_mm: 30, basis: "personnel protection (ASSUMED)"}
+  - {match: [hot], thickness_mm: 50, basis: "hot insulation, mineral wool (ASSUMED)"}
+  - {match: [], thickness_mm: 50, basis: "insulated, type not recognised (ASSUMED)"}

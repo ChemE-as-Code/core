@@ -1,0 +1,30 @@
+<!-- Actuating system PV4712.02: controlled actuator (fail close) operating GlobeValve1, under PlantModel/ActuatingSystems. The controller reaches it through an ActuatingFunction (References Systems), see signal-line.xml. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="ActuatingSystem1" type="Plant/Instrumentation.ActuatingSystem">
+  <Components property="ControlledActuator">
+    <Object id="ControlledActuator1" type="Plant/Instrumentation.ControlledActuator">
+      <Data property="DeviceTypeName">
+        <String>general</String>
+      </Data>
+      <Data property="FailAction">
+        <DataReference data="Plant/Enumerations.FailActionClassification.FailClose"/>
+      </Data>
+      <Data property="FailActionRepresentation">
+        <String>F.C.</String>
+      </Data>
+      <Data property="SubTagName">
+        <String>PV4712.02_YC</String>
+      </Data>
+    </Object>
+  </Components>
+  <Components property="OperatedValveReference">
+    <Object id="ActuatingSystem1_OperatedValveReference1" type="Plant/Instrumentation.OperatedValveReference">
+      <References objects="#GlobeValve1" property="Valve"/>
+      <Data property="SubTagName">
+        <String>PV4712.02_YV</String>
+      </Data>
+    </Object>
+  </Components>
+  <Data property="ActuatingSystemNumber">
+    <String>PV4712.02</String>
+  </Data>
+</Object>

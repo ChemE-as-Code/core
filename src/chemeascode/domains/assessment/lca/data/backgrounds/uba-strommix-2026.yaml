@@ -1,0 +1,95 @@
+# Packaged open background profile uba-strommix-2026: specific CO2 emissions of the German
+# electricity mix for 2023 (data), 2024 (preliminary) and 2025 (estimated), as the German
+# Environment Agency (UBA) states them on its summary page of 2026-03-23. Use it from
+# lca/factors.yaml with `include: [uba-strommix-2026]`; ids uba-strommix-2026:electricity-de-<year>.
+#
+# Generated from the page text. Scope: direct CO2 only (no CH4, N2O or upstream), per kWh of net
+# German electricity, emitted at generation, territorial basis (net of own use and line losses,
+# trade balance not applied): not comparable with a CO2e or life-cycle factor (the method check
+# flags it); UBA's own CO2e series is higher. Terms: UBA's
+# data terms (section 12a EGovG): commercial reuse allowed with UBA named and changes marked;
+# this is not a CC licence. Core issues #268, #306.
+schema: cheme/lca/v1
+kind: lca_factors
+sources:
+- id: uba-strommix-2026
+  title: CO2-Emissionen pro Kilowattstunde Strom 2025 nur leicht gesunken (specific CO2 emissions of the
+    German electricity mix)
+  provider: German Environment Agency (Umweltbundesamt, UBA)
+  version: summary page of 2026-03-23 (2023 data, 2024 preliminary, 2025 estimated)
+  url: https://www.umweltbundesamt.de/themen/co2-emissionen-pro-kilowattstunde-strom-2025-nur
+  licence: 'UBA data terms, section C of https://www.umweltbundesamt.de/datenschutz-haftung-urheberrecht
+    (use of data under Section 12a EGovG: commercial and non-commercial reuse, modification and passing
+    on, with UBA named in the source note and changes marked). Not a Creative Commons licence: the website''s
+    texts are CC BY-NC-ND 4.0 unless otherwise marked, and the 2026 report PDF is marked ''all rights
+    reserved'' (not packaged)'
+  attribution: 'Source: Umweltbundesamt, ''CO2-Emissionen pro Kilowattstunde Strom 2025 nur leicht gesunken''
+    (2026-03-23), https://www.umweltbundesamt.de/themen/co2-emissionen-pro-kilowattstunde-strom-2025-nur;
+    values converted from g to kg CO2 per kWh (changed).'
+  publication: public
+  redistribution: true
+  geography: DE
+  year: 2025
+  method: 'direct CO2 only (CH4, N2O and upstream chains not included): compare only within the same boundary,
+    UBA''s own CO2e series is higher'
+  checksum: sha256:17f73d301438678981a1244be9c3bd33eae97194d0102ca5481475dd6b326f3a
+  notes: >-
+    Grams of direct CO2 per kWh of net German electricity: all CO2 emitted at generation in Germany over
+    the electricity delivered to end use (the page words it 'des in Deutschland verbrauchten Stroms').
+    The denominator is net of plant own use, pumped-storage input and line losses, so losses are loaded
+    onto the delivered kWh; exports are not removed and imports not added: this is a territorial, generation-based
+    factor, not a trade-adjusted consumption factor (the emissions of the net import surplus are not attributed
+    to German generation, page text; UBA's own trade-adjusted factor, report 16/2026 section 1.2, is somewhat
+    lower and is not packaged). Fossil CO2 only: biogenic CO2 is a memo item outside the total, waste
+    counts at its fossil share. The year 2023 is final at publication but recalculated annually by UBA,
+    2024 is preliminary and 2025 estimated (UBA, 'Datenquellen'); sources: UBA emissions reporting, the
+    Arbeitsgruppe Erneuerbare Energien-Statistik, the Arbeitsgemeinschaft fuer Energiebilanzen e.V. (official
+    statistics) and UBA calculations. Only the figures stated on the summary page are packaged, not the
+    2026 report's tables (CO2e, with upstream chains): that report is marked 'all rights reserved' and
+    a written clarification from UBA is pending (core#268, core#306). The checksum is of the page copy
+    read on 2026-10-25.
+categories:
+- id: climate-change
+  title: Climate change
+  unit: kg CO2-eq
+  method: direct CO2 only (UBA; no CH4, N2O or upstream)
+factors:
+- id: electricity-de-2023
+  title: German electricity mix, 2023, direct CO2 at generation (territorial basis, no trade balance)
+  unit: kWh
+  values:
+    climate-change: 0.379
+  status: PUBLISHED
+  source: 'UBA summary page of 2026-03-23: 379 g CO2 per kWh (''des in Deutschland verbrauchten Stroms'',
+    emitted ''bei der Erzeugung''), 2023'
+  source_id: uba-strommix-2026
+  year: 2023
+  location: DE
+- id: electricity-de-2024
+  title: German electricity mix, 2024, provisional, direct CO2 at generation (territorial basis, no trade
+    balance)
+  unit: kWh
+  values:
+    climate-change: 0.353
+  status: PUBLISHED
+  source: 'UBA summary page of 2026-03-23: 353 g CO2 per kWh (''des in Deutschland verbrauchten Stroms'',
+    emitted ''bei der Erzeugung''), 2024 (preliminary data)'
+  source_id: uba-strommix-2026
+  year: 2024
+  location: DE
+- id: electricity-de-2025
+  title: German electricity mix, 2025, estimated, direct CO2 at generation (territorial basis, no trade
+    balance)
+  unit: kWh
+  values:
+    climate-change: 0.344
+  status: ESTIMATE
+  source: 'UBA summary page of 2026-03-23: 344 g CO2 per kWh (''des in Deutschland verbrauchten Stroms'',
+    emitted ''bei der Erzeugung''), 2025 (estimated by UBA)'
+  source_id: uba-strommix-2026
+  year: 2025
+  location: DE
+  basis: 'UBA''s own estimate (geschaetzt) of 2026-03-23, not derived by this project: direct CO2 at generation,
+    territorial basis, CO2 only'
+  validity: Germany's electricity mix in 2025, until UBA's next edition revises it; not trade-adjusted,
+    not CO2e, no upstream

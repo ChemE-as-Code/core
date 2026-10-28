@@ -1,0 +1,7 @@
+# The docs build (mkdocs build --strict), pinned to the versions core's docs group resolves to
+# (ChemE-as-Code/core uv.lock), so every ChemE-as-Code docs site builds alike.
+# Updated by hand with core, not by Dependabot (which would also offer mkdocs 2).
+#   pip install -r requirements-docs.txt && mkdocs build --strict
+mkdocs==1.6.1  # MkDocs 2 drops plugins and hooks
+mkdocs-material==9.7.7
+pymdown-extensions==12.3

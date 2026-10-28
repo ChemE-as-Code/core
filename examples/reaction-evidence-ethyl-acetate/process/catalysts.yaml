@@ -1,0 +1,15 @@
+# The catalyst of the selected route (schema cheme/catalysts/v1), from the evidence in
+# process/reaction-evidence.yaml. Only what a source read in full states is given.
+schema: cheme/catalysts/v1
+kind: catalysts
+catalysts:
+  - id: AMB15
+    name: Amberlyst 15
+    active_phase: sulfonic acid groups (strong acid cation-exchange resin)
+    support: macroporous styrene-divinylbenzene (20 % DVB)
+    physical:
+      form: granule
+      surface_area: 53
+      provenance: given
+      source: "reaction-evidence S-AHM Table 1 (p. 48): granules 0.600 to 0.850 mm, 53 m2/g"
+    sources: ["reaction-evidence S-KIR p. 570", "doi:10.31699/IJCPE.2013.4.6"]

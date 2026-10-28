@@ -1,0 +1,48 @@
+# What the plant must do. Schema: `cheme schema design_basis`.
+# Sources: [BREF] European Commission, Reference Document on Best Available Techniques for the
+# Manufacture of Large Volume Inorganic Chemicals - Ammonia, Acids and Fertilisers (LVIC-AAF),
+# August 2007, chapter 2 (ammonia), read in full at
+# https://bureau-industrial-transformation.jrc.ec.europa.eu/sites/default/files/2019-11/lvic_aaf.pdf
+# (accessed 2026-10-27); section and page given at each value.
+# Values with `provenance: assumed` are the example's own choices, not data: above all its scale.
+schema: cheme/design_basis/v1
+capacity:
+  product: liquid anhydrous ammonia
+  terminal: AMMONIA
+  value: 182
+  unit: t/d
+  provenance: assumed
+  source: "example scale: the AMMONIA product of process/flowsheet.yaml (S6, 445.9 kmol/h = 7594 kg/h) for 1000 kmol/h of makeup gas"
+  published_range: "a modern plant typically 1000-2000 t/d, new plants designed for up to 2200 t/d [BREF 2.1, p. 35]; the example is well below a single commercial train"
+feeds:
+  - name: Makeup synthesis gas
+    terminal: MAKEUP
+    h2_to_n2_molar: 3.0
+    h2_to_n2_source: "stoichiometric, N2 + 3 H2 = 2 NH3 [BREF 2.2.3.8, p. 43]"
+    argon_mol_percent: 1.0
+    argon_provenance: assumed
+    argon_source: "example value; makeup gas from conventional reforming with methanation carries methane and argon as inerts [BREF 2.2.3.8, p. 43], no figure given there"
+    pressure: {value: 200, unit: bar, source: "synthesis gas compressed to 100-250 bar [BREF 2.2.3.7, p. 42]; the example takes 200 bar"}
+    temperature: {value: 40, unit: degC, provenance: assumed, source: example value}
+    flow: {value: 1000, unit: kmol/h, provenance: assumed, source: example scale}
+products:
+  - name: Liquid anhydrous ammonia
+    terminal: AMMONIA
+    purity: NH3 >= 99.9 wt%
+    source: "commercial anhydrous ammonia has two grades: min. 99.7 wt% with about 0.2 wt% water, and min. 99.9 wt% [BREF 2.2.2.1, p. 38]; the example takes the second (it adds no water)"
+    note: "the flowsheet's separator F1 sends all NH3 to the liquid and no H2, N2 or Ar (an idealisation, process/flowsheet.yaml S6): dissolved gases are not modelled"
+  - name: Purge gas
+    terminal: PURGE
+    purpose: "keeps the inerts in the loop at approximately 10-15 % [BREF 2.2.3.8, p. 43]"
+    destination: "scrubbed with water to remove ammonia, then fuel or hydrogen recovery [BREF 2.2.3.8, p. 43]; outside the example"
+    note: "the example's 5 % purge (SP1) gives 9.2 mol% argon in the loop vapour (S5), just below that range"
+utilities:
+  - name: Ammonia refrigeration
+    use: "chills the converter effluent (E1) to condense the ammonia"
+    source: "cooling with water or air alone is not enough; vaporising ammonia chills the gas [BREF 2.2.3.8, p. 43]"
+    level: {value: -5, unit: degC, provenance: assumed, source: "the example's separator temperature (S4)"}
+site: {}
+assumptions:
+  - "Synthesis on an iron catalyst at 100-250 bar and 350-550 C [BREF 2.2.3.8, p. 43]; the example's converter R1 (400 C in, 470 C out, 200 bar) lies inside that window."
+  - "ASSUMED: the example's scale, the makeup gas temperature and argon content, the purge fraction and the separator temperature are illustrative, not plant data."
+  - "No site: the example has no site conditions; the battery limits are the makeup gas, the liquid ammonia and the purge."

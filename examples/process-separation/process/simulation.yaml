@@ -1,0 +1,45 @@
+# What DWSIM needs beyond the flowsheet (`cheme process simulate`; schema
+# `cheme schema process-simulation`). Units as in process/flowsheet.yaml unless given.
+schema: cheme/simulation/v1
+kind: simulation
+simulator: dwsim
+property_package: Peng-Robinson (PR)
+# The facts of the thermodynamic model selection (thermodynamic-model-selection, Carlson's
+# tree), checked against property_package on every translation and by `cheme maturity`.
+# They recommend Peng-Robinson (outcome nonpolar_no_pseudocomponents), so PR needs no
+# substitution. Here the tree decides on is_polar and has_pseudocomponents alone; the other
+# facts are recorded so a reviewer can see the regime was considered.
+method_selection:
+  facts:
+    # propane, n-butane and n-pentane are saturated hydrocarbons: nonpolar
+    is_polar: false
+    # no water, salts or acids among the components: no ions
+    is_electrolyte: false
+    # three pure compounds with CAS numbers in materials.yaml, no petroleum fractions
+    has_pseudocomponents: false
+    # light n-alkanes are completely miscible as liquids: no second liquid phase
+    liquid_liquid_expected: false
+    # no carboxylic acid or HF: no vapour-phase association
+    vapor_association_expected: false
+    # the highest pressure of the flowsheet: the feed at 12 bar(a) (flash 6, column 5.2-5.5);
+    # band high, the conservative choice; the nonpolar branch does not use the pressure
+    pressure_value: 12
+    pressure_unit: bar(a)
+    # interaction_parameters_available left unset: the nonpolar branch does not ask for it
+specs:
+  V1:
+    outlet_pressure: {value: 6, provenance: assumed, source: flash drum pressure}
+  # D1: no spec, an adiabatic flash at the valve outlet; vapour and liquid by the port ids
+  E1:
+    cold_outlet_temperature: {value: 70, provenance: assumed, source: column feed near its bubble point}
+    hot_pressure_drop: {value: 0.3, unit: bar, provenance: assumed, source: typical}
+    cold_pressure_drop: {value: 0.3, unit: bar, provenance: assumed, source: typical}
+  C1:
+    light_key: C3
+    heavy_key: NC4
+    light_key_in_bottoms: 0.01
+    heavy_key_in_distillate: 0.02
+    reflux_ratio: 3.5
+    condenser_pressure: {value: 5.2, provenance: assumed, source: total condenser}
+    reboiler_pressure: {value: 5.5, provenance: assumed, source: column pressure drop 0.3 bar}
+    condenser: total

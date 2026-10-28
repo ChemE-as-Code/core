@@ -1,0 +1,311 @@
+<!-- How line 47123 is drawn: label, pipes as ConnectorLines, valve symbol, node positions. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="PipingNetworkSystem3_Drawing1" type="Core/Diagram.RepresentationGroup">
+  <Components property="Groups">
+    <Object id="PipingNetworkSystem3_Drawing1_Groups1" type="Plant/Diagram.PipingNetworkSystemLabel">
+      <Components property="Elements">
+        <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1" type="Core/Diagram.Text">
+          <Components property="Template">
+            <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1" type="Core/Diagram.TextTemplate">
+              <Components property="Fragments">
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments1" type="Core/Diagram.AttributeRepresentation">
+                  <References objects="#PipingNetworkSystem3" property="Object"/>
+                  <Data property="AttributeName">
+                    <String>FluidCode</String>
+                  </Data>
+                  <Data property="Type">
+                    <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments2" type="Core/Diagram.LiteralText">
+                  <Data property="Text">
+                    <String> </String>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments3" type="Core/Diagram.AttributeRepresentation">
+                  <References objects="#PipingNetworkSystem3" property="Object"/>
+                  <Data property="AttributeName">
+                    <String>LineNumber</String>
+                  </Data>
+                  <Data property="Type">
+                    <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments4" type="Core/Diagram.LiteralText">
+                  <Data property="Text">
+                    <String> </String>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments5" type="Core/Diagram.AttributeRepresentation">
+                  <References objects="#PipingNetworkSystem3" property="Object"/>
+                  <Data property="AttributeName">
+                    <String>PipingClassCode</String>
+                  </Data>
+                  <Data property="Type">
+                    <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments6" type="Core/Diagram.LiteralText">
+                  <Data property="Text">
+                    <String> </String>
+                  </Data>
+                </Object>
+                <Object id="PipingNetworkSystem3_Drawing1_Groups1_Elements1_Template1_Fragments7" type="Core/Diagram.AttributeRepresentation">
+                  <References objects="#PipingNetworkSystem3" property="Object"/>
+                  <Data property="AttributeName">
+                    <String>NominalDiameterNumericalValueRepresentation</String>
+                  </Data>
+                  <Data property="Type">
+                    <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                  </Data>
+                </Object>
+              </Components>
+            </Object>
+          </Components>
+          <Data property="Alignment">
+            <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
+          </Data>
+          <Data property="Color">
+            <AggregatedDataValue type="Core/Diagram.Color">
+              <Data property="B">
+                <Integer>0</Integer>
+              </Data>
+              <Data property="G">
+                <Integer>0</Integer>
+              </Data>
+              <Data property="R">
+                <Integer>0</Integer>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+          <Data property="Font">
+            <String>Calibri</String>
+          </Data>
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>157.0</Double>
+              </Data>
+              <Data property="Y">
+                <Double>90.820498045</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+          <Data property="Rotation">
+            <Double>270.0</Double>
+          </Data>
+          <Data property="Size">
+            <Double>3.0</Double>
+          </Data>
+          <Data property="Text">
+            <String>MNb 47123 75HB13 80</String>
+          </Data>
+        </Object>
+      </Components>
+    </Object>
+    <Object id="PipingNetworkSegment3_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="Groups">
+        <Object id="Pipe3_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="Groups">
+            <Object id="Pipe3_Drawing1_Groups1" type="Core/Diagram.Static">
+              <Components property="Elements">
+                <Object id="Pipe3_Drawing1_Groups1_Elements1" type="Core/Diagram.ConnectorLine">
+                  <References objects="#PipingNodePosition5" property="Source"/>
+                  <References objects="#PipingNodePosition6" property="Target"/>
+                  <Data property="InnerPoints">
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>160.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>133.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                  <Data property="Stroke">
+                    <AggregatedDataValue type="Core/Diagram.Stroke">
+                      <Data property="Color">
+                        <AggregatedDataValue type="Core/Diagram.Color">
+                          <Data property="B">
+                            <Integer>0</Integer>
+                          </Data>
+                          <Data property="G">
+                            <Integer>128</Integer>
+                          </Data>
+                          <Data property="R">
+                            <Integer>128</Integer>
+                          </Data>
+                        </AggregatedDataValue>
+                      </Data>
+                      <Data property="DashStyle">
+                        <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                      </Data>
+                      <Data property="Width">
+                        <Double>0.5</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                </Object>
+              </Components>
+            </Object>
+          </Components>
+          <References objects="#Pipe3" property="Represents"/>
+        </Object>
+        <Object id="GlobeValve2_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="Groups">
+            <Object id="PipingNode6_Drawing1" type="Core/Diagram.RepresentationGroup">
+              <Components property="NodePositions">
+                <Object id="PipingNodePosition6" type="Plant/Diagram.PipingNodePosition">
+                  <References objects="#PipingNode6" property="Node"/>
+                  <Data property="Position">
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>160.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>121.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                </Object>
+              </Components>
+              <References objects="#PipingNode6" property="Represents"/>
+            </Object>
+            <Object id="PipingNode7_Drawing1" type="Core/Diagram.RepresentationGroup">
+              <Components property="NodePositions">
+                <Object id="PipingNodePosition7" type="Plant/Diagram.PipingNodePosition">
+                  <References objects="#PipingNode7" property="Node"/>
+                  <Data property="Position">
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>160.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>117.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                </Object>
+              </Components>
+              <References objects="#PipingNode7" property="Represents"/>
+            </Object>
+            <Object id="GlobeValve2_Drawing1_Groups1" type="Core/Diagram.Static">
+              <Components property="Elements">
+                <Object id="GlobeValve2_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+                  <References objects="#Shape3" property="Shape"/>
+                  <Data property="IsMirrored">
+                    <Boolean>false</Boolean>
+                  </Data>
+                  <Data property="Position">
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>160.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>119.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                  <Data property="Rotation">
+                    <Double>270.0</Double>
+                  </Data>
+                  <Data property="ScaleX">
+                    <Double>0.4</Double>
+                  </Data>
+                  <Data property="ScaleY">
+                    <Double>0.4</Double>
+                  </Data>
+                </Object>
+              </Components>
+            </Object>
+          </Components>
+          <References objects="#GlobeValve2" property="Represents"/>
+        </Object>
+        <Object id="Pipe4_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="Groups">
+            <Object id="Pipe4_Drawing1_Groups1" type="Core/Diagram.Static">
+              <Components property="Elements">
+                <Object id="Pipe4_Drawing1_Groups1_Elements1" type="Core/Diagram.ConnectorLine">
+                  <References objects="#PipingNodePosition7" property="Source"/>
+                  <References objects="#PipingNodePosition8" property="Target"/>
+                  <Data property="InnerPoints">
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>160.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>61.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                    <AggregatedDataValue type="Core/Diagram.Point">
+                      <Data property="X">
+                        <Double>181.0</Double>
+                      </Data>
+                      <Data property="Y">
+                        <Double>61.0</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                  <Data property="Stroke">
+                    <AggregatedDataValue type="Core/Diagram.Stroke">
+                      <Data property="Color">
+                        <AggregatedDataValue type="Core/Diagram.Color">
+                          <Data property="B">
+                            <Integer>0</Integer>
+                          </Data>
+                          <Data property="G">
+                            <Integer>128</Integer>
+                          </Data>
+                          <Data property="R">
+                            <Integer>128</Integer>
+                          </Data>
+                        </AggregatedDataValue>
+                      </Data>
+                      <Data property="DashStyle">
+                        <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                      </Data>
+                      <Data property="Width">
+                        <Double>0.5</Double>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                </Object>
+              </Components>
+            </Object>
+          </Components>
+          <References objects="#Pipe4" property="Represents"/>
+        </Object>
+        <Object id="PipingNetworkSegment3_Drawing1_Groups1" type="Core/Diagram.PipeFlowArrow">
+          <Components property="Elements">
+            <Object id="PipingNetworkSegment3_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+              <References objects="#Shape4" property="Shape"/>
+              <Data property="IsMirrored">
+                <Boolean>false</Boolean>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>181.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>65.640996091</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>90.0</Double>
+              </Data>
+              <Data property="ScaleX">
+                <Double>0.7</Double>
+              </Data>
+              <Data property="ScaleY">
+                <Double>0.7</Double>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+      </Components>
+      <References objects="#PipingNetworkSegment3" property="Represents"/>
+    </Object>
+  </Components>
+  <References objects="#PipingNetworkSystem3" property="Represents"/>
+</Object>

@@ -1,0 +1,6 @@
+name: process-nested
+description: Example flowsheet with a nested block (cheme process, schema cheme/process/v1)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

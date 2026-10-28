@@ -1,0 +1,4 @@
+schema: cheme/equipment/v1
+equipment:
+  - {tag: V-101, type: PressureVessel, service: Feed vessel, sheet: P-01}
+  - {tag: P-101, type: CentrifugalPump, service: Transfer pump, sheet: P-01}

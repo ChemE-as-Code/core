@@ -1,0 +1,1164 @@
+{
+  "present": true,
+  "files": [
+    {
+      "path": "control/loops.yaml",
+      "kind": "loops",
+      "status": "drafted",
+      "record": null,
+      "detail": "no review record covers it"
+    },
+    {
+      "path": "control/sequences.yaml",
+      "kind": "sequences",
+      "status": "drafted",
+      "record": null,
+      "detail": "no review record covers it"
+    },
+    {
+      "path": "control/cause-effect.yaml",
+      "kind": "interlocks",
+      "status": "drafted",
+      "record": null,
+      "detail": "no review record covers it"
+    },
+    {
+      "path": "process/narrative.md",
+      "kind": "narrative",
+      "status": "drafted",
+      "record": null,
+      "detail": "no review record covers it"
+    },
+    {
+      "path": "control/philosophy.md",
+      "kind": "philosophy",
+      "status": "drafted",
+      "record": null,
+      "detail": "no review record covers it"
+    }
+  ],
+  "loops": [
+    {
+      "id": "FIC-101",
+      "title": "Feed flow",
+      "section": "FEED",
+      "variable": "flow",
+      "measurement": [
+        "FT-101"
+      ],
+      "controller": "FIC-101",
+      "action": "reverse",
+      "final_elements": [
+        "FV-101 fail closed"
+      ],
+      "targets": [
+        "setpoint 3600 kg/h (given: basis of design) [design]"
+      ],
+      "modes": [
+        "manual",
+        "auto"
+      ],
+      "normal_mode": "auto",
+      "links": [],
+      "alarms": [],
+      "interlocks": [],
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "record": {
+        "id": "FIC-101",
+        "title": "Feed flow",
+        "purpose": "Hold the feed rate to the depropanizer at the rate of the operating case.",
+        "section": "FEED",
+        "cases": [
+          "design"
+        ],
+        "variable": "flow",
+        "measurement": [
+          {
+            "tag": "FT-101"
+          }
+        ],
+        "controller": "FIC-101",
+        "action": "reverse",
+        "final_elements": [
+          {
+            "tag": "FV-101",
+            "kind": "valve",
+            "actuator": "pneumatic",
+            "fail": "closed"
+          }
+        ],
+        "targets": [
+          {
+            "value": 3600.0,
+            "unit": "kg/h",
+            "provenance": "given",
+            "source": "basis of design",
+            "cases": [
+              "design"
+            ],
+            "stream": "S1",
+            "property": "flow"
+          }
+        ],
+        "modes": [
+          "manual",
+          "auto"
+        ],
+        "normal_mode": "auto",
+        "transitions": [
+          {
+            "from": "manual",
+            "to": "auto",
+            "by": "operator",
+            "condition": {
+              "loop": "LIC-102",
+              "state": "in auto"
+            }
+          }
+        ],
+        "rationale": "The let-down valve V1 sets the feed; the flash and the column follow it.",
+        "operator": "Reduce the rate when the column floods (no automatic action)."
+      }
+    },
+    {
+      "id": "LIC-102",
+      "title": "Flash drum level",
+      "section": "FEED",
+      "variable": "level",
+      "measurement": [
+        "LT-102"
+      ],
+      "controller": "LIC-102",
+      "action": "direct",
+      "final_elements": [
+        "LV-102 fail closed"
+      ],
+      "targets": [
+        "setpoint 50 % (assumed: DESIGN.md (ASSUMED))",
+        "low 20 % (assumed: DESIGN.md (ASSUMED))",
+        "high 80 % (assumed: DESIGN.md (ASSUMED))"
+      ],
+      "modes": [
+        "manual",
+        "auto"
+      ],
+      "normal_mode": "auto",
+      "links": [],
+      "alarms": [
+        "LT-102 LAL: Check LV-102 and the feed rate; reduce the feed if the level keeps falling.",
+        "LT-102 LAH: Check LV-102 opens; reduce the feed."
+      ],
+      "interlocks": [
+        "I-01"
+      ],
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "record": {
+        "id": "LIC-102",
+        "title": "Flash drum level",
+        "purpose": "Keep a liquid seal in D-101 and pass the liquid on to the preheater.",
+        "section": "FEED",
+        "variable": "level",
+        "measurement": [
+          {
+            "tag": "LT-102"
+          }
+        ],
+        "controller": "LIC-102",
+        "action": "direct",
+        "final_elements": [
+          {
+            "tag": "LV-102",
+            "kind": "valve",
+            "actuator": "pneumatic",
+            "fail": "closed"
+          }
+        ],
+        "targets": [
+          {
+            "value": 50.0,
+            "unit": "%",
+            "provenance": "assumed",
+            "source": "DESIGN.md (ASSUMED)"
+          },
+          {
+            "kind": "low",
+            "value": 20.0,
+            "unit": "%",
+            "provenance": "assumed",
+            "source": "DESIGN.md (ASSUMED)"
+          },
+          {
+            "kind": "high",
+            "value": 80.0,
+            "unit": "%",
+            "provenance": "assumed",
+            "source": "DESIGN.md (ASSUMED)"
+          }
+        ],
+        "modes": [
+          "manual",
+          "auto"
+        ],
+        "normal_mode": "auto",
+        "alarms": [
+          {
+            "tag": "LT-102",
+            "condition": "LAL",
+            "response": "Check LV-102 and the feed rate; reduce the feed if the level keeps falling."
+          },
+          {
+            "tag": "LT-102",
+            "condition": "LAH",
+            "response": "Check LV-102 opens; reduce the feed."
+          }
+        ],
+        "interlocks": [
+          "I-01"
+        ],
+        "rationale": "Averaging level control; the low-low trip I-01 on its own transmitter LT-106."
+      }
+    },
+    {
+      "id": "TIC-103",
+      "title": "Column feed temperature (master)",
+      "section": "PREHEAT",
+      "variable": "temperature",
+      "measurement": [
+        "TT-103"
+      ],
+      "controller": "TIC-103",
+      "action": "reverse",
+      "final_elements": [],
+      "targets": [
+        "setpoint 80 °C (assumed: until cheme process simulate fills S5)"
+      ],
+      "modes": [
+        "manual",
+        "auto"
+      ],
+      "normal_mode": "auto",
+      "links": [],
+      "alarms": [],
+      "interlocks": [],
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "record": {
+        "id": "TIC-103",
+        "title": "Column feed temperature (master)",
+        "purpose": "Preheat the column feed against hot pentane.",
+        "section": "PREHEAT",
+        "variable": "temperature",
+        "measurement": [
+          {
+            "tag": "TT-103"
+          }
+        ],
+        "controller": "TIC-103",
+        "action": "reverse",
+        "targets": [
+          {
+            "value": 80.0,
+            "unit": "°C",
+            "provenance": "assumed",
+            "source": "until cheme process simulate fills S5"
+          }
+        ],
+        "modes": [
+          "manual",
+          "auto"
+        ],
+        "normal_mode": "auto",
+        "rationale": "Cascade onto the hot pentane flow, so that a change of the hot oil header pressure is rejected by the slave."
+      }
+    },
+    {
+      "id": "FIC-105",
+      "title": "Hot pentane flow (slave)",
+      "section": "PREHEAT",
+      "variable": "flow",
+      "measurement": [
+        "FT-105"
+      ],
+      "controller": "FIC-105",
+      "action": "reverse",
+      "final_elements": [
+        "FV-105 fail closed"
+      ],
+      "targets": [
+        "setpoint 5000 kg/h (assumed: hot oil circulation) [design]"
+      ],
+      "modes": [
+        "manual",
+        "auto",
+        "cascade"
+      ],
+      "normal_mode": "cascade",
+      "links": [
+        "cascade from TIC-103"
+      ],
+      "alarms": [],
+      "interlocks": [
+        "I-01"
+      ],
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 1
+      },
+      "record": {
+        "id": "FIC-105",
+        "title": "Hot pentane flow (slave)",
+        "section": "PREHEAT",
+        "variable": "flow",
+        "measurement": [
+          {
+            "tag": "FT-105"
+          }
+        ],
+        "controller": "FIC-105",
+        "action": "reverse",
+        "final_elements": [
+          {
+            "tag": "FV-105",
+            "kind": "valve",
+            "actuator": "pneumatic",
+            "fail": "closed"
+          }
+        ],
+        "targets": [
+          {
+            "value": 5000.0,
+            "unit": "kg/h",
+            "provenance": "assumed",
+            "source": "hot oil circulation",
+            "cases": [
+              "design"
+            ],
+            "stream": "H1",
+            "property": "flow"
+          }
+        ],
+        "modes": [
+          "manual",
+          "auto",
+          "cascade"
+        ],
+        "normal_mode": "cascade",
+        "transitions": [
+          {
+            "from": "auto",
+            "to": "cascade",
+            "by": "operator",
+            "condition": {
+              "loop": "TIC-103",
+              "state": "in auto"
+            }
+          }
+        ],
+        "links": [
+          {
+            "type": "cascade",
+            "loop": "TIC-103"
+          }
+        ],
+        "interlocks": [
+          "I-01"
+        ]
+      }
+    },
+    {
+      "id": "PIC-104",
+      "title": "Flash drum pressure",
+      "section": "FEED",
+      "variable": "pressure",
+      "measurement": [
+        "PT-104"
+      ],
+      "controller": "PIC-104",
+      "action": "direct",
+      "final_elements": [
+        "PV-104 fail ?"
+      ],
+      "targets": [
+        "setpoint ? (flash pressure follows from the flash design (cheme process simulate))"
+      ],
+      "modes": [
+        "manual",
+        "auto"
+      ],
+      "normal_mode": "auto",
+      "links": [],
+      "alarms": [],
+      "interlocks": [],
+      "unresolved": [
+        "fail position of PV-104 (open relieves to the flare header; to be decided in the HAZOP)"
+      ],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 3
+      },
+      "record": {
+        "id": "PIC-104",
+        "title": "Flash drum pressure",
+        "section": "FEED",
+        "variable": "pressure",
+        "measurement": [
+          {
+            "tag": "PT-104"
+          }
+        ],
+        "controller": "PIC-104",
+        "action": "direct",
+        "final_elements": [
+          {
+            "tag": "PV-104",
+            "kind": "valve",
+            "actuator": "pneumatic"
+          }
+        ],
+        "targets": [
+          {
+            "unresolved": "flash pressure follows from the flash design (cheme process simulate)"
+          }
+        ],
+        "modes": [
+          "manual",
+          "auto"
+        ],
+        "normal_mode": "auto",
+        "unresolved": [
+          "fail position of PV-104 (open relieves to the flare header; to be decided in the HAZOP)"
+        ]
+      }
+    }
+  ],
+  "sequences": [
+    {
+      "id": "SEQ-START",
+      "title": "Start up the feed section",
+      "mode": "startup",
+      "section": "FEED",
+      "permissives": [
+        "interlock I-01 reset",
+        "XV-107 open",
+        "(FIC-101 in manual AND LIC-102 in manual)"
+      ],
+      "interlocks": [
+        "I-01"
+      ],
+      "steps": [
+        {
+          "id": "S1",
+          "title": "Admit feed",
+          "entry": "",
+          "actions": [
+            "FIC-101 setpoint 1200 kg/h (assumed: one third of the design rate) (operator)",
+            "FIC-101 to auto (operator)"
+          ],
+          "complete": "LT-102 > 30 % for 30 s",
+          "timeout": "30 min -> abort",
+          "next": "",
+          "operator": ""
+        },
+        {
+          "id": "S2",
+          "title": "Level control in automatic",
+          "entry": "",
+          "actions": [
+            "LIC-102 to auto"
+          ],
+          "complete": "LIC-102 in auto",
+          "timeout": "",
+          "next": "",
+          "operator": ""
+        },
+        {
+          "id": "S3",
+          "title": "Preheat",
+          "entry": "",
+          "actions": [
+            "FIC-105 to auto (operator)",
+            "TIC-103 to auto (operator)",
+            "FIC-105 to cascade (operator)"
+          ],
+          "complete": "TT-103 within 5 K of the TIC-103 setpoint for 10 min",
+          "timeout": "",
+          "next": "",
+          "operator": "Raise the hot pentane flow slowly; watch the column pressure."
+        },
+        {
+          "id": "S4",
+          "title": "Raise to the design rate",
+          "entry": "",
+          "actions": [
+            "FIC-101 setpoint 3600 kg/h (given: basis of design) [design] (operator)"
+          ],
+          "complete": "FIC-101 at setpoint for 15 min",
+          "timeout": "",
+          "next": "end",
+          "operator": ""
+        }
+      ],
+      "abort": {
+        "condition": "(interlock I-01 tripped OR [as text, not checked: operator judges the column unstable])",
+        "actions": [
+          "FIC-101 to manual",
+          "close FV-101"
+        ],
+        "then": "SEQ-STOP",
+        "notes": ""
+      },
+      "reset": {
+        "latching": true,
+        "manual": true,
+        "condition": "interlock I-01 reset",
+        "restart": "sequence SEQ-STOP complete"
+      },
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 1
+      },
+      "record": {
+        "id": "SEQ-START",
+        "title": "Start up the feed section",
+        "mode": "startup",
+        "section": "FEED",
+        "cases": [
+          "design"
+        ],
+        "equipment": [
+          "D-101",
+          "E-101"
+        ],
+        "permissives": [
+          {
+            "interlock": "I-01",
+            "state": "reset"
+          },
+          {
+            "tag": "XV-107",
+            "state": "open"
+          },
+          {
+            "all": [
+              {
+                "loop": "FIC-101",
+                "state": "in manual"
+              },
+              {
+                "loop": "LIC-102",
+                "state": "in manual"
+              }
+            ]
+          }
+        ],
+        "interlocks": [
+          "I-01"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "title": "Admit feed",
+            "actions": [
+              {
+                "loop": "FIC-101",
+                "action": "setpoint",
+                "setpoint": {
+                  "value": 1200.0,
+                  "unit": "kg/h",
+                  "provenance": "assumed",
+                  "source": "one third of the design rate"
+                },
+                "by": "operator"
+              },
+              {
+                "loop": "FIC-101",
+                "action": "auto",
+                "by": "operator"
+              }
+            ],
+            "complete": {
+              "tag": "LT-102",
+              "state": "> 30 %",
+              "delay": {
+                "value": 30.0,
+                "unit": "s"
+              }
+            },
+            "timeout": {
+              "value": 30.0,
+              "unit": "min"
+            },
+            "on_timeout": "abort"
+          },
+          {
+            "id": "S2",
+            "title": "Level control in automatic",
+            "actions": [
+              {
+                "loop": "LIC-102",
+                "action": "auto"
+              }
+            ],
+            "complete": {
+              "loop": "LIC-102",
+              "state": "in auto"
+            }
+          },
+          {
+            "id": "S3",
+            "title": "Preheat",
+            "actions": [
+              {
+                "loop": "FIC-105",
+                "action": "auto",
+                "by": "operator"
+              },
+              {
+                "loop": "TIC-103",
+                "action": "auto",
+                "by": "operator"
+              },
+              {
+                "loop": "FIC-105",
+                "action": "cascade",
+                "by": "operator"
+              }
+            ],
+            "complete": {
+              "tag": "TT-103",
+              "state": "within 5 K of the TIC-103 setpoint",
+              "delay": {
+                "value": 10.0,
+                "unit": "min"
+              }
+            },
+            "operator": "Raise the hot pentane flow slowly; watch the column pressure."
+          },
+          {
+            "id": "S4",
+            "title": "Raise to the design rate",
+            "actions": [
+              {
+                "loop": "FIC-101",
+                "action": "setpoint",
+                "setpoint": {
+                  "value": 3600.0,
+                  "unit": "kg/h",
+                  "provenance": "given",
+                  "source": "basis of design",
+                  "cases": [
+                    "design"
+                  ],
+                  "stream": "S1",
+                  "property": "flow"
+                },
+                "by": "operator"
+              }
+            ],
+            "complete": {
+              "loop": "FIC-101",
+              "state": "at setpoint",
+              "delay": {
+                "value": 15.0,
+                "unit": "min"
+              }
+            },
+            "next": "end"
+          }
+        ],
+        "abort": {
+          "condition": {
+            "any": [
+              {
+                "interlock": "I-01",
+                "state": "tripped"
+              },
+              {
+                "text": "operator judges the column unstable"
+              }
+            ]
+          },
+          "actions": [
+            {
+              "loop": "FIC-101",
+              "action": "manual"
+            },
+            {
+              "tag": "FV-101",
+              "action": "close"
+            }
+          ],
+          "then": "SEQ-STOP"
+        },
+        "reset": {
+          "latching": true,
+          "manual": true,
+          "condition": {
+            "interlock": "I-01",
+            "state": "reset"
+          },
+          "restart": {
+            "sequence": "SEQ-STOP",
+            "state": "complete"
+          }
+        }
+      }
+    },
+    {
+      "id": "SEQ-STOP",
+      "title": "Normal shutdown of the feed section",
+      "mode": "shutdown",
+      "section": "FEED",
+      "permissives": [],
+      "interlocks": [
+        "I-01"
+      ],
+      "steps": [
+        {
+          "id": "S1",
+          "title": "Stop the preheat",
+          "entry": "",
+          "actions": [
+            "FIC-105 to manual",
+            "close FV-105"
+          ],
+          "complete": "FV-105 closed",
+          "timeout": "",
+          "next": "",
+          "operator": ""
+        },
+        {
+          "id": "S2",
+          "title": "Stop the feed",
+          "entry": "",
+          "actions": [
+            "FIC-101 to manual",
+            "close FV-101"
+          ],
+          "complete": "FV-101 closed",
+          "timeout": "",
+          "next": "",
+          "operator": ""
+        },
+        {
+          "id": "S3",
+          "title": "Empty the flash drum to the preheater",
+          "entry": "",
+          "actions": [
+            "LIC-102 to manual (operator)"
+          ],
+          "complete": "LT-102 < 10 %",
+          "timeout": "",
+          "next": "",
+          "operator": "Close LV-102 before the level is lost; I-01 closes XV-107 at low-low level."
+        }
+      ],
+      "abort": {
+        "condition": "",
+        "actions": [],
+        "then": null,
+        "notes": "A trip during shutdown is handled by the C&E (I-01); the sequence stops where it is."
+      },
+      "reset": {
+        "latching": false,
+        "manual": true,
+        "condition": "",
+        "restart": ""
+      },
+      "unresolved": [],
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "record": {
+        "id": "SEQ-STOP",
+        "title": "Normal shutdown of the feed section",
+        "mode": "shutdown",
+        "section": "FEED",
+        "equipment": [
+          "D-101",
+          "E-101"
+        ],
+        "interlocks": [
+          "I-01"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "title": "Stop the preheat",
+            "actions": [
+              {
+                "loop": "FIC-105",
+                "action": "manual"
+              },
+              {
+                "tag": "FV-105",
+                "action": "close"
+              }
+            ],
+            "complete": {
+              "tag": "FV-105",
+              "state": "closed"
+            }
+          },
+          {
+            "id": "S2",
+            "title": "Stop the feed",
+            "actions": [
+              {
+                "loop": "FIC-101",
+                "action": "manual"
+              },
+              {
+                "tag": "FV-101",
+                "action": "close"
+              }
+            ],
+            "complete": {
+              "tag": "FV-101",
+              "state": "closed"
+            }
+          },
+          {
+            "id": "S3",
+            "title": "Empty the flash drum to the preheater",
+            "actions": [
+              {
+                "loop": "LIC-102",
+                "action": "manual",
+                "by": "operator"
+              }
+            ],
+            "complete": {
+              "tag": "LT-102",
+              "state": "< 10 %"
+            },
+            "operator": "Close LV-102 before the level is lost; I-01 closes XV-107 at low-low level."
+          }
+        ],
+        "abort": {
+          "notes": "A trip during shutdown is handled by the C&E (I-01); the sequence stops where it is."
+        },
+        "reset": {
+          "latching": false,
+          "manual": true
+        }
+      }
+    }
+  ],
+  "documents": [
+    {
+      "path": "process/narrative.md",
+      "kind": "narrative",
+      "valid": true,
+      "sections": [
+        {
+          "id": "FEED",
+          "title": "Feed let-down and flash",
+          "equipment": [
+            "D-101"
+          ],
+          "blocks": [
+            "FL",
+            "V1",
+            "D1"
+          ],
+          "cases": [
+            "design"
+          ],
+          "modes": [
+            "normal",
+            "startup",
+            "shutdown"
+          ],
+          "loops": [
+            "FIC-101",
+            "LIC-102",
+            "PIC-104"
+          ],
+          "sequences": [
+            "SEQ-START",
+            "SEQ-STOP"
+          ],
+          "interlocks": [
+            "I-01"
+          ]
+        },
+        {
+          "id": "PREHEAT",
+          "title": "Feed preheat",
+          "equipment": [
+            "E-101"
+          ],
+          "blocks": [
+            "PH",
+            "E1"
+          ],
+          "cases": [
+            "design"
+          ],
+          "modes": [
+            "normal",
+            "startup",
+            "shutdown"
+          ],
+          "loops": [
+            "TIC-103",
+            "FIC-105"
+          ]
+        },
+        {
+          "id": "COLUMN",
+          "title": "Depropanizer",
+          "equipment": [
+            "C-101"
+          ],
+          "blocks": [
+            "DC3",
+            "C1"
+          ],
+          "cases": [
+            "design"
+          ]
+        }
+      ],
+      "unresolved": [
+        "the column's own control (reflux, reboil, pressure) is not described yet"
+      ],
+      "headings": [
+        "Process narrative: depropanizer",
+        "FEED Feed let-down and flash",
+        "PREHEAT Feed preheat",
+        "COLUMN Depropanizer"
+      ]
+    },
+    {
+      "path": "control/philosophy.md",
+      "kind": "philosophy",
+      "valid": true,
+      "objectives": [
+        {
+          "id": "OBJ-1",
+          "title": "Feed the column at the rate of the operating case",
+          "loops": [
+            "FIC-101"
+          ]
+        },
+        {
+          "id": "OBJ-2",
+          "title": "Steady column feed temperature",
+          "loops": [
+            "TIC-103",
+            "FIC-105"
+          ]
+        },
+        {
+          "id": "OBJ-3",
+          "title": "No gas blow-by from D-101 into the preheater",
+          "loops": [
+            "LIC-102"
+          ]
+        }
+      ],
+      "failures": [
+        {
+          "id": "F-AIR",
+          "title": "Loss of instrument air",
+          "response": "FV-101, LV-102, FV-105 and XV-107 fail closed; the feed stops, D-101 holds its liquid. PV-104 is open (see the open points).",
+          "loops": [
+            "FIC-101",
+            "LIC-102",
+            "FIC-105",
+            "PIC-104"
+          ]
+        },
+        {
+          "id": "F-HOTOIL",
+          "title": "Loss of hot pentane",
+          "response": "TIC-103 saturates; the operator reduces the feed (FIC-101) and starts SEQ-STOP.",
+          "loops": [
+            "TIC-103",
+            "FIC-105"
+          ],
+          "sequences": [
+            "SEQ-STOP"
+          ]
+        },
+        {
+          "id": "F-LEVEL",
+          "title": "Loss of level in D-101",
+          "response": "Low-low level trip I-01 closes XV-107 and FV-105.",
+          "interlocks": [
+            "I-01"
+          ]
+        }
+      ],
+      "unresolved": [
+        "fail position of PV-104"
+      ],
+      "headings": [
+        "Control philosophy: depropanizer",
+        "Operating objectives",
+        "Control hierarchy",
+        "Normal operation and disturbances",
+        "Operator and automatic actions",
+        "Equipment and utility failures",
+        "Assumptions and open points"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "file": "control/loops.yaml",
+      "level": "info",
+      "rule": "cheme.control-shared-element",
+      "message": "loop FIC-105 shares FV-105 with interlock I-01: the loop is not independent of the interlock",
+      "line": 60,
+      "ids": [
+        "FIC-105",
+        "I-01",
+        "FV-105"
+      ],
+      "hint": "nothing to fix when meant; the HAZOP and SIL study judge independence",
+      "key": "FIC-105:I-01",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/loops.yaml#control-shared-element:FIC-105:I-01"
+    },
+    {
+      "file": "control/loops.yaml",
+      "level": "info",
+      "rule": "cheme.control-incomplete",
+      "message": "loop PIC-104: the fail position of PV-104 is not stated",
+      "line": 87,
+      "ids": [
+        "loop PIC-104"
+      ],
+      "hint": "give fail: open, closed, last (a drive stop, a heater off)",
+      "key": "loops.4.final_elements.0:the-fail-position-of-pv-104-is-not-stated",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/loops.yaml#control-incomplete:loops.4.final_elements.0:the-fail-position-of-pv-104-is-not-stated"
+    },
+    {
+      "file": "control/loops.yaml",
+      "level": "info",
+      "rule": "cheme.control-unresolved",
+      "message": "loop PIC-104: setpoint not known yet: flash pressure follows from the flash design (cheme process simulate)",
+      "line": 89,
+      "ids": [
+        "loop PIC-104"
+      ],
+      "hint": "give the value once it is known",
+      "key": "loops.4.targets.0.unresolved",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/loops.yaml#control-unresolved:loops.4.targets.0.unresolved"
+    },
+    {
+      "file": "control/loops.yaml",
+      "level": "info",
+      "rule": "cheme.control-unresolved",
+      "message": "loop PIC-104: open point: fail position of PV-104 (open relieves to the flare header; to be decided in the HAZOP)",
+      "line": 93,
+      "ids": [
+        "loop PIC-104"
+      ],
+      "hint": "resolve it and remove the entry, or keep it while it is open",
+      "key": "loops.4.unresolved.0",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/loops.yaml#control-unresolved:loops.4.unresolved.0"
+    },
+    {
+      "file": "control/philosophy.md",
+      "level": "info",
+      "rule": "cheme.control-unresolved",
+      "message": "control/philosophy.md: open point: fail position of PV-104",
+      "line": 23,
+      "ids": [
+        "control/philosophy.md"
+      ],
+      "hint": "resolve it and remove the entry, or keep it while it is open",
+      "key": "unresolved.0",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/philosophy.md#control-unresolved:unresolved.0"
+    },
+    {
+      "file": "control/sequences.yaml",
+      "level": "info",
+      "rule": "cheme.control-logic-text",
+      "message": "sequence SEQ-START: logic given as text is not checked: operator judges the column unstable",
+      "line": 48,
+      "ids": [
+        "sequence SEQ-START"
+      ],
+      "hint": "write it with all/any/vote and items where the format can express it",
+      "key": "sequences.0.abort.condition.any.1.text",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "control/sequences.yaml#control-logic-text:sequences.0.abort.condition.any.1.text"
+    },
+    {
+      "file": "process/narrative.md",
+      "level": "info",
+      "rule": "cheme.control-unresolved",
+      "message": "process/narrative.md: open point: the column's own control (reflux, reboil, pressure) is not described yet",
+      "line": 26,
+      "ids": [
+        "process/narrative.md"
+      ],
+      "hint": "resolve it and remove the entry, or keep it while it is open",
+      "key": "unresolved.0",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/narrative.md#control-unresolved:unresolved.0"
+    }
+  ],
+  "source": {
+    "commit": "05094f5b634ae806a6fea972d0d8e967e598be61",
+    "dirty": [],
+    "fingerprints": {
+      "control/cause-effect.yaml": "sha256:f8df0c0810a5779bde260a1178a0f85eff4320fc032117136f2304c7916a01c4",
+      "control/loops.yaml": "sha256:f7b8b2a22b51c22d0b3df8c6fbc0272791eec421be1ca6af890e2fb1f1399c2e",
+      "control/philosophy.md": "sha256:d298d7cd19dd9266f3ba639c375c7d35df43f9bf16642fc4ed4a34b9774efbf3",
+      "control/sequences.yaml": "sha256:19f4ce4d73d1c7c8c38b2e5d4a73d3ff5f107ba8ae456cca3c93beb19e465934",
+      "process/narrative.md": "sha256:18686ead861083c902aa3d6358ff557f86404a72fd851fe0948ac04ac4fef24a"
+    }
+  }
+}

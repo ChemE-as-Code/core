@@ -1,0 +1,18 @@
+# Packaged emission factor set epa-ap42: PLACEHOLDER (core#176). It holds no values. A factor of
+# lca/lca.yaml that names it (set: epa-ap42) refuses to run until the set is verified; give the
+# factor in lca/lca.yaml with its value, unit and source meanwhile.
+schema: cheme/lca/v1
+kind: emission_factors
+id: epa-ap42
+title: Compilation of Air Pollutant Emission Factors (AP-42)
+provider: US Environmental Protection Agency (US EPA)
+status: placeholder
+todo: >-
+  TODO: read the combustion (external combustion sources, stationary gas turbines), flare and
+  organic liquid storage tank factors from the AP-42 chapters themselves, and record each
+  chapter's edition and date, URL, checksum and table. The download host (epa.gov) was not
+  reachable when the mechanism was built, so nothing was read and no value is packaged.
+licence_note: >-
+  TODO (owner): works of the US federal government are generally not subject to copyright in the
+  US; confirm this holds for the AP-42 chapters used, and record the attribution to give, before
+  setting status verified and redistribution true.

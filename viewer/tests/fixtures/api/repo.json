@@ -1,0 +1,42 @@
+{
+  "name": "process-nested",
+  "root_name": "process-nested",
+  "branch": "main",
+  "head": "e66535e359fd73946ed3eadb60de2db9015addbd",
+  "stage": "concept",
+  "stages": [
+    {
+      "id": "concept",
+      "title": "Concept and feasibility"
+    },
+    {
+      "id": "basic",
+      "title": "Basic engineering"
+    },
+    {
+      "id": "detail",
+      "title": "Detail engineering"
+    }
+  ],
+  "sheets": [
+    {
+      "id": "BFD",
+      "file": "process/BFD.xml",
+      "title": "Block flow diagram",
+      "kind": "bfd",
+      "generator": "flowsheet",
+      "status": "drafted"
+    },
+    {
+      "id": "PFD",
+      "file": "process/PFD.xml",
+      "title": "Process flow diagram",
+      "kind": "pfd",
+      "generator": "flowsheet",
+      "status": "drafted"
+    }
+  ],
+  "dirty": true,
+  "has_layout": false,
+  "has_lca": false
+}

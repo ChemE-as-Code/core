@@ -1,0 +1,54 @@
+name: dwsim
+# cheme process simulate against the real DWSIM: builds the image of docker/dwsim (the
+# official Linux package, amd64, native on the runner) and runs every test gated by
+# CHEME_DWSIM_TESTS=1 (tests/test_process_simulate*.py: separations, columns and reactors).
+# The reactor tests compare DWSIM with cheme process propagate, so the propagation and reaction
+# modules they exercise are part of the trigger too.
+on:
+  pull_request:
+    paths: &simulation
+      - "src/chemeascode/domains/process/simulation/**"
+      - "src/chemeascode/integrations/dwsim*.py"
+      - "docker/dwsim/**"
+      - "src/chemeascode/domains/process/propagate.py"
+      - "src/chemeascode/domains/process/fixed_bed.py"
+      - "src/chemeascode/domains/process/reactors.py"
+      - "src/chemeascode/domains/process/model.py"
+      - "src/chemeascode/domains/process/thermodynamics/**"
+      - "src/chemeascode/domains/chemistry/thermochemistry.py"
+      - "src/chemeascode/domains/chemistry/reactions.py"
+      - "tests/test_process_simulate*.py"
+      - "tests/data/vle_ethanol_water.yaml"
+      - "examples/process-simulation/**"
+      - "examples/process-separation/**"
+      - "examples/process-double-column/**"
+      - ".github/workflows/dwsim.yml"
+  push:
+    branches: [main]
+    paths: *simulation
+permissions:
+  contents: read
+jobs:
+  dwsim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # pyDEXPI-dev is private: see ci.yml.
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+      - run: docker build --platform linux/amd64 -t cheme-dwsim:9.0.5 -f docker/dwsim/Dockerfile .
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --all-extras
+      # With the flag set the gated tests run (and fail without DWSIM); -rs lists any other skips.
+      - run: uv run pytest -rs tests/test_process_simulate.py tests/test_process_simulate_reactors.py
+          tests/test_process_simulate_kinetic.py tests/test_process_simulate_property_package.py
+          tests/test_process_simulate_property_package_srk.py
+          tests/test_process_simulate_property_package_nrtl.py tests/test_process_simulate_energy.py
+          tests/test_process_simulate_energy_liquid.py
+        env:
+          CHEME_DWSIM_TESTS: "1"

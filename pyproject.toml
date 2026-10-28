@@ -1,0 +1,121 @@
+[project]
+name = "cheme-as-code"
+version = "0.8.0"
+description = "Plant design as code: validate, format, render and diff DEXPI P&IDs, BFD/PFD and engineering YAML kept in git."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Process Intelligence Research" }]
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+]
+dependencies = [
+    "pydexpi",
+    "typer>=0.26.7",
+    "pyyaml>=6.0.2",
+    "pydantic>=2.13.4",
+    "lxml>=6.1.1",
+    # LCA uncertainty (Monte Carlo); already installed with pyDEXPI
+    "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+# `cheme serve`: the read-only HTTP API for the viewer.
+serve = ["fastapi>=0.143.3", "uvicorn>=0.54.0"]
+# `cheme render --png`: rasterising through resvg.
+png = ["resvg-py>=0.5.0"]
+# `cheme process props`: stream properties through thermo (pinned: the validated method).
+props = ["thermo==0.6.1", "chemicals==1.5.2", "CoolProp==8.0.0"]
+# foundation.units: conversion between any units through Pint (K, °C and the (a)/(g) pressure
+# units of the process YAML need no extra).
+units = ["pint>=0.24.4"]
+# domains/chemistry microkinetics: a mechanism solved by Cantera (a cross-check; the export to
+# Cantera YAML needs no extra); domains/process/furnace: the NASA gas and condensed-phase data
+# Cantera ships.
+# No wheels for Python 3.15 yet (a source build needs Boost).
+cantera = ["cantera>=3.2; python_version < '3.15'"]
+# domains/chemistry: SMILES validation and canonicalisation through RDKit (the web adapters in
+# integrations/ need no extra).
+chemistry = ["rdkit>=2024.3.5"]
+# `cheme assess lca` with backend brightway: characterisation from a Brightway 2.5 project
+# (ecoinvent or an open database, premise scenario databases). No wheels for Python 3.15 yet.
+lca = [
+    "bw2data>=4.8; python_version < '3.15'",
+    "bw2calc>=3.1; python_version < '3.15'",
+]
+
+[project.scripts]
+cheme = "chemeascode.interfaces.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff==0.16.10",
+    "fastapi>=0.143.3",
+    "uvicorn>=0.54.0",
+    "httpx2>=2.13.1",
+    "resvg-py>=0.5.0",
+    "thermo==0.6.1",
+    "chemicals==1.5.2",
+    "CoolProp==8.0.0",
+    "pint>=0.24.4",
+    "rdkit>=2024.3.5",
+    "cantera>=3.2; python_version < '3.15'",
+    "pytest-xdist>=3.8",
+]
+docs = [
+    "mkdocs>=1.6.1,<2",  # MkDocs 2 drops plugins and hooks
+    "mkdocs-material>=9.6",
+]
+
+[tool.uv.sources]
+# pyDEXPI 2.x is not on PyPI yet; pinned by commit. Bump deliberately.
+pydexpi = { git = "https://github.com/process-intelligence-research/pyDEXPI-dev.git", rev = "be793a039e8dac4380919c702dfcf81366869cc6" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chemeascode"]
+
+# The viewer and the agent runner live in this repository but are not part of the package.
+[tool.hatch.build.targets.sdist]
+exclude = ["/viewer", "/agent-cli"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# viewer/ (Node) and agent-cli/ (its own project and lint settings) are checked by their own CI.
+extend-exclude = ["viewer", "agent-cli"]
+# The agent-run runner is copied into plant repositories and run with the system python3.
+per-file-target-version = { "src/chemeascode/templates/project/scripts/agent-run/*.py" = "py39" }
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "BLE", "C4", "PIE", "RUF012", "RUF100", "PLW1510"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    # thermo's InteractionParameterDB.load_json reads its bundled tables with open(file).read()
+    # and never closes them; under pytest -n the garbage collector finalises them in some other test
+    "ignore:unclosed file .*Interaction Parameters:ResourceWarning",
+    "ignore:Exception ignored while finalizing file .*thermo/Interaction Parameters:pytest.PytestUnraisableExceptionWarning",
+    # likewise its CoolProp fluid table, loaded the first time water is a component
+    "ignore:unclosed file .*CoolPropFluids:ResourceWarning",
+    "ignore:Exception ignored .*CoolPropFluids:pytest.PytestUnraisableExceptionWarning",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The recommendation texts and their tests are kept verbatim from LLM4ChemE.
+"src/chemeascode/domains/process/separations/selection.py" = ["E501"]
+"tests/test_separation_selection.py" = ["E501"]
+
+[tool.ruff.lint.flake8-comprehensions]
+# dict(key=value, ...) reads as keyword arguments; keep it.
+allow-dict-calls-with-keyword-arguments = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["chemeascode"]

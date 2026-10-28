@@ -1,0 +1,172 @@
+<!-- How the actuating system is drawn, under Diagram/Groups: number label, actuator symbol (Shape1) with its fail-action label and the InstrumentationNodePosition the signal line ends at. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="ActuatingSystem1_Drawing1" type="Core/Diagram.RepresentationGroup">
+  <Components property="Groups">
+    <Object id="ActuatingSystem1_Drawing1_Groups1" type="Plant/Diagram.ActuatingSystemNumberLabel">
+      <Components property="Elements">
+        <Object id="ActuatingSystem1_Drawing1_Groups1_Elements1" type="Core/Diagram.Text">
+          <Components property="Template">
+            <Object id="ActuatingSystem1_Drawing1_Groups1_Elements1_Template1" type="Core/Diagram.TextTemplate">
+              <Components property="Fragments">
+                <Object id="ActuatingSystem1_Drawing1_Groups1_Elements1_Template1_Fragments1" type="Core/Diagram.AttributeRepresentation">
+                  <References objects="#ActuatingSystem1" property="Object"/>
+                  <Data property="AttributeName">
+                    <String>ActuatingSystemNumber</String>
+                  </Data>
+                  <Data property="Type">
+                    <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                  </Data>
+                </Object>
+              </Components>
+            </Object>
+          </Components>
+          <Data property="Alignment">
+            <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
+          </Data>
+          <Data property="Color">
+            <AggregatedDataValue type="Core/Diagram.Color">
+              <Data property="B">
+                <Integer>0</Integer>
+              </Data>
+              <Data property="G">
+                <Integer>0</Integer>
+              </Data>
+              <Data property="R">
+                <Integer>0</Integer>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+          <Data property="Font">
+            <String>Calibri</String>
+          </Data>
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>319.5</Double>
+              </Data>
+              <Data property="Y">
+                <Double>98.0</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+          <Data property="Rotation">
+            <Double>270.0</Double>
+          </Data>
+          <Data property="Size">
+            <Double>3.0</Double>
+          </Data>
+          <Data property="Text">
+            <String>PV4712.02</String>
+          </Data>
+        </Object>
+      </Components>
+    </Object>
+    <Object id="ControlledActuator1_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="Groups">
+        <Object id="ControlledActuator1_Drawing1_Groups1" type="Core/Diagram.Static">
+          <Components property="Elements">
+            <Object id="ControlledActuator1_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+              <References objects="#Shape1" property="Shape"/>
+              <Data property="IsMirrored">
+                <Boolean>false</Boolean>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>323.5</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>98.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>0.0</Double>
+              </Data>
+              <Data property="ScaleX">
+                <Double>0.45</Double>
+              </Data>
+              <Data property="ScaleY">
+                <Double>0.45</Double>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+        <Object id="ControlledActuator1_Drawing1_Groups2" type="Plant/Diagram.FailActionLabel">
+          <Components property="Elements">
+            <Object id="ControlledActuator1_Drawing1_Groups2_Elements1" type="Core/Diagram.Text">
+              <Components property="Template">
+                <Object id="ControlledActuator1_Drawing1_Groups2_Elements1_Template1" type="Core/Diagram.TextTemplate">
+                  <Components property="Fragments">
+                    <Object id="ControlledActuator1_Drawing1_Groups2_Elements1_Template1_Fragments1" type="Core/Diagram.AttributeRepresentation">
+                      <References objects="#ControlledActuator1" property="Object"/>
+                      <Data property="AttributeName">
+                        <String>FailActionRepresentation</String>
+                      </Data>
+                      <Data property="Type">
+                        <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                      </Data>
+                    </Object>
+                  </Components>
+                </Object>
+              </Components>
+              <Data property="Alignment">
+                <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
+              </Data>
+              <Data property="Color">
+                <AggregatedDataValue type="Core/Diagram.Color">
+                  <Data property="B">
+                    <Integer>0</Integer>
+                  </Data>
+                  <Data property="G">
+                    <Integer>0</Integer>
+                  </Data>
+                  <Data property="R">
+                    <Integer>0</Integer>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Font">
+                <String>Calibri</String>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>325.5</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>102.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>270.0</Double>
+              </Data>
+              <Data property="Size">
+                <Double>3.0</Double>
+              </Data>
+              <Data property="Text">
+                <String>F.C.</String>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+      </Components>
+      <Components property="NodePositions">
+        <Object id="InstrumentationNodePosition6" type="Plant/Diagram.InstrumentationNodePosition">
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>331.6</Double>
+              </Data>
+              <Data property="Y">
+                <Double>98.0</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+        </Object>
+      </Components>
+      <References objects="#ControlledActuator1" property="Represents"/>
+    </Object>
+  </Components>
+  <References objects="#ActuatingSystem1" property="Represents"/>
+</Object>

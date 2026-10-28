@@ -1,0 +1,70 @@
+# BFD stream aggregation (bfd.aggregate): an air separation in blocks only, with parallel
+# boundary streams between the same blocks. With `aggregate: true` the BFD draws S2 and S3
+# (COMP -> COLD) as one connection, and S6, S7 and S8 (COLD -> STORE) as another; each lists the
+# streams it represents (`represents: S2 S3`). Kept separate: the energy stream Q2 (another kind)
+# and the waste gas S4 (the other direction). Balances use the streams. Regenerate the BFD with
+# `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Air separation (aggregated BFD)
+units: {pressure: kPa(a), temperature: K, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+feeds:
+  - {id: AIR, title: Atmospheric air, ports: [{id: out, direction: out}]}
+  - {id: POWER, title: Electric power, ports: [{id: q, direction: out, kind: energy}]}
+products:
+  - {id: VENT, title: Vent, ports: [{id: in, direction: in}]}
+  - {id: GOX, title: Gaseous oxygen, ports: [{id: in, direction: in}]}
+  - {id: LIN, title: Liquid nitrogen, ports: [{id: in, direction: in}]}
+  - {id: LOX, title: Liquid oxygen, ports: [{id: in, direction: in}]}
+blocks:
+  - id: COMP
+    title: Compression and purification
+    class: Compressing
+    ports:
+      - {id: air, direction: in}
+      - {id: power, direction: in, kind: energy}
+      - {id: regen, direction: in}
+      - {id: main, direction: out}
+      - {id: boost, direction: out}
+      - {id: shaft, direction: out, kind: energy}
+      - {id: vent, direction: out}
+  - id: COLD
+    title: Cold box
+    class: SeparatingByThermalProcess
+    ports:
+      - {id: main, direction: in}
+      - {id: boost, direction: in}
+      - {id: shaft, direction: in, kind: energy}
+      - {id: waste, direction: out}
+      - {id: gox, direction: out}
+      - {id: lin, direction: out}
+      - {id: lox, direction: out}
+  - id: STORE
+    title: Product storage
+    class: ProcessStep
+    ports:
+      - {id: gox, direction: in}
+      - {id: lin, direction: in}
+      - {id: lox, direction: in}
+      - {id: gox_out, direction: out}
+      - {id: lin_out, direction: out}
+      - {id: lox_out, direction: out}
+streams:
+  - {id: S1, title: Air, from: AIR.out, to: COMP.air, template: air, state: {design: {flow: {value: 1000, provenance: given, source: basis of design}}}}
+  - {id: Q1, title: Compressor power, kind: energy, from: POWER.q, to: COMP.power, state: {design: {duty: {value: 120, provenance: assumed}}}}
+  - {id: S2, title: Main air, from: COMP.main, to: COLD.main, template: air, state: {design: {flow: {value: 700, provenance: assumed}}}}
+  - {id: S3, title: Booster air, from: COMP.boost, to: COLD.boost, template: air, state: {design: {flow: {value: 300, provenance: assumed}}}}
+  - {id: Q2, title: Expander shaft work, kind: energy, from: COMP.shaft, to: COLD.shaft, state: {design: {duty: {value: 15, provenance: assumed}}}}
+  - {id: S4, title: Regeneration gas, from: COLD.waste, to: COMP.regen, template: air, state: {design: {flow: {value: 100, provenance: assumed}}}}
+  - {id: S5, title: Vent gas, from: COMP.vent, to: VENT.in, template: air, state: {design: {flow: {value: 100, provenance: assumed}}}}
+  - {id: S6, title: GOX, from: COLD.gox, to: STORE.gox, template: air, state: {design: {flow: {value: 200, provenance: assumed}}}}
+  - {id: S7, title: LIN, from: COLD.lin, to: STORE.lin, template: air, state: {design: {flow: {value: 300, provenance: assumed}}}}
+  - {id: S8, title: LOX, from: COLD.lox, to: STORE.lox, template: air, state: {design: {flow: {value: 400, provenance: assumed}}}}
+  - {id: S9, title: GOX product, from: STORE.gox_out, to: GOX.in, template: air, state: {design: {flow: {value: 200, provenance: assumed}}}}
+  - {id: S10, title: LIN product, from: STORE.lin_out, to: LIN.in, template: air, state: {design: {flow: {value: 300, provenance: assumed}}}}
+  - {id: S11, title: LOX product, from: STORE.lox_out, to: LOX.in, template: air, state: {design: {flow: {value: 400, provenance: assumed}}}}
+bfd:
+  aggregate: true

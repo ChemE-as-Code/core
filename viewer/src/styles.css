@@ -1,0 +1,444 @@
+/* Design tokens. Light by default, dark via prefers-color-scheme or ?theme=dark (below). */
+:root {
+  color-scheme: light dark;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-sm: 12.5px;
+  --text: 14px;
+  --text-lg: 17px;
+  --radius: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --header-h: 52px;
+  --sidebar-w: 270px;
+
+  --bg: #ffffff;
+  --bg-soft: #f5f6f8;
+  --bg-sunk: #eceef2;
+  --surface: #ffffff;
+  --border: #d9dde3;
+  --fg: #1d2127;
+  --fg-muted: #5b6470;
+  --fg-faint: #8a929c;
+  /* brand palette (ChemE-as-Code logo, website packages/brand): navy primary, cyan highlight */
+  --accent: #0f3f7a;
+  --accent-soft: #e1f4fa;
+  --accent-fg: #ffffff;
+  --paper: #ffffff;
+
+  --ok: #1a7f37;
+  --ok-soft: #dcf3e2;
+  --bad: #c62828;
+  --bad-soft: #fbe2e2;
+  --warn: #9a6200;
+  --warn-soft: #fbefd5;
+  --info: #1f5f99;
+  --info-soft: #e3eef8;
+  --na: #5b6470;
+  --na-soft: #eceef2;
+
+  --added: #1a9e3f;
+  --removed: #d0312d;
+  --modified: #e08a00;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.06);
+
+  /* Charts (LCA): eight categorical colours, told apart without relying on hue alone; 0 is "other". */
+  --chart-0: #9aa3ad;
+  --chart-1: #2e6fb2;
+  --chart-2: #e08a00;
+  --chart-3: #2a9d6f;
+  --chart-4: #c2477a;
+  --chart-5: #7a5bc0;
+  --chart-6: #3aa6b9;
+  --chart-7: #a8792f;
+  --chart-8: #d0544a;
+}
+
+/* Dark tokens, written twice with the same declarations (tests/viewerOptions.test.ts checks):
+   from the system preference unless `?theme=light` forces light, and always for `?theme=dark`
+   (`data-theme` on <html>, set in main.ts from src/lib/viewerOptions.ts). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171b;
+    --bg-soft: #1b1f24;
+    --bg-sunk: #101215;
+    --surface: #1e2329;
+    --border: #2f363e;
+    --fg: #e5e8ec;
+    --fg-muted: #a3acb6;
+    --fg-faint: #78818b;
+    --accent: #5cd0ea;
+    --accent-soft: #0f3346;
+    --accent-fg: #04202b;
+    /* Drawings keep a light sheet so black linework stays readable. */
+    --paper: #f4f4f2;
+
+    --ok: #5ccf7c;
+    --ok-soft: #183a24;
+    --bad: #ff7b72;
+    --bad-soft: #43201f;
+    --warn: #e3b341;
+    --warn-soft: #3d2e10;
+    --info: #6aa8e0;
+    --info-soft: #1d3247;
+    --na: #a3acb6;
+    --na-soft: #262c33;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+
+    --chart-0: #6c757f;
+    --chart-1: #6aa8e0;
+    --chart-2: #f0a830;
+    --chart-3: #4cc495;
+    --chart-4: #e27aa6;
+    --chart-5: #a68de0;
+    --chart-6: #62c6d8;
+    --chart-7: #d2a55a;
+    --chart-8: #f07f75;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14171b;
+  --bg-soft: #1b1f24;
+  --bg-sunk: #101215;
+  --surface: #1e2329;
+  --border: #2f363e;
+  --fg: #e5e8ec;
+  --fg-muted: #a3acb6;
+  --fg-faint: #78818b;
+  --accent: #5cd0ea;
+  --accent-soft: #0f3346;
+  --accent-fg: #04202b;
+  /* Drawings keep a light sheet so black linework stays readable. */
+  --paper: #f4f4f2;
+
+  --ok: #5ccf7c;
+  --ok-soft: #183a24;
+  --bad: #ff7b72;
+  --bad-soft: #43201f;
+  --warn: #e3b341;
+  --warn-soft: #3d2e10;
+  --info: #6aa8e0;
+  --info-soft: #1d3247;
+  --na: #a3acb6;
+  --na-soft: #262c33;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  --chart-0: #6c757f;
+  --chart-1: #6aa8e0;
+  --chart-2: #f0a830;
+  --chart-3: #4cc495;
+  --chart-4: #e27aa6;
+  --chart-5: #a68de0;
+  --chart-6: #62c6d8;
+  --chart-7: #d2a55a;
+  --chart-8: #f07f75;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: var(--text) / 1.45 var(--font);
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  height: 100%;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 30px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.btn:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+select,
+input[type="text"],
+input[type="search"] {
+  min-height: 30px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 100%;
+}
+
+.page {
+  padding: var(--space-4) var(--space-6);
+  max-width: 1400px;
+}
+.page h1 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  word-break: break-all;
+}
+.page h1 small {
+  color: var(--fg-muted);
+  font-weight: normal;
+  font-size: var(--text);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.toolbar .spacer {
+  flex: 1;
+}
+
+.muted {
+  color: var(--fg-muted);
+}
+.faint {
+  color: var(--fg-faint);
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+table.data {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-sm);
+}
+table.data th,
+table.data td {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+table.data th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-soft);
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 1;
+}
+table.data tbody tr:last-child td {
+  border-bottom: 0;
+}
+table.data tbody tr:hover {
+  background: var(--bg-soft);
+}
+table.data tr.clickable {
+  cursor: pointer;
+}
+table.data tr.selected {
+  background: var(--accent-soft);
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--na-soft);
+  color: var(--na);
+}
+.badge.pass,
+.badge.added,
+.badge.clean {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.badge.fail,
+.badge.error,
+.badge.removed {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.badge.warning,
+.badge.modified,
+.badge.moved,
+.badge.dirty {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.badge.info,
+.badge.stage {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+/* Provenance of a process value: given, assumed, calculated. */
+.prov {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  font-family: var(--mono);
+  vertical-align: 1px;
+}
+.prov.given {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.prov.assumed {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.prov.calculated {
+  background: var(--info-soft);
+  color: var(--info);
+}
+/* A stream value the recorded simulation run filled (process/simulation-run.json `filled`). */
+.sim-mark {
+  display: inline-block;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  font-family: var(--mono);
+  vertical-align: 1px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sim-mark.stale {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.pv.stale {
+  text-decoration: underline dotted var(--warn);
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  margin: var(--space-3) 0;
+}
+.notice.error {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--fg);
+}
+.notice.warning {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--fg);
+}
+.notice.ok {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--fg);
+}
+.notice.info {
+  border-color: var(--info);
+  background: var(--info-soft);
+  color: var(--fg);
+}
+
+details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--space-2) 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: var(--space-3);
+  }
+}

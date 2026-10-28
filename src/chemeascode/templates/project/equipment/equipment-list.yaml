@@ -1,0 +1,3 @@
+# Equipment list. Schema: `cheme schema equipment`.
+schema: cheme/equipment/v1
+equipment: []

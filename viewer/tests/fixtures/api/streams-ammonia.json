@@ -1,0 +1,595 @@
+{
+  "rev": null,
+  "case": "design",
+  "cases": [
+    {
+      "id": "design",
+      "description": "Design case",
+      "default": true
+    }
+  ],
+  "default_case": "design",
+  "units": {
+    "pressure": "kPa(a)",
+    "temperature": "K",
+    "flow": "kmol/h",
+    "duty": "kW",
+    "enthalpy": "kJ/kmol"
+  },
+  "tolerance": {
+    "abs": 1.0,
+    "rel": 0.005
+  },
+  "streams": [
+    {
+      "id": "S1",
+      "title": "Makeup gas",
+      "kind": "material",
+      "from": "MAKEUP.out",
+      "to": "M1.makeup",
+      "from_block": "MAKEUP",
+      "to_block": "LOOP",
+      "on_bfd": true,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 20000.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "given",
+          "source": "basis of design",
+          "stale": false
+        },
+        "temperature": {
+          "value": 313.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "given",
+          "source": "basis of design",
+          "stale": false
+        },
+        "flow": {
+          "value": 1000.0,
+          "unit": "kmol/h",
+          "basis": "mole",
+          "provenance": "given",
+          "source": "basis of design",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.2475,
+          "H2": 0.7425,
+          "NH3": 0.0,
+          "AR": 0.01
+        },
+        "provenance": "given",
+        "source": "basis of design",
+        "fingerprint": null
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S2",
+      "title": "Converter feed",
+      "kind": "material",
+      "from": "M1.out",
+      "to": "R1.in",
+      "from_block": "LOOP",
+      "to_block": "LOOP",
+      "on_bfd": false,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 20000.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "assumed",
+          "source": "",
+          "stale": false
+        },
+        "temperature": {
+          "value": 673.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "assumed",
+          "source": "bed inlet, after the feed-effluent exchanger",
+          "stale": false
+        },
+        "flow": {
+          "value": 32313.5,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process propagate: mixer M1 from S1 S8",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.233641,
+          "H2": 0.700923,
+          "NH3": 0.0,
+          "AR": 0.0654357
+        },
+        "provenance": "calculated",
+        "source": "cheme process propagate: mixer M1 from S1 S8",
+        "fingerprint": "c4c1cf41178b7fbe"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S3",
+      "title": "Converter effluent",
+      "kind": "material",
+      "from": "R1.out",
+      "to": "E1.in",
+      "from_block": "LOOP",
+      "to_block": "LOOP",
+      "on_bfd": false,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 20000.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "assumed",
+          "source": "",
+          "stale": false
+        },
+        "temperature": {
+          "value": 743.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "assumed",
+          "source": "converter outlet",
+          "stale": false
+        },
+        "flow": {
+          "value": 32313.5,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process propagate: reactor R1 from S2",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.188147,
+          "H2": 0.56444,
+          "NH3": 0.170801,
+          "AR": 0.0766122
+        },
+        "provenance": "calculated",
+        "source": "cheme process propagate: reactor R1 from S2",
+        "fingerprint": "d56039267d06ea0e"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S4",
+      "title": "Cooled effluent",
+      "kind": "material",
+      "from": "E1.out",
+      "to": "F1.in",
+      "from_block": "LOOP",
+      "to_block": "LOOP",
+      "on_bfd": false,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": {
+          "value": 268.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "assumed",
+          "source": "chilled to -5 C",
+          "stale": false
+        },
+        "flow": {
+          "value": 32313.5,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process propagate: pass-through E1 from S3",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.188147,
+          "H2": 0.56444,
+          "NH3": 0.170801,
+          "AR": 0.0766122
+        },
+        "provenance": "calculated",
+        "source": "cheme process propagate: pass-through E1 from S3",
+        "fingerprint": "c2460d39930a77f4"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S5",
+      "title": "Separator vapour",
+      "kind": "material",
+      "from": "F1.vapour",
+      "to": "SP1.in",
+      "from_block": "LOOP",
+      "to_block": "LOOP",
+      "on_bfd": false,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": {
+          "value": 2164.657,
+          "unit": "kmol/h",
+          "basis": "mole",
+          "provenance": "assumed",
+          "source": "loop balance; all NH3 condensed",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.226902,
+          "H2": 0.680705,
+          "NH3": 0.0,
+          "AR": 0.092393
+        },
+        "provenance": "assumed",
+        "source": "loop balance; all NH3 condensed",
+        "fingerprint": null
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S6",
+      "title": "Liquid ammonia",
+      "kind": "material",
+      "from": "F1.liquid",
+      "to": "AMMONIA.in",
+      "from_block": "LOOP",
+      "to_block": "AMMONIA",
+      "on_bfd": true,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": {
+          "value": 445.8836,
+          "unit": "kmol/h",
+          "basis": "mole",
+          "provenance": "assumed",
+          "source": "loop balance; all NH3 condensed",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.0,
+          "H2": 0.0,
+          "NH3": 1.0,
+          "AR": 0.0
+        },
+        "provenance": "assumed",
+        "source": "loop balance; all NH3 condensed",
+        "fingerprint": null
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S7",
+      "title": "Purge",
+      "kind": "material",
+      "from": "SP1.purge",
+      "to": "PURGE.in",
+      "from_block": "LOOP",
+      "to_block": "PURGE",
+      "on_bfd": true,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": {
+          "value": 108.233,
+          "unit": "kmol/h",
+          "basis": "mole",
+          "provenance": "calculated",
+          "source": "cheme process propagate: splitter SP1 from S5",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.226902,
+          "H2": 0.680705,
+          "NH3": 0.0,
+          "AR": 0.092393
+        },
+        "provenance": "calculated",
+        "source": "cheme process propagate: splitter SP1 from S5",
+        "fingerprint": "6e3883418ea3839c"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S8",
+      "title": "Recycle gas",
+      "kind": "material",
+      "from": "SP1.recycle",
+      "to": "M1.recycle",
+      "from_block": "LOOP",
+      "to_block": "LOOP",
+      "on_bfd": false,
+      "template": "syngas",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": {
+          "value": 2056.425,
+          "unit": "kmol/h",
+          "basis": "mole",
+          "provenance": "assumed",
+          "source": "loop balance",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.226902,
+          "H2": 0.680705,
+          "NH3": 0.0,
+          "AR": 0.092393
+        },
+        "provenance": "assumed",
+        "source": "loop balance",
+        "fingerprint": null
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    }
+  ],
+  "balances": [
+    {
+      "node": "LOOP",
+      "kind": "block",
+      "status": "ok",
+      "in_kg_h": 8829.825,
+      "out_kg_h": 8829.826513,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S6",
+        "S7"
+      ],
+      "extents_kmol_h": {
+        "NH3_SYN": 222.941763
+      },
+      "title": "Synthesis loop"
+    },
+    {
+      "node": "M1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 32313.477665,
+      "out_kg_h": 32313.5,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S1",
+        "S8"
+      ],
+      "streams_out": [
+        "S2"
+      ],
+      "title": "Makeup and recycle"
+    },
+    {
+      "node": "R1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 32313.5,
+      "out_kg_h": 32313.5,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S2"
+      ],
+      "streams_out": [
+        "S3"
+      ],
+      "extents_kmol_h": {
+        "NH3_SYN": 222.941988
+      },
+      "title": "Ammonia converter"
+    },
+    {
+      "node": "E1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 32313.5,
+      "out_kg_h": 32313.5,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S3"
+      ],
+      "streams_out": [
+        "S4"
+      ],
+      "title": "Converter effluent cooler"
+    },
+    {
+      "node": "F1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 32313.5,
+      "out_kg_h": 32313.467759,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S4"
+      ],
+      "streams_out": [
+        "S5",
+        "S6"
+      ],
+      "title": "Ammonia separator"
+    },
+    {
+      "node": "SP1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 24719.624167,
+      "out_kg_h": 24719.635587,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S5"
+      ],
+      "streams_out": [
+        "S7",
+        "S8"
+      ],
+      "title": "Purge split"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "MAKEUP",
+      "kind": "feed",
+      "title": "Makeup synthesis gas",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "AMMONIA",
+      "kind": "product",
+      "title": "Liquid ammonia",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "PURGE",
+      "kind": "product",
+      "title": "Purge gas",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "LOOP",
+      "kind": "block",
+      "title": "Synthesis loop",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "M1",
+      "kind": "step",
+      "title": "Makeup and recycle",
+      "block": "LOOP",
+      "links": []
+    },
+    {
+      "id": "R1",
+      "kind": "step",
+      "title": "Ammonia converter",
+      "block": "LOOP",
+      "links": []
+    },
+    {
+      "id": "E1",
+      "kind": "step",
+      "title": "Converter effluent cooler",
+      "block": "LOOP",
+      "links": []
+    },
+    {
+      "id": "F1",
+      "kind": "step",
+      "title": "Ammonia separator",
+      "block": "LOOP",
+      "links": []
+    },
+    {
+      "id": "SP1",
+      "kind": "step",
+      "title": "Purge split",
+      "block": "LOOP",
+      "links": []
+    }
+  ],
+  "bfd_connections": {
+    "S1": [
+      "S1"
+    ],
+    "S6": [
+      "S6"
+    ],
+    "S7": [
+      "S7"
+    ]
+  },
+  "bfd_connections_from": "sheet"
+}

@@ -1,0 +1,282 @@
+[
+  {
+    "path": "equipment",
+    "type": "dir",
+    "kind": "other"
+  },
+  {
+    "path": "equipment/datasheets",
+    "type": "dir",
+    "kind": "other"
+  },
+  {
+    "path": "equipment/datasheets/C-1101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/C-1102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/C-3101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/C-3102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-1101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-1102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-1103.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-2101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-3101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-3102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-3103.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-3104.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4103.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4105A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4105B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4106A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/E-4106B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/F-1101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/F-2101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/K-1101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/K-3101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/K-4101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/K-4102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/KT-3101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-1101A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-1101B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-1102A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-1102B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-4101A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-4101B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-4102A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/P-4102B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/README.md",
+    "type": "file",
+    "kind": "markdown"
+  },
+  {
+    "path": "equipment/datasheets/T-4101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/T-4102.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/V-2101A.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/V-2101B.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "equipment/datasheets/V-3101.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout",
+    "type": "dir",
+    "kind": "other"
+  },
+  {
+    "path": "layout/README.md",
+    "type": "file",
+    "kind": "markdown"
+  },
+  {
+    "path": "layout/building.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/equipment-placement.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/hvac.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/lifting-study.csv",
+    "type": "file",
+    "kind": "other"
+  },
+  {
+    "path": "layout/lifting-study.md",
+    "type": "file",
+    "kind": "markdown"
+  },
+  {
+    "path": "layout/plant-model.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/site-plan.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/structures.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "layout/zones.yaml",
+    "type": "file",
+    "kind": "yaml"
+  },
+  {
+    "path": "electrical",
+    "type": "dir",
+    "kind": "other"
+  },
+  {
+    "path": "electrical/cable-schedule.csv",
+    "type": "file",
+    "kind": "other"
+  },
+  {
+    "path": "electrical/cable-schedule.md",
+    "type": "file",
+    "kind": "markdown"
+  }
+]

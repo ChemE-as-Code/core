@@ -1,0 +1,32 @@
+# A bipolar membrane cell with a high-performance membrane: about 3.0 V at 6.0 kA/m2 (0 mm gap,
+# 32 wt-% NaOH, 200 g/l NaCl in the anolyte, 90 °C) and a current efficiency above 95 %:
+# Brinkmann et al., Best Available Techniques (BAT) Reference Document for the Production of
+# Chlor-alkali, JRC, EUR 26844 EN (2014), doi:10.2791/13138, section 4.3.2.3.2. The current
+# efficiency is taken at its bound, 0.95.
+schema: cheme/electrochemical-cells/v1
+kind: electrochemical_cells
+cells:
+  - id: MEM-1
+    title: Bipolar membrane cell
+    reaction: CA
+    electrons: 2
+    electrodes:
+      anode: {equation: "2 Cl- -> Cl2 + 2 e-", species: {Cl-: -2, Cl2: 1, e-: 2}}
+      cathode: {equation: "2 H2O + 2 e- -> H2 + 2 OH-", species: {H2O: -2, e-: -2, H2: 1, OH-: 2}}
+    dissociation:
+      NaCl: {Na+: 1, Cl-: 1}
+      NaOH: {Na+: 1, OH-: 1}
+    cells: 1
+    current: {value: 6, unit: kA, provenance: given, source: "BREF chlor-alkali 2014, 4.3.2.3.2: 6.0 kA/m2"}
+    active_area: {value: 1, unit: m2, provenance: given, source: "reference cell"}
+    faradaic_efficiency: {value: 0.95, provenance: given, source: "BREF chlor-alkali 2014, 4.3.2.3.2: current efficiency > 95 %"}
+    voltage: {value: 3.0, unit: V, provenance: given, source: "BREF chlor-alkali 2014, 4.3.2.3.2: about 3.0 V at 6.0 kA/m2"}
+    thermal:
+      kind: isothermal
+      temperature: {value: 90, unit: °C, provenance: given, source: "BREF chlor-alkali 2014, 4.3.2.3.2"}
+    operating_range:
+      temperature: [353.15, 363.15]
+      current_density: [1400, 6500]
+      source: "BREF chlor-alkali 2014, Table 3.10: bipolar membrane cells 1.4-6.5 kA/m2; 90 °C operation"
+    electrolyte: "anolyte: NaCl brine about 200 g/l; catholyte: 32 wt-% NaOH; cation-exchange membrane"
+    sources: ["Brinkmann et al., BAT Reference Document for the Production of Chlor-alkali, EUR 26844 EN (2014), doi:10.2791/13138"]

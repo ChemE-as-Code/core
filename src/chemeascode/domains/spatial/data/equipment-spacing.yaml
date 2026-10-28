@@ -1,0 +1,48 @@
+# Minimum clear distances between equipment items in plan, by family or DEXPI class: a
+# screening table for the rule layout-spacing on the 3D model, checked like the site plan's
+# separations without declaring each pair. Every row is ASSUMED: check it against the owner's
+# spacing standard (e.g. the spacing tables of the CCPS Guidelines for Siting and Layout of
+# Facilities, or the insurer's). A separation in layout/site-plan.yaml naming both items
+# replaces the table for that pair; criteria: {spacing_table: false} switches the table off.
+#
+# A side matches an item by `family` (the model's family: pump, compressor, turbine, column,
+# vessel, horizontal_vessel, tank, shell_tube, plate_exchanger, air_cooler, filter, silencer,
+# stack, generic) or by `class` (a part of its DEXPI class name, any case); `any: true` matches
+# every item. Measured edge to edge between the footprints (round items as circles), only
+# between items whose height ranges overlap (not between items stacked on each other), and not
+# for items inside a closed casing (a cold box).
+schema: cheme/equipment-spacing/v1
+status: ASSUMED
+rows:
+  - a: {class: [Furnace, Fired, Boiler, Incinerator, Flare, Kiln, Burner]}
+    b: {any: true}
+    min_m: 15.0
+    basis: "Fired equipment to other process equipment: 15 m (typical screening value for an open flame near releases, ASSUMED)."
+  - a: {family: [pump]}
+    b: {family: [pump]}
+    min_m: 1.0
+    basis: "Pump to pump: 1 m clear for maintenance access between casings and motors (ASSUMED)."
+  - a: {family: [compressor, turbine]}
+    b: {family: [compressor, turbine]}
+    min_m: 3.0
+    basis: "Machine to machine (compressors, turbines, expanders): 3 m clear for maintenance and lifting (ASSUMED)."
+  - a: {family: [compressor, turbine]}
+    b: {family: [pump, vessel, column, horizontal_vessel, shell_tube, plate_exchanger, air_cooler, filter]}
+    min_m: 2.0
+    basis: "Machine to other process equipment: 2 m clear around the machine (ASSUMED)."
+  - a: {family: [column]}
+    b: {family: [column]}
+    min_m: 3.0
+    basis: "Column to column: 3 m shell to shell for platforms, piping and access (ASSUMED)."
+  - a: {family: [vessel, horizontal_vessel, column]}
+    b: {family: [vessel, horizontal_vessel]}
+    min_m: 1.5
+    basis: "Vessel to vessel: 1.5 m shell to shell for access and piping (ASSUMED)."
+  - a: {family: [shell_tube, plate_exchanger]}
+    b: {family: [shell_tube, plate_exchanger]}
+    min_m: 1.0
+    basis: "Exchanger to exchanger: 1 m clear for access to flanges and supports (ASSUMED)."
+  - a: {family: [tank]}
+    b: {family: [tank]}
+    min_m: 3.0
+    basis: "Storage tank to storage tank: 3 m shell to shell at least (ASSUMED; atmospheric flammable storage needs the larger fractions of the diameter of the fire codes)."

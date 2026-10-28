@@ -1,0 +1,14 @@
+# Cause and effect list: interlocks and trips. Schema: `cheme schema interlocks`.
+schema: cheme/interlocks/v1
+interlocks:
+  - id: I-01
+    title: D-101 low-low level (protects E-101 and the column feed from gas blow-by)
+    cause: {tag: LT-106, condition: LALL}
+    effects:
+      - {tag: XV-107, action: close}
+      - {tag: FV-105, action: close}
+    delay: {value: 5, unit: s}
+    latching: true
+    reset: manual
+    bypass: none foreseen (ASSUMED)
+    notes: PROPOSED; trip setting and SIL screening open (HAZOP)

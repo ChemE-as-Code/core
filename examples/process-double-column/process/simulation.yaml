@@ -1,0 +1,55 @@
+# What DWSIM needs beyond the flowsheet (`cheme process simulate`; schema
+# `cheme schema process-simulation`). Units as in process/flowsheet.yaml unless given.
+schema: cheme/simulation/v1
+kind: simulation
+simulator: dwsim
+property_package: Peng-Robinson (PR)
+# The facts of the thermodynamic model selection (thermodynamic-model-selection, Carlson's
+# tree), checked against property_package on every translation and by `cheme maturity`.
+# They recommend Peng-Robinson (outcome nonpolar_no_pseudocomponents), so PR needs no
+# substitution. Here the tree decides on is_polar and has_pseudocomponents alone; the other
+# facts are recorded so a reviewer can see the regime was considered.
+method_selection:
+  facts:
+    # N2 and O2 are homonuclear diatomics and Ar is monatomic: no dipole moment
+    is_polar: false
+    # no ions: a dry gas and cryogenic liquid of three molecular species
+    is_electrolyte: false
+    # all three are pure compounds with CAS numbers in materials.yaml, no assay fractions
+    has_pseudocomponents: false
+    # liquid N2, O2 and Ar are completely miscible: one liquid phase on every tray
+    liquid_liquid_expected: false
+    # no carboxylic acid or HF: no vapour-phase association
+    vapor_association_expected: false
+    # the highest pressure of the flowsheet: the HP column feed S2 at 5.5 bar(a) (the LP
+    # column runs at 1.3-1.4 bar(a)); band not_extreme, which this branch does not use
+    pressure_value: 5.5
+    pressure_unit: bar(a)
+    # interaction_parameters_available left unset: the nonpolar branch does not ask for it,
+    # and cheme-as-code does not inspect DWSIM's kij for AR/O2 (uncertain, not claimed)
+specs:
+  C1:
+    stages: 40
+    feed_stage: 40
+    reboiler: false
+    condenser: partial
+    condenser_pressure: {value: 5.2, provenance: assumed}
+    reboiler_pressure: {value: 5.5, provenance: assumed}
+    vapor_flow: {value: 12510, provenance: given, source: GAN product}
+    condenser_spec: {flow: {value: 24530, provenance: assumed, source: liquid nitrogen to the LP column}}
+    outlets: {n2: vapor, ln: distillate, crude: bottoms}
+    side_draws:
+      lin: {stage: 2, phase: liquid, flow: {value: 470, provenance: given, source: LIN product}}
+  C2:
+    stages: 59
+    feed_stages: {reflux: 1, crude: 22, lachmann: 24}
+    condenser: none
+    condenser_pressure: {value: 1.30, provenance: assumed}
+    reboiler_pressure: {value: 1.40, provenance: assumed}
+    reboiler_spec: {flow: {value: 470, provenance: given, source: LOX product}}
+    outlets: {waste: vapor, lox: bottoms}
+    side_draws:
+      gox: {stage: 59, phase: vapor, flow: {value: 20860, provenance: given, source: GOX product}}
+    # checked: C1 condenses ~8 % more than C2 reboils (cheme.process-sim-reboiler-
+    # unbalanced): the columns could make some 4 t/h more liquid than this LOX spec takes
+    heat_integration: {condenser_of: C1}

@@ -1,0 +1,11 @@
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: C3, name: Propane, formula: C3H8, cas: 74-98-6, chebi: "CHEBI:32879", molar_mass: 44.097, normal_boiling_point: 231.04}
+  - {id: NC4, name: n-Butane, formula: C4H10, cas: 106-97-8, chebi: "CHEBI:37808", molar_mass: 58.123, normal_boiling_point: 272.65}
+  - {id: NC5, name: n-Pentane, formula: C5H12, cas: 109-66-0, chebi: "CHEBI:37830", molar_mass: 72.150, normal_boiling_point: 309.21}
+templates:
+  - {id: hc, title: C3 to C5 hydrocarbons, components: [C3, NC4, NC5]}
+property_method:
+  adapter: thermo
+  status: placeholder

@@ -1,0 +1,102 @@
+{
+  "entries": {
+    "branches": {
+      "file": "dce1905351040e792f97.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "checks": {
+      "file": "961f787b0cd3443fbc7c.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "file?path=plant.yaml": {
+      "file": "b2e61e5c5b570606cbf9.txt",
+      "status": 200,
+      "type": "text/plain"
+    },
+    "file?path=process/flowsheet.yaml": {
+      "file": "9667dd2ab5d857ea53dd.txt",
+      "status": 200,
+      "type": "text/plain"
+    },
+    "file?path=process/materials.yaml": {
+      "file": "835b6fe4aac6d234b6f2.txt",
+      "status": 200,
+      "type": "text/plain"
+    },
+    "impact": {
+      "file": "6f61f46c23a66607af75.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "log?limit=50": {
+      "file": "704aa89f6b220ef90e0f.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "pid.svg?path=process/BFD.xml": {
+      "file": "26652dbef13987764f47.svg",
+      "status": 200,
+      "type": "image/svg+xml"
+    },
+    "pid.svg?path=process/PFD.xml": {
+      "file": "725a62894463bb83b895.svg",
+      "status": 200,
+      "type": "image/svg+xml"
+    },
+    "repo": {
+      "file": "071ca2227754705837aa.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "streams": {
+      "file": "d5a08b6893ecd1aa8b2a.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "streams?case=design": {
+      "file": "8df5187acc715dcfab42.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "tree": {
+      "file": "dc9c5edb8b2d479e697b.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "validate": {
+      "file": "133c8eb86cf813474ade.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "yaml?path=plant.yaml": {
+      "file": "3884310d809696415f57.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "yaml?path=process/flowsheet.yaml": {
+      "file": "77427965d982a2106a28.json",
+      "status": 200,
+      "type": "application/json"
+    },
+    "yaml?path=process/materials.yaml": {
+      "file": "c46a8df553b9fbbe318e.json",
+      "status": 200,
+      "type": "application/json"
+    }
+  },
+  "limits": {
+    "log_limit": 50,
+    "max_file_bytes": 2097152
+  },
+  "schema": "cheme/viewer-snapshot/v1",
+  "skipped": [],
+  "source": {
+    "commit": "86e3cb06234dd9c80144619fffd9781e2eada8fd",
+    "dirty": false,
+    "name": "process-recycle",
+    "rev": null,
+    "tool": "cheme-as-code 0.7.0"
+  }
+}

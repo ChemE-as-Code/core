@@ -1,0 +1,113 @@
+<!-- Line 47123: one segment, nozzle -> globe valve -> nozzle, under PipingNetworkSystems. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="PipingNetworkSystem3" type="Plant/Piping.PipingNetworkSystem">
+  <Components property="Segments">
+    <Object id="PipingNetworkSegment3" type="Plant/Piping.PipingNetworkSegment">
+      <Components property="Connections">
+        <Object id="Pipe3" type="Plant/Piping.Pipe">
+          <References objects="#Nozzle4" property="SourceItem"/>
+          <References objects="#PipingNode5" property="SourceNode"/>
+          <References objects="#GlobeValve2" property="TargetItem"/>
+          <References objects="#PipingNode6" property="TargetNode"/>
+        </Object>
+        <Object id="Pipe4" type="Plant/Piping.Pipe">
+          <References objects="#GlobeValve2" property="SourceItem"/>
+          <References objects="#PipingNode7" property="SourceNode"/>
+          <References objects="#Nozzle5" property="TargetItem"/>
+          <References objects="#PipingNode8" property="TargetNode"/>
+        </Object>
+      </Components>
+      <Components property="Items">
+        <Object id="GlobeValve2" type="Plant/Piping.GlobeValve">
+          <Components property="Nodes">
+            <Object id="PipingNode6" type="Plant/Piping.PipingNode">
+              <Data property="NominalDiameterNumericalValueRepresentation">
+                <String>80</String>
+              </Data>
+              <Data property="NominalDiameterRepresentation">
+                <String>DN 80</String>
+              </Data>
+              <Data property="NominalDiameterStandard">
+                <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+              </Data>
+              <Data property="NominalDiameterTypeRepresentation">
+                <String>DN</String>
+              </Data>
+            </Object>
+            <Object id="PipingNode7" type="Plant/Piping.PipingNode">
+              <Data property="NominalDiameterNumericalValueRepresentation">
+                <String>80</String>
+              </Data>
+              <Data property="NominalDiameterRepresentation">
+                <String>DN 80</String>
+              </Data>
+              <Data property="NominalDiameterStandard">
+                <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+              </Data>
+              <Data property="NominalDiameterTypeRepresentation">
+                <String>DN</String>
+              </Data>
+            </Object>
+          </Components>
+          <Data property="FluidCode">
+            <String>MNb</String>
+          </Data>
+          <Data property="PipingClassCode">
+            <String>75HB13</String>
+          </Data>
+          <Data property="PipingComponentNumber">
+            <String>C1</String>
+          </Data>
+        </Object>
+      </Components>
+      <References objects="#Nozzle4" property="SourceItem"/>
+      <References objects="#PipingNode5" property="SourceNode"/>
+      <References objects="#Nozzle5" property="TargetItem"/>
+      <References objects="#PipingNode8" property="TargetNode"/>
+      <Data property="FluidCode">
+        <String>MNb</String>
+      </Data>
+      <Data property="NominalDiameterNumericalValueRepresentation">
+        <String>80</String>
+      </Data>
+      <Data property="NominalDiameterRepresentation">
+        <String>DN 80</String>
+      </Data>
+      <Data property="NominalDiameterStandard">
+        <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+      </Data>
+      <Data property="NominalDiameterTypeRepresentation">
+        <String>DN</String>
+      </Data>
+      <Data property="PipingClassCode">
+        <String>75HB13</String>
+      </Data>
+      <Data property="PrimarySecondaryPipingNetworkSegment">
+        <DataReference data="Plant/Enumerations.PrimarySecondaryPipingNetworkSegmentClassification.PrimaryPipingNetworkSegment"/>
+      </Data>
+      <Data property="SegmentNumber">
+        <String>S1</String>
+      </Data>
+    </Object>
+  </Components>
+  <Data property="FluidCode">
+    <String>MNb</String>
+  </Data>
+  <Data property="LineNumber">
+    <String>47123</String>
+  </Data>
+  <Data property="NominalDiameterNumericalValueRepresentation">
+    <String>80</String>
+  </Data>
+  <Data property="NominalDiameterRepresentation">
+    <String>DN 80</String>
+  </Data>
+  <Data property="NominalDiameterStandard">
+    <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+  </Data>
+  <Data property="NominalDiameterTypeRepresentation">
+    <String>DN</String>
+  </Data>
+  <Data property="PipingClassCode">
+    <String>75HB13</String>
+  </Data>
+</Object>

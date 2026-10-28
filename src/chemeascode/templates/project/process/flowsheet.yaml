@@ -1,0 +1,24 @@
+# The flowsheet: the source of the BFD and PFD (`cheme process build` writes process/*.xml;
+# never edit those). Schema cheme/process/v1 (`cheme schema process-flowsheet`).
+# Units are explicit: a property without its own unit is in these. Pressure is absolute; a gauge
+# value needs its own unit (kPa(g)). Nm3/h needs normal_conditions.
+schema: cheme/process/v1
+kind: flowsheet
+title: ""
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+  # normal_conditions: {temperature: 273.15, pressure: 101.325, basis: ideal_gas}
+  # enthalpy_reference: {state: ideal_gas, temperature: 298.15}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}   # balances: |in - out| <= abs + rel * max(in, out), kg/h
+feeds: []      # external feeds (DEXPI Source): {id, title, ports: [{id: out, direction: out}]}
+products: []   # products (DEXPI Sink): {id, title, ports: [{id: in, direction: in}]}
+blocks: []     # BFD blocks: {id, title, class, ports: [{id, direction, kind}], links}
+steps: []      # PFD steps: {id, block, title, class, ports: [{id, direction, delegates}], links}
+streams: []    # {id, title, kind, from: NODE.port, to: NODE.port, template, state: {design: {...}}}
+layout: {bfd: {}, pfd: {}}

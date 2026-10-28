@@ -1,0 +1,28 @@
+name: validate
+on: [pull_request, push]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # cheme-as-code and pyDEXPI are private while in development. cheme-as-code is read with the
+      # fine-grained token in the secret PLANTCODE_READ_TOKEN (contents: read on
+      # ChemE-as-Code/core), pyDEXPI with a read-only deploy key, private half in the
+      # secret DEPLOY_KEY_PYDEXPI.
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: |
+          git config --global url."git@github.com:process-intelligence-research/".insteadOf "https://github.com/process-intelligence-research/"
+          git config --global url."https://x-access-token:${PLANTCODE_READ_TOKEN}@github.com/ChemE-as-Code/core".insteadOf "https://github.com/ChemE-as-Code/core"
+        env:
+          PLANTCODE_READ_TOKEN: ${{ secrets.PLANTCODE_READ_TOKEN }}
+      - uses: astral-sh/setup-uv@v6
+      - run: uv tool install git+https://github.com/ChemE-as-Code/core.git
+      - run: cheme fmt --check
+      - run: cheme validate
+      # Stage gates report progress (e.g. no design review recorded yet); they do not fail the build.
+      - name: Engineering-step gates (informational)
+        run: cheme check --no-write
+        continue-on-error: true

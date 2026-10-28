@@ -1,0 +1,319 @@
+meta:
+  name: thermodynamic_model_selection
+  version: 1.0.0
+  description: |
+    This rule inference engine implements the decision tree for thermodynamic model selection as proposed by E. C. Carlson and Aspen Plus. The engine takes into account various factors such as pressure band, polarity, electrolyte presence, pseudocomponents, availability of interaction parameters, expected phase behavior, and vapor association to recommend suitable thermodynamic models for a given chemical system.
+  source:
+    - E. C. Carlson, "Don't Gamble With Physical Properties For Simulations" Chemical Engineering Progress, vol. 92, pp. 35-46, 1996
+    - Aspen Plus User Guide Version 10.2, Chapter 7 - Physical Property Methods
+
+facts:
+  - id: pressure_band
+    possible_values: ["vacuum", "not_extreme", "high"]
+    description: Operating pressure band.
+  - id: is_polar
+    possible_values: [True, False, "unknown"]
+    question: Are any of the compounds polar?
+  - id: is_electrolyte
+    possible_values: [True, False, "unknown"]
+    question: Is the formulation an electrolyte?
+  - id: has_pseudocomponents
+    possible_values: [True, False, "unknown"]
+    question: Are any compounds pseudo components?
+  - id: interaction_parameters_available
+    possible_values: [True, False, "unknown"]
+    question: Are binary interaction parameters available for this mixture?
+  - id: liquid_liquid_expected
+    possible_values: [True, False, "unknown"]
+    question: Is liquid-liquid phase separation expected?
+  - id: vapor_association_expected
+    possible_values: [True, False, "unknown"]
+    question: Is vapor-phase association expected?
+  - id: polymerization_degree
+    possible_values: ["hexamer", "dimer", "unknown"]
+    question: What is the dominant polymerization degree for associated vapor species?
+
+outcomes:
+  - id: polar_electrolyte
+    models: ["Electrolyte NRTL (for liquid phase activity coefficient model with Peng-Robinson vapor phase fugacity coefficient model)", "Pitzer (for liquid phase activity coefficient model with Redlich-Kwong-Soave vapor phase fugacity coefficient model)"]
+    reasoning: Polar electrolyte.
+  - id: polar_non_electrolyte_high_pressure_with_params
+    models: ["Schwartzentruber-Renon-Polar", "Peng-Robinson with Wong-Sandler mixing rules", "Redlich-Kwong-Soave with Wong-Sandler mixing rules", "Peng-Robinson with modified Huron-Vidal mixing rules", "Redlich-Kwong-Soave with modified Huron-Vidal mixing rules"]
+    reasoning: Polar non-electrolyte at high pressure with known interaction parameters.
+  - id: polar_non_electrolyte_high_pressure_no_params
+    models: ["Predictive Redlich-Kwong-Soave", "Peng-Robinson with modified Huron-Vidal mixing rules", "Redlich-Kwong-Soave with modified Huron-Vidal mixing rules"]
+    reasoning: Polar non-electrolyte at high pressure without interaction parameters.
+  - id: nonpolar_no_pseudocomponents
+    models: ["Peng-Robinson", "Redlich-Kwong-Soave", "Lee-Kesler-Plocker", "Peng-Robinson with Boston-Mathias alpha function", "Redlich-Kwong-Soave with Boston-Mathias alpha function"]
+    reasoning: Non-polar mixture without pseudocomponents.
+  - id: nonpolar_pseudocomponents_vacuum
+    models: ["Braun K-10", "ideal"]
+    reasoning: Non-polar with pseudocomponents under vacuum.
+  - id: nonpolar_pseudocomponents_nonvacuum
+    models: ["Chao-Seader", "Grayson-Streed", "Braun K-10"]
+    reasoning: Non-polar with pseudocomponents at non-vacuum pressure.
+  - id: params_known_ll_expected_assoc_dimer
+    models: ["NRTL liquid phase activity coefficient model with Nothagel vapor phase model (NRTL-NTH)", "NRTL liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (NRTL-HOC)", "UNIQUAC liquid phase activity coefficient model with Nothagel vapor phase fugacity coefficient model (UNIQUAC-NTH)", "UNIQUAC liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (UNIQUAC-HOC)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association, dimer polymers, interaction parameters known, liquid-liquid expected.
+  - id: params_known_ll_not_expected_assoc_dimer
+    models: ["NRTL liquid phase activity coefficient model with Nothagel vapor phase model (NRTL-NTH)", "NRTL liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (NRTL-HOC)", "UNIQUAC liquid phase activity coefficient model with Nothagel vapor phase fugacity coefficient model (UNIQUAC-NTH)", "UNIQUAC liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (UNIQUAC-HOC)", "Wilson liquid phase activity coefficient model with Nothagel vapor phase fugacity coefficient model (WILS-NTH)", "Wilson liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (WILS-HOC)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association, dimer polymers, interaction parameters known, liquid-liquid not expected.
+  - id: params_known_ll_not_expected_assoc_hexamer
+    models: ["Wilson liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (WILS-HF)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association as hexamers, interaction parameters known, liquid-liquid not expected.
+  - id: params_known_ll_expected_assoc_hexamer
+    models: ["NRTL liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (NRTL-HF)", "UNIQUAC liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (UNIQ-HF)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association as hexamer polymers, interaction parameters known, liquid-liquid expected.
+  - id: params_unknown_ll_not_expected_assoc_hexamer
+    models: ["UNIFAC liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (UNIF-HF)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association as hexamer polymers, interaction parameters unknown, liquid-liquid not expected.
+  - id: params_unknown_ll_not_expected_assoc_dimer
+    models: ["UNIFAC liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (UNIF-HOC)"]
+    reasoning: Polar, non-electrolyte, low pressure, vapor association as dimer polymers, interaction parameters unknown, liquid-liquid not expected.
+  - id: params_known_ll_not_expected_no_assoc
+    models: ["NRTL (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)", "NRTL liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (NRTL-RK)", "NRTL (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (NRTL-2)", "UNIQUAC (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)", "UNIQUAC liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (UNIQ-RK)", "UNIQUAC (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (UNIQ-2)", "Wilson (for liquid phase activity coefficient model, together with an ideal gas vapor phase fugacity coefficient model)", "Wilson liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (Wils-RK)", "Wilson with liquid enthalpy reference state as liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (Wils-LR)", "Wilson with ideal gas and liquid enthalpy reference state as liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (Wils-GLR)"]
+    reasoning: Polar, non-electrolyte, low pressure, no vapor association, interaction parameters known, no liquid-liquid separation.
+  - id: params_known_ll_expected_no_assoc
+    models: ["NRTL (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)", "NRTL liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (NRTL-RK)", "NRTL (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (NRTL-2)", "UNIQUAC (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)", "UNIQUAC liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (UNIQ-RK)", "UNIQUAC (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (UNIQ-2)"]
+    reasoning: Polar, non-electrolyte, low pressure, no vapor association, interaction parameters known, liquid-liquid behavior expected.
+  - id: params_unknown_ll_expected
+    models: ["UNIFAC for liquid-liquid systems (UNIFAC-LL)"]
+    reasoning: Polar, non-electrolyte, low pressure, no vapor association, interaction parameters unknown, liquid-liquid expected.
+  - id: params_unknown_ll_not_expected_no_assoc
+    models: ["UNIFAC (for liquid phase activity coefficient model and a Redlich-Kwong vapor phase fugacity coefficient model)", "Lyngby-modified UNIFAC (UNIF-LBY)", "Dortmund-modified UNIFAC (UNIF-DMD)"]
+    reasoning: Polar, non-electrolyte, low pressure, no vapor association, interaction parameters unknown, liquid-liquid not expected.
+
+rules:
+  - id: polarity_check
+    name: polarity_check
+    is_entrypoint: True
+    branches:
+      - when:
+          fact: is_polar
+          equals: True
+        next: electrolyte_check
+      - when:
+          fact: is_polar
+          equals: False
+        next: pseudo_check
+
+  - id: electrolyte_check
+    name: electrolyte_check
+    branches:
+      - when:
+          fact: is_electrolyte
+          equals: True
+        then: polar_electrolyte
+      - when:
+          fact: is_electrolyte
+          equals: False
+        next: pressure_check_polar
+    
+  - id: pseudo_check
+    name: pseudo_check
+    branches:
+      - when:
+          fact: has_pseudocomponents
+          equals: False
+        then: nonpolar_no_pseudocomponents
+      - when:
+          fact: has_pseudocomponents
+          equals: True
+        next: pressure_check_nonpolar
+  
+  - id: pressure_check_nonpolar
+    name: pressure_check_nonpolar
+    branches:
+      - when:
+          fact: pressure_band
+          equals: vacuum
+        then: nonpolar_pseudocomponents_vacuum
+      - when:
+          fact: pressure_band
+          in: [not_extreme, high]
+        then: nonpolar_pseudocomponents_nonvacuum
+
+  - id: pressure_check_polar
+    name: pressure_check_polar
+    branches:
+      - when:
+          fact: pressure_band
+          equals: high
+        next: high_pressure_branch
+      - when:
+          fact: pressure_band
+          in: [not_extreme, vacuum]
+        next: activity_branch
+
+  - id: high_pressure_branch
+    name: high_pressure_branch
+    branches:
+      - when:
+          fact: interaction_parameters_available
+          equals: True
+        then: polar_non_electrolyte_high_pressure_with_params
+      - when:
+          fact: interaction_parameters_available
+          equals: False
+        then: polar_non_electrolyte_high_pressure_no_params
+
+  - id: activity_branch
+    name: activity_branch
+    branches:
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: True
+        next: assoc_check
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: False
+        next: assoc_check
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: True
+        then: params_unknown_ll_expected
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: False
+        next: assoc_check
+
+  - id: assoc_check
+    name: assoc_check
+    branches:
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: True
+            - fact: vapor_association_expected
+              equals: True
+        next: polymerization_degree_check
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: True
+            - fact: vapor_association_expected
+              equals: False
+        then: params_known_ll_expected_no_assoc
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+        next: polymerization_degree_check
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: False
+        then: params_known_ll_not_expected_no_assoc
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+        next: polymerization_degree_check
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: False
+        then: params_unknown_ll_not_expected_no_assoc
+
+
+  - id: polymerization_degree_check
+    name: polymerization_degree_check
+    branches:
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: True
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: dimer
+        then: params_known_ll_expected_assoc_dimer
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: True
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: hexamer
+        then: params_known_ll_expected_assoc_hexamer
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: dimer
+        then: params_known_ll_not_expected_assoc_dimer
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: True
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: hexamer
+        then: params_known_ll_not_expected_assoc_hexamer
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: dimer
+        then: params_unknown_ll_not_expected_assoc_dimer
+      - when:
+          all:
+            - fact: interaction_parameters_available
+              equals: False
+            - fact: liquid_liquid_expected
+              equals: False
+            - fact: vapor_association_expected
+              equals: True
+            - fact: polymerization_degree
+              equals: hexamer
+        then: params_unknown_ll_not_expected_assoc_hexamer

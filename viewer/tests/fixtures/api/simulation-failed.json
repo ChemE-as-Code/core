@@ -1,0 +1,209 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "dwsim",
+    "property_package": "Peng-Robinson (PR)",
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [],
+    "guesses": {},
+    "specs": {
+      "K1": {
+        "outlet_pressure": {
+          "value": 800.0,
+          "provenance": "given",
+          "source": "instrument air header pressure"
+        },
+        "efficiency": {
+          "value": 0.78,
+          "provenance": "assumed",
+          "source": "typical single-stage centrifugal"
+        }
+      },
+      "E1": {
+        "pressure_drop": {
+          "value": 20.0,
+          "unit": "kPa",
+          "provenance": "assumed",
+          "source": "shell and tube, gas side"
+        },
+        "outlet_temperature": {
+          "value": 308.15,
+          "provenance": "given",
+          "source": "35 C after the aftercooler"
+        }
+      }
+    }
+  },
+  "run": {
+    "case": "design",
+    "run_at": "2026-10-23T13:08:58Z",
+    "tool": "cheme-as-code 0.7.0",
+    "simulator": {
+      "name": "dwsim",
+      "version": "9.0.5.0"
+    },
+    "property_package": "Peng-Robinson (PR)",
+    "model_fingerprint": "aa92c1c90ad4962a",
+    "inputs": {
+      "commit": "c62be914b1eea33a48fcc27bf034db6539d62158",
+      "dirty": [],
+      "fingerprints": {
+        "process/flowsheet.yaml": "sha256:185c5eb3e96191fbfc7773cff107d52dbf4c65664c78eaba5e9db0d8b46da482",
+        "process/materials.yaml": "sha256:5194b43824ad48e1fbf1c7243217f9b5cbe6fc10862fdbfeaa9eb740dc1910b7",
+        "process/simulation.yaml": "sha256:ee50c5bf0012871f395fb0928a1b146632058dbf6ef67929f9cf986f99d5b95e"
+      }
+    },
+    "converged": false,
+    "iterations": null,
+    "messages": [
+      "E1: not calculated"
+    ],
+    "units": [
+      {
+        "id": "K1",
+        "unit": "compressor",
+        "status": "simulated",
+        "converged": null,
+        "results": {
+          "duty_kW": 84.2
+        },
+        "messages": [],
+        "warnings": []
+      },
+      {
+        "id": "E1",
+        "unit": "cooler",
+        "status": "simulated",
+        "converged": false,
+        "results": {
+          "duty_kW": -81.0
+        },
+        "messages": [
+          "E1: not calculated"
+        ],
+        "warnings": []
+      },
+      {
+        "id": "X1",
+        "unit": "splitter",
+        "status": "simulated",
+        "converged": null,
+        "results": {},
+        "messages": [],
+        "warnings": []
+      }
+    ],
+    "streams": [],
+    "findings": [
+      {
+        "file": "process/flowsheet.yaml",
+        "line": 4,
+        "level": "warning",
+        "rule": "cheme.process-sim-not-converged",
+        "message": "case design: the simulation did not converge: E1: not calculated",
+        "ids": [],
+        "hint": "check the specs and the feeds; no stream value is written",
+        "id": "process/flowsheet.yaml#process-sim-not-converged:4"
+      }
+    ]
+  },
+  "stale": false,
+  "staleness": {
+    "model_fingerprint": "aa92c1c90ad4962a",
+    "current_fingerprint": "aa92c1c90ad4962a",
+    "changed_files": []
+  },
+  "units": [
+    {
+      "id": "K1",
+      "unit": "compressor",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "outlet_pressure": {
+          "value": 800.0,
+          "provenance": "given",
+          "source": "instrument air header pressure"
+        },
+        "efficiency": {
+          "value": 0.78,
+          "provenance": "assumed",
+          "source": "typical single-stage centrifugal"
+        }
+      },
+      "run": {
+        "id": "K1",
+        "unit": "compressor",
+        "status": "simulated",
+        "converged": null,
+        "results": {
+          "duty_kW": 84.2
+        },
+        "messages": [],
+        "warnings": []
+      }
+    },
+    {
+      "id": "E1",
+      "unit": "cooler",
+      "status": "simulated",
+      "reason": "",
+      "spec": {
+        "pressure_drop": {
+          "value": 20.0,
+          "unit": "kPa",
+          "provenance": "assumed",
+          "source": "shell and tube, gas side"
+        },
+        "outlet_temperature": {
+          "value": 308.15,
+          "provenance": "given",
+          "source": "35 C after the aftercooler"
+        }
+      },
+      "run": {
+        "id": "E1",
+        "unit": "cooler",
+        "status": "simulated",
+        "converged": false,
+        "results": {
+          "duty_kW": -81.0
+        },
+        "messages": [
+          "E1: not calculated"
+        ],
+        "warnings": []
+      }
+    },
+    {
+      "id": "X1",
+      "unit": "splitter",
+      "status": "simulated",
+      "reason": "",
+      "spec": null,
+      "run": {
+        "id": "X1",
+        "unit": "splitter",
+        "status": "simulated",
+        "converged": null,
+        "results": {},
+        "messages": [],
+        "warnings": []
+      }
+    }
+  ],
+  "problem": null,
+  "findings": []
+}

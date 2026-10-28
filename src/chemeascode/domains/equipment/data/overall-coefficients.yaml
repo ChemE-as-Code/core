@@ -1,0 +1,58 @@
+# Typical overall heat-transfer coefficients of shell-and-tube exchangers, W/(m2 K), transcribed
+# from:
+#   R. K. Sinnott, "Coulson & Richardson's Chemical Engineering, Volume 6: Chemical Engineering
+#   Design", 4th ed., Elsevier Butterworth-Heinemann, 2005, Table 12.1 "Typical overall
+#   coefficients" (p. 637).
+#
+# Verification (issue core#66). The rows have NOT been checked against the printed book, and
+# neither has the page number. Each row's `check` names the independent public reproductions of
+# the same table that agree with it (the keys of `checks` below). A reproduction is not the
+# print: it confirms that the transcription matches what others transcribed, nothing more.
+# Rows that remain unverified against any independent source: exchanger/gases-gases (see its
+# check). Rows confirmed by one reproduction only: exchanger/heavy-oils (energiazero; pidesign
+# has no heavy oils / heavy oils row). cooler/light-oils-water: the two reproductions disagree,
+# the value follows pidesign (see its check).
+# The table gives ranges for preliminary sizing. cheme-as-code uses the middle of a row's range as the
+# design typical, and every value taken from here is ASSUMED: it stands in for a U calculated
+# from the film coefficients and fouling factors of the actual design, or a supplier's value.
+# Check the rows against the printed table before a contractual use.
+#
+# A datasheet chooses a row with type_specific.u_service: <id> (`cheme datasheets fill`), or
+# gives overall_u_w_m2k itself; nothing is matched by guessing from the service text.
+schema: cheme/overall-coefficients/v1
+source: "Sinnott, Coulson & Richardson's Chemical Engineering Vol. 6, 4th ed. (2005), Table 12.1, p. 637"
+unit: W/(m2 K)
+checks:
+  pidesign: "J. E. Edwards (P & I Design Ltd), Design and rating of shell and tube heat exchangers, MNL 032A (2008), Appendix VI, U in Btu/(h ft2 F) (x 5.678 = W/(m2 K)); https://chemstations.com/hubfs/shell.pdf, read 2026-10-23"
+  energiazero: "Typical overall heat transfer coefficients (U-values), shell and tube table in W/(m2 C), unattributed; https://www.energiazero.org/cartelle/macchine/Typical-Heat-Transfer-Coefficients-1.pdf, read 2026-10-23"
+print_checked: false
+rows:
+  # id: {exchanger, hot, cold, range: [low, high], check: <checks keys that agree, or a note>}
+  exchanger/water-water:              {exchanger: exchanger, hot: water, cold: water, range: [800, 1500], check: "pidesign + energiazero"}
+  exchanger/organic-solvents:         {exchanger: exchanger, hot: organic solvents, cold: organic solvents, range: [100, 300], check: "pidesign + energiazero"}
+  exchanger/light-oils:               {exchanger: exchanger, hot: light oils, cold: light oils, range: [100, 400], check: "pidesign + energiazero"}
+  exchanger/heavy-oils:               {exchanger: exchanger, hot: heavy oils, cold: heavy oils, range: [50, 300], check: "energiazero"}
+  exchanger/gases-gases:              {exchanger: exchanger, hot: gases, cold: gases, range: [10, 50], check: "unverified: pidesign text reads a single \"29\" (min/max run together), energiazero splits the row by pressure (5-35 at atm, 100-300 at 200 bar)"}
+  cooler/organic-solvents-water:      {exchanger: cooler, hot: organic solvents, cold: water, range: [250, 750], check: "pidesign + energiazero"}
+  cooler/light-oils-water:            {exchanger: cooler, hot: light oils, cold: water, range: [350, 900], check: "pidesign 62-158 Btu/(h ft2 F) = 352-897 W/(m2 K) confirms 350-900; energiazero gives 350-700 (disagrees on the upper bound, value kept with pidesign)"}
+  cooler/heavy-oils-water:            {exchanger: cooler, hot: heavy oils, cold: water, range: [60, 300], check: "pidesign + energiazero"}
+  cooler/gases-water:                 {exchanger: cooler, hot: gases, cold: water, range: [20, 300], check: "pidesign + energiazero"}
+  cooler/organic-solvents-brine:      {exchanger: cooler, hot: organic solvents, cold: brine, range: [150, 500], check: "pidesign + energiazero"}
+  cooler/water-brine:                 {exchanger: cooler, hot: water, cold: brine, range: [600, 1200], check: "pidesign + energiazero"}
+  cooler/gases-brine:                 {exchanger: cooler, hot: gases, cold: brine, range: [15, 250], check: "pidesign + energiazero"}
+  heater/steam-water:                 {exchanger: heater, hot: steam, cold: water, range: [1500, 4000], check: "pidesign + energiazero"}
+  heater/steam-organic-solvents:      {exchanger: heater, hot: steam, cold: organic solvents, range: [500, 1000], check: "pidesign + energiazero"}
+  heater/steam-light-oils:            {exchanger: heater, hot: steam, cold: light oils, range: [300, 900], check: "pidesign + energiazero"}
+  heater/steam-heavy-oils:            {exchanger: heater, hot: steam, cold: heavy oils, range: [60, 450], check: "pidesign + energiazero"}
+  heater/steam-gases:                 {exchanger: heater, hot: steam, cold: gases, range: [30, 300], check: "pidesign + energiazero"}
+  heater/dowtherm-heavy-oils:         {exchanger: heater, hot: Dowtherm, cold: heavy oils, range: [50, 300], check: "pidesign + energiazero"}
+  heater/dowtherm-gases:              {exchanger: heater, hot: Dowtherm, cold: gases, range: [20, 200], check: "pidesign + energiazero"}
+  heater/flue-gases-steam:            {exchanger: heater, hot: flue gases, cold: steam, range: [30, 100], check: "pidesign + energiazero"}
+  heater/flue-gases-hydrocarbon-vapours: {exchanger: heater, hot: flue gases, cold: hydrocarbon vapours, range: [30, 100], check: "pidesign + energiazero"}
+  condenser/aqueous-vapours-water:    {exchanger: condenser, hot: aqueous vapours, cold: water, range: [1000, 1500], check: "pidesign + energiazero"}
+  condenser/organic-vapours-water:    {exchanger: condenser, hot: organic vapours, cold: water, range: [700, 1000], check: "pidesign + energiazero"}
+  condenser/organics-non-condensables-water: {exchanger: condenser, hot: organics with some non-condensables, cold: water, range: [500, 700], check: "pidesign + energiazero"}
+  condenser/vacuum-water:             {exchanger: condenser, hot: vacuum condensers, cold: water, range: [200, 500], check: "pidesign + energiazero"}
+  vaporiser/steam-aqueous-solutions:  {exchanger: vaporiser, hot: steam, cold: aqueous solutions, range: [1000, 1500], check: "pidesign + energiazero"}
+  vaporiser/steam-light-organics:     {exchanger: vaporiser, hot: steam, cold: light organics, range: [900, 1200], check: "pidesign + energiazero"}
+  vaporiser/steam-heavy-organics:     {exchanger: vaporiser, hot: steam, cold: heavy organics, range: [600, 900], check: "pidesign + energiazero"}

@@ -1,0 +1,41 @@
+<!-- Controller PICSA-4712.02: sensor, measuring line, the ActuatingFunction pointing at ActuatingSystem1 and the SignalConveyingFunction from the controller to it (the signal line), under ProcessInstrumentationFunctions. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="ProcessInstrumentationFunction2" type="Plant/Instrumentation.ProcessInstrumentationFunction">
+  <Components property="ActuatingFunctions">
+    <Object id="ActuatingFunction1" type="Plant/Instrumentation.ActuatingFunction">
+      <References objects="#ActuatingSystem1" property="Systems"/>
+      <Data property="ActuatingFunctionNumber">
+        <String>PV4712.02</String>
+      </Data>
+    </Object>
+  </Components>
+  <Components property="ProcessSignalGeneratingFunctions">
+    <Object id="ProcessSignalGeneratingFunction2" type="Plant/Instrumentation.ProcessSignalGeneratingFunction">
+      <References objects="#BlindFlange2" property="SensingLocation"/>
+      <Data property="ProcessSignalGeneratingFunctionNumber">
+        <String>PT4712.02</String>
+      </Data>
+    </Object>
+  </Components>
+  <Components property="SignalConveyingFunctions">
+    <Object id="MeasuringLineFunction2" type="Plant/Instrumentation.MeasuringLineFunction">
+      <References objects="#ProcessSignalGeneratingFunction2" property="Source"/>
+      <References objects="#ProcessInstrumentationFunction2" property="Target"/>
+    </Object>
+    <Object id="SignalConveyingFunction1" type="Plant/Instrumentation.SignalConveyingFunction">
+      <References objects="#ProcessInstrumentationFunction2" property="Source"/>
+      <References objects="#ActuatingFunction1" property="Target"/>
+    </Object>
+  </Components>
+  <Data property="Location">
+    <DataReference data="Plant/Enumerations.LocationClassification.CentralLocation"/>
+  </Data>
+  <Data property="ProcessInstrumentationFunctionCategory">
+    <String>P</String>
+  </Data>
+  <Data property="ProcessInstrumentationFunctionNumber">
+    <String>4712.02</String>
+  </Data>
+  <Data property="ProcessInstrumentationFunctions">
+    <String>ICSA</String>
+  </Data>
+</Object>

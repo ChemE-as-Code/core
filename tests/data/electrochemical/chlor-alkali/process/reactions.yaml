@@ -1,0 +1,20 @@
+# Brine electrolysis (core#366). dH on the aqueous standard state (infinite dilution) from the
+# CODATA key values (Cox, Wagman, Medvedev 1989), kJ/mol: dfH(Cl-, aq) = -167.080,
+# dfH(OH-, aq) = -230.015, dfH(H2O, l) = -285.830; Na+ is a spectator and Cl2, H2 are reference
+# states: dH = 2 (-230.015) - 2 (-167.080) - 2 (-285.830) = 445.790 kJ/mol. The real brine
+# (about 200 g/l NaCl) and caustic (32 wt-%) differ from it by their heats of dilution, which
+# are not modelled (electrolyte thermodynamics, core#364).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: CA
+    title: Chlor-alkali electrolysis
+    equation: 2 NaCl + 2 H2O -> Cl2 + H2 + 2 NaOH
+    stoichiometry: {NaCl: -2, H2O: -2, Cl2: 1, H2: 1, NaOH: 2}
+    phase: liquid
+    heat_of_reaction:
+      value: 445790
+      temperature: 298.15
+      provenance: given
+      source: "CODATA Key Values for Thermodynamics (Cox, Wagman, Medvedev 1989): Cl-(aq), OH-(aq), H2O(l); infinite dilution"
+    sources: ["Cox, Wagman, Medvedev, CODATA Key Values for Thermodynamics, Hemisphere, New York (1989)"]

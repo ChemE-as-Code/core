@@ -1,0 +1,93 @@
+# Control loop register: regulatory loops only. The trips are in control/cause-effect.yaml.
+# Schema: `cheme schema loops`. Conventions (action, fail, travel): docs/framework/control.md.
+# PROPOSED: not reviewed or approved for implementation; status from reviews/.
+schema: cheme/loops/v1
+loops:
+  - id: FIC-101
+    title: Feed flow
+    purpose: Hold the feed rate to the depropanizer at the rate of the operating case.
+    section: FEED
+    cases: [design]
+    variable: flow
+    measurement: [{tag: FT-101}]
+    controller: FIC-101
+    action: reverse
+    final_elements:
+      - {tag: FV-101, kind: valve, actuator: pneumatic, fail: closed}
+    targets:
+      - {kind: setpoint, value: 3600, unit: kg/h, provenance: given, source: basis of design,
+         cases: [design], stream: S1, property: flow}
+    modes: [manual, auto]
+    normal_mode: auto
+    transitions:
+      - {from: manual, to: auto, by: operator, condition: {loop: LIC-102, state: in auto}}
+    rationale: The let-down valve V1 sets the feed; the flash and the column follow it.
+    operator: Reduce the rate when the column floods (no automatic action).
+  - id: LIC-102
+    title: Flash drum level
+    purpose: Keep a liquid seal in D-101 and pass the liquid on to the preheater.
+    section: FEED
+    variable: level
+    measurement: [{tag: LT-102}]
+    controller: LIC-102
+    action: direct
+    final_elements:
+      - {tag: LV-102, kind: valve, actuator: pneumatic, fail: closed}
+    targets:
+      - {kind: setpoint, value: 50, unit: "%", provenance: assumed, source: DESIGN.md (ASSUMED)}
+      - {kind: low, value: 20, unit: "%", provenance: assumed, source: DESIGN.md (ASSUMED)}
+      - {kind: high, value: 80, unit: "%", provenance: assumed, source: DESIGN.md (ASSUMED)}
+    modes: [manual, auto]
+    normal_mode: auto
+    alarms:
+      - {tag: LT-102, condition: LAL, response: Check LV-102 and the feed rate; reduce the feed if the level keeps falling.}
+      - {tag: LT-102, condition: LAH, response: Check LV-102 opens; reduce the feed.}
+    interlocks: [I-01]
+    rationale: Averaging level control; the low-low trip I-01 on its own transmitter LT-106.
+  - id: TIC-103
+    title: Column feed temperature (master)
+    purpose: Preheat the column feed against hot pentane.
+    section: PREHEAT
+    variable: temperature
+    measurement: [{tag: TT-103}]
+    controller: TIC-103
+    action: reverse
+    targets:
+      - {kind: setpoint, value: 80, unit: °C, provenance: assumed, source: until cheme process simulate fills S5}
+    modes: [manual, auto]
+    normal_mode: auto
+    rationale: Cascade onto the hot pentane flow, so that a change of the hot oil header pressure is rejected by the slave.
+  - id: FIC-105
+    title: Hot pentane flow (slave)
+    section: PREHEAT
+    variable: flow
+    measurement: [{tag: FT-105}]
+    controller: FIC-105
+    action: reverse
+    final_elements:
+      - {tag: FV-105, kind: valve, actuator: pneumatic, fail: closed}
+    targets:
+      - {kind: setpoint, value: 5000, unit: kg/h, provenance: assumed, source: hot oil circulation,
+         cases: [design], stream: H1, property: flow}
+    modes: [manual, auto, cascade]
+    normal_mode: cascade
+    links:
+      - {type: cascade, loop: TIC-103}
+    transitions:
+      - {from: auto, to: cascade, by: operator, condition: {loop: TIC-103, state: in auto}}
+    interlocks: [I-01]
+  - id: PIC-104
+    title: Flash drum pressure
+    section: FEED
+    variable: pressure
+    measurement: [{tag: PT-104}]
+    controller: PIC-104
+    action: direct
+    final_elements:
+      - {tag: PV-104, kind: valve, actuator: pneumatic}
+    targets:
+      - {kind: setpoint, unresolved: flash pressure follows from the flash design (cheme process simulate)}
+    modes: [manual, auto]
+    normal_mode: auto
+    unresolved:
+      - fail position of PV-104 (open relieves to the flare header; to be decided in the HAZOP)

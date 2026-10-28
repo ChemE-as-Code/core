@@ -1,0 +1,95 @@
+{
+  "files": [
+    "process/materials.yaml",
+    "process/flowsheet.yaml",
+    "process/BFD.xml",
+    "process/PFD.xml"
+  ],
+  "compared": {
+    "sheets": [
+      "process/BFD.xml",
+      "process/PFD.xml"
+    ],
+    "not_loaded": [],
+    "planned": [],
+    "lists": [
+      "process"
+    ],
+    "cross_checks": [],
+    "skipped": [
+      "equipment list vs P&IDs (no P&ID loaded)",
+      "lines list vs P&IDs (no P&ID loaded)",
+      "instruments list vs P&IDs (no P&ID loaded)"
+    ]
+  },
+  "findings": [
+    {
+      "file": "process/BFD.xml",
+      "level": "warning",
+      "rule": "cheme.generated-outdated",
+      "message": "process/BFD.xml is outdated: process/*.yaml changed since it was generated",
+      "line": null,
+      "ids": [
+        "BFD"
+      ],
+      "hint": "run cheme process build BFD",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/BFD.xml#generated-outdated:BFD"
+    },
+    {
+      "file": "process/BFD.xml",
+      "level": "info",
+      "rule": "dexpi.load",
+      "message": "12 port/connection reference cycles cut by the loader (first one named)",
+      "line": null,
+      "ids": [
+        "FEED_out"
+      ],
+      "hint": "the Port/ProcessConnection reference cycle every process model has",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/BFD.xml#dexpi.load:FEED_out"
+    },
+    {
+      "file": "process/PFD.xml",
+      "level": "warning",
+      "rule": "cheme.generated-outdated",
+      "message": "process/PFD.xml is outdated: process/*.yaml changed since it was generated",
+      "line": null,
+      "ids": [
+        "PFD"
+      ],
+      "hint": "run cheme process build PFD",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/PFD.xml#generated-outdated:PFD"
+    },
+    {
+      "file": "process/PFD.xml",
+      "level": "info",
+      "rule": "dexpi.load",
+      "message": "21 port/connection reference cycles cut by the loader (first one named)",
+      "line": null,
+      "ids": [
+        "FEED_out"
+      ],
+      "hint": "the Port/ProcessConnection reference cycle every process model has",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/PFD.xml#dexpi.load:FEED_out"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "rev": null,
+  "file": "control/cause-effect.yaml",
+  "interlocks": [
+    {
+      "id": "I-01",
+      "title": "LOX tank low-low level",
+      "cause": {
+        "tag": "LIA-4107",
+        "condition": "LALL"
+      },
+      "effects": [
+        {
+          "tag": "P-4101A",
+          "action": "trip"
+        },
+        {
+          "tag": "P-4101B",
+          "action": "trip"
+        },
+        {
+          "tag": "XV-4136",
+          "action": "close"
+        }
+      ],
+      "sheet": "P-04",
+      "sil": null,
+      "notes": "D-024, D-055 (5): set so the liquid above T-4101/N4 holds NPSHr of P-4101A/B (supplier) - 0.34 m (NPSHa at the outlet level, datasheets) + margin (ASSUMED until the supplier's NPSHr); SIL from the screening"
+    },
+    {
+      "id": "I-02",
+      "title": "LIN tank low-low level",
+      "cause": {
+        "tag": "LIA-4108",
+        "condition": "LALL"
+      },
+      "effects": [
+        {
+          "tag": "P-4102A",
+          "action": "trip"
+        },
+        {
+          "tag": "P-4102B",
+          "action": "trip"
+        },
+        {
+          "tag": "XV-4137",
+          "action": "close"
+        }
+      ],
+      "sheet": "P-04",
+      "sil": null,
+      "notes": "D-024, D-055 (5): set so the liquid above T-4102/N4 holds NPSHr of P-4102A/B (supplier) - 0.31 m (NPSHa at the outlet level, datasheets) + margin (ASSUMED until the supplier's NPSHr); SIL from the screening"
+    }
+  ],
+  "columns": [
+    "P-4101A",
+    "P-4101B",
+    "XV-4136",
+    "P-4102A",
+    "P-4102B",
+    "XV-4137"
+  ],
+  "rows": [
+    {
+      "id": "I-01",
+      "title": "LOX tank low-low level",
+      "cause": "LIA-4107",
+      "condition": "LALL",
+      "sheet": "P-04",
+      "sil": null,
+      "cells": [
+        "trip",
+        "trip",
+        "close",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": "I-02",
+      "title": "LIN tank low-low level",
+      "cause": "LIA-4108",
+      "condition": "LALL",
+      "sheet": "P-04",
+      "sil": null,
+      "cells": [
+        "",
+        "",
+        "",
+        "trip",
+        "trip",
+        "close"
+      ]
+    }
+  ]
+}

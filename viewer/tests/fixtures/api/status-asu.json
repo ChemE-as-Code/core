@@ -1,0 +1,228 @@
+{
+  "plant": {
+    "name": "ASU-1 (500 t/d GOX)",
+    "stage": "basic",
+    "stages": [
+      "concept",
+      "basic",
+      "detail"
+    ]
+  },
+  "sheets": [
+    {
+      "id": "P-01",
+      "file": "pid/P-01.xml",
+      "state": "drawn",
+      "drawn": {
+        "equipment": 11,
+        "lines": 18,
+        "instruments": 12
+      },
+      "assigned": {
+        "equipment": 11,
+        "lines": 18,
+        "instruments": 12
+      },
+      "missing": {
+        "equipment": [],
+        "lines": [],
+        "instruments": []
+      }
+    },
+    {
+      "id": "P-02",
+      "file": "pid/P-02.xml",
+      "state": "drawn",
+      "drawn": {
+        "equipment": 4,
+        "lines": 6,
+        "instruments": 14
+      },
+      "assigned": {
+        "equipment": 4,
+        "lines": 5,
+        "instruments": 14
+      },
+      "missing": {
+        "equipment": [],
+        "lines": [],
+        "instruments": []
+      }
+    },
+    {
+      "id": "P-03",
+      "file": "pid/P-03.xml",
+      "state": "drawn",
+      "drawn": {
+        "equipment": 9,
+        "lines": 30,
+        "instruments": 15
+      },
+      "assigned": {
+        "equipment": 9,
+        "lines": 25,
+        "instruments": 15
+      },
+      "missing": {
+        "equipment": [],
+        "lines": [],
+        "instruments": []
+      }
+    },
+    {
+      "id": "P-04",
+      "file": "pid/P-04.xml",
+      "state": "drawn",
+      "drawn": {
+        "equipment": 15,
+        "lines": 31,
+        "instruments": 22
+      },
+      "assigned": {
+        "equipment": 15,
+        "lines": 28,
+        "instruments": 22
+      },
+      "missing": {
+        "equipment": [],
+        "lines": [],
+        "instruments": []
+      }
+    }
+  ],
+  "process": {
+    "blocks": 4,
+    "steps": 15,
+    "streams": 40,
+    "case": "design",
+    "block_balances": {
+      "ok": 4
+    }
+  },
+  "next_sheet": null,
+  "validation": {
+    "errors": 0,
+    "warnings": 139,
+    "infos": 95,
+    "by_rule": {
+      "cheme.generator-undeclared": 4,
+      "cheme.instrument-no-interlock": 13,
+      "cheme.label-literal": 2,
+      "cheme.label-tag": 22,
+      "cheme.layout-access-enclosed": 1,
+      "cheme.layout-free-span": 5,
+      "cheme.layout-line-length": 16,
+      "cheme.layout-line-unrouted": 2,
+      "cheme.layout-not-placed": 1,
+      "cheme.layout-nozzle-unconnected": 2,
+      "cheme.layout-operability": 9,
+      "cheme.layout-support-missing": 16,
+      "cheme.layout-tray-separation": 1,
+      "cheme.layout-tray-span": 17,
+      "cheme.layout-tray-zone": 6,
+      "cheme.line-crossing": 4,
+      "cheme.review-finding-status": 82,
+      "cheme.review-front-matter": 3,
+      "cheme.review-unknown-commit": 10,
+      "cheme.template-metadata": 12,
+      "cheme.titleblock-sheet": 2,
+      "dexpi.load": 2,
+      "pydexpi_composition_fractions": 2
+    },
+    "not_on_pid": {}
+  },
+  "gates": {
+    "concept": [],
+    "basic": [],
+    "detail": []
+  },
+  "signoffs": {
+    "concept": {
+      "commit": "9e8d01896c515e67d19186c4d9e0c4c209d74b67",
+      "date": "2026-10-18T16:20:00+00:00",
+      "signed_by": "A. Engineer",
+      "branch": "main",
+      "review": "reviews/2026-10-18-basic-engineering.md",
+      "reviewer_kind": "human",
+      "on_default_branch": true
+    },
+    "basic": {
+      "commit": "32cbe38fd3e8bdb3f72cd75c37a0ab19cb87db9a",
+      "date": "2026-10-23T09:05:00+00:00",
+      "signed_by": "A. Engineer",
+      "branch": "stage/basic",
+      "review": "reviews/2026-10-23-layout-review9.md",
+      "reviewer_kind": "agent",
+      "on_default_branch": false
+    }
+  },
+  "legacy_status": null,
+  "reviews": {
+    "records": 13,
+    "open": [
+      {
+        "id": "2026-10-21-layout#15",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "KT-3101 casing extension not modelled"
+      },
+      {
+        "id": "2026-10-22-layout-review3#2",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "PSV-3114 / PSV-3116 tailpipes free 4.5 m above the valves"
+      },
+      {
+        "id": "2026-10-22-layout-review3#3",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "layout-operability warnings"
+      },
+      {
+        "id": "2026-10-22-layout-review3#4",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "rack free spans and support missing"
+      },
+      {
+        "id": "2026-10-23-layout-review9#1",
+        "severity": "medium",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "D-060 (2) pinned five supports for the DN 80 GOX backup tie-in GOX-4002 S12 at 10.4 m. Only SP-6.5 is a real stub: 0.49 m on the GOX-4002 S4 post-1 crossbar at 9.92 m. The other four are `kind: stub` columns 6.62 .. 7.12 m tall at x 180.8 (computed: base / top / what they stand on):<br>- SP-8.9: base 3.79 on the CW-4001 S1 post-3 crossbar, top 10.41;<br>- SP-11.0 / SP-15.4 / SP-19.9: base 3.29 on the CWR-4001 S1 post-4 / -5 / -6 crossbars, top 10.41.<br>Each stands on the end region of a 1 m HEB200 crossbar of a 3.3 / 3.8 m T-post that was laid out for one DN 100 water line. An oxygen line is then carried 7 m higher on that post: the crossbar takes a bending moment, and the T-post a wind and friction moment, that it was not drawn for. The VP-4 east columns (HEB400, x 180.12) stand 0.68 m west of these stubs over the same y range (52.0 .. 59.2). D-060 (2) leaves \"that those posts carry the extra load\" to the stress engineer. The model calls them stubs, so no rule tests their height or what they stand on. Section build/layout-section-x180.8_crop-44-0-66-12.png."
+      },
+      {
+        "id": "2026-10-23-layout-review9#2",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "The lifting study now lists the MAC motor (D-055 (7)): 30 t, gross 34.65 t, \"needed t\" 46.2, under `building B1`, status \"building crane\". The B1 crane is rated 40 t (layout/building.yaml). The study prints a needed capacity above the crane rating, and gives no verdict on it. The 46.2 t is the gross load divided by the 0.75 chart utilisation of a mobile crane. For an overhead crane, the rated capacity is compared with the gross load: 34.65 t ≤ 40 t, so the lift fits. D-055 (7) says so, but the generated study does not, and E-1101 .. E-1103 have the same blank."
+      },
+      {
+        "id": "2026-10-23-layout-review9#3",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "E-4101 became the four-shell intercooler package (D-055 (6), `shape: box`, x 163.5..169.5, y 37.1..39.9, 3.2 m). In this form the model generates no bundle-pull envelope for it. E-4102 and E-4103 still have theirs (E-4102/bundle_pull x 171.75..176.0). Each of the four shells is a removable-bundle shell-and-tube cooler of about 5 m (D-053 (2), D-055 (6)). Today the 6.5 m either side at 0..3.2 m is free (computed: no pipe or steel in x 157.0..163.5 or 169.5..176.0, y 37.1..39.9). Nothing keeps it free, and no rule would see a later route or post there. GOX-4001 runs north-south at x ≈ 162 only 1.5 m west of the package, above 3.2 m. Plan build/layout-plan_crop-155-22-190-52.png."
+      },
+      {
+        "id": "2026-10-23-layout-review9#4",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "The `layout-free-span` warnings for CW-4001 S1, CWR-4002 S1 and GAN-4004 S1 say \"proposed support steel: ... (cheme layout pin <id>)\". The proposals they name carry \"place it by hand\" in their own `reason`. They stand in the line beside or below (computed clear gap):<br>- SP-163.2 / SP-166.5 columns -0.07 m into CWR-4001 S1;<br>- SP-7.8 crossbar -0.08 m into GAN-4002 S4;<br>- SP-9.5 column -0.18 m into GAN-4002 S4.<br>Pinning them as offered would declare steel through a pipe. The other generated proposals that cut pipes (AIR-3002 S4, LN-3001 S3, RL-3001 S2, LIN-4003 S1, GOX-4002 S5, GOX-4001 S1) are not offered in a warning text, and D-060 (2) records them all."
+      },
+      {
+        "id": "2026-10-23-layout-review9#5",
+        "severity": "low",
+        "record": "reviews/2026-10-23-layout-review9.md",
+        "finding": "Several items marked final do not match the current flowsheet:<br>- **E-3101 datasheet** (`draft: false`, D-060 (4)): its UA and minimum approach rest on cold outlets at 13 C, ASSUMED. The flowsheet still has S7 / S9 / S17 at 25 C, which the datasheet itself says the warm composite cannot reach.<br>- **K-3101 / KT-3101 / E-3104**: these stay on flowsheet states that do not balance the compander. D-060 (6) finds booster - 0.97² x expander = -32 kW.<br>- **CW-3001 / CWR-3001**: the line list gives ~5.1 m3/h at DN 150 (0.08 m/s).<br>The flowsheet changes (S4C / S4D 8.45 bara, S5B 8.25 bara / -124.7 C, S7 / S9 / S17 13 C) are requested in D-060 (6). `process/flowsheet.yaml` belongs to the parallel simulation work (D-058 / D-059), so the items stay inconsistent until then. With the balance, the E-3104 duty becomes 85 kW (~7.4 m3/h)."
+      }
+    ]
+  },
+  "git": {
+    "is_repo": true,
+    "branch": "stage/basic",
+    "head": "7b8dce14ed0a2e26c102712915c46b503824cc06",
+    "default_branch": "main",
+    "dirty": [],
+    "ahead": 2,
+    "behind": 0
+  }
+}

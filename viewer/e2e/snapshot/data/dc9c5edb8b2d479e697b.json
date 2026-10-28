@@ -1,0 +1,1 @@
+[{"path":"plant.yaml","type":"file","kind":"yaml"},{"path":"process","type":"dir","kind":"other"},{"path":"process/BFD.xml","type":"file","kind":"pid"},{"path":"process/PFD.xml","type":"file","kind":"pid"},{"path":"process/flowsheet.yaml","type":"file","kind":"yaml"},{"path":"process/materials.yaml","type":"file","kind":"yaml"}]

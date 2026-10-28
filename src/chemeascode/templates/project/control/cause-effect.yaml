@@ -1,0 +1,13 @@
+# Cause and effect list: interlocks and trips. Schema: `cheme schema interlocks`.
+# On a sheet, refer to an interlock ("see C&E I-01") instead of spelling out what it trips.
+schema: cheme/interlocks/v1
+interlocks: []
+#  - id: I-01
+#    title: LIN tank low-low level
+#    cause: {tag: LIA-101, condition: LALL}
+#    effects:
+#      - {tag: P-101A, action: stop}     # trip, stop, start, close, open, depressurize, alarm
+#      - {tag: XV-101, action: close}
+#    sheet: P-01
+#    sil: null                           # from SIL screening: 1 to 4, or 0 / a (no SIL)
+#    notes: D-012

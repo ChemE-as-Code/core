@@ -1,0 +1,63 @@
+# What the plant must do. Schema: `cheme schema design_basis`.
+# The example is the double column of the air separation unit asu-1 of the ChemE-as-Code process
+# library: its GOX and GAN rates are close to those of asu-1, its LIN and LOX rates below them
+# (simulation.yaml C1 and C2; each flow below says how it compares). Sources:
+# [ASU-1] ChemE-as-Code/process-library, processes/asu-1/process/design-basis.yaml at commit
+#   debdc572d3d3ef993c2c3d431dde071e665f91e7 (2026-10-24): the project owner's design
+#   specification there, not a published plant;
+# [NASA] NASA Goddard Space Flight Center, Earth Fact Sheet, "Atmospheric composition (by volume,
+#   dry air)", last updated 15 November 2024,
+#   https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html (accessed 2026-10-27);
+# [CFR] 42 CFR 84.79(b), breathing oxygen, https://www.law.cornell.edu/cfr/text/42/84.79
+#   (accessed 2026-10-27).
+# Values with `provenance: assumed` are the example's own choices or assumed in [ASU-1].
+schema: cheme/design_basis/v1
+capacity:
+  product: GOX
+  terminal: GOX
+  value: 20860
+  unit: kg/h
+  t_per_d: 500.6
+  provenance: assumed
+  source: "[ASU-1] capacity: 500 t/d GOX (20,833 kg/h) to pipeline; the example draws 20,860 kg/h (simulation.yaml C2 gox side draw), 0.13 % more"
+feeds:
+  - name: Air near its dew point (HP column feed)
+    terminal: AIR
+    composition_mol_fraction: {N2: 0.7811, O2: 0.2096, AR: 0.0093}
+    composition_source: "[NASA] dry air 78.08 % N2, 20.95 % O2, 9340 ppm Ar, normalised over N2, O2 and Ar (0.78108, 0.20958, 0.00934); CO2 and water are removed upstream of the cold box, outside the example, and the other trace gases are not modelled"
+    flow: {value: 83190, unit: kg/h, provenance: assumed, source: "example scale, from an earlier revision of [ASU-1] (commit d6f7e5fa92dc372575644eff2f8fe9bb34ce1044: 76,000 Nm3/h dry air in all); [ASU-1] now sizes for 85,840 Nm3/h"}
+  - name: Lachmann air (expander outlet)
+    terminal: LA
+    composition_mol_fraction: {N2: 0.7811, O2: 0.2096, AR: 0.0093}
+    composition_source: "[NASA], as the HP column feed"
+    flow: {value: 14870, unit: kg/h, provenance: assumed, source: "about 11,500 Nm3/h, ASSUMED in [ASU-1] (assumptions)"}
+products:
+  - name: GOX
+    terminal: GOX
+    purity: O2 >= 99.5 mol%
+    source: "[ASU-1] products; for comparison, breathing oxygen must hold at least 99.0 % O2 by volume [CFR]"
+    flow: {value: 20860, unit: kg/h, provenance: assumed, source: "simulation.yaml C2 gox side draw; [ASU-1] 20,833 kg/h"}
+    delivery: "30 barg, 40 C to pipeline [ASU-1], after the GOX compressor, outside the example"
+  - name: GAN (pressure nitrogen)
+    terminal: GAN
+    purity: O2 <= 10 ppm(mol)
+    source: "[ASU-1] products"
+    flow: {value: 12510, unit: kg/h, source: "simulation.yaml C1 vapor_flow; [ASU-1] 10,000 Nm3/h, which is 12,498 kg/h of N2 (22.414 m3/kmol at 0 C and 1 atm, 28.013 kg/kmol), 0.1 % less"}
+  - name: LIN
+    terminal: LIN
+    purity: O2 <= 10 ppm(mol)
+    source: "[ASU-1] products (LIN backup storage)"
+    flow: {value: 470, unit: kg/h, provenance: assumed, source: "simulation.yaml C1 lin side draw; [ASU-1] assumes 600 kg/h, limited by the expander refrigeration"}
+  - name: LOX
+    terminal: LOX
+    purity: O2 >= 99.5 mol%
+    source: "[ASU-1] products (LOX backup storage)"
+    flow: {value: 470, unit: kg/h, provenance: assumed, source: "simulation.yaml C2 reboiler spec; [ASU-1] assumes 600 kg/h, limited by the expander refrigeration"}
+  - name: Waste nitrogen
+    terminal: WASTE
+    note: "no specification; without an argon column the argon leaves with it [ASU-1]"
+utilities: []
+site: {}
+assumptions:
+  - "The purities are requirements: the example has no run record, so whether its columns meet them is not checked (cheme process simulate --check reports the compositions)."
+  - "No site and no utilities: the example begins at the cold box (air near its dew point, Lachmann air from the expander); the site of [ASU-1] is that plant's."

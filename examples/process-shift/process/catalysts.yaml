@@ -1,0 +1,32 @@
+# The shift catalyst (schema cheme/catalysts/v1). Typical values of iron-chromium HTS catalysts,
+# to be confirmed with the vendor's data sheet (provenance assumed).
+schema: cheme/catalysts/v1
+kind: catalysts
+catalysts:
+  - id: FE_CR
+    name: Iron-chromium high-temperature shift catalyst
+    active_phase: Fe3O4 (from Fe2O3)
+    promoters: [Cr2O3, CuO]
+    physical:
+      form: pellet
+      particle_diameter: 0.006
+      sphericity: 0.86
+      particle_density: 1950
+      bulk_density: 1130
+      bed_voidage: 0.42
+      surface_area: 80
+      provenance: assumed
+      source: "6 x 6 mm pellets, typical of Fe-Cr HTS catalysts (Twigg, Catalyst Handbook)"
+    window:
+      temperature: [583.15, 773.15]
+      pressure: [100, 8000]
+      provenance: assumed
+      source: "310-500 C (Twigg, Catalyst Handbook)"
+    space_velocity: {basis: GHSV, range: [2000, 6000], gas: dry, provenance: assumed, source: "dry gas basis, typical"}
+    poisons: [sulfur compounds, chlorides]
+    deactivation:
+      lifetime: 5
+      mechanisms: [sintering, poisoning]
+      provenance: assumed
+      source: "3-8 years in service (Twigg, Catalyst Handbook)"
+    price: {value: 12, unit: USD/kg, year: 2024, provenance: assumed, source: "order of magnitude; ask for a quotation"}

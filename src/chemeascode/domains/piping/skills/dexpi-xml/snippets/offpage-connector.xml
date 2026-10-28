@@ -1,0 +1,47 @@
+<!-- An off-page connector: line 47121 comes from another sheet. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<!-- In PipingNetworkSystem1 (line 47121)/Segments: the segment STARTING at the FlowInPipeOffPageConnector, which it owns (Items); the first pipe and the segment start at its node -->
+<Object id="PipingNetworkSegment1" type="Plant/Piping.PipingNetworkSegment">
+  <Components property="Connections">
+    <Object id="Pipe1" type="Plant/Piping.Pipe">
+      <References objects="#FlowInPipeOffPageConnector1" property="SourceItem"/>
+      <References objects="#PipingNode1" property="SourceNode"/>
+      <References objects="#Nozzle1" property="TargetItem"/>
+      <References objects="#PipingNode2" property="TargetNode"/>
+    </Object>
+  </Components>
+  <Components property="Items">
+    <Object id="FlowInPipeOffPageConnector1" type="Plant/Piping.FlowInPipeOffPageConnector">
+      <Components property="Nodes">
+        <Object id="PipingNode1" type="Plant/Piping.PipingNode"/>
+      </Components>
+    </Object>
+  </Components>
+  <References objects="#FlowInPipeOffPageConnector1" property="SourceItem"/>
+  <References objects="#PipingNode1" property="SourceNode"/>
+  <References objects="#Nozzle1" property="TargetItem"/>
+  <References objects="#PipingNode2" property="TargetNode"/>
+  <Data property="FluidCode">
+    <String>MNb</String>
+  </Data>
+  <Data property="NominalDiameterNumericalValueRepresentation">
+    <String>80</String>
+  </Data>
+  <Data property="NominalDiameterRepresentation">
+    <String>DN 80</String>
+  </Data>
+  <Data property="NominalDiameterStandard">
+    <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+  </Data>
+  <Data property="NominalDiameterTypeRepresentation">
+    <String>DN</String>
+  </Data>
+  <Data property="PipingClassCode">
+    <String>75HB13</String>
+  </Data>
+  <Data property="PrimarySecondaryPipingNetworkSegment">
+    <DataReference data="Plant/Enumerations.PrimarySecondaryPipingNetworkSegmentClassification.PrimaryPipingNetworkSegment"/>
+  </Data>
+  <Data property="SegmentNumber">
+    <String>S1</String>
+  </Data>
+</Object>

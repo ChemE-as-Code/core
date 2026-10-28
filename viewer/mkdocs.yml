@@ -1,0 +1,95 @@
+# Theme, palette and extensions follow ChemE-as-Code/core's mkdocs.yml. Built in CI to check it
+# (.github/workflows/docs.yml); not published.
+site_name: ChemE-as-Code viewer
+site_description: "Read-only web viewer for a cheme-as-code plant repository: P&IDs, diffs, lists, streams and checks, from cheme serve or a static snapshot."
+site_url: https://docs.cheme-as-code.org/viewer/
+repo_url: https://github.com/ChemE-as-Code/viewer
+repo_name: ChemE-as-Code/viewer
+edit_uri: edit/main/docs/
+copyright: Copyright (C) 2026 Artur Schweidtmann. AGPL-3.0-or-later, see LICENSE and NOTICE.
+# Not the default site/: the README's static-snapshot recipe writes there, and a build empties it.
+site_dir: build/docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+# Pages include their sections from README.md (the single source), see docs/hooks/includes.py.
+hooks:
+  - docs/hooks/includes.py
+
+exclude_docs: |
+  hooks/
+
+watch:
+  - README.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Using the viewer: using.md
+  - Data sources and static snapshots: data-sources.md
+  - Embedding: embedding.md
+  - Development: development.md
+  - Architecture decisions:
+      - adr/README.md
+      - "0001 Record architecture decisions": adr/0001-record-architecture-decisions.md
+      - "0002 Read-only viewer": adr/0002-read-only-viewer.md
+      - "0003 Data only through the API client": adr/0003-data-only-through-the-api-client.md
+      - "0004 Static snapshots, same origin": adr/0004-static-snapshots-same-origin.md
+      - "0005 Server-rendered SVG P&IDs": adr/0005-server-rendered-svg-pids.md
+      - "0006 Schema-driven YAML tables": adr/0006-schema-driven-yaml-tables.md
+      - "0007 Diff semantics of cheme diff": adr/0007-diff-semantics-shared-with-cheme-diff.md
+      - "0008 Embed mode for the Atlas": adr/0008-embed-mode-for-the-atlas.md
+      - "0009 three.js 3D layout": adr/0009-threejs-3d-layout.md
+      - "0010 Accessibility and keyboard": adr/0010-accessibility-and-keyboard-model.md
+      - "0011 Testing with API fixtures": adr/0011-testing-with-api-fixtures-and-playwright.md
+      - "0012 Rename to cheme-as-code-viewer": adr/0012-rename-to-cheme-as-code-viewer.md
+      - "0013 AGPL-3.0-or-later licence": adr/0013-agpl-licence.md
+      - Template: adr/template.md

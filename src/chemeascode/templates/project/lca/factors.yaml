@@ -1,0 +1,23 @@
+# The project's characterised factors. Schema: `cheme schema lca_factors`.
+#
+# The default background is the packaged open profile desnz-ghg-2026: the UK Government GHG
+# Conversion Factors 2026 (DESNZ), Open Government Licence v3.0, whose terms permit publishing
+# the results with the attribution. It gives a SCREENING CARBON FOOTPRINT only (climate change,
+# UK geography, GWP100 of AR4/AR5): map a flow with `factor: desnz-ghg-2026:electricity-gb`
+# (docs/framework/lca.md of cheme-as-code lists its factors). A flow it does not
+# cover is a gap in the results, never 0.
+#
+# Add the project's own factors below (a published dataset, an EPD, a calculation), each with
+# its status (PUBLISHED, EPD, ASSUMED; PROXY or ESTIMATE with basis and validity), source,
+# reference year, geography and its registry entry (source_id -> sources:, with licence and
+# publication policy). Do not copy licensed database content beyond what its licence allows;
+# a licensed database belongs in a local Brightway project (backend: brightway), not here.
+schema: cheme/lca/v1
+kind: lca_factors
+include: [desnz-ghg-2026]
+categories:
+  # elementary: the packaged method that characterises the plant's own emissions (mapped
+  # elementary: {compartment, origin} in lca/lca.yaml) in this category, by CAS number
+  - {id: climate-change, title: Climate change, unit: kg CO2-eq, method: "GWP100", elementary: ipcc2021-gwp100}
+sources: []
+factors: []

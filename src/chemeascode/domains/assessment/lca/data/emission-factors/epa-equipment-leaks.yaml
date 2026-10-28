@@ -1,0 +1,18 @@
+# Packaged emission factor set epa-equipment-leaks: PLACEHOLDER (core#176). It holds no values.
+# A factor of lca/lca.yaml that names it (set: epa-equipment-leaks) refuses to run until the set
+# is verified; give the factor in lca/lca.yaml with its value, unit and source meanwhile.
+schema: cheme/lca/v1
+kind: emission_factors
+id: epa-equipment-leaks
+title: Protocol for Equipment Leak Emission Estimates (average emission factors)
+provider: US Environmental Protection Agency (US EPA)
+status: placeholder
+todo: >-
+  TODO: read the average emission factors per component type and service (gas/vapour, light
+  liquid, heavy liquid) from the protocol itself, and record its exact document number, edition,
+  URL and checksum and the table of every factor. The download host (epa.gov) was not reachable
+  when the mechanism was built, so nothing was read and no value is packaged.
+licence_note: >-
+  TODO (owner): works of the US federal government are generally not subject to copyright in the
+  US; confirm this holds for the protocol and its tables, and record the attribution to give,
+  before setting status verified and redistribution true.

@@ -1,0 +1,6 @@
+name: process-ammonia
+description: Ammonia synthesis loop with a conversion reactor (cheme process, reactions cheme/reactions/v1)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

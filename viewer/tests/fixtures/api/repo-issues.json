@@ -1,0 +1,50 @@
+{
+  "name": "process-separation",
+  "root_name": "process-separation-issues",
+  "branch": "main",
+  "head": "e2b8713ed695210eaf71f745b868c0aaadaa7642",
+  "stage": "basic",
+  "stages": [
+    {
+      "id": "concept",
+      "title": "Concept and feasibility"
+    },
+    {
+      "id": "basic",
+      "title": "Basic engineering"
+    },
+    {
+      "id": "detail",
+      "title": "Detail engineering"
+    }
+  ],
+  "sheets": [
+    {
+      "id": "BFD",
+      "file": "process/BFD.xml",
+      "title": "Block flow diagram",
+      "kind": "bfd",
+      "generator": "flowsheet",
+      "status": "drafted"
+    },
+    {
+      "id": "PFD",
+      "file": "process/PFD.xml",
+      "title": "Process flow diagram",
+      "kind": "pfd",
+      "generator": "flowsheet",
+      "status": "drafted"
+    }
+  ],
+  "dirty": false,
+  "has_layout": false,
+  "has_lca": false,
+  "has_tea": false,
+  "has_equipment_estimate": true,
+  "has_simulation": true,
+  "has_reactions": false,
+  "has_datasheets": false,
+  "has_kinetic_data": false,
+  "has_control": true,
+  "has_issues": true
+}

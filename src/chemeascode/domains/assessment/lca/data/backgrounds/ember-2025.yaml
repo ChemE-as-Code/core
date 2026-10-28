@@ -1,0 +1,560 @@
+# Packaged open background profile ember-2025: life-cycle emissions intensity of electricity
+# generation in 2025 for the G20, the EU-27 and its members, Norway, Switzerland and the world
+# (Ember, CC BY 4.0). Use it from lca/factors.yaml with `include: [ember-2025]`; ids
+# ember-2025:electricity-<iso2>, electricity-eu27, electricity-glo.
+#
+# Credit Ember with the attribution below (CC BY 4.0: link the licence, say it is modified).
+# Generated from Ember's yearly CSV (downloaded 2026-10-25; the URL is not versioned, so the
+# checksum pins that copy); each factor names its line. Scope: life cycle (upstream, supply
+# chain, manufacturing), generation-based, no T&D losses. Do not mix with the direct-emission
+# profiles (egrid-2023, eea-ener038-2024) in one comparison without saying so. Core issue #268.
+schema: cheme/lca/v1
+kind: lca_factors
+sources:
+- id: ember-2025
+  title: 'Ember Yearly Electricity Data (global): emissions intensity of generation'
+  provider: Ember
+  version: release of 2026-09-15 (downloaded 2026-10-25), data year 2025
+  url: https://ember-energy.org/data/yearly-electricity-data/
+  licence: CC-BY-4.0
+  attribution: Ember (2026), Yearly Electricity Data (release 2026-09-15), https://ember-energy.org/data/yearly-electricity-data/,
+    CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); subset, converted to kg CO2e/kWh.
+  publication: public
+  redistribution: true
+  geography: GLO
+  year: 2025
+  method: 'life-cycle GWP100 per technology (UNECE 2022; Jordaan et al. 2022 for gas; IPCC Fifth Assessment
+    WG3 Annex III midpoints), upstream methane at GWP 21 (IPCC Second Assessment): no single GWP basis'
+  checksum: sha256:91d30fb170dac8a62130f7b39e11ecbb301f902e08400e9561510882eadcd701
+  notes: >-
+    Life-cycle emissions intensity of electricity generation (Ember methodology v1.6): upstream methane,
+    supply chain and manufacturing included, all gases as CO2e over 100 years; per kWh of gross generation
+    (net-generation factors adjusted by 6 % for thermal and 1 % for other sources), no imports, no T&D
+    losses. Modelled with per-technology factors (gas 2017, coal 2020), not measured; bioenergy at the
+    IPCC midpoint for energy crops, by Ember's account a significant underestimate for woody biomass;
+    coal CHP counts electricity only. The latest year is partly projected from monthly data and regional
+    and world values are estimated: they are revised in later releases. The download URL is not versioned:
+    the checksum is of the copy read on 2026-10-25 (release_generation_yearly_global.csv).
+categories:
+- id: climate-change
+  title: Climate change
+  unit: kg CO2-eq
+  method: life-cycle GWP100 (Ember; mixed basis)
+factors:
+- id: electricity-ar
+  title: Electricity, Argentina, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.34561
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 4424 (Argentina, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 345.61
+  source_id: ember-2025
+  year: 2025
+  location: AR
+- id: electricity-at
+  title: Electricity, Austria, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.116605
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 6924 (Austria, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 116.605
+  source_id: ember-2025
+  year: 2025
+  location: AT
+- id: electricity-au
+  title: Electricity, Australia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.517956
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 6312 (Australia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 517.956
+  source_id: ember-2025
+  year: 2025
+  location: AU
+- id: electricity-be
+  title: Electricity, Belgium, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.151262
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 10137 (Belgium, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 151.262
+  source_id: ember-2025
+  year: 2025
+  location: BE
+- id: electricity-bg
+  title: Electricity, Bulgaria, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.275347
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 14321 (Bulgaria, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 275.347
+  source_id: ember-2025
+  year: 2025
+  location: BG
+- id: electricity-br
+  title: Electricity, Brazil, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.109218
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 13288 (Brazil, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 109.218
+  source_id: ember-2025
+  year: 2025
+  location: BR
+- id: electricity-ca
+  title: Electricity, Canada, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.191587
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 16995 (Canada, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 191.587
+  source_id: ember-2025
+  year: 2025
+  location: CA
+- id: electricity-ch
+  title: Electricity, Switzerland, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.039278
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 90440 (Switzerland, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 39.278
+  source_id: ember-2025
+  year: 2025
+  location: CH
+- id: electricity-cn
+  title: Electricity, China, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.528278
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 19336 (China, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 528.278
+  source_id: ember-2025
+  year: 2025
+  location: CN
+- id: electricity-cy
+  title: Electricity, Cyprus, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.505196
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 23968 (Cyprus, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 505.196
+  source_id: ember-2025
+  year: 2025
+  location: CY
+- id: electricity-cz
+  title: Electricity, Czechia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.401366
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 24579 (Czechia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 401.366
+  source_id: ember-2025
+  year: 2025
+  location: CZ
+- id: electricity-de
+  title: Electricity, Germany, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.334117
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 36966 (Germany, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 334.117
+  source_id: ember-2025
+  year: 2025
+  location: DE
+- id: electricity-dk
+  title: Electricity, Denmark, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.099904
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 25191 (Denmark, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 99.904
+  source_id: ember-2025
+  year: 2025
+  location: DK
+- id: electricity-ee
+  title: Electricity, Estonia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.318833
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 29759 (Estonia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 318.833
+  source_id: ember-2025
+  year: 2025
+  location: EE
+- id: electricity-es
+  title: Electricity, Spain, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.153459
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 88220 (Spain, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 153.459
+  source_id: ember-2025
+  year: 2025
+  location: ES
+- id: electricity-eu27
+  title: Electricity, EU, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.210536
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 26908 (EU, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 210.536
+  source_id: ember-2025
+  year: 2025
+  location: EU27
+- id: electricity-fi
+  title: Electricity, Finland, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.057182
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 32895 (Finland, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 57.182
+  source_id: ember-2025
+  year: 2025
+  location: FI
+- id: electricity-fr
+  title: Electricity, France, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.041224
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 33507 (France, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 41.224
+  source_id: ember-2025
+  year: 2025
+  location: FR
+- id: electricity-gb
+  title: Electricity, United Kingdom, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.218001
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 98959 (United Kingdom, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 218.001
+  source_id: ember-2025
+  year: 2025
+  location: GB
+- id: electricity-glo
+  title: Electricity, World, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.460092
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 102966 (World, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 460.092
+  source_id: ember-2025
+  year: 2025
+  location: GLO
+- id: electricity-gr
+  title: Electricity, Greece, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.324644
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 38003 (Greece, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 324.644
+  source_id: ember-2025
+  year: 2025
+  location: GR
+- id: electricity-hr
+  title: Electricity, Croatia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.158091
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 22935 (Croatia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 158.091
+  source_id: ember-2025
+  year: 2025
+  location: HR
+- id: electricity-hu
+  title: Electricity, Hungary, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.16262
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 43219 (Hungary, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 162.62
+  source_id: ember-2025
+  year: 2025
+  location: HU
+- id: electricity-id
+  title: Electricity, Indonesia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.705326
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 44718 (Indonesia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 705.326
+  source_id: ember-2025
+  year: 2025
+  location: ID
+- id: electricity-ie
+  title: Electricity, Ireland, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.263298
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 46365 (Ireland, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 263.298
+  source_id: ember-2025
+  year: 2025
+  location: IE
+- id: electricity-in
+  title: Electricity, India, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.670945
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 44302 (India, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 670.945
+  source_id: ember-2025
+  year: 2025
+  location: IN
+- id: electricity-it
+  title: Electricity, Italy, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.284431
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 47419 (Italy, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 284.431
+  source_id: ember-2025
+  year: 2025
+  location: IT
+- id: electricity-jp
+  title: Electricity, Japan, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.473735
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 48485 (Japan, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 473.735
+  source_id: ember-2025
+  year: 2025
+  location: JP
+- id: electricity-kr
+  title: Electricity, South Korea, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.417659
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 87387 (South Korea, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 417.659
+  source_id: ember-2025
+  year: 2025
+  location: KR
+- id: electricity-lt
+  title: Electricity, Lithuania, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.138142
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 55447 (Lithuania, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 138.142
+  source_id: ember-2025
+  year: 2025
+  location: LT
+- id: electricity-lu
+  title: Electricity, Luxembourg, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.118347
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 56059 (Luxembourg, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 118.347
+  source_id: ember-2025
+  year: 2025
+  location: LU
+- id: electricity-lv
+  title: Electricity, Latvia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.134896
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 53139 (Latvia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 134.896
+  source_id: ember-2025
+  year: 2025
+  location: LV
+- id: electricity-mt
+  title: Electricity, Malta, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.483393
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 59815 (Malta, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 483.393
+  source_id: ember-2025
+  year: 2025
+  location: MT
+- id: electricity-mx
+  title: Electricity, Mexico, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.481442
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 61586 (Mexico, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 481.442
+  source_id: ember-2025
+  year: 2025
+  location: MX
+- id: electricity-nl
+  title: Electricity, Netherlands, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.253664
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 66835 (Netherlands, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 253.664
+  source_id: ember-2025
+  year: 2025
+  location: NL
+- id: electricity-no
+  title: Electricity, Norway, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.02805
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 71045 (Norway, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 28.05
+  source_id: ember-2025
+  year: 2025
+  location: 'NO'
+- id: electricity-pl
+  title: Electricity, Poland, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.590814
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 75504 (Poland, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 590.814
+  source_id: ember-2025
+  year: 2025
+  location: PL
+- id: electricity-pt
+  title: Electricity, Portugal, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.1278
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 76116 (Portugal, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 127.8
+  source_id: ember-2025
+  year: 2025
+  location: PT
+- id: electricity-ro
+  title: Electricity, Romania, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.258395
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 77912 (Romania, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 258.395
+  source_id: ember-2025
+  year: 2025
+  location: RO
+- id: electricity-ru
+  title: Electricity, Russia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.446909
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 78533 (Russia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 446.909
+  source_id: ember-2025
+  year: 2025
+  location: RU
+- id: electricity-sa
+  title: Electricity, Saudi Arabia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.679828
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 82059 (Saudi Arabia, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 679.828
+  source_id: ember-2025
+  year: 2025
+  location: SA
+- id: electricity-se
+  title: Electricity, Sweden, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.03539
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 90024 (Sweden, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 35.39
+  source_id: ember-2025
+  year: 2025
+  location: SE
+- id: electricity-si
+  title: Electricity, Slovenia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.182198
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 85480 (Slovenia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 182.198
+  source_id: ember-2025
+  year: 2025
+  location: SI
+- id: electricity-sk
+  title: Electricity, Slovakia, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.095279
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 84881 (Slovakia, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 95.279
+  source_id: ember-2025
+  year: 2025
+  location: SK
+- id: electricity-tr
+  title: Electricity, Türkiye, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.475776
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 96608 (Türkiye, 2025, Total generation), 'Emissions intensity
+    (gCO2e/kWh)' = 475.776
+  source_id: ember-2025
+  year: 2025
+  location: TR
+- id: electricity-us
+  title: Electricity, United States, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.384403
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 99401 (United States, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 384.403
+  source_id: ember-2025
+  year: 2025
+  location: US
+- id: electricity-za
+  title: Electricity, South Africa, gross generation (life cycle)
+  unit: kWh
+  values:
+    climate-change: 0.699199
+  status: PUBLISHED
+  source: Ember yearly electricity data, line 86746 (South Africa, 2025, Total generation), 'Emissions
+    intensity (gCO2e/kWh)' = 699.199
+  source_id: ember-2025
+  year: 2025
+  location: ZA

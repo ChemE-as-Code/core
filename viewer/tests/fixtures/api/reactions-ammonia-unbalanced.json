@@ -1,0 +1,423 @@
+{
+  "rev": null,
+  "file": "process/reactions.yaml",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "reactions": [
+    {
+      "id": "NH3_SYN",
+      "title": "Ammonia synthesis",
+      "equation": "N2 + 3 H2 <=> 2 NH3",
+      "stoichiometry": {
+        "N2": -1.0,
+        "H2": -3.0,
+        "NH3": 3.0
+      },
+      "phase": "vapor",
+      "reversible": true,
+      "conversion": null,
+      "heat_of_reaction": {
+        "value": -91116.0,
+        "unit": "kJ/kmol",
+        "temperature": 298.15,
+        "provenance": "given",
+        "source": "2 x dHf(NH3, g) = 2 x -45.558 kJ/mol, ATcT"
+      },
+      "equilibrium_constant": null,
+      "rate": null,
+      "mechanism": null,
+      "catalyst": "FE_NH3",
+      "sources": [
+        "Appl, Ammonia, Ullmann's Encyclopedia of Industrial Chemistry, doi:10.1002/14356007.a02_143.pub3"
+      ],
+      "key_component": null,
+      "type": "equilibrium",
+      "units": [
+        {
+          "unit": "R1",
+          "kind": "step",
+          "model": "equilibrium",
+          "approach_K": 20.0,
+          "conversion": null
+        }
+      ],
+      "rate_law": null,
+      "microkinetics": null,
+      "element_balance": {
+        "evaluable": true,
+        "balanced": false,
+        "change": {
+          "N": 1.0,
+          "H": 3.0
+        }
+      }
+    }
+  ],
+  "reactors": [
+    {
+      "node": "LOOP",
+      "kind": "block",
+      "bed": null,
+      "model": null,
+      "balance": "imbalance",
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S6",
+        "S7"
+      ],
+      "temperature_out_K": null,
+      "pressure_out_kPa": null,
+      "approach_K": 0.0,
+      "fugacity": "ideal",
+      "reactions": [
+        {
+          "id": "NH3_SYN",
+          "extent_kmol_h": 187.74043594942106,
+          "heat_of_reaction_kJ_kmol": null,
+          "ln_k": null,
+          "ln_q_over_k": null,
+          "rate": null,
+          "rate_unit": null
+        }
+      ],
+      "duty_kW": null,
+      "missing": [
+        "one outlet with a temperature",
+        "the temperature of every stream"
+      ]
+    },
+    {
+      "node": "R1",
+      "kind": "step",
+      "bed": null,
+      "model": "equilibrium",
+      "balance": "imbalance",
+      "streams_in": [
+        "S2"
+      ],
+      "streams_out": [
+        "S3"
+      ],
+      "temperature_out_K": 743.15,
+      "pressure_out_kPa": 20000.0,
+      "approach_K": 20.0,
+      "fugacity": "peng_robinson",
+      "reactions": [
+        {
+          "id": "NH3_SYN",
+          "extent_kmol_h": 187.74058667863684,
+          "heat_of_reaction_kJ_kmol": -132048.48296745605,
+          "ln_k": 20.99022341235499,
+          "ln_q_over_k": -28.4188927873682,
+          "rate": null,
+          "rate_unit": null
+        }
+      ],
+      "duty_kW": -4798.052680310904,
+      "missing": []
+    }
+  ],
+  "balance": {
+    "balances": [
+      {
+        "node": "LOOP",
+        "kind": "block",
+        "status": "imbalance",
+        "in_kg_h": 8829.825,
+        "out_kg_h": 8829.826513,
+        "missing": [],
+        "failing": [
+          "H2 1496.88 kg/h in, 148.528 kg/h out: -212.898 kg/h not explained by reactions NH3_SYN",
+          "N2 6933.47 kg/h in, 687.976 kg/h out: -986.129 kg/h not explained by reactions NH3_SYN",
+          "NH3 0 kg/h in, 7593.84 kg/h out: -1998.38 kg/h not explained by reactions NH3_SYN"
+        ],
+        "streams_in": [
+          "S1"
+        ],
+        "streams_out": [
+          "S6",
+          "S7"
+        ],
+        "extents_kmol_h": {
+          "NH3_SYN": 187.740436
+        }
+      },
+      {
+        "node": "R1",
+        "kind": "step",
+        "status": "imbalance",
+        "in_kg_h": 32313.5,
+        "out_kg_h": 32313.5,
+        "missing": [],
+        "failing": [
+          "H2 4318.92 kg/h in, 2970.57 kg/h out: -212.899 kg/h not explained by reactions NH3_SYN",
+          "N2 20005 kg/h in, 13759.5 kg/h out: -986.114 kg/h not explained by reactions NH3_SYN",
+          "NH3 0 kg/h in, 7593.84 kg/h out: -1998.39 kg/h not explained by reactions NH3_SYN"
+        ],
+        "streams_in": [
+          "S2"
+        ],
+        "streams_out": [
+          "S3"
+        ],
+        "extents_kmol_h": {
+          "NH3_SYN": 187.740587
+        }
+      }
+    ],
+    "findings": [
+      {
+        "file": "process/reactions.yaml",
+        "level": "error",
+        "rule": "cheme.reaction-element-balance",
+        "message": "reaction NH3_SYN does not balance: atoms created H +3, N +1",
+        "line": 11,
+        "ids": [
+          "NH3_SYN"
+        ],
+        "hint": "correct the coefficients or the formulas",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/reactions.yaml#reaction-element-balance:NH3_SYN"
+      },
+      {
+        "file": "process/reactions.yaml",
+        "level": "warning",
+        "rule": "cheme.process-heat-of-reaction",
+        "message": "reaction NH3_SYN: heat_of_reaction -91116 kJ/kmol, the components' ideal_gas data give -136674 kJ/kmol at 298.15 K",
+        "line": 14,
+        "ids": [
+          "NH3_SYN"
+        ],
+        "hint": "check the coefficients (per kmol of extent as written), the value or the formation data",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/reactions.yaml#process-heat-of-reaction:NH3_SYN"
+      },
+      {
+        "file": "process/flowsheet.yaml",
+        "level": "error",
+        "rule": "cheme.process-balance",
+        "message": "block LOOP (design) does not balance: H2 1496.88 kg/h in, 148.528 kg/h out: -212.898 kg/h not explained by reactions NH3_SYN; N2 6933.47 kg/h in, 687.976 kg/h out: -986.129 kg/h not explained by reactions NH3_SYN; NH3 0 kg/h in, 7593.84 kg/h out: -1998.38 kg/h not explained by reactions NH3_SYN",
+        "line": 24,
+        "ids": [
+          "LOOP"
+        ],
+        "hint": "in: S1; out: S6, S7 -- correct the flows or compositions",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/flowsheet.yaml#process-balance:LOOP"
+      },
+      {
+        "file": "process/flowsheet.yaml",
+        "level": "error",
+        "rule": "cheme.process-balance",
+        "message": "step R1 (design) does not balance: H2 4318.92 kg/h in, 2970.57 kg/h out: -212.899 kg/h not explained by reactions NH3_SYN; N2 20005 kg/h in, 13759.5 kg/h out: -986.114 kg/h not explained by reactions NH3_SYN; NH3 0 kg/h in, 7593.84 kg/h out: -1998.39 kg/h not explained by reactions NH3_SYN",
+        "line": 41,
+        "ids": [
+          "R1"
+        ],
+        "hint": "in: S2; out: S3 -- correct the flows or compositions",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/flowsheet.yaml#process-balance:R1"
+      }
+    ]
+  },
+  "kinetics": {
+    "file": "process/catalysts.yaml",
+    "catalysts": [
+      {
+        "id": "FE_NH3",
+        "name": "Promoted iron ammonia synthesis catalyst",
+        "active_phase": "Fe (reduced magnetite, Fe3O4)",
+        "promoters": [
+          "K2O",
+          "Al2O3",
+          "CaO"
+        ],
+        "support": "",
+        "physical": {
+          "form": "granule",
+          "particle_diameter": 0.003,
+          "sphericity": null,
+          "particle_density": 4800.0,
+          "bulk_density": 2800.0,
+          "bed_voidage": 0.42,
+          "surface_area": 15.0,
+          "provenance": "assumed",
+          "source": "typical of fused iron catalysts, 1.5-3 mm (Appl, Ullmann's)"
+        },
+        "window": {
+          "temperature": [
+            643.15,
+            803.15
+          ],
+          "pressure": [
+            10000.0,
+            35000.0
+          ],
+          "provenance": "assumed",
+          "source": "370-530 C, 100-350 bar (Appl, Ullmann's)"
+        },
+        "space_velocity": null,
+        "poisons": [
+          "H2O",
+          "CO",
+          "CO2",
+          "O2",
+          "sulfur compounds",
+          "chlorides"
+        ],
+        "deactivation": {
+          "lifetime": 10.0,
+          "mechanisms": [
+            "sintering",
+            "poisoning by oxygen compounds"
+          ],
+          "regeneration": "none (oxygen poisoning is reversible by re-reduction)",
+          "provenance": "assumed",
+          "source": "10-15 years in service (Appl, Ullmann's)"
+        },
+        "price": null,
+        "sources": [
+          "Appl, Ammonia, Ullmann's Encyclopedia of Industrial Chemistry, doi:10.1002/14356007.a02_143.pub3"
+        ],
+        "reactions": [
+          "NH3_SYN"
+        ],
+        "units": [
+          {
+            "unit": "R1",
+            "kind": "step",
+            "reactor": "equilibrium",
+            "reactions": [
+              "NH3_SYN"
+            ],
+            "bed": null
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison H2O is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison CO is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison CO2 is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison O2 is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison sulfur compounds is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_NH3: poison chlorides is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_NH3"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_NH3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+name: process-simulation
+description: Example flowsheet solved by DWSIM (cheme process simulate, process/simulation.yaml)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

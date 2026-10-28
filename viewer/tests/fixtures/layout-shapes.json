@@ -1,0 +1,149 @@
+{
+  "site": { "width": 120, "depth": 80, "name": "Demo site" },
+  "areas": [
+    { "id": "A-PROC", "title": "Process area", "box": [10, 10, 60, 50], "kind": "process" },
+    { "id": "A-TANK", "title": "Tank farm", "box": [70, 10, 110, 50], "kind": "storage" },
+    { "id": "A-ROAD", "title": "Main road corridor", "box": [0, 55, 120, 65], "kind": "road" },
+    { "id": "A-UTIL", "title": "Utilities", "box": [55, 40, 75, 52], "kind": "utilities" }
+  ],
+  "roads": [
+    { "id": "R-1", "points": [[0, 60], [120, 60]], "width": 8 },
+    { "id": "R-2", "points": [[65, 60], [65, 5], [115, 5]], "width": 6 }
+  ],
+  "racks": [
+    { "id": "PR-1", "title": "Main pipe rack", "points": [[15, 30], [55, 30]], "width": 6, "levels": [5, 7.5] }
+  ],
+  "buildings": [
+    {
+      "id": "B-100",
+      "title": "Compressor house",
+      "origin": [20, 38],
+      "width": 18,
+      "depth": 10,
+      "rotation_deg": 0,
+      "levels": [
+        { "id": "L0", "title": "Ground floor", "elevation": 0, "height": 6, "kind": "floor" },
+        { "id": "L1", "title": "Platform", "elevation": 6, "kind": "platform" },
+        { "id": "RF", "title": "Roof", "elevation": 9, "kind": "roof" }
+      ],
+      "frame": { "grid_x": [0, 6, 12, 18], "grid_y": [0, 10] }
+    },
+    {
+      "id": "B-200",
+      "title": "Control room",
+      "origin": [100, 70],
+      "width": 12,
+      "depth": 8,
+      "rotation_deg": 90,
+      "levels": [{ "id": "L0", "elevation": 0, "height": 4, "kind": "floor" }]
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "P-101",
+      "type": "CentrifugalPump",
+      "position": [25, 20, 0],
+      "shape": "box",
+      "size": [2, 1, 1.2],
+      "rotation_deg": 90,
+      "building": null,
+      "level": null,
+      "sheet": "pid/P-01.xml"
+    },
+    {
+      "tag": "V-101",
+      "type": "Vessel",
+      "position": [40, 20, 0],
+      "shape": "vertical_cylinder",
+      "size": { "diameter": 3, "height": 8 },
+      "rotation_deg": 0,
+      "building": null,
+      "level": null,
+      "sheet": "P-01"
+    },
+    {
+      "tag": "E-101",
+      "type": "ShellAndTubeHeatExchanger",
+      "position": [48, 20, 0.5],
+      "shape": "horizontal_cylinder",
+      "size": { "diameter": 1.2, "length": 6 },
+      "rotation_deg": 0,
+      "building": null,
+      "level": null,
+      "sheet": "pid/P-01.xml"
+    },
+    {
+      "tag": "E-102",
+      "type": "ShellAndTubeHeatExchanger",
+      "position": [49, 20.5, 0.5],
+      "shape": "horizontal_cylinder",
+      "size": { "diameter": 1.2, "length": 6 },
+      "rotation_deg": 0,
+      "building": null,
+      "level": null,
+      "sheet": null
+    },
+    {
+      "tag": "K-101",
+      "type": "Compressor",
+      "position": [29, 43, 0],
+      "shape": "box",
+      "size": [5, 3, 2.5],
+      "rotation_deg": 0,
+      "building": "B-100",
+      "level": "L0",
+      "sheet": "pid/P-02.xml"
+    },
+    {
+      "tag": "TK-201",
+      "type": "Tank",
+      "position": [85, 30, 0],
+      "shape": "vertical_cylinder",
+      "size": { "diameter": 14, "height": 12 },
+      "rotation_deg": 0,
+      "building": null,
+      "level": null,
+      "sheet": "pid/P-02.xml"
+    },
+    {
+      "tag": "S-301",
+      "type": "SphericalVessel",
+      "position": [100, 20, 2],
+      "shape": "sphere",
+      "size": { "diameter": 8 },
+      "rotation_deg": 0,
+      "building": null,
+      "level": null,
+      "sheet": null
+    }
+  ],
+  "findings": [
+    {
+      "file": "layout/equipment-placement.yaml",
+      "level": "error",
+      "rule": "cheme.layout-clash",
+      "message": "E-101 and E-102 overlap",
+      "line": 24,
+      "ids": ["E-101", "E-102"],
+      "hint": "Move one of them or change its size."
+    },
+    {
+      "file": "layout/site-plan.yaml",
+      "level": "warning",
+      "rule": "cheme.layout-area-overlap",
+      "message": "Areas A-PROC and A-UTIL overlap",
+      "line": 8,
+      "ids": ["A-PROC", "A-UTIL"],
+      "hint": ""
+    },
+    {
+      "file": "layout/equipment-placement.yaml",
+      "level": "info",
+      "rule": "cheme.layout-not-placed",
+      "message": "C-101 is in the equipment list but not placed",
+      "line": null,
+      "ids": ["C-101"],
+      "hint": "Add it to layout/equipment-placement.yaml."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+# Ideal-gas data and critical constants from `cheme chemistry thermo nitrogen hydrogen ammonia
+# argon` (extra props).
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: N2
+    name: Nitrogen
+    formula: N2
+    cas: 7727-37-9
+    molar_mass: 28.014
+    normal_boiling_point: 77.36
+    critical: {Tc: 126.192, Pc: 3395.8, omega: 0.0372, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 0.0, S_298: 191.6, cp_R: [3.539, -0.000261, 7e-08, 1.57e-09, -9.9e-13], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: H2
+    name: Hydrogen
+    formula: H2
+    cas: 1333-74-0
+    molar_mass: 2.016
+    normal_boiling_point: 20.28
+    critical: {Tc: 33.145, Pc: 1296.4, omega: -0.219, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 0.0, S_298: 130.7, cp_R: [2.883, 0.003681, -7.72e-06, 6.92e-09, -2.13e-12], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: NH3
+    name: Ammonia
+    formula: NH3
+    cas: 7664-41-7
+    molar_mass: 17.031
+    normal_boiling_point: 239.82
+    critical: {Tc: 405.56, Pc: 11363.4, omega: 0.256, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: -45558.0, S_298: 192.8, cp_R: [4.238, -0.004215, 2.041e-05, -2.126e-08, 7.61e-12], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: AR
+    name: Argon
+    formula: Ar
+    cas: 7440-37-1
+    molar_mass: 39.948
+    normal_boiling_point: 87.30
+    critical: {Tc: 150.687, Pc: 4863, omega: -0.00219, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 0.0, S_298: 154.8, cp_R: [2.5], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+templates:
+  - {id: syngas, title: Synthesis gas, components: [N2, H2, NH3, AR]}
+property_method:
+  adapter: thermo
+  status: placeholder

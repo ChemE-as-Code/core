@@ -1,0 +1,242 @@
+<!-- How the instrument connection is drawn: pipe, valve, blind flange (Shape13) with its PipingNodePosition and the InstrumentationNodePosition1 the measuring line starts at. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="PipingNetworkSegment13_Drawing1" type="Core/Diagram.RepresentationGroup">
+  <Components property="Groups">
+    <Object id="Pipe16_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="Groups">
+        <Object id="Pipe16_Drawing1_Groups1" type="Core/Diagram.Static">
+          <Components property="Elements">
+            <Object id="Pipe16_Drawing1_Groups1_Elements1" type="Core/Diagram.ConnectorLine">
+              <References objects="#PipingNodePosition31" property="Source"/>
+              <References objects="#PipingNodePosition32" property="Target"/>
+              <Data property="Stroke">
+                <AggregatedDataValue type="Core/Diagram.Stroke">
+                  <Data property="Color">
+                    <AggregatedDataValue type="Core/Diagram.Color">
+                      <Data property="B">
+                        <Integer>0</Integer>
+                      </Data>
+                      <Data property="G">
+                        <Integer>128</Integer>
+                      </Data>
+                      <Data property="R">
+                        <Integer>128</Integer>
+                      </Data>
+                    </AggregatedDataValue>
+                  </Data>
+                  <Data property="DashStyle">
+                    <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                  </Data>
+                  <Data property="Width">
+                    <Double>0.25</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+      </Components>
+      <References objects="#Pipe16" property="Represents"/>
+    </Object>
+    <Object id="BallValve3_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="Groups">
+        <Object id="PipingNode34_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="NodePositions">
+            <Object id="PipingNodePosition32" type="Plant/Diagram.PipingNodePosition">
+              <References objects="#PipingNode34" property="Node"/>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>281.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>150.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+            </Object>
+          </Components>
+          <References objects="#PipingNode34" property="Represents"/>
+        </Object>
+        <Object id="PipingNode35_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="NodePositions">
+            <Object id="PipingNode35_Drawing1_NodePositions1" type="Plant/Diagram.PipingNodePosition">
+              <References objects="#PipingNode35" property="Node"/>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>281.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>146.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+            </Object>
+          </Components>
+          <References objects="#PipingNode35" property="Represents"/>
+        </Object>
+        <Object id="BallValve3_Drawing1_Groups1" type="Core/Diagram.Static">
+          <Components property="Elements">
+            <Object id="BallValve3_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+              <References objects="#Shape8" property="Shape"/>
+              <Data property="IsMirrored">
+                <Boolean>false</Boolean>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>281.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>148.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>270.0</Double>
+              </Data>
+              <Data property="ScaleX">
+                <Double>0.4</Double>
+              </Data>
+              <Data property="ScaleY">
+                <Double>0.4</Double>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+        <Object id="BallValve3_Drawing1_Groups2" type="Plant/Diagram.ValveLabel">
+          <Components property="Elements">
+            <Object id="BallValve3_Drawing1_Groups2_Elements1" type="Core/Diagram.Text">
+              <Components property="Template">
+                <Object id="BallValve3_Drawing1_Groups2_Elements1_Template1" type="Core/Diagram.TextTemplate">
+                  <Components property="Fragments">
+                    <Object id="BallValve3_Drawing1_Groups2_Elements1_Template1_Fragments1" type="Core/Diagram.AttributeRepresentation">
+                      <References objects="#BallValve3" property="Object"/>
+                      <Data property="AttributeName">
+                        <String>PipingComponentName</String>
+                      </Data>
+                      <Data property="Type">
+                        <DataReference data="Core/Diagram.AttributeRepresentationType.Value"/>
+                      </Data>
+                    </Object>
+                    <Object id="BallValve3_Drawing1_Groups2_Elements1_Template1_Fragments2" type="Core/Diagram.LiteralText">
+                      <Data property="Text">
+                        <String>-</String>
+                      </Data>
+                    </Object>
+                  </Components>
+                </Object>
+              </Components>
+              <Data property="Alignment">
+                <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
+              </Data>
+              <Data property="Color">
+                <AggregatedDataValue type="Core/Diagram.Color">
+                  <Data property="B">
+                    <Integer>0</Integer>
+                  </Data>
+                  <Data property="G">
+                    <Integer>0</Integer>
+                  </Data>
+                  <Data property="R">
+                    <Integer>0</Integer>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Font">
+                <String>Calibri</String>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>284.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>145.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>270.0</Double>
+              </Data>
+              <Data property="Size">
+                <Double>3.0</Double>
+              </Data>
+              <Data property="Text">
+                <String>73KH12-25</String>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+      </Components>
+      <References objects="#BallValve3" property="Represents"/>
+    </Object>
+    <Object id="BlindFlange1_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="Groups">
+        <Object id="PipingNode36_Drawing1" type="Core/Diagram.RepresentationGroup">
+          <Components property="NodePositions">
+            <Object id="PipingNode36_Drawing1_NodePositions1" type="Plant/Diagram.PipingNodePosition">
+              <References objects="#PipingNode36" property="Node"/>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>281.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>146.0</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+            </Object>
+          </Components>
+          <References objects="#PipingNode36" property="Represents"/>
+        </Object>
+        <Object id="BlindFlange1_Drawing1_Groups1" type="Core/Diagram.Static">
+          <Components property="Elements">
+            <Object id="BlindFlange1_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+              <References objects="#Shape13" property="Shape"/>
+              <Data property="IsMirrored">
+                <Boolean>false</Boolean>
+              </Data>
+              <Data property="Position">
+                <AggregatedDataValue type="Core/Diagram.Point">
+                  <Data property="X">
+                    <Double>281.0</Double>
+                  </Data>
+                  <Data property="Y">
+                    <Double>145.2</Double>
+                  </Data>
+                </AggregatedDataValue>
+              </Data>
+              <Data property="Rotation">
+                <Double>270.0</Double>
+              </Data>
+              <Data property="ScaleX">
+                <Double>0.4</Double>
+              </Data>
+              <Data property="ScaleY">
+                <Double>0.4</Double>
+              </Data>
+            </Object>
+          </Components>
+        </Object>
+      </Components>
+      <Components property="NodePositions">
+        <Object id="InstrumentationNodePosition1" type="Plant/Diagram.InstrumentationNodePosition">
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>281.0</Double>
+              </Data>
+              <Data property="Y">
+                <Double>145.2</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+        </Object>
+      </Components>
+      <References objects="#BlindFlange1" property="Represents"/>
+    </Object>
+  </Components>
+  <References objects="#PipingNetworkSegment13" property="Represents"/>
+</Object>

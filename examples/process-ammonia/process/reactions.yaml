@@ -1,0 +1,16 @@
+# The reactions of the loop (schema cheme/reactions/v1). Coefficients are per component id
+# of materials.yaml: negative reactants, positive products. cheme validate checks the element
+# balance and the heat of reaction against the components' ideal-gas data; the converter step
+# R1 names the reaction and takes it to equilibrium (ln K from the same data).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: NH3_SYN
+    title: Ammonia synthesis
+    equation: N2 + 3 H2 <=> 2 NH3
+    stoichiometry: {N2: -1, H2: -3, NH3: 2}
+    phase: vapor
+    reversible: true
+    heat_of_reaction: {value: -91116, provenance: given, source: "2 x dHf(NH3, g) = 2 x -45.558 kJ/mol, ATcT"}
+    catalyst: FE_NH3
+    sources: ["Appl, Ammonia, Ullmann's Encyclopedia of Industrial Chemistry, doi:10.1002/14356007.a02_143.pub3"]

@@ -1,0 +1,7 @@
+This work is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) - see LICENSE.
+
+This applies to the whole repository: the cheme-as-code package, the viewer (viewer/, with its own NOTICE) and the agent runner (agent-cli/). Third-party data and code keep their own licences, recorded next to them (LICENSE and SOURCE.md files).
+
+Technische Universiteit Delft hereby disclaims all copyright interest in the program "Cheme-as-Code" written by Artur M. Schweidtmann. Paulien Herder, Dean of Applied Science.
+
+Copyright (C) 2026 Artur Schweidtmann

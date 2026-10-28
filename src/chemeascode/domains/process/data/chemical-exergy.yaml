@@ -1,0 +1,23 @@
+# Standard chemical exergy of pure substances, kJ/mol, by CAS number, for the dead state
+# T0 = 298.15 K, P0 = 101.325 kPa and Szargut's reference environment.
+# Source: J. Szargut, D. R. Morris, F. R. Steward, "Exergy analysis of thermal, chemical, and
+# metallurgical processes", Hemisphere, 1988 (Appendix, model II), as tabulated in T. J. Kotas,
+# "The Exergy Method of Thermal Plant Analysis", 1995, Table D.3, and A. Bejan, G. Tsatsaronis,
+# M. Moran, "Thermal Design and Optimization", 1996, Table C.2 (model II).
+# Gases at their ideal-gas state; water also as liquid. Used by chemeascode.domains.process.exergy.
+source: "Szargut, Morris, Steward 1988, model II (Kotas 1995 Table D.3; Bejan et al. 1996 Table C.2)"
+dead_state: {temperature: 298.15, pressure: 101.325}
+substances:
+  "7727-37-9": {name: nitrogen, gas: 0.72}
+  "7782-44-7": {name: oxygen, gas: 3.97}
+  "7440-37-1": {name: argon, gas: 11.69}
+  "124-38-9": {name: carbon dioxide, gas: 19.87}
+  "7732-18-5": {name: water, gas: 9.50, liquid: 0.90}
+  "1333-74-0": {name: hydrogen, gas: 236.09}
+  "74-82-8": {name: methane, gas: 831.65}
+  "630-08-0": {name: carbon monoxide, gas: 275.10}
+  "7440-59-7": {name: helium, gas: 30.37}
+  "7440-01-9": {name: neon, gas: 27.19}
+  "7439-90-9": {name: krypton, gas: 34.36}
+  "7440-63-3": {name: xenon, gas: 40.33}
+  "7664-41-7": {name: ammonia, gas: 337.90}

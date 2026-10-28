@@ -1,0 +1,65 @@
+{
+  "model": {
+    "penetrations": [
+      {
+        "id": "CB-1/AIR-2002",
+        "refs": {
+          "lines": [
+            "AIR-2002"
+          ],
+          "segments": [
+            "Line_AIR2002_S2"
+          ]
+        },
+        "source": "generated",
+        "owner": "CB-1",
+        "wall": "CB-1/wall-north-12",
+        "pipe": "P-03/Line_AIR2002_S2",
+        "point": [
+          132.914,
+          47.1,
+          8.254
+        ],
+        "material": "casing",
+        "end_inside": true,
+        "length": 0.0,
+        "opening": {
+          "side": "north",
+          "offset": 7.75,
+          "width": 0.65,
+          "height": 0.65,
+          "sill": 7.95,
+          "kind": "opening"
+        },
+        "review_needed": true,
+        "reason": "into CB-1: a casing penetration"
+      }
+    ]
+  },
+  "model_findings": [
+    {
+      "file": "layout/plant-model.yaml",
+      "level": "info",
+      "rule": "cheme.layout-wall-penetration",
+      "message": "pipe P-03/Line_AIR2002_S2 (AIR-2002) into CB-1: a casing penetration at [132.9, 47.1, 8.3], outside its declared openings",
+      "line": null,
+      "ids": [
+        "P-03/Line_AIR2002_S2",
+        "CB-1/wall-north-12"
+      ],
+      "hint": "declare the opening in layout/structures.yaml (cheme layout pin CB-1/AIR-2002: north side, offset 7.75, width 0.65, height 0.65, sill 7.95 m), or route the line through an existing opening (via points)",
+      "key": "CB-1/AIR-2002",
+      "box": [
+        132.56,
+        46.746,
+        7.9,
+        133.268,
+        47.454,
+        8.608
+      ],
+      "crop": null,
+      "accepted": null,
+      "measured": null
+    }
+  ]
+}

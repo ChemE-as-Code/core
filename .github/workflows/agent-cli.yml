@@ -1,0 +1,40 @@
+name: agent-cli
+# The agent runner in agent-cli/: its own pyproject.toml and uv.lock. It also runs when the
+# interface it calls changes (`cheme runs record`, the run-record schema and writer). No API key:
+# the tests cover the guards and the job supervisor, not live sessions.
+on:
+  pull_request:
+    paths:
+      - "agent-cli/**"
+      - "src/chemeascode/project/run_records.py"
+      - "src/chemeascode/foundation/schemas/run_record.py"
+      - "src/chemeascode/interfaces/cli/runs.py"
+      - ".github/workflows/agent-cli.yml"
+  push:
+    branches: [main]
+    paths:
+      - "agent-cli/**"
+      - "src/chemeascode/project/run_records.py"
+      - "src/chemeascode/foundation/schemas/run_record.py"
+      - "src/chemeascode/interfaces/cli/runs.py"
+      - ".github/workflows/agent-cli.yml"
+  workflow_dispatch:
+concurrency:
+  group: agent-cli-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+defaults:
+  run:
+    working-directory: agent-cli
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv run --with pytest pytest -q

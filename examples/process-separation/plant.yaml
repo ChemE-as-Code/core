@@ -1,0 +1,6 @@
+name: process-separation
+description: Example flowsheet with a flash, a heat exchanger and a shortcut column, solved by DWSIM (cheme process simulate)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

@@ -1,0 +1,88 @@
+name: project-template
+# After ci passed on a push to main, regenerate the project-template repository from `cheme init`
+# of that commit and push it when anything changed. project-template is never edited by hand
+# (AGENTS.md).
+# Secrets: DEPLOY_KEY_PYDEXPI (as in ci.yml) and PROJECT_TEMPLATE_TOKEN, a fine-grained token
+# with contents: read and write on ChemE-as-Code/project-template only.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: project-template
+  cancel-in-progress: false
+# GITHUB_TOKEN only reads core; the push to project-template uses PROJECT_TEMPLATE_TOKEN.
+permissions:
+  contents: read
+env:
+  # the commit ci passed on (a manual run: the tip of main)
+  SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+jobs:
+  tip:
+    # A manual run on main, or a ci run of a push (not of a pull request from a branch named
+    # main) that passed. ci runs finish in any order: only the tip of main is regenerated, so an
+    # older commit whose ci finished late never overwrites the template of a newer one.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      current: ${{ steps.tip.outputs.current }}
+    steps:
+      - id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ "$tip" != "$SOURCE_SHA" ]; then
+            echo "main has moved on to $tip; the ci run of that commit regenerates the template"
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+  regenerate:
+    needs: tip
+    if: needs.tip.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      # The rewrite above sends every github.com URL over SSH, where only the pyDEXPI key is
+      # loaded; drop it so the next checkout uses PROJECT_TEMPLATE_TOKEN over HTTPS.
+      - run: git config --global --unset-all url."git@github.com:".insteadOf
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ChemE-as-Code/project-template
+          token: ${{ secrets.PROJECT_TEMPLATE_TOKEN }}
+          path: project-template
+      - name: Regenerate
+        run: |
+          uv run cheme init "$RUNNER_TEMP/fresh" --name "My plant"
+          rsync -a --delete --exclude .git "$RUNNER_TEMP/fresh/" project-template/
+      - name: Commit and push
+        working-directory: project-template
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "project-template is current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          version=$(uv run --project "$GITHUB_WORKSPACE" python -c "import importlib.metadata as m; print(m.version('cheme-as-code'))")
+          git commit -q -m "Regenerate from core main (cheme-as-code $version, ${SOURCE_SHA::7})"
+          git push

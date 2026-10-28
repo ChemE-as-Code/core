@@ -1,0 +1,5 @@
+name: lca-scenarios-asu
+description: >-
+  SYNTHETIC test fixture: an ASU-like plant (GOX, GAN, LOX, LIN and electric power) for regional
+  LCI scenarios (core#172). Not a design; the regional factors are synthetic test values.
+stage: concept

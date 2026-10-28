@@ -1,0 +1,226 @@
+{
+  "rev": null,
+  "directory": "experiments/kinetics",
+  "files": [
+    {
+      "file": "experiments/kinetics/broken.yaml",
+      "data": null,
+      "fit": null,
+      "problem": "experiments/kinetics/broken.yaml: kind: Input should be 'kinetic-data' (and 4 more)"
+    },
+    {
+      "file": "experiments/kinetics/wgs.yaml",
+      "data": {
+        "schema": "cheme/kinetic-data/v1",
+        "kind": "kinetic-data",
+        "reaction": "WGS",
+        "catalyst": "FE_CR",
+        "basis": "catalyst_mass",
+        "points": [
+          {
+            "temperature": 623.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 5.855889764883201e-07
+          },
+          {
+            "temperature": 623.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 4.460626879741241e-07
+          },
+          {
+            "temperature": 623.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 1.1973790945882563e-06
+          },
+          {
+            "temperature": 623.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 9.227478781839086e-07
+          },
+          {
+            "temperature": 653.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 1.5380344097877336e-06
+          },
+          {
+            "temperature": 653.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 1.1599605774932217e-06
+          },
+          {
+            "temperature": 653.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 3.1746907485372893e-06
+          },
+          {
+            "temperature": 653.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 2.435185225723712e-06
+          },
+          {
+            "temperature": 683.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 3.6862596954342333e-06
+          },
+          {
+            "temperature": 683.15,
+            "partial_pressures": {
+              "CO": 1.5,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 2.7437963839999626e-06
+          },
+          {
+            "temperature": 683.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 9.0,
+              "CO2": 0.8999999999999999,
+              "H2": 13.5
+            },
+            "rate": 7.702120108006928e-06
+          },
+          {
+            "temperature": 683.15,
+            "partial_pressures": {
+              "CO": 3.0,
+              "H2O": 12.0,
+              "CO2": 1.7999999999999998,
+              "H2": 13.5
+            },
+            "rate": 5.872812574337408e-06
+          }
+        ],
+        "provenance": "calculated",
+        "source": "the example's rate law"
+      },
+      "fit": {
+        "rate": {
+          "form": "power_law",
+          "basis": "catalyst_mass",
+          "driving": "partial_pressure",
+          "k": {
+            "A": 5526.427808632127,
+            "Ea": 111000.00000000058,
+            "n": 0.0,
+            "T_ref": 1.0
+          },
+          "orders": {
+            "CO": 0.9999999999999868,
+            "H2O": -0.8673915022754023
+          },
+          "reverse": "equilibrium",
+          "adsorption": [],
+          "power": 1.0,
+          "catalyst": "FE_CR",
+          "temperature_range": [
+            623.15,
+            683.15
+          ],
+          "provenance": "calculated",
+          "source": "fitted to 12 points (calculated: the example's rate law)"
+        },
+        "parameters": {
+          "ln_A": {
+            "value": 8.617296919901216,
+            "standard_error": 4.0322524638268705e-13,
+            "interval_95": [
+              8.617296919900287,
+              8.617296919902145
+            ]
+          },
+          "Ea": {
+            "value": 111000.00000000058,
+            "standard_error": 1.860483531513759e-09,
+            "interval_95": [
+              110999.99999999629,
+              111000.00000000487
+            ]
+          },
+          "order_CO": {
+            "value": 0.9999999999999868,
+            "standard_error": 3.716342936127413e-14,
+            "interval_95": [
+              0.9999999999999011,
+              1.0000000000000724
+            ]
+          },
+          "order_H2O": {
+            "value": -0.8673915022754023,
+            "standard_error": 8.954234117603372e-14,
+            "interval_95": [
+              -0.8673915022756088,
+              -0.8673915022751958
+            ]
+          }
+        },
+        "r_squared": 1.0,
+        "points": 12,
+        "residuals": [
+          -4.085620730620576e-14,
+          3.019806626980426e-14,
+          -3.375077994860476e-14,
+          3.907985046680551e-14,
+          -4.440892098500626e-14,
+          2.4868995751603507e-14,
+          -3.552713678800501e-14,
+          3.552713678800501e-14,
+          -5.1514348342607263e-14,
+          1.9539925233402755e-14,
+          -4.263256414560601e-14,
+          2.6645352591003757e-14
+        ],
+        "notes": [],
+        "reverse": true
+      },
+      "problem": null
+    }
+  ]
+}

@@ -1,0 +1,237 @@
+{
+  "repository": "ChemE-as-Code/process-library",
+  "label": "process:separation",
+  "web": "https://github.com/ChemE-as-Code/process-library/issues?q=is%3Aissue%20label%3A%22process%3Aseparation%22",
+  "new": {
+    "action": "https://github.com/ChemE-as-Code/process-library/issues/new?template=1-action-item.yml&labels=process%3Aseparation&process=separation",
+    "hold": "https://github.com/ChemE-as-Code/process-library/issues/new?template=2-engineering-hold.yml&labels=process%3Aseparation&process=separation",
+    "tq": "https://github.com/ChemE-as-Code/process-library/issues/new?template=3-technical-query.yml&labels=process%3Aseparation&process=separation",
+    "change": "https://github.com/ChemE-as-Code/process-library/issues/new?template=4-design-change.yml&labels=process%3Aseparation&process=separation"
+  },
+  "stage": "basic",
+  "stages": [
+    "concept",
+    "basic",
+    "detail"
+  ],
+  "open_by_gate": {
+    "Basic": {
+      "tq": 1
+    },
+    "concept": {
+      "action": 1,
+      "tq": 1
+    },
+    "none": {
+      "other": 1,
+      "action": 1
+    },
+    "detail": {
+      "change": 1
+    },
+    "basic": {
+      "action": 1,
+      "hold": 1
+    }
+  },
+  "blocking": {
+    "concept": [
+      9,
+      8,
+      1
+    ],
+    "basic": [
+      9,
+      8,
+      3,
+      2,
+      1
+    ],
+    "detail": [
+      9,
+      8,
+      5,
+      3,
+      2,
+      1
+    ]
+  },
+  "issues": [
+    {
+      "number": 9,
+      "title": "Agree the cooling water return temperature",
+      "state": "open",
+      "status": "open",
+      "type": "tq",
+      "gate": "Basic",
+      "gates": [
+        "Basic"
+      ],
+      "disciplines": [
+        "process"
+      ],
+      "source": "client",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/9",
+      "created": "2026-10-09T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 8,
+      "title": "Size the flash drum demister",
+      "state": "open",
+      "status": "open",
+      "type": "action",
+      "gate": "concept",
+      "gates": [
+        "concept",
+        "basic"
+      ],
+      "disciplines": [
+        "mechanical"
+      ],
+      "source": "design-review",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/8",
+      "created": "2026-10-08T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 7,
+      "title": "Tidy up the stream naming",
+      "state": "open",
+      "status": "open",
+      "type": null,
+      "gate": null,
+      "gates": [],
+      "disciplines": [],
+      "source": null,
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/7",
+      "created": "2026-10-07T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 6,
+      "title": "Check the relief load of the column overhead",
+      "state": "open",
+      "status": "open",
+      "type": "action",
+      "gate": null,
+      "gates": [],
+      "disciplines": [
+        "safety"
+      ],
+      "source": "internal",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/6",
+      "created": "2026-10-06T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 5,
+      "title": "Replace the shortcut column by a rigorous one",
+      "state": "open",
+      "status": "open",
+      "type": "change",
+      "gate": "detail",
+      "gates": [
+        "detail"
+      ],
+      "disciplines": [
+        "process"
+      ],
+      "source": "design-review",
+      "waiting": "work",
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/5",
+      "created": "2026-10-05T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 4,
+      "title": "Add a low-low level trip on the flash drum",
+      "state": "closed",
+      "status": "closed",
+      "type": "action",
+      "gate": "concept",
+      "gates": [
+        "concept"
+      ],
+      "disciplines": [
+        "safety"
+      ],
+      "source": "hazop",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/4",
+      "created": "2026-10-04T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": "2026-10-20T12:00:00Z"
+    },
+    {
+      "number": 3,
+      "title": "PIC-104: state the controller action and the fail position of PV-104",
+      "state": "open",
+      "status": "in-progress",
+      "type": "action",
+      "gate": "basic",
+      "gates": [
+        "basic"
+      ],
+      "disciplines": [
+        "control"
+      ],
+      "source": "control-review",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/3",
+      "created": "2026-10-03T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 2,
+      "title": "Reboiler duty is a placeholder until the vendor quotes",
+      "state": "open",
+      "status": "open",
+      "type": "hold",
+      "gate": "basic",
+      "gates": [
+        "basic"
+      ],
+      "disciplines": [
+        "mechanical",
+        "process"
+      ],
+      "source": "vendor",
+      "waiting": "input",
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/2",
+      "created": "2026-10-02T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    },
+    {
+      "number": 1,
+      "title": "Confirm the feed composition with the client",
+      "state": "open",
+      "status": "for-verification",
+      "type": "tq",
+      "gate": "concept",
+      "gates": [
+        "concept"
+      ],
+      "disciplines": [
+        "process"
+      ],
+      "source": "client",
+      "waiting": null,
+      "url": "https://github.com/ChemE-as-Code/process-library/issues/1",
+      "created": "2026-10-01T09:00:00Z",
+      "updated": "2026-10-24T09:00:00Z",
+      "closed": null
+    }
+  ]
+}

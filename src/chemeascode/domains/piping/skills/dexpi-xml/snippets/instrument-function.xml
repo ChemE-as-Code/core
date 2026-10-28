@@ -1,0 +1,29 @@
+<!-- An instrument function (PI-4712.01) under ProcessInstrumentationFunctions. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="ProcessInstrumentationFunction1" type="Plant/Instrumentation.ProcessInstrumentationFunction">
+  <Components property="ProcessSignalGeneratingFunctions">
+    <Object id="ProcessSignalGeneratingFunction1" type="Plant/Instrumentation.ProcessSignalGeneratingFunction">
+      <References objects="#BlindFlange1" property="SensingLocation"/>
+      <Data property="ProcessSignalGeneratingFunctionNumber">
+        <String>PT4712.01</String>
+      </Data>
+    </Object>
+  </Components>
+  <Components property="SignalConveyingFunctions">
+    <Object id="MeasuringLineFunction1" type="Plant/Instrumentation.MeasuringLineFunction">
+      <References objects="#ProcessSignalGeneratingFunction1" property="Source"/>
+      <References objects="#ProcessInstrumentationFunction1" property="Target"/>
+    </Object>
+  </Components>
+  <Data property="Location">
+    <DataReference data="Plant/Enumerations.LocationClassification.Field"/>
+  </Data>
+  <Data property="ProcessInstrumentationFunctionCategory">
+    <String>P</String>
+  </Data>
+  <Data property="ProcessInstrumentationFunctionNumber">
+    <String>4712.01</String>
+  </Data>
+  <Data property="ProcessInstrumentationFunctions">
+    <String>I</String>
+  </Data>
+</Object>

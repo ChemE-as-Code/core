@@ -1,0 +1,18 @@
+# Components and templates of the process. Schema cheme/process/v1 (`cheme schema
+# process-materials`). Every component has a stable id; molar_mass in kg/kmol,
+# normal_boiling_point in K at 101.325 kPa.
+schema: cheme/process/v1
+kind: materials
+components: []
+#  - {id: N2, name: Nitrogen, formula: N2, cas: 7727-37-9, molar_mass: 28.014, normal_boiling_point: 77.36}
+templates: []
+#  - {id: air, title: Air, components: [N2, O2, AR]}
+# property_method is a placeholder until `cheme process props --fill` records the method: its
+# benchmarked property package, package versions and application range. Packages:
+# air-pr-chemsep (N2/O2/Ar, 77-315 K, vapour 100-3200 kPa(a), liquid and two-phase 100-600
+# kPa(a)) and syngas-pr-vapor (H2/N2/Ar/CH4/CO/CO2 mixtures, NH3 pure or dilute with H2/N2/Ar/
+# CH4, vapour only, in benchmarked temperature-pressure boxes). `cheme process props --coverage` shows which applies
+# to each stream; `package: <id>` here chooses one.
+property_method:
+  adapter: thermo
+  status: placeholder

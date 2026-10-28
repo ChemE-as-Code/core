@@ -1,0 +1,68 @@
+# Indicative extents of zones around release points, for the 3D layout (layout/zones.yaml
+# sources). Screening values only: every row is ASSUMED until a site area classification
+# (IEC 60079-10-1 / EI 15 for flammable gases and liquids) or an oxygen and inert vent study
+# replaces it. No dispersion is modelled. A zone source picks the rows of its source kind,
+# release grade and substance class; each row gives one volume (a sphere around the release
+# point, or a cylinder from grade up to the point plus the radius).
+schema: cheme/release-radii/v1
+status: ASSUMED
+substances:
+  oxygen: [oxygen, o2, gox, lox, "oxygen-enriched"]
+  inert: [nitrogen, n2, gan, lin, argon, ar, lar, "waste nitrogen", "waste n2", helium, "carbon dioxide", co2, inert]
+  flammable_gas: [hydrogen, h2, methane, "natural gas", ethane, ethylene, propane, propylene, butane, "fuel gas", syngas, "carbon monoxide", co]
+  flammable_liquid: [methanol, ethanol, hexane, heptane, toluene, benzene, gasoline, naphtha, diesel, kerosene, acetone]
+rows:
+  # ---- oxygen: enriched atmosphere around vents and relief outlets
+  - {source: vent, grade: continuous, substance: oxygen, kind: oxygen_enriched, radius_m: 5.0, shape: sphere,
+     basis: "Continuous O2 vent: keep ignition sources and people out of the enriched cloud; indicative 5 m around the outlet (ASSUMED; cf. EIGA guidance on the safe location of oxygen and inert gas vents)."}
+  - {source: vent, grade: primary, substance: oxygen, kind: oxygen_enriched, radius_m: 5.0, shape: sphere,
+     basis: "Intermittent O2 vent (start-up, blow-off): as a continuous vent (ASSUMED)."}
+  - {source: psv_outlet, grade: secondary, substance: oxygen, kind: oxygen_enriched, radius_m: 3.0, shape: sphere,
+     basis: "O2 relief valve outlet, rare release: indicative 3 m (ASSUMED)."}
+  - {source: flange, grade: secondary, substance: oxygen, kind: oxygen_enriched, radius_m: 1.0, shape: sphere,
+     basis: "O2 flange or valve leak: indicative 1 m (ASSUMED)."}
+  - {source: valve, grade: secondary, substance: oxygen, kind: oxygen_enriched, radius_m: 1.0, shape: sphere,
+     basis: "O2 valve stem leak: indicative 1 m (ASSUMED)."}
+  - {source: compressor_seal, grade: secondary, substance: oxygen, kind: oxygen_enriched, radius_m: 3.0, shape: sphere,
+     basis: "O2 compressor shaft seal: indicative 3 m (ASSUMED)."}
+  - {source: pump_seal, grade: secondary, substance: oxygen, kind: oxygen_enriched, radius_m: 3.0, shape: sphere,
+     basis: "LOX pump seal: cold liquid flashes and spreads at grade; indicative 3 m (ASSUMED)."}
+  # ---- inert gases: oxygen-deficient atmosphere (asphyxiation)
+  - {source: vent, grade: continuous, substance: inert, kind: oxygen_deficient, radius_m: 5.0, shape: sphere,
+     basis: "Continuous N2/Ar vent: oxygen-deficient cloud; vent elevated above platforms, indicative 5 m (ASSUMED; cf. EIGA guidance on the safe location of oxygen and inert gas vents)."}
+  - {source: vent, grade: primary, substance: inert, kind: oxygen_deficient, radius_m: 5.0, shape: sphere,
+     basis: "Intermittent inert vent: as a continuous vent (ASSUMED)."}
+  - {source: psv_outlet, grade: secondary, substance: inert, kind: oxygen_deficient, radius_m: 3.0, shape: sphere,
+     basis: "Inert relief valve outlet: indicative 3 m (ASSUMED)."}
+  - {source: pump_seal, grade: secondary, substance: inert, kind: oxygen_deficient, radius_m: 3.0, shape: cylinder,
+     basis: "LIN/LAR pump seal: cold vapour collects at grade; indicative 3 m (ASSUMED)."}
+  - {source: flange, grade: secondary, substance: inert, kind: oxygen_deficient, radius_m: 1.0, shape: sphere,
+     basis: "Inert flange leak: indicative 1 m (ASSUMED)."}
+  # ---- flammable gas (IEC 60079-10-1 zones; extents indicative, typical of EI 15 point-source tables)
+  - {source: vent, grade: continuous, substance: flammable_gas, kind: hazardous, zone: 0, radius_m: 1.0, shape: sphere,
+     basis: "Continuous release: zone 0 at the outlet, indicative 1 m (ASSUMED)."}
+  - {source: vent, grade: continuous, substance: flammable_gas, kind: hazardous, zone: 1, radius_m: 3.0, shape: sphere,
+     basis: "Around the zone 0 of a continuous vent: zone 1, indicative 3 m (ASSUMED)."}
+  - {source: vent, grade: primary, substance: flammable_gas, kind: hazardous, zone: 1, radius_m: 3.0, shape: sphere,
+     basis: "Primary release: zone 1, indicative 3 m (ASSUMED)."}
+  - {source: psv_outlet, grade: secondary, substance: flammable_gas, kind: hazardous, zone: 1, radius_m: 3.0, shape: sphere,
+     basis: "Relief outlet to atmosphere: zone 1 within 3 m (ASSUMED; zone 2 beyond is not drawn)."}
+  - {source: pump_seal, grade: secondary, substance: flammable_gas, kind: hazardous, zone: 2, radius_m: 3.0, shape: cylinder,
+     basis: "Pump seal, secondary grade: zone 2, indicative 3 m from grade to 1 m above the seal (ASSUMED)."}
+  - {source: compressor_seal, grade: secondary, substance: flammable_gas, kind: hazardous, zone: 2, radius_m: 3.0, shape: sphere,
+     basis: "Compressor seal, secondary grade: zone 2, indicative 3 m (ASSUMED)."}
+  - {source: flange, grade: secondary, substance: flammable_gas, kind: hazardous, zone: 2, radius_m: 1.0, shape: sphere,
+     basis: "Flange, secondary grade: zone 2, indicative 1 m (ASSUMED)."}
+  - {source: valve, grade: secondary, substance: flammable_gas, kind: hazardous, zone: 2, radius_m: 1.0, shape: sphere,
+     basis: "Valve stem, secondary grade: zone 2, indicative 1 m (ASSUMED)."}
+  - {source: drain, grade: primary, substance: flammable_gas, kind: hazardous, zone: 1, radius_m: 1.5, shape: sphere,
+     basis: "Sample point or drain, primary grade: zone 1, indicative 1.5 m (ASSUMED)."}
+  # ---- flammable liquid
+  - {source: pump_seal, grade: secondary, substance: flammable_liquid, kind: hazardous, zone: 2, radius_m: 3.0, shape: cylinder,
+     basis: "Pump seal handling a flammable liquid: zone 2, indicative 3 m (ASSUMED)."}
+  - {source: flange, grade: secondary, substance: flammable_liquid, kind: hazardous, zone: 2, radius_m: 1.0, shape: sphere,
+     basis: "Flange, flammable liquid: zone 2, indicative 1 m (ASSUMED)."}
+  - {source: vent, grade: primary, substance: flammable_liquid, kind: hazardous, zone: 1, radius_m: 1.5, shape: sphere,
+     basis: "Tank breather vent: zone 1, indicative 1.5 m (ASSUMED)."}
+  - {source: drain, grade: primary, substance: flammable_liquid, kind: hazardous, zone: 1, radius_m: 1.5, shape: sphere,
+     basis: "Open drain or sample point: zone 1, indicative 1.5 m (ASSUMED)."}

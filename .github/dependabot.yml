@@ -1,0 +1,43 @@
+# Weekly update pull requests, one per ecosystem and folder: the Python dependencies of uv.lock
+# (the package), viewer/package-lock.json, agent-cli/uv.lock and the commit-pinned GitHub Actions
+# of .github/workflows. pyDEXPI is pinned by commit in
+# pyproject.toml ([tool.uv.sources]) and bumped deliberately, so it is left out.
+# pyDEXPI-dev is private: workflows of Dependabot's pull requests read Dependabot secrets, not
+# Actions secrets, so ci needs DEPLOY_KEY_PYDEXPI as a Dependabot secret too, and resolving
+# uv.lock needs read access to pyDEXPI-dev (a `registries:` git entry with a token).
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: pydexpi
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /viewer
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      # TypeScript 7 (the native port) has no JS API; vue-tsc (Volar) needs typescript <7.
+      - dependency-name: typescript
+        versions: [">=7"]
+  - package-ecosystem: uv
+    directory: /agent-cli
+    schedule:
+      interval: weekly
+    groups:
+      agent-cli:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

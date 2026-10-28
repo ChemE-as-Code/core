@@ -1,0 +1,33 @@
+# The catalysts of the loop (schema cheme/catalysts/v1). The converter step R1 names its catalyst;
+# cheme validate checks that the converter's streams stay inside the catalyst's window and that
+# none of its feeds carries a poison (poisons named by component id are checked; the others are
+# listed for the reader). The values are typical, to be confirmed with the vendor's data sheet.
+schema: cheme/catalysts/v1
+kind: catalysts
+catalysts:
+  - id: FE_NH3
+    name: Promoted iron ammonia synthesis catalyst
+    active_phase: Fe (reduced magnetite, Fe3O4)
+    promoters: [K2O, Al2O3, CaO]
+    physical:
+      form: granule
+      particle_diameter: 0.003
+      particle_density: 4800
+      bulk_density: 2800
+      bed_voidage: 0.42
+      surface_area: 15
+      provenance: assumed
+      source: "typical of fused iron catalysts, 1.5-3 mm (Appl, Ullmann's)"
+    window:
+      temperature: [643.15, 803.15]
+      pressure: [10000, 35000]
+      provenance: assumed
+      source: "370-530 C, 100-350 bar (Appl, Ullmann's)"
+    poisons: [H2O, CO, CO2, O2, sulfur compounds, chlorides]
+    deactivation:
+      lifetime: 10
+      mechanisms: [sintering, poisoning by oxygen compounds]
+      regeneration: none (oxygen poisoning is reversible by re-reduction)
+      provenance: assumed
+      source: "10-15 years in service (Appl, Ullmann's)"
+    sources: ["Appl, Ammonia, Ullmann's Encyclopedia of Industrial Chemistry, doi:10.1002/14356007.a02_143.pub3"]

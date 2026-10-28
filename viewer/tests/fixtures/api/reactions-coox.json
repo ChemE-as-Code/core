@@ -1,0 +1,337 @@
+{
+  "rev": null,
+  "file": "process/reactions.yaml",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "reactions": [
+    {
+      "id": "COOX",
+      "title": "",
+      "equation": "",
+      "stoichiometry": {
+        "CO": -2.0,
+        "O2": -1.0,
+        "CO2": 2.0
+      },
+      "phase": null,
+      "reversible": false,
+      "conversion": {
+        "key": "CO",
+        "value": 0.5,
+        "provenance": "assumed",
+        "source": ""
+      },
+      "heat_of_reaction": null,
+      "equilibrium_constant": null,
+      "rate": null,
+      "mechanism": {
+        "site_density": 2.7063e-05,
+        "adsorbates": [
+          "CO*",
+          "O*"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "equation": "",
+            "stoichiometry": {
+              "CO": -1.0,
+              "*": -1.0,
+              "CO*": 1.0
+            },
+            "forward": null,
+            "sticking": {
+              "s0": 0.84,
+              "Ea": 0.0
+            },
+            "reverse": {
+              "A": 10000000000000.0,
+              "Ea": 125500.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "energies": null
+          },
+          {
+            "id": "S2",
+            "equation": "",
+            "stoichiometry": {
+              "O2": -1.0,
+              "*": -2.0,
+              "O*": 2.0
+            },
+            "forward": null,
+            "sticking": {
+              "s0": 0.07,
+              "Ea": 0.0
+            },
+            "reverse": {
+              "A": 10000000000000.0,
+              "Ea": 213200.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "energies": null
+          },
+          {
+            "id": "S3",
+            "equation": "",
+            "stoichiometry": {
+              "CO*": -1.0,
+              "O*": -1.0,
+              "CO2": 1.0,
+              "*": 2.0
+            },
+            "forward": {
+              "A": 10000000000000.0,
+              "Ea": 105000.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "sticking": null,
+            "reverse": null,
+            "energies": null
+          }
+        ],
+        "catalyst": "",
+        "provenance": "assumed",
+        "source": "after Deutschmann et al. (1996)"
+      },
+      "catalyst": "",
+      "sources": [],
+      "key_component": "CO",
+      "type": "conversion",
+      "units": [
+        {
+          "unit": "R",
+          "kind": "block",
+          "model": "conversion",
+          "approach_K": 0.0,
+          "conversion": {
+            "value": 0.5,
+            "from": "process/reactions.yaml"
+          }
+        }
+      ],
+      "rate_law": null,
+      "microkinetics": {
+        "conditions": {
+          "unit": "R",
+          "stream": "S2",
+          "temperature_K": 500.0,
+          "pressures_bar": {
+            "CO": 0.010049999999999998,
+            "CO2": 0.010049999999999998,
+            "O2": 0.09548
+          }
+        },
+        "missing": null,
+        "reaction": "COOX",
+        "temperature_K": 500.0,
+        "pressures_bar": {
+          "CO": 0.010049999999999998,
+          "CO2": 0.010049999999999998,
+          "O2": 0.09548
+        },
+        "product": "CO2",
+        "tof_per_s": 7.71777978360072e-07,
+        "coverages": {
+          "CO*": 0.9999993207024443,
+          "O*": 7.187087014908922e-09,
+          "*": 6.721104686357797e-07
+        },
+        "step_rates_per_s": {
+          "S1": 7.717779784144341e-07,
+          "S2": 3.8588898918003607e-07,
+          "S3": 7.71777978360072e-07
+        },
+        "rate_control": {
+          "S1": -1.9915462637154677e-06,
+          "S2": 1.0000019769734465,
+          "S3": 1.437513261221697e-08
+        },
+        "apparent_activation_kJ_kmol": 253078.5585263552,
+        "orders": {
+          "CO": -2.0000026104259767,
+          "O2": 1.0000019769734465
+        },
+        "mechanism_source": "after Deutschmann et al. (1996)",
+        "mechanism_provenance": "assumed"
+      },
+      "element_balance": {
+        "evaluable": true,
+        "balanced": true,
+        "change": {}
+      }
+    },
+    {
+      "id": "UNUSED",
+      "title": "",
+      "equation": "",
+      "stoichiometry": {
+        "CO": -2.0,
+        "O2": -1.0,
+        "CO2": 2.0
+      },
+      "phase": null,
+      "reversible": false,
+      "conversion": null,
+      "heat_of_reaction": null,
+      "equilibrium_constant": null,
+      "rate": null,
+      "mechanism": {
+        "site_density": 2.7063e-05,
+        "adsorbates": [
+          "CO*",
+          "O*"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "equation": "",
+            "stoichiometry": {
+              "CO": -1.0,
+              "*": -1.0,
+              "CO*": 1.0
+            },
+            "forward": null,
+            "sticking": {
+              "s0": 0.84,
+              "Ea": 0.0
+            },
+            "reverse": {
+              "A": 10000000000000.0,
+              "Ea": 125500.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "energies": null
+          },
+          {
+            "id": "S2",
+            "equation": "",
+            "stoichiometry": {
+              "O2": -1.0,
+              "*": -2.0,
+              "O*": 2.0
+            },
+            "forward": null,
+            "sticking": {
+              "s0": 0.07,
+              "Ea": 0.0
+            },
+            "reverse": {
+              "A": 10000000000000.0,
+              "Ea": 213200.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "energies": null
+          },
+          {
+            "id": "S3",
+            "equation": "",
+            "stoichiometry": {
+              "CO*": -1.0,
+              "O*": -1.0,
+              "CO2": 1.0,
+              "*": 2.0
+            },
+            "forward": {
+              "A": 10000000000000.0,
+              "Ea": 105000.0,
+              "n": 0.0,
+              "T_ref": 1.0
+            },
+            "sticking": null,
+            "reverse": null,
+            "energies": null
+          }
+        ],
+        "catalyst": "",
+        "provenance": "assumed",
+        "source": "after Deutschmann et al. (1996)"
+      },
+      "catalyst": "",
+      "sources": [],
+      "key_component": null,
+      "type": null,
+      "units": [],
+      "rate_law": null,
+      "microkinetics": {
+        "conditions": null,
+        "missing": "the reaction takes place in no block or step"
+      },
+      "element_balance": {
+        "evaluable": true,
+        "balanced": true,
+        "change": {}
+      }
+    }
+  ],
+  "reactors": [
+    {
+      "node": "R",
+      "kind": "block",
+      "bed": null,
+      "model": "conversion",
+      "balance": "ok",
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S2"
+      ],
+      "temperature_out_K": 500.0,
+      "pressure_out_kPa": 100.0,
+      "approach_K": 0.0,
+      "fugacity": "ideal",
+      "reactions": [
+        {
+          "id": "COOX",
+          "extent_kmol_h": 0.4999711111111112,
+          "heat_of_reaction_kJ_kmol": null,
+          "ln_k": null,
+          "ln_q_over_k": null,
+          "rate": null,
+          "rate_unit": null
+        }
+      ],
+      "duty_kW": null,
+      "missing": [
+        "reaction COOX: no equilibrium_constant and no ideal_gas data for CO, O2, CO2",
+        "ideal_gas data for CO, CO2, N2, O2"
+      ]
+    }
+  ],
+  "balance": {
+    "balances": [
+      {
+        "node": "R",
+        "kind": "block",
+        "status": "ok",
+        "in_kg_h": 2841.232,
+        "out_kg_h": 2841.232636,
+        "missing": [],
+        "failing": [],
+        "streams_in": [
+          "S1"
+        ],
+        "streams_out": [
+          "S2"
+        ],
+        "extents_kmol_h": {
+          "COOX": 0.499971
+        }
+      }
+    ],
+    "findings": []
+  },
+  "kinetics": {
+    "file": null,
+    "catalysts": [],
+    "findings": []
+  }
+}

@@ -1,0 +1,145 @@
+# The double column of an air separation unit: the HP column C1 (no reboiler: the air enters at
+# the bottom; a partial condenser gives GAN vapour and liquid nitrogen, LIN is drawn from the
+# top tray), the LP column C2 (no condenser: the liquid nitrogen is its reflux; GOX is drawn as
+# vapour from the sump, LOX as liquid). C1's condenser boils C2's sump (the condenser-reboiler).
+# The feeds are given; the rest is left to `cheme process simulate --fill`.
+# Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Air separation double column
+units:
+  pressure: bar(a)
+  temperature: °C
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - id: AIR
+    title: Air near its dew point
+    ports: [{id: out, direction: out}]
+  - id: LA
+    title: Lachmann air (expander outlet)
+    ports: [{id: out, direction: out}]
+products:
+  - id: GAN
+    title: Pressure nitrogen
+    ports: [{id: in, direction: in}]
+  - id: LIN
+    title: Liquid nitrogen
+    ports: [{id: in, direction: in}]
+  - id: WASTE
+    title: Waste nitrogen
+    ports: [{id: in, direction: in}]
+  - id: GOX
+    title: Gaseous oxygen
+    ports: [{id: in, direction: in}]
+  - id: LOX
+    title: Liquid oxygen
+    ports: [{id: in, direction: in}]
+
+blocks:
+  - id: HPC
+    title: HP column
+    class: Distilling
+    ports:
+      - {id: feed, direction: in}
+      - {id: n2, direction: out}
+      - {id: lin, direction: out}
+      - {id: ln, direction: out}
+      - {id: crude, direction: out}
+  - id: LPC
+    title: LP column
+    class: Distilling
+    ports:
+      - {id: reflux, direction: in}
+      - {id: crude, direction: in}
+      - {id: lachmann, direction: in}
+      - {id: waste, direction: out}
+      - {id: gox, direction: out}
+      - {id: lox, direction: out}
+
+steps:
+  - id: C1
+    block: HPC
+    title: HP column
+    class: Distilling
+    ports:
+      - {id: feed, direction: in, delegates: feed}
+      - {id: n2, direction: out, delegates: n2}
+      - {id: lin, direction: out, delegates: lin}
+      - {id: ln, direction: out, delegates: ln}
+      - {id: crude, direction: out, delegates: crude}
+  - id: C2
+    block: LPC
+    title: LP column
+    class: Distilling
+    ports:
+      - {id: reflux, direction: in, delegates: reflux}
+      - {id: crude, direction: in, delegates: crude}
+      - {id: lachmann, direction: in, delegates: lachmann}
+      - {id: waste, direction: out, delegates: waste}
+      - {id: gox, direction: out, delegates: gox}
+      - {id: lox, direction: out, delegates: lox}
+
+streams:
+  - id: S1
+    title: HP column feed
+    from: AIR.out
+    to: C1.feed
+    template: air
+    state:
+      design:
+        pressure: {value: 5.5, provenance: given, source: main heat exchanger outlet}
+        temperature: {value: -173, provenance: given, source: near the dew point}
+        flow: {value: 83190, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {N2: 0.7811, O2: 0.2096, AR: 0.0093}, provenance: given, source: dry air}
+  - id: S2
+    title: GAN
+    from: C1.n2
+    to: GAN.in
+    template: air
+  - id: S3
+    title: LIN
+    from: C1.lin
+    to: LIN.in
+    template: air
+  - id: S4
+    title: Liquid nitrogen reflux
+    from: C1.ln
+    to: C2.reflux
+    template: air
+  - id: S5
+    title: Rich liquid
+    from: C1.crude
+    to: C2.crude
+    template: air
+  - id: S6
+    title: Lachmann air
+    from: LA.out
+    to: C2.lachmann
+    template: air
+    state:
+      design:
+        pressure: {value: 1.35, provenance: given, source: expander outlet}
+        temperature: {value: -178, provenance: given, source: expander outlet}
+        flow: {value: 14870, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {N2: 0.7811, O2: 0.2096, AR: 0.0093}, provenance: given, source: dry air}
+  - id: S7
+    title: Waste nitrogen
+    from: C2.waste
+    to: WASTE.in
+    template: air
+  - id: S8
+    title: GOX
+    from: C2.gox
+    to: GOX.in
+    template: air
+  - id: S9
+    title: LOX
+    from: C2.lox
+    to: LOX.in
+    template: air

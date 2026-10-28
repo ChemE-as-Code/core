@@ -1,0 +1,41 @@
+# EXAMPLE RATES - THEY PRICE NOTHING. Schema: `cheme schema rates`.
+#
+# This file shows the shape of the project's unit rates and estimate factors. The numbers are
+# round placeholders in no currency (XXX, ISO 4217 "no currency"), not prices: cheme-as-code holds
+# no cost data. `cheme assess estimate` warns while `example: true` stands, and a gate that
+# requires `rates` fails. Replace every rate and factor with the project's own (a quotation, a
+# company cost database, a published index), each with its status, source and year, then set
+# the currency and remove `example: true`.
+#
+# A take-off row (`cheme assess mto`) is priced by the FIRST rate of its category whose
+# where: filters all match it, so put specific rates before general ones. Units per category:
+# pipe m; elbow, tee, reducer, flange, gasket, valve, inline ea; steel t; grating, insulation
+# m2; concrete m3. Filters: item (glob), dn_min, dn_max, class (pipe class, glob), spec (glob),
+# group (glob).
+schema: cheme/rates/v1
+example: true
+currency: XXX
+cost_year: 2026
+basis: "EXAMPLE: shape of a factor estimate of the bulk materials of the 3D model"
+rates:
+  - {id: pipe-small, category: pipe, unit: m, rate: 1, where: {dn_max: 50}, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: pipe, category: pipe, unit: m, rate: 2, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: elbow, category: elbow, unit: ea, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: tee, category: tee, unit: ea, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: reducer, category: reducer, unit: ea, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: flange, category: flange, unit: ea, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: gasket, category: gasket, unit: ea, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: control-valve, category: valve, unit: ea, rate: 10, where: {item: "*Control*"}, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: valve, category: valve, unit: ea, rate: 5, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: inline, category: inline, unit: ea, rate: 5, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: steel, category: steel, unit: t, rate: 10, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: grating, category: grating, unit: m2, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: insulation, category: insulation, unit: m2, rate: 1, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+  - {id: concrete, category: concrete, unit: m3, rate: 5, status: ASSUMED, source: "EXAMPLE placeholder, not a price", year: 2026}
+factors:
+  # direct: factor x the material cost of the categories in applies_to (all when empty)
+  - {id: piping-erection, title: "Piping erection and testing", kind: direct, factor: 1, applies_to: [pipe, elbow, tee, reducer, flange, gasket, valve, inline, insulation], status: ASSUMED, source: "EXAMPLE placeholder, not a factor", year: 2026}
+  - {id: steel-erection, title: "Steel and grating erection", kind: direct, factor: 1, applies_to: [steel, grating], status: ASSUMED, source: "EXAMPLE placeholder, not a factor", year: 2026}
+  # indirect: factor x the direct cost; contingency: factor x direct plus indirect cost
+  - {id: indirects, title: "Engineering and construction management", kind: indirect, factor: 0.1, status: ASSUMED, source: "EXAMPLE placeholder, not a factor", year: 2026}
+  - {id: contingency, title: "Contingency", kind: contingency, factor: 0.1, status: ASSUMED, source: "EXAMPLE placeholder, not a factor", year: 2026}

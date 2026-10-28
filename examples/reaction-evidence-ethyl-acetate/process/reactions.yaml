@@ -1,0 +1,26 @@
+# The model's reaction (schema cheme/reactions/v1), handed over from the model basis of
+# process/reaction-evidence.yaml (skill route-selection). The conversion and the equilibrium
+# constant cite the observations they come from; the rate laws of the sources stay in the
+# evidence (their units are inconsistent and their basis lumps the catalyst: see its gaps).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: ESTERIF
+    title: Esterification of acetic acid with ethanol
+    equation: CH3COOH + C2H5OH <=> CH3COOC2H5 + H2O
+    stoichiometry: {AcOH: -1, EtOH: -1, EtOAc: 1, H2O: 1}
+    phase: liquid
+    reversible: true
+    conversion:
+      key: AcOH
+      value: 0.75
+      provenance: given
+      source: "reaction-evidence O-KIR-CONV (S-KIR p. 574): batch maximum at EtOH/AcOH 2, 353 K"
+    equilibrium_constant:
+      basis: mole_fraction
+      a: 1.3862943611198906  # ln 4.0
+      temperature_range: [323, 353]
+      provenance: given
+      source: "reaction-evidence O-KIR-KIN (S-KIR p. 575): K = 4.0 +- 0.2 on mole fractions, taken as independent of temperature"
+    catalyst: AMB15
+    sources: ["reaction-evidence S-KIR"]

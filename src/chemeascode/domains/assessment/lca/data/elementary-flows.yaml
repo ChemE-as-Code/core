@@ -1,0 +1,379 @@
+# Curated elementary-flow crosswalk (core#175): the identity of the elementary flows cheme's
+# packaged methods, examples and tests use, in reference flow lists. Not a flow list: only these
+# flows, extended one at a time with a verified identifier. CAS is an attribute here, never the
+# identity: a flow is a substance in a compartment and sub-compartment, with an origin.
+#
+# Lists:
+# - ef-3.1: the EF 3.1 reference package (European Commission, JRC; free reuse with
+#   attribution), the primary list. No EF 3.1 UUID is recorded yet: none could be verified
+#   offline against the reference package when this file was made, and none is guessed. Every
+#   flow's EF 3.1 identity is therefore {list: ef-3.1, uuid: null}, and cheme assess lca
+#   reports it (cheme.lca-flow-uuid, info). TODO(core#313): add the EF 3.1 UUIDs from the
+#   reference package, with its version: scripts/fill_ef31_uuids.py reads them from a downloaded
+#   copy of the package (a flow gets an `ef-3.1: {name, unit, uuid, categories}` block by
+#   sub-compartment, as biosphere3's), and remove the finding's cause.
+# - biosphere3: the ecoinvent elementary exchange list (biosphere3 in Brightway), for
+#   Brightway. The UUIDs, names, categories and units below were read from
+#   "ecoinvent elementary flows 3.9.xml" (ecoinvent elementary exchanges, EcoSpold02
+#   validElementaryExchanges) as distributed with bw2io 0.9.17 (BSD-3-Clause, Copyright (c)
+#   2016 Chris Mutel and Paul Scherrer Institut). Only identifiers and names are recorded (no
+#   values, no characterisation): facts needed to address the flows, with this attribution.
+#   ecoinvent publishes its elementary exchange list for free download; check its current
+#   terms before redistributing more of it.
+#
+# Fields: id (cheme's key), cas, compartment (air, water, soil, resource), origin (fossil,
+# biogenic, land-use-change; absent: any), default (false: chosen only by its id, e.g. a water
+# source), and per list: name, unit, per_kg (the list unit per kg of the exchange, for flows the
+# list counts in m3: water at 1000 kg/m3, the LCI convention), and uuid by sub-compartment
+# (sub-compartments as in docs/framework/lca.md; resources: in-air, in-water, in-ground, land).
+source:
+  biosphere3: "ecoinvent elementary exchanges 3.9 (validElementaryExchanges 3.0.0.49140), via bw2io 0.9.17"
+  ef-3.1: "EF 3.1 reference package (European Commission): no UUID recorded yet"
+flows:
+  - id: carbon-dioxide-fossil
+    cas: "124-38-9"
+    compartment: air
+    origin: fossil
+    biosphere3:
+      name: Carbon dioxide, fossil
+      unit: kg
+      uuid:
+        unspecified: 349b29d1-3e58-4c66-98b9-9d1a076efd2e
+        urban-close-to-ground: f9749677-9c9f-4678-ab55-c607dfdc2cb9
+        non-urban-high-stack: aa7cac3a-3625-41d4-bc54-33e2cf11ec46
+        lower-stratosphere: 16eeda8a-1ea2-408e-ab37-2648495058dd
+  - id: carbon-dioxide-biogenic
+    cas: "124-38-9"
+    compartment: air
+    origin: biogenic
+    biosphere3:
+      name: Carbon dioxide, non-fossil
+      unit: kg
+      uuid:
+        unspecified: eba59fd6-f37e-41dc-9ca3-c7ea22d602c7
+        urban-close-to-ground: 73ed05cc-9727-4abf-9516-4b5c0fe54a16
+        non-urban-high-stack: d6235194-e4e6-4548-bfa3-ac095131aef4
+        lower-stratosphere: 4e1f0bb0-2703-4303-bf86-972d810612cf
+  - id: carbon-dioxide-land-use-change
+    cas: "124-38-9"
+    compartment: air
+    origin: land-use-change
+    biosphere3:
+      name: Carbon dioxide, from soil or biomass stock
+      unit: kg
+      uuid:
+        unspecified: e4e9febc-07c1-403d-8d3a-6707bb4d96e6
+        urban-close-to-ground: e8787b5e-d927-446d-81a9-f56977bbfeb4
+        non-urban-high-stack: 78eb1859-abd9-44c6-9ce3-f3b5b33d619c
+        lower-stratosphere: 6d89125e-e9b7-4d7e-a1fc-ada45dbd8815
+  - id: methane-fossil
+    cas: "74-82-8"
+    compartment: air
+    origin: fossil
+    biosphere3:
+      name: Methane, fossil
+      unit: kg
+      uuid:
+        unspecified: 0795345f-c7ae-410c-ad25-1845784c75f5
+        urban-close-to-ground: 5f7aad3d-566c-4d0d-ad59-e765f971aa0f
+        non-urban-high-stack: 70ef743b-3ed5-4a6d-b192-fb6d62378555
+        lower-stratosphere: 6b1b495b-70ee-4be6-b1c2-3031aa4d6add
+  - id: methane-biogenic
+    cas: "74-82-8"
+    compartment: air
+    origin: biogenic
+    biosphere3:
+      name: Methane, non-fossil
+      unit: kg
+      uuid:
+        unspecified: da1157e2-7593-4dfd-80dd-a3449b37a4d8
+        urban-close-to-ground: baf58fc9-573c-419c-8c16-831ac03203b9
+        non-urban-high-stack: 57bdb443-d4a6-423d-8024-959b8261d02e
+        lower-stratosphere: 258263a0-6be3-4439-bd84-efee0498b849
+  - id: methane-land-use-change
+    cas: "74-82-8"
+    compartment: air
+    origin: land-use-change
+    biosphere3:
+      name: Methane, from soil or biomass stock
+      unit: kg
+      uuid:
+        unspecified: 7f0ba7c9-341e-413d-80f6-8753727d65d1
+        urban-close-to-ground: 299c6564-426e-48c3-b516-fdf301d12127
+        non-urban-high-stack: 9541a975-800f-4fed-9edf-28f6e411a015
+        lower-stratosphere: ef4566f0-60d5-4bbe-a2cb-7268a81fecd4
+  - id: carbon-monoxide-fossil
+    cas: "630-08-0"
+    compartment: air
+    origin: fossil
+    biosphere3:
+      name: Carbon monoxide, fossil
+      unit: kg
+      uuid:
+        unspecified: ba2f3f82-c93a-47a5-822a-37ec97495275
+        urban-close-to-ground: 6edcc2df-88a3-48e1-83d8-ffc38d31c35b
+        non-urban-high-stack: 099b36ab-4c03-4587-87f4-2f81e337afb8
+        lower-stratosphere: a3beb5ac-5149-47f6-a035-53fc5030f10a
+  - id: carbon-monoxide-biogenic
+    cas: "630-08-0"
+    compartment: air
+    origin: biogenic
+    biosphere3:
+      name: Carbon monoxide, non-fossil
+      unit: kg
+      uuid:
+        unspecified: 2cb2333c-1599-46cf-8435-3dffce627524
+        urban-close-to-ground: 9afa0173-ecbd-4f2c-9c5c-b3128a032812
+        non-urban-high-stack: b821ad93-ba6a-4d74-b6ae-ca12cd9563d7
+        lower-stratosphere: 968495ec-1000-438a-9e11-467776ebb54e
+  - id: carbon-monoxide-land-use-change
+    cas: "630-08-0"
+    compartment: air
+    origin: land-use-change
+    biosphere3:
+      name: Carbon monoxide, from soil or biomass stock
+      unit: kg
+      uuid:
+        unspecified: 69a6c884-39be-444f-a67c-7436a5e66de2
+        urban-close-to-ground: 51c58d09-0699-4d51-80b3-a1bb2b9313e4
+        non-urban-high-stack: 68b9b577-90cf-49e4-88bb-a55d80f3ac5d
+        lower-stratosphere: e1da7e11-cc2c-4ea2-a42a-bf558150014b
+  - id: dinitrogen-monoxide
+    cas: "10024-97-2"
+    compartment: air
+    biosphere3:
+      name: Dinitrogen monoxide
+      unit: kg
+      uuid:
+        unspecified: 20185046-64bb-4c09-a8e7-e8a9e144ca98
+        urban-close-to-ground: 6dc1b46f-ee89-4495-95c4-b8a637bcd6cb
+        non-urban-high-stack: afd6d670-bbb0-4625-9730-04088a5b035e
+        lower-stratosphere: 473826ae-125a-4b02-8c8e-c84322491d80
+  - id: sulfur-hexafluoride
+    cas: "2551-62-4"
+    compartment: air
+    biosphere3:
+      name: Sulfur hexafluoride
+      unit: kg
+      uuid:
+        unspecified: 35d1dff5-b535-4628-9826-4a8fce08a1f2
+        urban-close-to-ground: 856c9aa2-c20c-49a8-9417-c71bdb5f17b0
+        non-urban-high-stack: c7c769bb-89b9-4459-afed-e3acecd39339
+        lower-stratosphere: 44e4d1ce-fa79-4ed5-93f9-445c4ff8df2e
+  - id: nitrogen-oxides
+    cas: "10102-44-0"
+    compartment: air
+    biosphere3:
+      name: Nitrogen oxides
+      unit: kg
+      uuid:
+        unspecified: c1b91234-6f24-417b-8309-46111d09c457
+        urban-close-to-ground: d068f3e2-b033-417b-a359-ca4f25da9731
+        non-urban-high-stack: 77357947-ccc5-438e-9996-95e65e1e1bce
+        lower-stratosphere: 4841a0fe-c250-4a39-94a1-1bc31426c0f1
+  - id: sulfur-dioxide
+    cas: "7446-09-5"
+    compartment: air
+    biosphere3:
+      name: Sulfur dioxide
+      unit: kg
+      uuid:
+        unspecified: fd7aa71c-508c-480d-81a6-8052aad92646
+        urban-close-to-ground: 8c52f40c-69b7-4538-8923-b371523c71f5
+        non-urban-high-stack: 78c3efe4-421c-4d30-82e4-b97ac5124993
+        lower-stratosphere: 16521d00-4b6f-464f-b5dd-8da4a27b15ca
+  - id: ammonia
+    cas: "7664-41-7"
+    compartment: air
+    biosphere3:
+      name: Ammonia
+      unit: kg
+      uuid:
+        unspecified: 87883a4e-1e3e-4c9d-90c0-f1bea36f8014
+        urban-close-to-ground: 9990b51b-7023-4700-bca0-1a32ef921f74
+        non-urban-high-stack: 0f440cc0-0f74-446d-99d6-8ff0e97a2444
+        lower-stratosphere: 8494ed3c-0416-4aa5-b100-51a2b2bcadbd
+  - id: particulate-matter-pm2.5
+    compartment: air
+    biosphere3:
+      name: Particulate Matter, < 2.5 um
+      unit: kg
+      uuid:
+        unspecified: 21e46cb8-6233-4c99-bac3-c41d2ab99498
+        urban-close-to-ground: 230d8a0a-517c-43fe-8357-1818dd12997a
+        non-urban-high-stack: 66f50b33-fd62-4fdd-a373-c5b0de7de00d
+        lower-stratosphere: ddd99a3a-be86-423d-b36a-a9dc8af1b1f8
+  - id: nmvoc
+    compartment: air
+    biosphere3:
+      name: NMVOC, non-methane volatile organic compounds
+      unit: kg
+      uuid:
+        unspecified: d3260d0e-8203-4cbb-a45a-6a13131a5108
+        urban-close-to-ground: 175baa64-d985-4c5e-84ef-67cc3a1cf952
+        non-urban-high-stack: 33b38ccb-593b-4b11-b965-10d747ba3556
+        lower-stratosphere: 36c96aed-9335-4564-8cdd-46f01a13700c
+  - id: nitrogen
+    cas: "7727-37-9"
+    compartment: air
+    biosphere3:
+      name: Nitrogen
+      unit: kg
+      uuid:
+        unspecified: e5ea66ee-28e2-4e9b-9a25-4414551d821c
+  - id: oxygen
+    cas: "7782-44-7"
+    compartment: air
+    biosphere3:
+      name: Oxygen
+      unit: kg
+      uuid:
+        unspecified: 9ec076d9-6d9f-4a0b-9851-730626ed4319
+  - id: argon
+    cas: "7440-37-1"
+    compartment: air
+    biosphere3:
+      name: Argon-40
+      unit: kg
+      uuid:
+        unspecified: 38321e66-f6ab-4908-b26f-c17267559bc5
+  - id: water-to-air
+    cas: "7732-18-5"
+    compartment: air
+    biosphere3:
+      name: Water
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        unspecified: 075e433b-4be4-448e-9510-9a5029c1ce94
+        urban-close-to-ground: 5d368100-b1bc-4456-8420-e469edccf349
+        non-urban-high-stack: 09872080-d143-4fb1-a3a5-647b077107ff
+        lower-stratosphere: f14b59ff-d438-442d-8bad-b53694b8263a
+  - id: water-to-water
+    cas: "7732-18-5"
+    compartment: water
+    biosphere3:
+      name: Water
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        unspecified: 2404b41a-2eed-4e9d-8ab6-783946fdf5d6
+        fresh-surface: db4566b1-bd88-427d-92da-2d25879063b9
+        ground: 51254820-3456-4373-b7b4-056cf7b16e01
+        sea: 4f0f15b3-b227-4cdc-b0b3-6412d55695d5
+  - id: carbon-dioxide-in-air
+    cas: "124-38-9"
+    compartment: resource
+    biosphere3:
+      name: Carbon dioxide, in air
+      unit: kg
+      uuid:
+        in-air: cc6a1abb-b123-4ca6-8f16-38209df609be
+  - id: nitrogen-in-air
+    cas: "7727-37-9"
+    compartment: resource
+    biosphere3:
+      name: Nitrogen
+      unit: kg
+      uuid:
+        in-air: e3f5fd63-7dcb-41f1-9b8a-a48a8d68bc65
+  - id: oxygen-in-air
+    cas: "7782-44-7"
+    compartment: resource
+    biosphere3:
+      name: Oxygen
+      unit: kg
+      uuid:
+        in-air: af01e564-f816-4906-bd4f-b7c932f926b9
+  - id: argon-in-air
+    cas: "7440-37-1"
+    compartment: resource
+    biosphere3:
+      name: Argon-40
+      unit: kg
+      uuid:
+        in-air: 8b46f615-69c9-4ca3-815e-a7bde116d202
+  - id: water-unspecified-natural-origin
+    cas: "7732-18-5"
+    compartment: resource
+    biosphere3:
+      name: Water, unspecified natural origin
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: 831f249e-53f2-49cf-a93c-7cee105f048e
+        in-ground: 478e8437-1c21-4032-8438-872a6b5ddcdf
+  - id: water-river
+    cas: "7732-18-5"
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Water, river
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: 8c75e7ab-8ab8-41e4-b394-c166ff5b050d
+  - id: water-lake
+    cas: "7732-18-5"
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Water, lake
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: 1acb026e-9de6-48fe-9e0d-be4d24125bbc
+  - id: water-sea
+    cas: "7732-18-5"
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Water, salt, ocean
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: 629ffbca-ca71-4e4b-a006-ca9bdd9cd1df
+  - id: water-cooling
+    cas: "7732-18-5"
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Water, cooling, unspecified natural origin
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: fc1c42ce-a759-49fa-b987-f1ec5e503db1
+  - id: water-well
+    cas: "7732-18-5"
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Water, well, in ground
+      unit: m3
+      per_kg: 0.001
+      uuid:
+        in-water: 67c40aae-d403-464d-9649-c12695e43ad8
+  - id: occupation-industrial-area
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Occupation, industrial area
+      unit: m2*year
+      uuid:
+        land: fe9c3a98-a6d2-452d-a9a4-a13e64f1b95b
+  - id: transformation-from-unspecified
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Transformation, from unspecified
+      unit: m2
+      uuid:
+        land: 29630a65-f38c-48a5-9744-c0121f586640
+  - id: transformation-to-industrial-area
+    compartment: resource
+    default: false
+    biosphere3:
+      name: Transformation, to industrial area
+      unit: m2
+      uuid:
+        land: 4624deff-2016-41d4-b2bf-3db8dab88779

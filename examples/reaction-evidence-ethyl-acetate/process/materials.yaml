@@ -1,0 +1,13 @@
+# Components of the ethyl acetate routes. CAS, SMILES, formula and molar mass from PubChem
+# (`cheme chemistry props NAME -p cas -p smiles -p formula -p molecular_weight`); cheme validate
+# checks the InChIKeys against the SMILES and the formula.
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: EtOH, name: Ethanol, formula: C2H6O, cas: 64-17-5, smiles: CCO, inchikey: LFQSCWFLJHTTHZ-UHFFFAOYSA-N, molar_mass: 46.07}
+  - {id: AcOH, name: Acetic acid, formula: C2H4O2, cas: 64-19-7, smiles: CC(=O)O, inchikey: QTBSBXVTEAMEQO-UHFFFAOYSA-N, molar_mass: 60.05}
+  - {id: EtOAc, name: Ethyl acetate, formula: C4H8O2, cas: 141-78-6, smiles: CCOC(=O)C, inchikey: XEKOWRVHYACXOJ-UHFFFAOYSA-N, molar_mass: 88.11}
+  - {id: H2O, name: Water, formula: H2O, cas: 7732-18-5, smiles: O, inchikey: XLYOFNOQVPJJNP-UHFFFAOYSA-N, molar_mass: 18.015}
+  - {id: H2, name: Hydrogen, formula: H2, cas: 1333-74-0, smiles: "[HH]", inchikey: UFHFLCQGNIYNRP-UHFFFAOYSA-N, molar_mass: 2.016}
+  - {id: C2H4, name: Ethylene, formula: C2H4, cas: 74-85-1, smiles: C=C, inchikey: VGGSQFUCUMXWEO-UHFFFAOYSA-N, molar_mass: 28.05}
+  - {id: AcH, name: Acetaldehyde, formula: C2H4O, cas: 75-07-0, smiles: CC=O, inchikey: IKHGUXGNUITLKF-UHFFFAOYSA-N, molar_mass: 44.05}

@@ -1,0 +1,4 @@
+name: reaction-evidence-ethyl-acetate
+description: Reaction evidence for ethyl acetate (skills reaction-evidence-search and route-selection) before any flowsheet
+stage: concept
+sheets: []

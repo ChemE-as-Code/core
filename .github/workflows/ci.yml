@@ -1,0 +1,68 @@
+name: ci
+# The cheme-as-code package (src/, tests/, docs/). Pull requests run on pull_request; push covers
+# main only, so a pull request push runs once. A change only under viewer/ or agent-cli/ does not
+# run it (viewer.yml, agent-cli.yml); every other path, shared root files included, does.
+on:
+  pull_request:
+    paths-ignore: ["viewer/**", "agent-cli/**", ".github/workflows/viewer.yml", ".github/workflows/agent-cli.yml"]
+  push:
+    branches: [main]
+    paths-ignore: ["viewer/**", "agent-cli/**", ".github/workflows/viewer.yml", ".github/workflows/agent-cli.yml"]
+# A new push to a pull request cancels its superseded run. A push to main gets a group of its
+# own commit: one group per branch would let a queued run replace the pending one, leaving the
+# commits in between without a result.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # pyDEXPI-dev is private: a read-only deploy key on it; its private half is the
+      # secret DEPLOY_KEY_PYDEXPI (key comment = repo URL, so ssh-agent maps it to that repo).
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+      # Python 3.12: the oldest version pyproject.toml allows, and every extra has wheels for it
+      # (cantera and the lca extra have none for 3.15 yet). Third-party actions are pinned by
+      # commit; Dependabot (.github/dependabot.yml) proposes the updates.
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      # --locked: a uv.lock out of date with pyproject.toml fails instead of being re-resolved
+      - run: uv sync --locked --all-extras
+      - run: uv run ruff format --check && uv run ruff check
+      - run: uv run pytest -n auto
+      # The package stays independent of the viewer and the agent runner in this repository.
+      - name: wheel and sdist hold only the package
+        run: |
+          uv build --out-dir /tmp/dist
+          ! unzip -l /tmp/dist/*.whl | grep -E ' (viewer|agent-cli)/'
+          ! tar -tzf /tmp/dist/*.tar.gz | grep -E '^[^/]+/(viewer|agent-cli)/'
+  docs:
+    # Builds the documentation site (mkdocs.yml) and keeps it as an artifact. No deployment.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      # The reference pages are generated from the code, so the package and its serve extra
+      # must import.
+      - run: uv sync --locked --all-extras --group docs
+      - run: uv run --group docs mkdocs build --strict
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: site
+          path: site/
+          retention-days: 14

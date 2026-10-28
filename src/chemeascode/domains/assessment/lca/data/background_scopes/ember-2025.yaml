@@ -1,0 +1,11 @@
+# Structured scope of ember-2025 (core#306); the profile file stays byte-stable.
+# From the profile notes: life-cycle (upstream, supply chain, manufacturing) CO2e per kWh of gross
+# generation, no imports, no T&D losses; no single GWP basis.
+sources:
+  ember-2025:
+    basis: life-cycle
+    delivery: generation
+    gases: co2e
+    gwp: mixed
+    mix: grid-average
+    accounting: generation

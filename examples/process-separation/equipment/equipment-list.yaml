@@ -1,0 +1,6 @@
+# Equipment of the depropanizer (the steps of process/flowsheet.yaml). Schema: `cheme schema equipment`.
+schema: cheme/equipment/v1
+equipment:
+  - {tag: D-101, type: Vessel, service: Feed flash drum (step D1)}
+  - {tag: E-101, type: ShellAndTubeHeatExchanger, service: Feed preheater (step E1)}
+  - {tag: C-101, type: ProcessColumn, service: Depropanizer (step C1)}

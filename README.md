@@ -1,0 +1,1732 @@
+# cheme-as-code
+
+**Plant design as code.** A process plant kept as plain files in a git repository -- DEXPI 2.0.1
+P&IDs, engineering lists in YAML, decisions in Markdown -- edited by engineers and by coding
+agents such as Claude Code, and checked by this tool.
+
+Coding agents are very good with text files and git, and getting better. cheme-as-code gives them
+(and people) what they need to work on engineering files the same way they work on code: a
+validator with `file:line` findings, a formatter that keeps diffs small, a renderer, a visual
+diff, and engineering-step gates.
+
+> Status: research prototype of the Process Intelligence Research group. Private until the first
+> release.
+
+> **Renamed from plantcode.** Since 0.7.0 the package is `cheme-as-code`, the import name
+> `chemeascode` and the command `cheme`; finding ids start with `cheme.` and schema ids with
+> `cheme/`. The old names are gone, without aliases. Plant repositories migrate once:
+> [docs/framework/rename.md](docs/framework/rename.md).
+
+## How the pieces fit together
+
+This repository is the toolkit of **ChemE-as-Code**, the open project of the `cheme` toolkit,
+viewer, process library and Process Atlas. The project's terms (calculation maturity, design
+maturity, project stage, review status) are defined once, in the
+[glossary](docs/concepts/glossary.md).
+
+Three kinds of repository, like a toolbox and notebooks:
+
+| repository | what it is | what you do with it |
+|---|---|---|
+| [`core`](https://github.com/ChemE-as-Code/core) (this one) | **the toolbox**: the `cheme` command and the skills (instructions for agents) | install it once on your computer |
+| [`project-template`](https://github.com/ChemE-as-Code/project-template) | **an empty notebook**: a new plant with no content yet | press **Use this template** on GitHub to start a plant |
+| [`process-library`](https://github.com/ChemE-as-Code/process-library) | **filled notebooks**: real plants, one folder each (`processes/asu-1`) | read them, copy from them, add a new process |
+
+This repository also holds the **viewer** ([`viewer/`](viewer/README.md), the web app that
+`cheme serve` serves) and the **agent runner** ([`agent-cli/`](agent-cli/README.md), Claude agents
+with a spending cap and run records), each with its own package files and CI. The `cheme`
+package needs neither of them, nor an LLM provider.
+
+Starting a plant takes two steps:
+
+1. **Make the plant repository.** Either press **Use this template** on GitHub (no tools needed),
+   or run `cheme init my-plant` on your computer. Both give the same files.
+2. **Install the toolbox.** `uv tool install git+https://github.com/ChemE-as-Code/core.git`
+   (see [Install](#install)). The plant repository holds your data, not the tools: checking,
+   drawing and generating (`cheme validate`, `cheme render`, `cheme process build`, ...) always
+   run the installed `cheme`. The plant's CI installs it too.
+
+The skills in a plant's `.claude/skills/` are **copies** of the skills in this repository, because
+Claude Code reads skills only from the repository it works in. They do not update themselves:
+after upgrading `cheme` (`uv tool upgrade cheme-as-code`), run `cheme skills update` in each plant,
+and `cheme skills status` to see which are out of date. `project-template` is never edited by hand
+either: after every merge to `main` here, the `project-template` workflow regenerates it with
+`cheme init` and pushes it (secret `PROJECT_TEMPLATE_TOKEN`). If that workflow cannot run, for
+example while GitHub Actions is unavailable, the template falls behind until the next run.
+
+While this repository is private, people need read access to it (and to pyDEXPI), and a plant's CI
+needs two secrets (`PLANTCODE_READ_TOKEN` for this repository, `DEPLOY_KEY_PYDEXPI` for pyDEXPI;
+see the plant's `.github/workflows/validate.yml`).
+
+## Install
+
+```sh
+uv tool install git+https://github.com/ChemE-as-Code/core.git
+```
+
+Needs Python 3.12+ and read access to pyDEXPI. pyDEXPI 2.x is not on PyPI yet: cheme-as-code pins it
+to a commit of its git repository (`[tool.uv.sources]` in `pyproject.toml`), so `uv` clones it
+during the install. With `uv` this needs nothing else; with `pip`, install it from git first
+(`pip install "pydexpi @ git+https://github.com/process-intelligence-research/pyDEXPI-dev.git@<rev>"`,
+the `rev` of `pyproject.toml`), then cheme-as-code. A private repository needs git credentials that
+can read it (an SSH key or a credential helper); `cheme --version` prints the pyDEXPI that
+was installed. For PNG output
+(`cheme render --png`) install the `png` extra, which adds resvg:
+`uv tool install 'cheme-as-code[png] @ git+https://github.com/ChemE-as-Code/core.git'`.
+Stream properties (`cheme process props`) and the phase calculations of
+`chemeascode.domains.process.thermodynamics` need the `props` extra (thermo and chemicals,
+pinned); the viewer API (`cheme serve`) the `serve` extra; unit conversion beyond K, °C and
+the pressure units of the process YAML (`chemeascode.foundation.units`) the `units` extra (Pint);
+SMILES checks in `chemeascode.domains.chemistry` the `chemistry` extra (RDKit). Extras combine:
+`cheme-as-code[png,props,serve]`.
+
+The ChemSep SRK interaction parameters (`kij`) of the Redlich-Kwong-Soave phase calculation are
+not shipped, as their licence is not yet confirmed (pre-release issue 55). `cheme data fetch chemsep-srk`
+downloads ChemSep-LITE (http://www.chemsep.org, plain HTTP; the archive's sha256 is checked), or
+reads a downloaded copy with `--zip lite.zip`, and installs the converted `srk.json` in the user
+data directory (`$CHEME_DATA_DIR` if set; `cheme data status` shows where). Without it every
+SRK `kij` is zero, and the result's `notes` say so.
+
+Component properties (`cheme chemistry props NAME -p PROPERTY`) come from PubChem, the
+NIST WebBook, OSHA and thermo; `--source Thermo` stays offline. SMILES checks in the kinetics
+tools need the `chemistry` extra (RDKit).
+
+## Use
+
+```sh
+cheme init my-plant --name "Ethanol plant"   # folders, schemas, agent skills, CI
+cd my-plant && git init && cheme git-setup    # readable P&ID diffs, pre-commit hook
+cheme validate                                # P&IDs + lists, and lists vs P&IDs
+cheme validate --ignore cheme.label-literal  # leave a rule out (--only: just these)
+cheme sheet new P-01 --title "Feed and reaction"  # a sheet with a real title block
+cheme sheet meta P-01 Revision=B Status=issued   # title-block values, texts updated too
+cheme fmt                                     # canonical XML, a readable id on every object
+cheme render                                  # build/<sheet>.svg
+cheme render --png --crop 150,50,300,180      # build/<sheet>_crop-150-50-300-180.png
+cheme render --png --tiles 4x3 --findings     # build/<sheet>_tile-A1.png ... C4, findings marked
+cheme diff main                               # build/diff.html, changes highlighted
+cheme diff main --list                        # one line per changed plant item
+cheme show T4750                              # where an object is, and what it connects to
+cheme show K-4101 --layout                    # measured plot-plan distances around it
+cheme --version                               # cheme-as-code, pyDEXPI, the interpreter path
+cheme run scripts/draft_P-02.py pid/P-02.xml  # a generator, with pyDEXPI importable
+cheme regen P-02                              # rebuild a generated sheet (plant.yaml generator:)
+cheme copy P4711 --prefix Pump_P4711B --tag P4711B --offset 0,30   # a spare, with its drawing
+cheme fragment valve --id V1 --class GateValve --dn 80 --at 70,184 # XML to paste
+cheme move Inst_FI101 --offset -8,12          # nudge a symbol with its nodes and labels
+cheme rename T4101_I1 T4101_N6 --children     # an id, every #reference, the ids under it
+cheme set Line_101 FluidCode=Nitrogen         # a data value and the labels that show it
+cheme status [--json]                         # sheets, findings by sheet, gates, sign-offs
+cheme check                                   # engineering-step gates (checks/checks.yaml)
+cheme cause-effect                            # build/cause-effect.html + .csv
+cheme process build                           # BFD and PFD from process/materials.yaml + flowsheet.yaml
+cheme process streams [--md]                  # stream table with provenance, block balances
+cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
+cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
+cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
+cheme process energy                          # energy balances, simulation energy audit, boundary gaps
+cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
+cheme chemistry thermo ammonia                # ideal-gas formation data for materials.yaml (extra props)
+cheme process props --fill                    # phase, density, enthalpy (extra props), in range only
+cheme process methods                         # which thermodynamic models phase/simulate run, substitutes
+cheme process phase A B --model Peng-Robinson # kij coverage per pair; with -T/-P a flash (extra props)
+cheme process extract [UNIT] [--systems]      # LLE extraction stages, process/extraction.yaml (extra props)
+cheme process layout --view pfd --pin         # keep the generated positions in flowsheet.yaml
+cheme layout build [--check]                  # layout/plant-model.yaml: 3D parts, nozzles, envelopes
+cheme layout cables [--write]                 # cable schedule: from, to, size, trays, length
+cheme layout lifting [--write]                # lifting study: radius, load moment, capacity per heavy lift
+cheme assess mto | estimate [--write]         # material take-off of the model, factor estimate
+cheme assess equipment [--write]              # equipment costs from published correlations (Turton)
+cheme assess tea [--write] [--compare REV]    # TEA: capex build-up, cash flow, NPV/IRR/LCOP, drivers
+cheme datasheets draft [--tag T]              # draft datasheets for items without one (sources, TBD)
+cheme datasheets fill [--tag T] [--param k=v] # calculated sizes with their basis into the drafts
+cheme schema [equipment]                      # JSON Schema of a YAML file kind (none: list them)
+cheme migrate [--check | --write]             # add `schema: cheme/<kind>/v1` where a YAML input lacks it
+cheme serve                                   # read-only JSON API on 127.0.0.1:8765
+```
+
+### validate
+
+A P&ID is checked in layers: well-formed XML, a lossless DEXPI 2.0.1 load by pyDEXPI, pyDEXPI's
+validation rules, then cheme-as-code's document rules (unique ids, an id on every object, every plant
+item drawn) and model rules:
+
+| rule | level | finds |
+|---|---|---|
+| `cheme.segment-ends` | error | a segment's Source/Target Item/Node that is not where its pipes and items start / end, or a node that is not its item's |
+| `cheme.dn-mismatch` | warning | a pipe joining two nodes of different numerical DN (reducers too: a reducer changes DN between its own nodes, which no pipe joins) |
+| `cheme.label-stale` | warning | a `Text` whose `TextTemplate` (with an `AttributeRepresentation`) renders other than its cached text, or cannot be rendered (an attribute the object does not have) |
+| `cheme.duplicate-tag` | error | two piping components (`PipingComponentNumber` or `PositionNumber` with a plant-wide tag such as `HV-4146`; the segment-local `C1` of the DEXPI reference does not count) or two instruments (printed tag) with the same tag, on one sheet or across the sheets |
+| `cheme.label-literal` | warning / info | a drawn `Text` of literal text only (no template, or only `LiteralText` fragments) whose text contradicts (warning) or repeats (info) the data of the object its drawing represents: its DN or its nodes' DNs (`DN = 25/50`, a nozzle's `80`, a reducer's `80/50`), a physical quantity with its unit (`6 barg` against `SetPressureHigh`), or a string attribute |
+| `cheme.template-metadata` | warning | a MetaData value, the `<Model name/uri>` or the diagram `Name` that is still template data: pyDEXPI's sample title block (`A. P. Prover`, `Oil & Gas, Inc.`, `Dexpi City`, `P3.1415`, 2016 dates, `name="example"`, `DEXPI Example C01`, ...) or the placeholders of the template sheet (`cheme-template`, `TEMPLATE`) |
+| `cheme.titleblock-approval` | warning | `ApproverName`, `ApprovalDateRepresentation` or status (`ApprovalDescription`) "approved" while `checks/status.json` records no sign-off of the current stage (every recorded gate of the stage passing, or a per-stage entry); `CheckerName` while `reviews/` holds no review record |
+| `cheme.titleblock-sheet` | warning | `SheetNumber` (the sheet id, or its number: `1` for `P-01`) or `DrawingName` (neither containing the other) disagreeing with the sheet's entry in `plant.yaml` |
+| `cheme.line-through-label` | warning | a pipe or signal line running through a text box, its own line number or DN label included (it must reach 0.3 mm into the box) |
+| `cheme.line-crossing` | warning | two pipes, or a pipe and a signal line, crossing more than 0.5 mm from either line's ends (a branch ending on a line, a tee or a measuring line's tap is no crossing); one finding per pair of lines, with the points |
+| `cheme.label-overlap` | warning | two text boxes overlapping by more than 0.25 mm both ways, or a text box that a symbol outline of an object it does not belong to reaches 0.4 mm into, or an equipment text (its tag) that the outline of the item's own symbol reaches 0.4 mm into (a tag inside its vessel is fine, also over the internals drawn inside a column; its nozzles do not count) |
+| `cheme.label-far-from-owner` | warning | a label more than 15 mm from the object it represents (a literal note starting with an instrument's tag, e.g. `LALL-4108 / TSLL-4114 trip ...`, belongs next to that instrument; `LALL-4108` is a function of loop `LIA-4108`); or a label 4 mm or more from its own object and less than half as far from another of the same kind (equipment, valve, instrument, line), so that it reads as the other's |
+| `cheme.text-outside-frame` | warning | a drawn text running more than 0.5 mm outside the inside of the sheet's border |
+| `cheme.title-text-overflow` | warning | a title block text more than 2 mm wider than its cell (e.g. a long sheet title from `plant.yaml`) |
+| `cheme.line-through-symbol` | warning | a pipe or signal line running through an instrument bubble, or the body of an equipment item, it does not end on (a line ending at a nozzle, or with an end inside the body at an internal or a tap, does not count) |
+| `cheme.drawing-not-checked` | info | the SVG export failed, so the four drawing rules did not run |
+
+`cheme.segment-ends` reports what pyDEXPI's Mandatory rules `pydexpi_segment_connectivity`
+and `pydexpi_segment_reference_nodes_and_items_match` find, once per segment, on the line of the
+segment's `References`; the pyDEXPI rule ids are named in the message, and are not reported
+separately. The ends are read from how the pipes connect, not from their order in the file
+(DEXPI 2.0.1 does not order a segment's `Connections`; pipes listed out of flow order are only
+pyDEXPI's Recommended `pydexpi_segment_linear_order`). A segment may end at another node of its
+end item when that item is one of the segment's own `Items`: the DEXPI reference P&ID ends a
+segment at the outlet of its last valve or at the branch of its tee, where the next segment
+starts. A template that stops short of its text (the reference labels valves `66KL21-80` from
+`PipingComponentName` and `-`) is not stale while the text starts with what the template
+renders. Labels made of literal text only (e.g. a hand-written `DN = 25/50`) show no attribute,
+so `label-stale` cannot check them; `cheme.label-literal` compares the values they spell out
+with the object's data instead. DNs are compared as a set (`DN = 25/50` matches nodes DN 25 and
+DN 50 in either order); a text that is only numbers (`80`, `80/50`) is read as DNs when the object
+has any. The info findings say which labels must be changed by hand with the data (`-q` hides
+them).
+
+#### Drawing geometry
+
+The four drawing rules check the sheet as `cheme render` draws it: pyDEXPI's SVG export,
+with every shape's transform applied, so they see what a reader of the rendered sheet sees.
+Text boxes are estimated from the font size and the characters (Arial widths, the export's
+fallback font), placed by `text-anchor` and `dominant-baseline` (a `text-bottom` label stands
+above its y, a `middle` one is centred on it) and turned with the text. The sheet's border (zone
+numbers) and title block are not checked. Each finding has the sheet, the ids, a `box` in sheet
+mm and a `crop` (the box plus 10 mm, on the sheet) ready for `cheme render --crop`; the text
+output adds `[crop X0,Y0,X1,Y1] [id ...]`. Before the totals, `cheme validate` prints one
+line per sheet with the counts, which a review record quotes:
+
+```
+pid/P-04.xml:1952: warning cheme.line-crossing [Line_GOX4003_S1_P2, Inst_UIC4103_ML]: pipe GOX-4003 (Line_GOX4003_S1_P2) crosses signal line Inst_UIC4103_ML at (121.4,80.0), away from any node -- route one line around the other; ... [crop 110.3,69,132.4,91] [id pid/P-04.xml#line-crossing:Line_GOX4003_S1_P2+Inst_UIC4103_ML]
+drawing pid/P-04.xml: 1 line-through-label, 1 line-crossing, 3 label-overlap, 11 label-far-from-owner
+```
+
+They take well under a second per sheet. On the DEXPI reference P&ID they find its three line
+crossings and two labels its own lines touch.
+
+#### Tags named in texts
+
+Literal texts (no template) often name other objects: off-page texts (`from P-03 LIN-3001`) and
+trip notes (`LALL-4108 / TSLL-4114 trip P-4102A/B, XV-4137`). With every sheet validated, a
+cross-check reads their tag-like tokens -- letters, `-`, digits, e.g. `P-4102A`, with `A/B`
+expanded -- that have the shape (letters and number of digits) of a tag in the lists or sheets,
+or of an instrument loop:
+
+| rule | level | finds |
+|---|---|---|
+| `cheme.label-tag-unknown` | warning | a token that no list entry, drawn tag (TagName, LineNumber, valve number, printed instrument tag) or instrument loop has (`LALL-4108` is known when `LIA-4108` is), or a sheet number plant.yaml does not declare |
+| `cheme.offpage-mismatch` | warning | an off-page connector whose text names a line other than its own that differs only in its code (`LN-3001` on `LIN-3001`), is not on the named sheet, or does not join the connector's line there (a branch's `from P-04 GAN-4002` is fine); or names a sheet that does not carry the connector's line |
+| `cheme.label-tag` | info | what each such text names and what it is (`K-4101 (equipment)`, `LALL-4108 (instrument loop)`), as no template follows these names |
+
+A note that names an external tag on purpose is accepted like any other finding.
+
+#### Accepting a finding
+
+Each finding has an id, `<file>#<rule without cheme.>:<subject>` (`--json` gives it as
+`id`; the drawing rules also print it), e.g.
+`pid/P-03.xml#line-crossing:Line_GOX3001_S1_P1+Line_LOX3001_S1_P1`. `checks/checks.yaml` can
+accept findings, each with a reason; `*` and `?` match any text:
+
+```yaml
+accept:
+  - id: "pid/P-03.xml#line-crossing:Line_GOX3001_S1_P1+Line_LOX3001_S1_P1"
+    reason: "D-023: no route around the GOX riser (J. Smith, design review 2026-10-20)"
+```
+
+`cheme validate` then reports the finding as info, `(accepted: <reason>)`, the `drawing`
+line counts it as `(+1 accepted)`, and no gate fails on it. Only warnings and infos can be
+accepted: an entry (top-level or a gate's) that matches an error leaves it an error, so validate,
+the pre-commit hook, CI and the gates still fail, and is reported as `cheme.accept-error`
+(warning). An entry, top-level or a gate's, that names no finding is `cheme.accept-unused`
+(info), so stale entries get removed. The text output prints `[id ...]` on every finding that
+can be accepted.
+
+YAML lists are checked against their schemas, then compared with the P&IDs: equipment tags and
+classes (`cheme.equipment-*`), the optional `dimensions` of an equipment item (overall
+`diameter`, `height` or `length`, `width`, `head`, `support`, `weight`) against the sizes its
+P&ID states where it states them (`NominalCapacityVolume`, `CylinderLength`, `TubeLength`, a
+chamber's `InsideDiameter` or `NominalDiameter`, `PlateHeight`/`PlateWidth`:
+`cheme.equipment-dimension-mismatch`, warning), line numbers against `PipingNetworkSystem` LineNumbers and
+their DN, per segment when the line lists `segments` (`cheme.line-not-listed`,
+`line-not-on-pid`, `line-dn-mismatch`), their `from`/`to` against the ends of the drawn
+segments (`cheme.line-endpoint-mismatch`, warning: a listed tag drawn on a loaded sheet that the
+line does not reach while it ends at a nozzle of equipment the list does not name; `BL`, `ATM`,
+line numbers and areas are not compared, and nor is an end beyond a tee or an off-page
+connector), and instrument tags as printed, e.g. `PICSA-4712.02`
+(`cheme.instrument-not-listed`, `instrument-not-on-pid`), and, when the optional
+`piping/special-items.yaml` (kind `piping_items`: tag, type, line, sheet, `set_pressure_barg`,
+`relief_case`) exists, tagged piping components by their printed tag (the first of
+`PipingComponentNumber`, `PositionNumber`, `PipingComponentName` that is not a segment-local
+number such as the DEXPI reference's `C1`; a component with only `C1` has no tag):
+`cheme.piping-item-not-on-pid`, `piping-item-not-listed` (only safety
+valves and fittings -- `SafetyValveOrFitting` subclasses -- and silencers must be listed),
+`piping-item-type-mismatch` (the DEXPI class or a superclass), `piping-item-line-mismatch`. An
+item of that list may be placed in the layout like equipment. Interlocks in
+`control/cause-effect.yaml` (kind `interlocks`: `id`, `cause: {tag, condition}`, `effects:
+[{tag, action}]` with action trip, stop, start, close, open, depressurize or alarm, `sheet`,
+`sil`: 1 to 4, or 0 / `a`) are checked against the lists and sheets:
+`cheme.interlock-unknown-tag` (warning, a cause or effect tag no list holds and no sheet
+draws), `cheme.interlock-duplicate`, `cheme.interlock-duplicate-effect` (warning, two effects
+of one interlock on one tag; the matrix shows both actions), and
+`cheme.instrument-no-interlock` for a trip instrument -- function letters with `HH` or `LL`
+(`TSLL-4114`), or instrument-list notes saying it trips -- that is in no interlock, as its
+cause or in its `logic` (info up to the concept stage, a warning from `basic` on).
+`cheme cause-effect [-o FILE]` writes the matrix, causes by effect tags, to
+`build/cause-effect.html` and `.csv`. An entry listed twice is
+`cheme.line-duplicate` / `instrument-duplicate` / `equipment-duplicate`, and each entry is
+checked on its own line. Numbers, tags and DNs need no quotes (`number: 47121` is read as
+`'47121'`) and surrounding blanks are ignored.
+
+Sheets in `plant.yaml` may be `status: planned` (the default is `drafted`): declared, not drawn
+yet. A planned sheet without its file is `cheme.sheet-planned` (info) instead of
+`cheme.missing-sheet` (error); once the file exists it is validated like any other.
+Missing from the P&IDs is judged per sheet: a listed item whose `sheet:` names a planned sheet,
+or one that is missing or did not load, is held back, and so is an item without `sheet:` while
+any sheet is missing or did not load, or while `plant.yaml` `stage` is the first stage (after
+the first stage a planned sheet does not hold back items without `sheet:`). Held items give one
+info line per list, rule and reason (all their ids in `ids`); an item assigned to a drafted,
+loaded sheet stays a warning. The `compared:` line names planned and not loaded sheets.
+`--ignore RULE[,RULE]` drops rules from the report and `--only RULE[,RULE]` keeps only those
+(ids or globs such as `cheme.*-not-on-pid`, repeatable); both apply to `--json`, `--quiet`
+and `--fail-on`. A pattern that matches `cheme.generated-sheet-drift` (`cheme.generated-*`
+included) also matches `cheme.generator-failed`, as a gate's `rules` do. The text output
+ends with a `compared:` line naming the sheets, lists and cross-checks run (and those skipped, with the
+reason); `--json` has the same under `compared`. Each finding is one line an agent can act on:
+
+```
+pid/P-01.xml:1043: error dexpi.load [Pipe_7]: Reference 'Nozzle_9' for attribute 'targetNode' not found ...
+equipment/equipment-list.yaml:14: warning cheme.equipment-not-on-pid [P-102B]: P-102B is in the equipment list and on no P&ID -- draw it, or remove it from the list
+```
+
+Equipment datasheets, `equipment/datasheets/<TAG>.yaml` (kind `datasheet`: service, operating
+and design conditions, materials, sizing basis, values marked `assumed`), are checked against
+their schema and the equipment list: `cheme.datasheet-not-listed` (warning, a tag not in the
+list), `cheme.datasheet-mismatch` (warning, design pressure, temperature or type differ from
+the list entry) and `cheme.datasheet-name` (warning, a file not named after its tag).
+`cheme datasheets draft [--tag T]` drafts the missing ones from the equipment list, the
+P&ID nozzles and the flowsheet streams linked to each item: every value with its source,
+unknowns `TBD`, `draft: true` (the `datasheets` gate, a detail gate, does not count drafts).
+`cheme datasheets fill [--tag T] [--param name=value] [--dry-run]` calculates the sizes a
+draft leaves `TBD` and writes each with its basis (calculation, stream ids, nozzles, pipes,
+cited tables; `assumed: true` when an input is an assumption), never over a value it did not
+write: exchanger duty (property adapter), LMTD with F and area from a given or typical U
+(Sinnott, C&R Vol. 6, Table 12.1); pump head from the stream pressures, the nozzle elevations
+and the Darcy-Weisbach losses along the routed lines, NPSH available and power; compressor
+stages, power and intercooler duties; Fenske-Underwood-Gilliland stages; vessel volume and
+residence time. A value calculated from the streams carries their fingerprint, and validate
+reports it as `cheme.datasheet-stale` once they change; the sheet's `operating` names the
+`case` and the `streams` it was filled from, which validate resolves (`cheme.contract-ref`). See [docs/framework/sizing.md](docs/framework/sizing.md) and the skill
+`datasheets`.
+
+#### 3D layout
+
+The optional files `layout/site-plan.yaml` (kind `site_plan`: site box, plot areas, roads, pipe
+racks), `layout/building.yaml` (kind `building`: buildings, levels, column grid) and
+`layout/equipment-placement.yaml` (kind `placement`: position, rotation, `mount: {building |
+structure, level}`, nozzle overrides and declared access platforms of each equipment-list tag) describe the plant in 3D, in
+metres, x east, y north, z up, origin at the site's south-west corner (see the template's
+`layout/README.md`). An item's shape and size come from the equipment list: its DEXPI `type`
+picks a parametric family (`domains/spatial/shapes.py`: vessel, column, tank, shell-and-tube or
+plate exchanger, air cooler, pump, compressor, turbine, filter, silencer, stack, generic) and its
+`dimensions` the overall size; the placement's `shape` overrides the shape and its `size` is only
+a fallback for an item without dimensions. Each file is checked against its schema, then:
+
+| rule | level | finds |
+|---|---|---|
+| `cheme.layout-outside-site` | error | an area, road, rack, building or equipment item extending outside the site box |
+| `cheme.layout-clash` | error | two equipment items intersecting (plan outlines, and the parts standing out of them such as a tank's stair); equipment intersecting a building it is not placed in; equipment on a road (or `road` area); equipment reaching into a rack's height band (lowest tier - 0.5 m to top tier + 0.5 m) under its footprint; a building on a road, a rack running through a building below its top + 0.5 m, or two buildings overlapping |
+| `cheme.layout-unknown-tag` | error | a placed tag that is not in the equipment list (or `piping/special-items.yaml`) |
+| `cheme.layout-not-placed` | info | an equipment-list item without a placement (only when a placement file exists) |
+| `cheme.layout-level` | error | an unknown building or level, `z` more than 0.05 m from its level's elevation, or an item outside its building's footprint; as a warning, an item taller than its level's clear height, or placed in a building with levels but without a `level` |
+| `cheme.layout-area-overlap` | warning | two plot areas overlapping (roads excepted) |
+| `cheme.layout-duplicate` | warning | an id or tag listed twice |
+| `cheme.layout-line-route` | warning | a line of `piping/line-list.yaml` whose ends lie in different areas, or further apart than `max_unsupported_length` (site plan, default 30 m), and that no rack carries: an end further than `rack_reach` (default: `max_unsupported_length`, as the run from an end to the rack is unsupported) from every rack centreline, or the racks at its two ends not connected; names the ends, their areas, the distance and the nearest rack |
+| `cheme.layout-line-length` | info | such a line that racks do carry, with its length estimated along the rack centrelines |
+| `cheme.layout-line-unrouted` | info | a line one of whose ends is a tag of the equipment or piping-items list, or a tag drawn on a sheet, that is not placed, so its route cannot be checked |
+| `cheme.layout-separation` | warning | a declared separation (site plan `separations`) not kept, e.g. `K-4101 to CB-1: 32.3 m < 50.0 m (1 x height 50 m; D-026; toppling)`; or one naming an id that is not on the plot plan |
+| `cheme.layout-size-from-placement` | info | items sized by the placement's `size` instead of `dimensions` in the equipment list (one finding listing them) |
+| `cheme.layout-size-ignored` | warning | a placement `size` for an item that has `dimensions` |
+| `cheme.layout-size-missing` | warning | an item with neither, drawn at its family's assumed size |
+| `cheme.layout-nozzle-unknown` | error | a nozzle override naming a nozzle the item's P&ID does not draw |
+| `cheme.layout-unreadable` | error | (`cheme serve` only) a layout file that exists but cannot be read, e.g. a symlink out of the repository |
+
+A line's end is a placed tag (`K-4101/N2` counts as `K-4101`; a piping item of
+`piping/special-items.yaml` may be placed too), an area id, the line's `from_area` / `to_area`
+(an end that is no placed item, e.g. a vent area), or another line's number, then the point of
+that line (the straight run between its own ends) nearest the other end. Racks are connected
+where their strips touch or cross. A separation is `{from, to, min_m | min_factor_of_height,
+height_of: max|from|to, measure: footprint|centre, reason, basis}` between placed tags, areas,
+buildings, roads, racks or `site-boundary`; the height is the top of the item (a building's
+highest level), and distances are horizontal, between footprints unless `measure: centre`.
+`cheme show <tag> --layout` prints the measured distances from an item (or building, area,
+road, rack) to the nearest items, buildings, roads, racks and areas and to the site boundary, so
+`DESIGN.md` can quote measured values. `GET /api/layout` returns each line's route as `lines:
+[{number, from, to, from_point, to_point, distance, length_est, racks, finding}]`.
+
+**The generated model.** `cheme layout build [--check] [--force]` derives
+`layout/plant-model.yaml` (kind `layout_model`) from the layout files, the equipment list
+(`type`, `dimensions`), the line list and the P&IDs: every placed item's parts (cylinders, heads,
+cones, boxes with a material hint), its nozzles from the P&ID (point, outward direction, DN,
+lines and segments; placed from the side of the symbol they are drawn on, or overridden in the
+placement) and its maintenance envelopes (bundle pull, motor removal, pump access), plus the site
+geometry. Commit it with its inputs. `cheme validate` reports
+`cheme.layout-model-edited` (error), `-version`, `-outdated` (warnings) and `-missing`
+(info); `cheme impact` lists an outdated model. The format and the `/api/layout` contract:
+[docs/framework/layout-model.md](docs/framework/layout-model.md).
+
+**Cable trays.** With `electrical/electrical-list.yaml` (rooms in buildings, the motor list's
+powers, junction boxes) the build cables the plant: a motor for every driven item, instruments
+where the P&IDs measure, junction boxes, power and instrument trays from the rooms along the
+racks' own tray tier to the loads, sized by their cables, and the cable schedule
+(`cheme layout cables`). Rules, rooms and the schedule:
+[docs/framework/electrical.md](docs/framework/electrical.md).
+
+**HVAC ducts.** With `layout/hvac.yaml` (air handling units, rooms with their air changes) the
+build ventilates the buildings: terminals in each room, supply and extract ducts from the unit
+routed inside the building, the intake and exhaust to their louvres, each duct sized within
+its velocity limit (findings `layout-hvac-capacity`, `-duct-unrouted`, `-clash-duct`; skill
+`hvac-ducts`). The sections and rules:
+[docs/framework/layout-model.md](docs/framework/layout-model.md).
+
+**Access and lifting.** The rules on the model check headroom over every walking surface
+(stairs, landings, platforms, structure floors), a free standing space in front of valves,
+transmitters and casing hatches (a stair flight is no operating position), the walk beside a
+stacked stair's next flight, ways off a roof inside a vent zone, and the operators
+`piping/routing.yaml` declares for what stays out of reach (`operators:` chain wheel, extension
+spindle, remote operator, remote-mounted transmitter, each within an ASSUMED limit).
+`cheme layout lifting` gives the lifting study of the heavy items: working radius, gross
+load, load moment, capacity needed, lift and hook height, lane and laydown, checked against
+crane load charts in `layout/crane-chart.yaml` when the project has chosen a crane (gate
+`lifting-study`). Details: [docs/framework/layout-model.md](docs/framework/layout-model.md).
+
+**Material take-off and estimate.** `cheme assess mto` counts the model's bulk materials
+(pipe by DN, class and insulation; elbows, tees, reducers, flanges, gaskets; valves by type and
+DN; steel tonnage by section; grating, insulation and concrete); `cheme assess estimate`
+prices them with the project's `estimate/rates.yaml` (every rate with status, source and year;
+cheme-as-code ships no prices, the template's file is an example) by the factor method. `--write`
+puts them into `estimate/`; the gate `kind: mto` checks they are current.
+`cheme assess equipment` costs the equipment list from the published purchased and bare
+module cost correlations of Turton et al. (CAPCOST, 5th ed. 2018, Appendix A; package data with
+the table of every row), escalated by the CEPCI value the project gives with its year and
+source in `estimate/cost-basis.yaml`; an item outside a correlation's range or without its size
+or factors is a finding, never extrapolated, and the report states its AACE 18R-97 class.
+Rows, rules and `GET /api/mto`: [docs/framework/mto.md](docs/framework/mto.md).
+
+**Techno-economic analysis.** `cheme assess tea` evaluates the economics against the decision
+`estimate/tea.yaml` states (npv, irr, lcop or cash cost and a threshold). It works for continuous
+and batch plants, in one or several operating cases, for material and energy main products.
+
+- **Capital:** built up from the equipment or take-off estimate, or from a reference cost scaled
+  to the plant's capacity (ISBL, then OSBL, owner's cost and contingency). Its AACE class is
+  checked against the stage.
+- **What the plant buys and sells:** the flowsheet's feeds and products, their components,
+  consumables it does not carry, and emissions with a carbon price and free allocation. Each is
+  priced with the project's prices (status, source and year on each; cheme ships none), with
+  price paths over the life.
+- **Fixed cost and periodic events:** replacements, turnarounds and grants.
+
+The result is the discounted cash flow (NPV, IRR, LCOP and cash cost of the main product,
+payback; tax losses credited or carried forward), plus:
+
+- the cost of production per unit;
+- scenarios;
+- a tornado and the break-even value of every input, i.e. what would change the decision;
+- with `uncertainty:`, a seeded Monte Carlo (P10/P50/P90, P(meets), Spearman drivers).
+
+`--compare REV` lists the premises two analyses do not share (product, specification,
+boundary, scale, location, currency and cost year, case, operation, discount and tax rate)
+before their results. Gate `kind: tea`, `GET /api/tea` and the viewer's TEA page:
+[docs/framework/tea.md](docs/framework/tea.md).
+
+The model also holds steel (`layout/structures.yaml` frames and generated rack bents), access
+platforms (declared in the placement's `access:`, or proposed with `review_needed`), zones
+(`layout/zones.yaml`) and a pipe route for every P&ID segment. The router is deterministic: a
+line goes over the racks when its ends lie in different areas, its straight run would cross a
+road or another area, or it is longer than `local_max_m` (15 m); it rises near the equipment,
+enters the rack at the point nearest each end and takes a lane of its own. Local lines run at
+the pipe-way elevation (`local_elevation_m`, 3.5 m), pump suction and discharge runs at grade.
+Battery-limit ends (`BL`, `CW`, `CWR`) go to a `battery_limits:` point or rack end of
+`piping/routing.yaml`, else the nearest rack end. Each pipe records how (`method`) and why
+(`reason`) it was routed. `cheme layout report` lists every line routed, skipped or
+unrouted with the reasons and the counts per method and reason; `layout route --line L`
+reroutes some lines, `layout pin` keeps a route or platform, `layout render --plan | --section
+x=.. [--png]` draws plans and sections. Gates of kind `layout-model` (template:
+`layout-plot-plan`, `layout-3d`, `layout-detail`) turn this into stage requirements, and the
+skills `layout-yaml`, `pipe-routing`, `structures-access`, `area-classification` and `review`
+say how to work with it. What the layout does not do (pipe stress, supports, isometrics,
+structural design, HVAC and cable trays, dispersion, CAD export beyond glTF) is listed in
+[`domains/spatial/README.md`](src/chemeascode/domains/spatial/README.md).
+
+Equipment is compared by its outline in plan over the height of its box: a circle for a vertical
+cylinder or sphere, else its rectangle turned with it; against other equipment also by the solid
+parts standing out of that outline (a tank's stair, a base plate, a plinth); buildings turn in steps of 90 degrees; roads and
+racks are strips of their width along their centrelines, closed at the bends. A level is as high
+as its `height`, else up to the next level, else 4 m (a floor) or a 0.2 / 0.3 m slab (platform /
+roof); a building without levels is 6 m high. Touching is not a clash. Numbers must be finite
+(no `.inf` / `.nan`), ids not empty, and a round shape takes `size: {diameter, ...}` (a list is
+for `box` only). The layout rules run only when every layout file present passes its schema.
+
+### sheet
+
+`cheme sheet new <ID> [--title T] [--file F] [--revision R] [--force]` writes
+`pid/<ID>.xml` from the template frame (`.claude/skills/dexpi-xml/snippets/empty-sheet.xml`,
+generated without pyDEXPI's sample data) and fills its title block from `plant.yaml`: Model
+name (plant name) and uri, diagram Name (the sheet id), DrawingNumber (`<project.number>-<ID>`),
+DrawingName (title), SheetNumber, project number and name, client (EnterpriseName), site,
+revision (`project.revision`, default A), creation and modification dates, status "for review";
+approver, approval date and checker stay empty. It adds the sheet to `plant.yaml` `sheets:`
+(keeping comments; with an empty list the sheets already in `pid/` are listed too) or turns a
+planned entry drafted. The optional `project:` block of `plant.yaml` is
+`{number, name, client, site, revision}` (`cheme schema plant`).
+
+`cheme sheet meta <ID> Key=Value ...` sets title-block values: a MetaData property
+(`RevisionNumber`, `ApproverName`, ...), a short name (`Revision`, `Status`, `Title`,
+`Approver`, `Checker`, `Creator`, `Client`, `Site`, `Project`, `Number`, `Sheet`, `Date`, ...),
+or `ModelName`, `ModelUri`, `DiagramName`. Each title-block text showing a changed attribute is
+re-rendered with pyDEXPI's label toolkit (what `cheme.label-stale` checks), and the file is
+written in `fmt` form. Without pairs it prints the title block.
+
+### fmt
+
+Gives every `<Object>` without an id a deterministic, readable one (`Tank1_Nozzles2`,
+`Pipe3_Drawing1`) -- pyDEXPI would otherwise mint a random id on every load -- and writes the
+document back through pyDEXPI's serializer in canonical order, keeping the `<Model>`'s `name`
+and `uri`. It refuses a document whose load reports a loss -- a loader error, or a warning that
+content "will be ignored", such as a `Data` property DEXPI does not define -- and names it; the
+edit commands then write their change unformatted and say so. XML comments and processing
+instructions have no place in the DEXPI model and are dropped, each one reported with its line
+(by `cheme fmt`, `cheme run --fmt`, the edit commands, `cheme sheet meta` and the Python API's
+`Sheet.save()`, as a warning).
+
+### render
+
+`cheme render [PATHS] [--png] [--scale 4] [--crop X0,Y0,X1,Y1] [--rev REV] [-o OUT]` draws
+each sheet with pyDEXPI's SVG export to `build/<sheet>.svg` (`build/<sheet>@<rev>.svg` with
+`--rev`, which renders the sheet as committed at that revision). With `--crop` the name ends
+in the crop, `build/<sheet>[@<rev>]_crop-X0-Y0-X1-Y1.svg|png` (corners ordered), so a crop never
+overwrites the full sheet or another crop. `--png` writes a PNG instead,
+`--scale` pixels per sheet millimetre (default 4); it needs the `png` extra and says so when it is
+missing. `--crop` limits the output, SVG or PNG, to a region of the sheet given in millimetres
+from the top-left corner, Y down. These are the sheet's own XML coordinates (the export does not
+flip Y), so a `Position` read from the XML can be used directly. Each drawn object's `<g>` carries
+the id of the object it represents. A PNG larger than 100 Mpx is refused (exit 2). A sheet that
+does not load or draw is reported as `<path>: cannot render: <reason>`; the other sheets are still
+rendered and the exit code is 1.
+
+`--findings` draws the drawing-geometry findings (see validate) on the output as numbered red
+frames with the rule's name; those checks/checks.yaml's `accept:` accepts are grey and captioned
+`(accepted)`. `--tiles CxR` (e.g. `4x3`) renders the whole viewBox, which can include content
+left of or above the frame, as C columns by R rows of tiles that overlap by 10 %, `build/<sheet>[@<rev>]_tile-<row letter><column>.svg|png`
+(`_tile-B3` is the second row, third column), at `--scale 8` unless given, and writes the index
+`build/<sheet>[@<rev>]_tiles.json` (each tile's `crop`, its file and, with `--findings`, the
+findings it shows: number, rule, `id` and, when accepted, the reason); it prints one line per
+tile with `--crop X0,Y0,X1,Y1 --scale S`, which reproduces the tile.
+`--tiles auto` picks the grid so a tile is at most 1600 x 1200 px (2 mm text is 16 px at scale
+8): 3x3 for an A3 sheet. `--tiles` with `--crop` or `-o`, or a malformed grid, exits 2. Tiles
+make a visual review cover the whole sheet; they do not replace the drawing rules.
+
+`--emphasise-inline` draws the valves, inline fittings (reducers, silencers, ...) and the
+actuators 1.5 times larger about their insertion points, with lines twice as wide, so they can be
+read on a full-sheet render (a valve at the usual scale 0.4 is 4 x 2 mm). It is a review aid: the
+XML, the pipes and the labels are unchanged, and the output is named `..._inline.svg|png`
+(`build/<sheet>_inline_tile-A1.png` with `--tiles`) so it never stands in for the drawing.
+
+### diff
+
+`cheme diff [OLD=HEAD] [NEW=working tree] [--path P] [--html OUT] [--json] [--list [--verbose|--flat]]` loads two
+revisions, compares them with pyDEXPI's semantic diff, and writes an HTML page with both sheets
+side by side: added items green, removed red, modified orange, plus the change list and the
+review-text diff. It prints the counts per sheet and the report's path. Without `--path` it
+compares every `pid/*.xml` on either side, so a deleted or added sheet is reported too. An
+unknown revision exits 2 with `unknown revision` (as does `render --rev`). A sheet that does not
+load or draw on either side is named on stderr with a one-line reason
+(`<sheet>: cannot compare: <rev> does not load: <reason>`, or `cannot draw <rev>: <reason>`);
+the other sheets are still compared, the output (counts, list, JSON, HTML) is still written, and
+the exit code is 1.
+
+- `--list` prints, per changed sheet, a `<sheet>:` line (with `(sheet added)` or
+  `(sheet removed)` for a sheet on one side only) and one line per plant item a change belongs
+  to: `<kind> <class> <id> [tag]: N added, M removed, K modified` (`, L moved` when any moved),
+  e.g. `removed TubularHeatExchanger TubularHeatExchanger1 [H1008]: 0 added, 132 removed, 0
+  modified`. `<kind>` is what happened to the item itself, or `changed` when only its parts or
+  its drawing did. A part (nozzle, node, chamber) belongs to its item, a pipe or segment to its
+  line (piping network system), a valve or tee is an item of its own, an instrument function's
+  parts belong to it, and a drawing element to the item of the object it draws (the title block
+  and frame to the plant model); changes that belong to none are counted under
+  `changed (no plant item)`. Removed items come first, then added, modified and changed.
+- `--list --verbose` adds, under each item, its changes one per line, indented, as `--flat`
+  prints them.
+- `--list --flat` prints one line per changed object, as 0.2 did:
+  `<kind> <class> <id> [tag] (<domain>) <attrs> -> drawn as <owner|not drawn>`, e.g.
+  `modified GlobeValve GlobeValve2 [C1A] (conceptual) pipingComponentNumber -> drawn as GlobeValve2`.
+  The owner is the drawn object (a `<g id>` of the SVG) the change shows on. `--flat` or
+  `--verbose` without `--list` exits 2.
+- `--json` prints a JSON array with one object per changed sheet, the shape of `GET /api/diff`
+  without `old_svg`/`new_svg`: `path`, `old_rev`, `new_rev`, `status`, `changes`
+  (`kind`, `object_type`, `object_id`, `tag`, `domain`, `detail`, `item`), `old_highlight`,
+  `new_highlight`, `old_owner`, `new_owner`, `items` (each plant item a change names: `class`,
+  `tag`), `projection_diff`, `error` (why the sheet could not be compared or a side not drawn;
+`""` when all went well). No change prints `[]`.
+
+With `--json` or `--list` the HTML report is written only when `--html` names a file.
+
+### show
+
+`cheme show ID_OR_TAG [--sheet FILE]` finds an object in every sheet (or in one) by its XML id
+or a tag -- `TagName`, the printed instrument tag (`PICSA-4712.02`; also without the hyphen or
+with a space), `LineNumber`, `PipingComponentNumber`/`PipingComponentName`, a function or
+segment number -- and prints where it is: `file:start-end` of its `<Object>` block, its class and
+tag, its owner chain, the `file:start-end` of the RepresentationGroup(s) that draw it with the
+region their points span (`at X0,Y0,X1,Y1 mm`, sheet mm, Y down: symbol insertion points, line
+and label positions; add a margin for `render --crop`) or the drawn object it is part of, the ids it references and the references to it, each with a line number.
+An object's parts (nozzles, chambers, instrument functions) are listed with what connects to
+them. For a piping network system (a line number) or segment it also lists the segments, their end
+items and nodes, the pipes with both ends, and every item's nodes with their DN.
+
+For equipment (or a nozzle), `connections:` lists each nozzle with the segment and line attached
+to it and what is at the segment's other end (another equipment's nozzle, a tee on another
+segment, its own end item, or open), or the instrument sensing at it, or `nothing`. `only for
+<tag>:` lists what exists only for that equipment and dangles without it: the segments reached
+from its nozzles through items that are not tees, when they reach no other equipment, no
+off-page connector and no tee branching off them; lines all of whose segments are among them;
+and the branch tee on another segment they start from. Items on those segments that are part of
+an instrument chain are named with the `cheme show` call that prints it.
+
+`instrumentation:` follows the instrument chains an object is part of, from any member: an
+instrument function (`ProcessInstrumentationFunction`) or its parts, an
+`InstrumentationLoopFunction`, an `ActuatingSystem` (or its actuator), a valve its
+`OperatedValveReference` names, or an object (or part, such as a nozzle) a
+`ProcessSignalGeneratingFunction` senses at. Per function it prints the loop(s) that list it
+(or `none`), what it senses and where, its measuring and signal lines (`Source -> Target`, with
+their drawings), and each `ActuatingFunction` with its `ActuatingSystem`, `ControlledActuator`
+and operated valve, each with its block and drawing. Functions joined by a signal line (a
+cascade) are listed together.
+
+It reads the XML only, so it works on a sheet pyDEXPI cannot load. Nothing found: exit 1 and
+close ids and tags.
+
+```
+$ cheme show T4750
+pid/P-01.xml:3412-3718 Tank Tank1 [T4750]
+  owner: PlantModel1 (PlantModel) pid/P-01.xml:8 < Model_EngineeringModel1 (EngineeringModel) pid/P-01.xml:6
+  drawn by: Tank1_Drawing1 (RepresentationGroup) pid/P-01.xml:25152-28120 at 171,69.3138,280,291 mm
+  references (0):
+  referenced by (4):
+    pid/P-01.xml:25233 Tank1_Drawing1_Groups2_Elements1_Template1_Fragments1 (AttributeRepresentation) Object
+    ...
+  parts (9):
+    Nozzles: Nozzle5 (ProcessNozzle N1) pid/P-01.xml:3414-3434 <- Pipe4 TargetItem, PipingNetworkSegment3 TargetItem
+    ...
+  connections:
+    Nozzle5 (ProcessNozzle N1): segment PipingNetworkSegment3 (PipingNetworkSegment S1) of line 47123 pid/P-01.xml:449-535; other end: PlateHeatExchanger1 (PlateHeatExchanger H1007) nozzle Nozzle4 (ProcessNozzle N2)
+    Nozzle18 (ProcessNozzle N3): nothing
+    ...
+  only for T4750 (these dangle without it):
+    segment PipingNetworkSegment8 (PipingNetworkSegment S2) of line 47125 pid/P-01.xml:979-1016
+    ...
+    line PipingNetworkSystem5 (PipingNetworkSystem 47125) pid/P-01.xml:889-1039: all its segments
+    branch tee PipeTee1 (PipeTee C3) pid/P-01.xml:1231-1285 on PipingNetworkSegment11 (PipingNetworkSegment S3) of line 47126 pid/P-01.xml:1221-1315: its branch serves only this
+  instrumentation (1 function(s)):
+    ProcessInstrumentationFunction4 (ProcessInstrumentationFunction TICSA-4750.03) pid/P-01.xml:2577-2616 drawn by ProcessInstrumentationFunction4_Drawing1 pid/P-01.xml:16160-16448 at 197.25,57.25,340.5,64.75 mm
+      loop: PlantModel1_InstrumentationLoopFunctions4 (InstrumentationLoopFunction 4750.03) pid/P-01.xml:306-311
+      actuates: ActuatingFunction3 (ActuatingFunction TV4750.03) pid/P-01.xml:2579-2584
+        system: ActuatingSystem3 (ActuatingSystem TV4750.03) pid/P-01.xml:257-285 drawn by ActuatingSystem3_Drawing1 pid/P-01.xml:9941-10111 at 337.5,104.9,340.5,115.5 mm
+        ...
+        valve: GlobeValve3 (GlobeValve C1) pid/P-01.xml:2348-2401 (OperatedValveReference pid/P-01.xml:275)
+      senses: ProcessSignalGeneratingFunction3 (ProcessSignalGeneratingFunction TT4750.03) pid/P-01.xml:2587-2592 at Nozzle17 (InstrumentNozzle N7) pid/P-01.xml:3519
+      ...
+```
+
+### copy
+
+`cheme copy ID --prefix NEWID [--tag TAG] [--offset DX,DY] [--sheet FILE] [--into PARENT_ID]
+[--print]` duplicates an object (an id or a unique tag) with its parts and every
+`RepresentationGroup` that draws it or a part: symbol, nozzles and their nodes, node positions,
+labels, the equipment data table. Every id inside the copies is renamed deterministically: the
+object's id becomes `NEWID`, an id starting with it keeps its suffix
+(`CentrifugalPump1_Drawing1` -> `Pump_P4711B_Drawing1`), any other id gets the prefix
+(`Nozzle1` -> `Pump_P4711B_Nozzle1`). References inside the copy follow; references out of it are
+kept (shapes, a sensing location), except connections (`SourceItem`, `TargetNode`, a
+ConnectorLine's `Source`, ...), which would join a node twice and are dropped. `--tag` sets the
+tag property (`TagName`, or `PipingComponentNumber`, ...; with `TagNamePrefix`,
+`TagNameSequenceNumber`, `TagNameSuffix` when the object has them) and every label text of the
+copy that showed the old tag. Drawing coordinates move by `--offset` (sheet mm, Y down); an
+`EquipmentBarLabel` data table goes to the nearest free slot of the table band instead (moved
+with the offset only when there is none, and said so). The copies are inserted as text next to
+the originals (with `--into`, at the end of that object's matching `Components` and its drawing),
+so the rest of the file stays byte for byte. It prints the new ids, the `file:start-end` written,
+and what was **not copied** -- the pipes and segments at the original's nozzles, an actuating
+system's valve reference -- with their lines. `--print` prints the XML and changes no file. Run
+`cheme fmt` and `cheme validate` afterwards.
+
+An instrument copied with another measured variable follows it in its functions: `copy
+Inst_AI3104 --tag FI-4199` gives the sensor `FT4199` (and an actuator `AV...` `FV...`). Options
+that adapt the copy in the same command (each repeatable):
+
+| option | does |
+|---|---|
+| `--rename OLD=NEW` | an inner tag (`HV-4146=HV-4147`): every copied data value equal to it, the label texts that show it, and the ids that spell it (`..._HV4146` -> `..._HV4147`) |
+| `--renumber OLD:NEW` | a number (`4144:4145`) in the copied tags, label texts and ids |
+| `--set PROP=VALUE` | a data value on every copied object that has PROP (`FluidCode=Liquid nitrogen` on a line and its segments), typed as `cheme set` types it, and the labels showing it |
+| `--connect PIPE[.source\|.target]=ITEM:NODE` | close a copied pipe's open end (its old or new id): the pipe's Item/Node references, the segment end that pointed at the same place, and the ConnectorLine's `Source`/`Target` at the node's position |
+| `--sense-at ID[:X,Y]` | an instrument's `SensingLocation`; with X,Y a new `InstrumentationNodePosition` in ID's drawing, where the copied measuring line now starts |
+
+Ids inside the copy that spell the original's tag follow `--tag` too (`CV_LOX4004` of line
+`LOX-4004` -> `CV_LIN4004`). The report ends with `duplicate tags:`: each tag of the copy that an
+object on this sheet or another sheet already has, with its line. `--connect` refuses a node
+another pipe already ends at.
+
+### move, rename, set
+
+Edit commands for objects already on a sheet. Each works on the XML tree (never pyDEXPI's
+editor), leaves the file as it was except for the change, runs `cheme fmt` afterwards
+(`--no-fmt` not), and with `--print` prints the change as a unified diff and writes nothing.
+Without `--sheet` they use the one sheet holding the id or tag. An unknown id, a taken name or
+a value of the wrong type exits 2 and changes nothing.
+
+- `cheme move ID --offset DX,DY` moves every coordinate that draws ID (the drawings of the
+  object and its parts: symbol, node positions, labels, the bends of lines drawn inside its
+  group whose ends both move) and prints each one, old -> new. ConnectorLines attached to a moved
+  node position follow by reference; their bends stay and are listed as `stretched`, and a
+  straight one that is no longer horizontal or vertical as `now slanted`. A PolyLine ending on a
+  moved point gets that end moved. An `EquipmentBarLabel` data table stays in its band. ID may
+  be a drawing element too, to move only it (a label `Text`).
+- `cheme rename OLD NEW [--children]` renames the id OLD and every `#OLD` reference;
+  `--children` also every id `OLD_*` (`T4101_I1_Drawing`, `T4101_I1_Pos`). A name already taken
+  is refused. A note says when the object keeps data that spelled the old id (its `SubTagName`).
+  Given a tag instead of an id (`cheme rename HV-4146 HV-4147`) it sets the tag data
+  (`TagNamePrefix`/`SequenceNumber`/`Suffix` with a `TagName`; an instrument's category,
+  letters and number, and the numbers of its sensor and actuator) and the labels showing it;
+  `--ids` also renames the ids that spell the whole tag (`V101`, not inside `FV101`) within the
+  retagged objects, their parts and drawings. A tag already held by another piping
+  component or instrument (this sheet or another) is refused. When two objects share a tag
+  (after a copy), `cheme rename ID NEWTAG --tag` retags the one with the id ID
+  (`rename Inst_Y FI-4150 --tag`: category, number, sensor `FT4150`). A valve that shares its
+  tag with its own actuation chain (`XV-104`: the valve, the actuating system that operates it,
+  the actuating function driving that system and, when tagged alike, the instrument function)
+  is retagged together with it by `cheme rename XV-104 XV-105`; any other object with the tag
+  still makes it ambiguous. Tags in
+  `PositionNumber` (safety valves) address objects like the other tag properties.
+- `cheme set ID PROP=VALUE...` sets data values by their DEXPI name, in the type the
+  attribute has: the type of the value already there, else pyDEXPI's class -- `String`,
+  `Double`, `Integer`, `Boolean`, an enumeration member (`OnHold=OnHold`), a physical quantity
+  with its unit (`InsulationThickness='50 mm'`, `'16 barg'`, `'26 MetreCubed'`). A dotted name
+  reaches into an aggregate (`Stroke.Width=0.5` on a ConnectorLine). `PROP=` removes the value.
+  Every label whose template shows an attribute of the object gets the cached text pyDEXPI's
+  label renderer gives, so `cheme.label-stale` stays clean (also on a sheet whose Texts have
+  no ids yet); the lines changed are printed. Setting an instrument's
+  `ProcessInstrumentationFunctionCategory` or `...Number` renumbers its sensor and actuator too,
+  and a tag another object already has is noted.
+
+### fragment
+
+`cheme fragment KIND --id ID [--sheet FILE] ...` prints ready-to-paste XML in two parts,
+`CONCEPTUAL` and `DRAWING`, each after an XML comment saying where it goes (plus a `SHAPE` part
+when the symbol is not in the catalogue, e.g. `GATE_VALVE_SHAPE`). Ids derive from `--id`:
+
+| kind | options | writes |
+|---|---|---|
+| `node` | `--dn 80 [--standard Din2448\|Iso6708\|none] [--at X,Y]` | a `PipingNode` with all DN properties; with `--at`, its `PipingNodePosition` group |
+| `pipe` | `--from ITEM:NODE --to ITEM:NODE [--points x,y;x,y]` | a `Pipe` and its `ConnectorLine` between the two node positions, `--points` the bends |
+| `valve` | `--class GlobeValve\|BallValve\|GateValve\|SwingCheckValve\|ButterflyValve --dn --at X,Y [--rotation R] [--tag]` | the valve with nodes `ID_N1` (in), `ID_N2` (out), its symbol (scale 0.4) and node positions 2 mm either side |
+| `tee` | `--dn [--branch-dn] --at X,Y [--rotation R] [--branch up\|down\|left\|right]` | a `PipeTee` with `ID_N1` run in, `ID_N2` run out, `ID_N3` branch, drawn as in the reference (Shape12 dot, positions 0.001 mm apart) |
+| `segment` | `--from ITEM:NODE --to ITEM:NODE [--like SEGMENT] [--number S2] [--dn]` | a `PipingNetworkSegment` with its ends, data copied from `--like`, empty `Connections`/`Items`, and its drawing group |
+| `label` | `--for ID --attribute A [--at X,Y]` | a label (`ValveLabel`, `EquipmentTagNameLabel`, ... by the object's class) showing the attribute |
+| `equipment` | `--class C --tag T --at X,Y [--shape S] [--rotation R] [--scale S\|SX,SY] [--label-at X,Y] [--marker NAME:dy[:SY][:m]] --nozzle N1:dx,dy[:DN] ...` | equipment of DEXPI class `C` with tag parts, nozzles (`ID_N1`, node `ID_N1_Node`; no DN: an instrument connection), symbol (default by class) with marker symbols such as packed beds and trays, nozzle stubs and node positions, tag label |
+| `nozzle` | `--on EQUIP --at dx,dy [--dn] [--tag]` (needs `--sheet`) | a nozzle for existing equipment, placed from its symbol, pasted into its `Nozzles` and its drawing |
+| `instrument` | `--tag PIC-4101 --at X,Y --sense ITEM[:x,y] [--field]` | a `ProcessInstrumentationFunction` (category, letters, number) with its `ProcessSignalGeneratingFunction` (sensing location ITEM) and `MeasuringLineFunction`, bubble, labels, node positions and the drawn measuring line |
+| `signal` | `--from INST --to VALVE\|INST[,...] [--fail-action FC\|FO\|FL] [--number] [--points]` (needs `--sheet`) | a `SignalLineFunction` drawn dashed; to a valve also an `ActuatingFunction` and, when the valve has none, an `ActuatingSystem` with `ControlledActuator` and `OperatedValveReference` (and actuator symbol) |
+| `offpage` | `--in\|--out --at X,Y [--rotation R] [--dn] [--note TEXT] [--note-at X,Y]` | a `FlowIn`/`FlowOutPipeOffPageConnector` with node, arrow and note |
+| `line` | `--number N --dn [--fluid F] [--at X,Y]` | a `PipingNetworkSystem` with empty `Segments`, its drawing and number label |
+| `note` | `--text TEXT --at X,Y` | a `Static` text at the top of the diagram, owned by no object (no `label-literal`) |
+| `shape` | `NAME [--id]` | the catalogue `Shape` to paste into a sheet that lacks it, or which id it has there |
+
+`--rotation` is the flow direction in degrees (0 left to right, 90 down, 270 up; Y down). With
+`--sheet` the shape ids come from the sheet's `ShapeCatalogue` (looked up by shape name, else the
+reference ids), a pipe's ends from the sheet's node positions (else `<node>_Position`, the name a
+fragment gives them), and a label's cached text from the value it shows. Notes (a node that
+already has a pipe, a DN without a standard enumeration value) go to stderr. Nothing is written.
+With `--sheet`, the comments of the drafting kinds name the holder's id and line.
+
+The template catalogue (`empty-sheet.xml`, `shapes.md`) has, besides the reference's shapes,
+compressors, turbine/expander, blower, column with packed-bed and tray markers, gas filter,
+silencer, air cooler, general and shell-and-tube exchangers, electric heater, ambient vaporizer,
+flat-bottom tank, plate-fin exchanger and gate valve (`chemeascode.domains.piping.authoring.shapes`; their
+`SymbolRegistrationNumber` is the shape's name until an ISO 10628-2 number is checked against
+the standard; none is borrowed from a symbol of another name).
+
+### run
+
+`cheme run [--fmt SHEET] SCRIPT [ARGS...]` runs a Python file in cheme-as-code's own
+interpreter, where `pydexpi` and `chemeascode` (with the authoring API) import. A plant repository
+has no Python project, so neither `python3` nor `uv run python` can import pyDEXPI there, and the
+template's `Bash(cheme:*)` permission already covers `cheme run`. Arguments after SCRIPT
+go to the script as `sys.argv[1:]`, its exit code is cheme-as-code's (an uncaught exception prints
+its traceback and exits 1), and the working directory is the repository root, so relative paths
+mean the same wherever it is started. `--fmt SHEET` (before SCRIPT, repeatable) formats a sheet
+after a successful run (after SCRIPT it goes to the script, and cheme-as-code warns).
+`cheme --version` prints the interpreter's path on its second line.
+
+### Authoring API (`chemeascode.domains.piping.authoring`)
+
+Generator scripts build sheets with the documented module `chemeascode.domains.piping.authoring` instead of
+their own XML helpers:
+
+```python
+import sys
+from chemeascode.domains.piping.authoring import (
+    Sheet,
+    Marker,
+    Nozzle,
+    equipment,
+    line,
+    valve,
+    tee,
+    instrument,
+    offpage,
+    note,
+)
+
+sheet = Sheet.load(sys.argv[1])  # reads the shape catalogue, ids, node positions
+pump = equipment(
+    sheet,
+    "CentrifugalPump",
+    "P-101",
+    shape="CENTRIFUGAL_PUMP_SHAPE",
+    at=(160, 150),
+    nozzles=[Nozzle("N1", (-7.5, 0), 80), Nozzle("N2", (0, -7.5), 50)],
+)
+column = equipment(
+    sheet,
+    "ProcessColumn",
+    "C-101",
+    shape="COLUMN_SHAPE",
+    at=(260, 120),
+    scale=(1.0, 1.6),
+    markers=[Marker("COLUMN_PACKED_BED_SHAPE", -20, 1.5), Marker("COLUMN_TRAY_SHAPE", 20)],
+)
+t = tee("T1")
+line(
+    sheet,
+    "80-W-101",
+    dn=80,
+    fluid="Water",
+    route=[
+        offpage("in", at=(40, 150), note="from P-01"),
+        valve("HV101", "GateValve"),
+        t,
+        valve("FV101", tag="FV-101"),
+        pump["N1"],
+    ],
+)
+line(
+    sheet, "25-W-103", dn=25, route=[t.branch, (t.branch.xy[0], 180), offpage("out", at=(120, 180))]
+)
+instrument(
+    sheet,
+    "FIC-101",
+    at=(130, 130),
+    sensing="Line_80W101_S2",
+    sensing_at=(135, 150),
+    signal_to="FV101",
+)
+note(sheet, "Trip: LALL-101 stops P-101", at=(60, 180))
+sheet.save()  # writes, then cheme fmt
+```
+
+| builder | builds |
+|---|---|
+| `Sheet.load(path)`, `sheet.save([path])` | load a sheet (refusing ids that clash when adding), write and format it |
+| `equipment(sheet, cls, tag, shape=, at=, nozzles=[Nozzle(name, (dx, dy), dn)], scale=, markers=)` | equipment of a DEXPI class with nozzles, symbol, node positions and tag label; `eq["N1"]` is a nozzle's port. `scale=1.2` or `scale=(1.0, 1.6)` (ScaleX, ScaleY: a tall column); `markers=[Marker("COLUMN_PACKED_BED_SHAPE", -20, 1.5), ("COLUMN_TRAY_SHAPE", 10), "COLUMN_TRAY_SHAPE:20:1:m"]` draws packed beds and trays on the symbol at `dy` from its centre, as `fragment equipment --marker NAME:dy[:SY][:m]` does. A shape missing from an older sheet's catalogue is copied from the template's |
+| `line(sheet, number, dn=, fluid=, route=[start, (x, y)..., valve(...), tee(...), end])` | the piping network system, its segments (split at tees), pipes with bends, inline items and the number and DN labels, placed beside the route and never on it, clear of symbols, other lines and texts where there is room |
+| `valve(id, cls, at=, tag=)`, `tee(id, at=, branch=)` | inline items for a route (mid-leg without `at`); `t.branch` is the tee's branch port |
+| `offpage("in"\|"out", at=, note=)` | an off-page connector starting or ending a route |
+| `instrument(sheet, tag, at=, sensing=, sensing_at=, signal_to=, location=)` | an instrument function with sensor, measuring line and bubble; `signal_to` a valve adds the actuating system, actuator and signal line |
+| `note(sheet, text, at=)`, `label(sheet, for_id, attribute, at=)` | free text owned by no object; a label as `fragment label` makes it |
+
+Valves, tees, pipes, segments and labels are built by the same functions as `cheme
+fragment`, so the XML is identical. Each builder is atomic: one that raises (an id that
+exists, a valve off its leg) leaves the sheet as it was, so a corrected retry with the same ids
+works. `cheme init` puts a runnable example in `scripts/example_draft.py`.
+
+### regen: generated and hand-maintained sheets
+
+A sheet in `plant.yaml` may name its generator:
+
+```yaml
+sheets:
+  - {id: P-04, file: pid/P-04.xml, generator: {script: scripts/draft_P-04.py, frame: 9aa9b38}}
+```
+
+`frame` is a file in the repository or a git revision whose copy of the sheet file is the start
+(the commit with the empty sheet). A sheet with a generator is **generated**: the script is the
+source and the XML is not edited by hand. Without one it is **hand-maintained**: the XML is the
+source and any script is provenance only.
+
+- `cheme regen [SHEET...]` copies the frame to a scratch file, runs `cheme run SCRIPT
+  FILE` (the script edits FILE in place) and `fmt`, and writes the sheet. It refuses when the
+  sheet differs from what the generator *as committed at HEAD* makes (someone edited the XML by
+  hand) and names the plant items that differ; `--force` overwrites anyway. `--detach SHEET`
+  removes the `generator:` (keeping the rest of `plant.yaml` as written): the sheet becomes
+  hand-maintained. `--list` prints each sheet's state.
+- `cheme validate` runs each declared generator in a scratch copy of the repository (so
+  whatever else the script writes never reaches the working tree) and warns
+  `cheme.generated-sheet-drift` when it no longer reproduces the sheet (`generator-failed`
+  when it cannot run). This executes the scripts `plant.yaml` declares, also in the pre-commit
+  hook and CI: on a clone you do not trust, run `cheme validate --skip-generators`, which
+  leaves this out. `validate` also gives an info
+  `cheme.generator-undeclared` for each `scripts/draft_<sheet>.py` of a sheet without
+  `generator:`.
+
+### process: BFD, PFD, stream table and properties
+
+The block flow diagram (BFD) and process flow diagram (PFD) are generated, never drawn by hand.
+Their source is two YAML files, schema `cheme/process/v1`:
+
+- `process/materials.yaml` (kind `process-materials`): components (id, name, formula, CAS, molar
+  mass, optional InChIKey and SMILES, checked by `cheme validate`), templates (ordered component lists) and the property method;
+- `process/flowsheet.yaml` (kind `process-flowsheet`): units (every value without its own unit
+  is in these; pressure absolute, gauge only as an explicit unit, `Nm3/h` only with
+  `normal_conditions`), cases, the balance tolerance, `feeds` and `products` (DEXPI `Source` and
+  `Sink`), `blocks` and `steps` with explicit `ports` (in/out, material/energy/information),
+  `streams` from port to port with a per-case `state` (pressure, temperature, flow, duty,
+  composition, phase), `links` to the lists and sheets, and `layout.bfd` / `layout.pfd` pins.
+  Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
+  A value or composition may give an `uncertainty` (the LCA's shape, e.g. `{gsd2: 1.2}` or
+  `{distribution: triangular, low: 0.9, high: 1.1}`); `cheme assess lca` samples a feed's or
+  product's flow with it, and no calculated value's fingerprint includes it. An optional
+  `origin` says what kind of figure it is: given `measured`, `vendor` or `literature`; assumed
+  `design-rule`, `estimate` or `literature`; calculated `simulated` (`cheme process simulate
+  --fill` writes it) or `correlation` (`cheme process props --fill`, `cheme datasheets fill`).
+  Another pairing is `cheme.provenance-origin` (warning). A DEXPI sheet maps `measured` to
+  OBSERVED, and `lca.yaml`'s `uncertainty.defaults` may be keyed by an origin
+  (`measured: {gsd2: 1.02}`), which wins over the provenance's.
+
+`plant.yaml` declares the sheets by kind: `{id: BFD, kind: bfd, file: process/BFD.xml}` and
+`{id: PFD, kind: pfd, file: process/PFD.xml}`. A `kind: validate` gate with `generated: [pfd]`
+(the template's `process-basic`) fails until the PFD is declared and built.
+
+`plant.yaml`'s `requires: cheme-as-code>=X.Y` (written by `cheme init`) names the oldest
+cheme-as-code the repository works with; an older one stops every command, the pre-commit hook
+included, with `cheme.version-required` and an upgrade hint before any schema error.
+
+- **`cheme process build [SHEET...] [--force]`** writes DEXPI 2.0.1 `ProcessModel`s with a
+  drawing. The BFD shows blocks, feeds and products and every stream that crosses a block
+  boundary; the PFD nests the steps in their blocks, with block ports delegating to step ports
+  (`superReference`), and adds the internal streams. Values become `QualifiedValue`s with their
+  provenance and case. The layout is layered left to right with recycles routed back, labels
+  placed clear of lines and nodes, and the `layout.<view>` pins applied. A rebuild is
+  byte-identical; a title rename moves nothing.
+- **Calculated values and phase in the sheets.** Each material stream's `MaterialState` (its
+  `MaterialStateType`) carries the `state.calculated` values DEXPI 2.0.1 has a property for:
+  `density` (kg/m3) and `specificEnthalpy`, one `QualifiedValue` per case with the YAML
+  provenance (`calculated`: CALCULATED) and source. DEXPI binds `specificEnthalpy` to mass
+  units, so kJ/kmol is divided by the case's molar mass (kJ/kg; the display text keeps the
+  kJ/kmol value, the description names the molar mass and the enthalpy reference); without a
+  molar mass the enthalpy is not a `QualifiedValue`. The phase is the material state's `phases`:
+  one `MaterialStateType` per phase present (identifier `vapor` or `liquid`, two-phase gives
+  both), its description `<case>: <phase>, vapour fraction <x>; <provenance>; source: ...`.
+  DEXPI has no property for the molar mass (or any other calculated value): those are lines
+  `calculated molar_mass (<case>) = 28.96 kg/kmol; source: ...` in the state type's
+  description; no class or attribute is invented. **Stale values are not exported**: a value
+  or phase reported by `cheme.process-calculated-stale` is left out of the sheet, and the
+  description says `stale, not exported (<case>): density, phase`, so a DEXPI consumer never
+  reads a value its inputs no longer give. Because staleness follows from the YAML, the sheet is
+  `generated-outdated` until rebuilt; recalculate (`props --fill`) and rebuild to export again.
+- **BFD aggregation.** `bfd: {aggregate: true}` in the flowsheet draws parallel boundary
+  streams between the same two BFD nodes (same kind, same direction) as one connection;
+  `aggregate: [[A, B], ...]` limits it to those pairs (`cheme.process-aggregate` if one is
+  not on the BFD). The connection keeps its first stream's id and ports, its label and
+  description list every stream (`represents: S2 S3`), and it carries no values; the PFD,
+  stream table and balances are unchanged (`examples/process-aggregate/`).
+- **Refinement keeps stream ids.** When a block gets steps, a boundary stream keeps its id and
+  moves its end from `BLOCK.port` to `STEP.port`, whose port `delegates` the block port. Balances
+  count it once; the BFD and its balances are unchanged by a refinement
+  (`examples/process-blocks/` before, `examples/process-recycle/` after).
+- **Nested blocks.** A block with `parent: P` is drawn inside P on the PFD (with its own steps
+  and nested blocks) and is a sub process step of P; the BFD shows top-level blocks. Its ports
+  `delegate` P's ports where a stream crosses P's boundary, just like step ports
+  (`examples/process-nested/`). Inside a block, ports are ordered by where their lines go and
+  the step order with the fewest crossings wins.
+- **Generated-sheet provenance.** Each sheet records a fingerprint of its YAML source and of its
+  own XML. `validate` reports `cheme.generated-outdated` (warning: the YAML changed, rebuild),
+  `cheme.generated-edited` (error: the XML was edited by hand; `build` refuses it unless
+  `--force`) and `cheme.generated-version` (warning: cheme-as-code's generator version, generator
+  code (`generator_sha256`, a hash of the `chemeascode.domains.process` sources) or schema version
+  changed). A YAML edit never reports `generated-edited`.
+- **Balances.** Steady-state, non-reactive mass and component balances per block and per step,
+  on its boundary streams (internal streams cancel), with `|in - out| <= abs + rel * max(in,
+  out)`, in the default case and every other case that streams give a state for.
+  `cheme.process-balance` (error) names the block, the case and both sums;
+  `process-balance-not-evaluable` (info, default case only: in another case a balance with
+  missing values is not reported) names the missing values;
+  `process-component-balance-not-evaluable` (info) a mass balance that closes while the
+  component balance lacks compositions (accepted by the concept gate, not by `process-basic`).
+- **Reactions** live in `process/reactions.yaml` (schema `cheme/reactions/v1`,
+  `cheme schema process-reactions`): stoichiometry over the component ids (reactants
+  negative), an optional conversion of a key component, heat of reaction, catalyst and sources.
+  `validate` checks each reaction's element balance from the components' `formula`
+  (`cheme.reaction-*`). A step or block naming `reactions: [ID, ...]` (optionally
+  `conversion: {ID: fraction}`), or a block with `balance_scope: reactive`, balances mass and
+  elements instead of components, and the component changes must be explained by extents of its
+  reactions (least squares; `process streams` prints the extents). A block holding a reactor
+  step is reactive too. `reactor: equilibrium` takes the named reactions to equilibrium at the
+  outlet's temperature (plus `approach`) and pressure, `reactor: gibbs` minimises the Gibbs
+  energy over every component of the streams (both ideal gas, in `process propagate`), with
+  ln K from each component's `ideal_gas` data (formation enthalpy, entropy, Cp/R polynomial) or
+  a reaction's `equilibrium_constant`. With `fugacity: peng_robinson` the equilibrium is that of a
+  real gas (Peng-Robinson fugacity coefficients from the components' `critical:` constants;
+  `domains/chemistry/eos.py`). `examples/process-ammonia` is an ammonia synthesis loop with a
+  real-gas equilibrium converter, purge and recycle.
+- **Fixed beds** (`reactor: pfr` with `catalyst:` and `bed:`): `process propagate`
+  integrates the reactions' rate laws along the catalyst mass (1D plug flow, adiabatic,
+  isothermal or cooled, Ergun pressure drop; `domains/process/fixed_bed.py`) and writes the
+  outlet's composition, flow, temperature and pressure; `process reactors` adds the bed
+  (catalyst mass and volume, pressure drop, hot spot, profile). `datasheets fill` sizes a
+  reactor's datasheet from its bed (or the catalyst's space velocity) and `assess equipment`
+  adds its first catalyst fill at the catalyst's price. `examples/process-shift` is an
+  adiabatic high-temperature shift bed.
+- **`cheme process reactors [--case C] [--json]`** reports per reactor its model, the extents,
+  each reaction's heat and ln K at the outlet, `ln(Q/K)` (0 at equilibrium) and the duty
+  H(out) - H(in) on the elements basis, ideal gas.
+- **Catalysts** live in `process/catalysts.yaml` (schema `cheme/catalysts/v1`): active phase,
+  promoters, support, particle and bed data, the temperature and pressure window, space
+  velocity, poisons, deactivation and price, each with provenance. A reactor names its
+  `catalyst:`; `validate` warns when its streams leave the window or a feed carries a poison.
+  Reactions take a `rate:` (power law or LHHW, per kg of catalyst or per m3, optional
+  `(1 - Q/K)`), which `process reactors` evaluates at the outlet. A reaction's `catalyst:`, its
+  `rate.catalyst` and its `mechanism.catalyst` name a catalyst by id; `validate` warns on one
+  the file does not declare (`cheme.catalyst-unknown`).
+- **Reactive hazard screening**: **`cheme process reactor-hazards [--json]`** gives each
+  reactor's adiabatic rise, MTSR, MTT and, with a TD24 from calorimetry (`hazard:` on the
+  reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
+  (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`).
+- **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
+  [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
+  step's reactions: yield and selectivity of P against the key's conversion over a range of
+  space times, the largest yield of each, and the PFR's instantaneous selectivity
+  (`domains/process/reactor_choice.py`; the SVG in light and dark); `--region-svg FILE` adds
+  the candidate attainable region (`domains/process/attainable_region.py`).
+- **Reactor uncertainty**: **`cheme process reactor-uncertainty NODE [--samples 200] [--seed 1]
+  [--case C] [--json]`** samples the `uncertainty` of a step's reaction data (`rate.uncertainty`
+  of A and Ea, and that of `heat_of_reaction`, `equilibrium_constant` and `conversion`) by Monte
+  Carlo through the step's own reactor model (a fixed bed, a stirred tank or batch, a conversion
+  reactor; equilibrium and Gibbs reactors are not sampled) and prints the conversion of the key
+  (the first fed reactant), the outlet and the highest temperature as declared, with their mean
+  and 5th, 50th and 95th percentile; draws that do not solve are counted and named
+  (`domains/process/reactor_uncertainty.py`). Nothing is written. Exit 2 when the step cannot
+  be sampled (not one inlet, no reaction with an uncertainty, not solvable as declared).
+- **Selectivity as a design input**: a conversion reactor step may give `selectivity: {key,
+  conversion, products: {id: S}}` (kmol formed per kmol of the key converted); `process
+  propagate` solves the extents of its parallel and series reactions
+  (`chemistry.reactions.selectivity_extents`), refusing selectivities the reactions cannot give.
+- **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
+  `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
+  target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
+  liquid; `process propagate --fill` writes the outlet and `process reactors` reports the tanks'
+  conversions and duty, or the batch's profile and heat release.
+- **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
+  on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
+  `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
+  `concentration` (with each component's `liquid_molar_volume`), and its rate law on
+  `driving: mole_fraction`, `activity` or `concentration`
+  (`domains/chemistry/liquid.py`). `reactor: equilibrium` solves a liquid equilibrium and
+  `process reactors` reports ln(Q/K) and the rate on that basis; `validate` warns when a basis
+  does not fit the phase (`cheme.reaction-phase-basis`).
+- **Solids, crystallizers and filters** (pre-release issue 365): a component with `phase: solid` in
+  `process/materials.yaml` is a solid (a crystal, or a hydrate with its water in the formula,
+  `Na2CO3(H2O)10`), a separate component from the same substance dissolved; every stream then
+  divides into dry solid and liquid (mother liquor or moisture) with their compositions
+  (`domains/process/solids.py`; no particle size or population balance). A block or step with
+  `crystallizer:` (one solute, one solvent, one material inlet) is a cooling and/or evaporative
+  crystallizer with an optional specified filter or centrifuge (`separation:` solid recovery
+  and cake liquid) and mother-liquor `recycle:`; `basis: solubility` predicts the crystals from
+  sourced solubility data (the mother liquor leaves saturated; points interpolated in
+  temperature, never extrapolated), `basis: yield` imposes them (specified, compared with the
+  solubility when given). `solid_separation:` is a filter or centrifuge on its own. `process
+  propagate --fill` writes the outlets, `validate` balances the node on mass and elements, the
+  model basis is `solubility-equilibrium` (predictive, not simulated), `imposed-yield` or
+  `solid-split` (specified). **`cheme process crystallizers [--case C] [--json]`** reports the
+  crystals formed (and at equilibrium), recovery, loop iterations, mass, solute and element
+  residuals, the lumped duty (with `energy:`), the outlets as dry solid, liquid and moisture,
+  and refuses impurities, several solutes or a temperature outside the data
+  (`cheme.process-crystallizer-unsupported`). Qualified against Felder & Rousseau Example 4.5-2
+  and Geankoplis Examples 12.11-1 and 12.11-2 (`tests/test_crystallization.py`;
+  `docs/adr/0025-solid-components-and-a-bounded-crystallizer-adapter.md`).
+- **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
+  `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
+  records the searches, sources, observations, candidate routes, conflicts and the model basis
+  behind the reactions, before any flowsheet. `cheme validate` checks it (`cheme.evidence-*`:
+  references, DOIs and patent numbers, a location for every reported value, no numbers from a
+  source only seen as a snippet, units, the yield basis, duplicate evidence, kinetics validity,
+  an explicit model basis whose reactions `reactions.yaml` declares). **`cheme chemistry
+  evidence [--json]`** prints the route comparison. Worked example:
+  `examples/reaction-evidence-ethyl-acetate` (three routes to ethyl acetate from papers and
+  patents).
+- **The reaction library**: **`cheme chemistry library [ID] [--add]`** lists, shows and adds 23
+  industrial processes (ammonia, methanol, reforming, shift, methanation, ethylene oxide,
+  sulfuric and nitric acid, Claus, Fischer-Tropsch, hydrotreating, styrene, acrylonitrile,
+  propylene oxide, cracking, vinyl chloride, formaldehyde, maleic anhydride, cumene,
+  ethylbenzene, MTBE, HCN): components with chemicals' ideal-gas data and critical constants,
+  main and side reactions, typical catalysts and windows, with sources
+  (`domains/process/data/library/`, built by `scripts/build_reaction_library.py` from
+  `scripts/reaction_library.yaml`). `--add` appends to the plant's process files, keeping their
+  comments. Each entry's `model_basis` says which reactor model its own data support, checked
+  against the data: `equilibrium` (8 entries: every reaction reversible, gas phase, ideal-gas
+  data over the window; an equilibrium limit, not a kinetic model) or `stoichiometry_only` (15
+  entries: no conversion, selectivity, equilibrium basis or rate law); `conversion_selectivity`
+  and `kinetic` need sourced conversions or rate laws no entry has yet. The listing, `--add`
+  and `GET /api/library` show it: an entry brings chemistry, the reactor model is chosen
+  separately.
+- **Microkinetics**: a reaction's `mechanism:` lists its elementary surface steps (adsorbates
+  `X*`, free sites `*`, per-site rate constants or sticking coefficients). **`cheme chemistry
+  microkinetics ID -T K -p ID=BAR ... [--cantera] [--export FILE]`** solves the mean-field steady
+  state (coverages, TOF, degree of rate control per step, apparent activation energy, orders;
+  `domains/chemistry/microkinetics.py`), checks it against Cantera (extra `cantera`) and writes
+  Cantera's YAML input.
+- **Rate laws from data**: `experiments/kinetics/*.yaml` (schema `cheme/kinetic-data/v1`)
+  holds rates of a reaction; **`cheme experiments fit-rate FILE [--form lhhw] [--reverse]`**
+  fits a power law (linear least squares on ln r) or an LHHW law (Levenberg-Marquardt), each
+  parameter with its 95 % interval; **`cheme experiments sample-mechanism`** makes such data
+  from a mechanism, to lump it into a rate law for a fixed bed. Mechanism steps may give DFT
+  `energies:` (transition state theory) instead of rate constants.
+- **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
+  the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
+  prints it as a `rate:` entry (network). An entry that is a formula and also another
+  compound's SMILES (`CO`, `NO`, `O`, `C`) is refused as ambiguous: give a name (`carbon
+  monoxide`), an explicit SMILES (`[C-]#[O+]`) or `smiles:CO` for the SMILES reading.
+- **`cheme chemistry thermo NAME... [--fit LO,HI]`** (extra `props`) prints a component's
+  `ideal_gas` entry from chemicals: ATcT formation enthalpy, entropy and Poling's Cp/R (to
+  1000 K), or Cp/R fitted to thermo's ideal-gas heat capacity over LO to HI K.
+- **`cheme process streams [--case C] [--md | --csv | --json]`** prints the stream table
+  (value, unit and provenance per property, calculated values, stale ones marked) and the
+  balances.
+- **`cheme process propagate --fill | --check`** derives missing compositions and flows
+  through steps whose streams determine them: pass-through classes (compressing, pumping,
+  cooling, heating, filtering, transporting, flow control; heat exchanging with one stream in
+  and one out) keep composition and flow, mixers combine, splitters keep the composition and
+  split by `split: {outlet port: fraction}` (else the one missing outlet flow is the mass
+  balance remainder), and a conversion reactor (a step naming `reactions:`, each with a
+  conversion) converts its fraction of each key component's inlet flow; a crystallizer or a
+  filter (`crystallizer:`, `solid_separation:`, below) fills its outlets. Other separators, and
+  reactors without conversions, are only checked, never solved. Values are
+  `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
+  are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
+  prints the run as an adapter result (`cheme/adapter-result/v1`, `cheme schema
+  adapter-result`): `converged` when every node is solved, else `not-converged` with the
+  unsolved nodes in `messages` and `units`; `iterations` the sweeps through the flowsheet; per
+  stream the derived values and those written (`filled`). It writes no file of its own.
+- **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
+  vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
+  process's property package (`property_method.package` in `materials.yaml`, else the package
+  covering the most streams; `--coverage` lists it and, per stream, whether it is covered or
+  why not, writing nothing). Package `air-pr-chemsep`: N2, O2 and Ar; 77 to 315 K; vapour 100
+  to 3200 kPa(a); liquid and two-phase 100 to 600 kPa(a). Peng-Robinson (thermo, ChemSep kij)
+  for equilibrium and vapour density, COSTALD for liquid density, enthalpy on ideal gas at
+  298.15 K and 101.325 kPa. The references (NIST WebBook equations,
+  `tests/data/process_props_references.yaml`) pass within 0.5 % (gas density at ambient
+  pressure), 1 % (gas density up to 31 bar), 1.5 % (liquid density) and 0.3 K (saturation
+  temperatures). Package `syngas-pr-vapor`: H2, N2, Ar, CH4, CO, CO2 and their mixtures, NH3
+  pure and in mixtures with H2, N2, Ar and CH4 up to mole fraction 0.25 (ammonia synthesis loop
+  gas), vapour only, in per-component temperature-pressure boxes within 250 to 1000 K and 100 to
+  30000 kPa(a), benchmarked by `tests/test_property_packages.py` against CoolProp's reference
+  equations of state, GERG-2008 mixtures and the Neumann et al. (2020) ammonia mixture models,
+  and against measured densities (density 2 % pure, 3 % mixtures; enthalpy differences 300
+  kJ/kmol). A state outside the range, another component, a pressure that is
+  not absolute and positive, solids, or a phase the flash contradicts is refused with a finding,
+  and nothing is written. `--fill` never overwrites given or assumed values, records the method,
+  its package versions and range in `materials.yaml`, and stores an input fingerprint with each
+  calculated value; when an input changes, `validate` reports `cheme.process-calculated-stale`
+  until it is recalculated (a refused recalculation keeps the old values, marked stale).
+  `--check` recalculates and reports only (exit 1 on a warning); `--fill` exits 3 when it
+  refused a stream and names the refused streams on its summary line. `--json` prints the run
+  as an adapter result (solver `thermo` with its version and EOS; `not-converged` with the
+  refused or uncalculable streams in `messages`; `iterations` null, one flash per stream).
+- **`cheme process simulate --fill | --check [--save x.dwxmz]`** solves the flowsheet in
+  DWSIM. `process/simulation.yaml` gives the property package and what each step needs beyond
+  its streams (every value with its provenance):
+
+  ```yaml
+  schema: cheme/simulation/v1
+  kind: simulation
+  property_package: Peng-Robinson (PR)
+  specs:
+    K1: {outlet_pressure: {value: 800, provenance: given}, efficiency: {value: 0.78, provenance: assumed}}
+    E1: {outlet_temperature: {value: 308.15, provenance: given}}
+  ```
+
+  DWSIM runs in Docker: build the image once with `docker build --platform linux/amd64 -t
+  cheme-dwsim:9.0.5 -f docker/dwsim/Dockerfile .` in this repository. Simulated streams get
+  temperature, pressure, flow and composition (energy streams their duty) as `calculated`;
+  given and assumed values are never overwritten, and a deviation from them is a warning. A
+  duty is written only where its sign agrees with its energy stream's direction (heat added or
+  power into the unit, heat removed or power produced out of it); otherwise, and for a
+  component separator's energy imbalance, `cheme.process-sim-energy-direction` warns. Run
+  `props --fill` afterwards for phase, density and enthalpy. Units: compressor, expander, pump,
+  heater, cooler, valve, mixer, splitter, flash drum, heat exchanger, shortcut and rigorous
+  column, and conversion, equilibrium and Gibbs reactors from the flowsheet's reactions (the
+  specs each needs: `cheme schema process-simulation`); recycle loops are torn
+  and solved iteratively. Rigorous columns take side draws, a partial or no condenser, no
+  reboiler and a condenser-reboiler check (`examples/process-double-column`, an air separation
+  double column). See `examples/process-simulation`
+  and `examples/process-separation`.
+
+  `--fill` also records the run in `process/simulation-run.json` (generated, committed with the
+  flowsheet; schema `cheme/simulation-run/v1`, one entry per case): simulator and version,
+  property package, when, the model fingerprint and the input files' commit and fingerprints,
+  convergence and `status`, iterations (the flowsheet passes DWSIM made: one per solve without
+  a recycle, else the iterations of the slowest recycle), messages, per unit its
+  status (simulated, or excluded with the reason), convergence, results and warnings, per stream
+  the simulated values and which of them it holds. A run that does not converge is recorded too
+  (no stream value is written). `--check` and `cheme validate` report a record from other
+  inputs (`cheme.process-sim-run-stale`, warning; translating needs no simulator), `--check`
+  also a case without one (`-sim-run-missing`, info).
+  `GET /api/simulation` serves it. Each entry is an adapter result (`cheme/adapter-result/v1`)
+  in the file's keys: `simulator` (with `method`, the property package) is its solver.
+
+  The property package must be one the worker runs (`cheme process methods`; another is
+  `cheme.process-sim-property-package`, error). `method_selection: {facts: {...}}` records the
+  facts of the thermodynamic model selection; the translation re-evaluates them and flags a
+  package they do not recommend (`cheme.process-sim-method-not-recommended`, warning) unless
+  `method_selection.substitution` records why it is accepted (`-sim-method-substituted`,
+  info); incomplete facts are `-sim-method-selection`.
+- **`cheme process methods [--json]`** prints the supported-method contract
+  (`domains/process/thermodynamics/methods.yml`): for each model the selection tree can
+  recommend, whether `cheme process phase` (thermo) and `cheme process simulate` (DWSIM) run
+  it, else the nearest model they run as an explicit substitution with what it loses, or none.
+  Coverage decisions: electrolytes, solid equilibrium and petroleum pseudocomponents are
+  unsupported on both routes (ions, unidentified components and, with water, the salts, acids
+  and bases `electrolytes.yml` lists, and any compound of an alkali or alkaline-earth metal,
+  are refused by the phase route and by the simulation
+  translation, `cheme.process-sim-electrolyte`; the phase route has no solid phase).
+  Electrolytes are `limited`: the electrolyte route runs Pitzer's liquid model for aqueous NaCl
+  only (`cheme process electrolyte`, below). The phase route claims no application range; the simulation
+  route claims one only where a test benchmarks it (today Peng-Robinson (PR) for N2/O2/Ar and their
+  mixtures, Soave-Redlich-Kwong (SRK) for each of them alone, NRTL for the ethanol + water
+  bubble points at 101.3 kPa(a) against measured VLE data, on DWSIM 9.0.5,
+  `methods[].simulation.application_range`, checked by `cheme maturity`).
+- **`cheme process phase COMPONENT... (--model EOS | --liquid M --vapor V) [--z x,y]
+  [--temperature T --pressure P] [--accept-zero A:B] [--check] [--json]`** (extra `props`)
+  reports per binary pair whether the model's interaction parameter is `sourced` (with its
+  source: thermo's ChemSep PR, NRTL and Wilson tables, the fetched ChemSep SRK file, thermo's
+  UNIFAC group parameters), `missing` (the calculation uses zero) or `accepted_zero`
+  (`--accept-zero`); with a temperature and pressure it also runs the flash. `--check` exits 1
+  when a pair is missing. Python: `thermodynamics.coverage.interaction_parameter_coverage`.
+- **`cheme process electrolyte --temperature T --pressure P (--molality M | --mass-fraction W |
+  --species Na+=M,Cl-=M) [--system NaCl-H2O] [--json]`** (extras `cantera` and `props`) runs a
+  qualified aqueous electrolyte system of the versioned contract
+  `domains/process/thermodynamics/electrolytes.yml` (ADR 0027): today NaCl-H2O, through Pitzer's
+  equations in Cantera's `HMW-electrolyte` phase with the Silvester and Pitzer (1977) parameters,
+  complete dissociation into Na+ and Cl-. It prints the mean ionic activity coefficient
+  (molality scale), the osmotic coefficient, the water activity and the water vapour pressure
+  over the solution (a_w times the IAPWS-95 saturation pressure), the relative apparent molar
+  enthalpy phi_L of NaCl (heats of dilution), the species, element and charge closure, and the
+  provenance (solver version, parameter source, tolerances, benchmark). The claim:
+  273.15-373.15 K, up to 1000 kPa(a) and 6 mol/kg, phi_L from 313.15 K, one liquid phase;
+  `tests/test_electrolytes.py` checks it against Hamer and Wu (1972) and Pitzer, Peiper and
+  Busey (1984) within 2 % in gamma+-, 0.01 in phi and 0.03 RT in phi_L. Anything else is refused
+  with exit code 3 and a rule id (`cheme.process-electrolyte-range`, `-unsupported` for another
+  ion, `-charge-balance`, `-phase` for a boiling solution, `-system`), never computed with a
+  neutral-fluid model. A brine in a mass balance with specified splits (an inventory) needs no
+  property model; its properties come from this route or stay unclaimed. Python:
+  `thermodynamics.electrolytes.electrolyte_state`.
+  A converged run is also checked for energy, independently of the duty balance DWSIM closes
+  itself; the record keeps the audit under `energy`. Exchangers: the hot and cold composite
+  curves from the solved temperatures and duties (counter-current, constant heat capacity flow
+  per stream) give the least approach; a crossing is `sim-temperature-cross`, an approach below
+  `min_approach` (in `simulation.yaml`, or per exchanger spec) `sim-exchanger-approach`; a
+  stream that changes phase is `sim-exchanger-zones` (info: no zone temperatures, so the
+  internal approach is not checked). Utility levels: a duty whose energy stream comes from (or
+  goes to) a terminal with `category: utility` and `utility: {kind, supply_temperature,
+  return_temperature, min_approach}` is checked against those temperatures
+  (`sim-utility-level`). Enthalpy closure: per unit and for the simulated plant (boundary
+  streams, heat, shaft work) from DWSIM's stream enthalpies, within an explicit tolerance
+  (`sim-energy-unbalanced`). Reactors (conversion, equilibrium, Gibbs, kinetic_pfr) close on a
+  heat-of-formation basis: DWSIM's enthalpy flows plus `sum (n_out - n_in) dHf_298` of the
+  reacting components, on DWSIM's own formation enthalpies (its database, which its reactor
+  duty takes), so the closure tests the simulation's energy conservation. Verified live
+  (DWSIM 9.0.5): the reference state (each component's ideal gas at 298.15 K = 0, no
+  formation enthalpies) for Peng-Robinson, PR78 and SRK, not for NRTL; the duty reproduced
+  within 1e-3 kW for vapour ammonia synthesis at 10 bar (conversion, equilibrium and Gibbs
+  reactors under Peng-Robinson; the conversion reactor under PR78 and SRK). The project's
+  formation enthalpies are compared with DWSIM's separately (`sim-formation-data`): a warning
+  where values declared in materials make a reaction heat that differs by more than 1 % of it
+  (`predictive.formation-data` then fails); a smaller nonzero difference, chemicals' fallback
+  values and missing values are info and recorded limitations, with each component's
+  difference in kJ/kmol (ammonia: -45558 kJ/kmol in ATcT, -45898 in DWSIM, 0.74 % of the
+  synthesis heat). Another package and units
+  with an unestablished duty sign are `sim-energy-unsupported`, never a number. Every duty
+  is classified once as hot or cold utility, power, or heat recovered between process streams
+  (process-to-process exchangers, condenser-reboilers), which is never also counted as utility.
+- **`cheme process extract [UNIT] [--systems] [--json]`** (extra `props`) solves each extractor
+  of `process/extraction.yaml` (schema `cheme/extraction/v1`, `cheme schema process-extraction`):
+  a feed and a solvent feed through `stages` countercurrent equilibrium stages at one
+  temperature, NRTL from thermo with a bundled LLE system (`system:`, listed by `--systems`) or
+  sourced parameters for every pair (`model:`). It prints the raffinate and extract, solute
+  recovery, solvent loss, distribution coefficient and selectivity, the component closure and
+  `qualification` (`qualified` only for a bundled system inside its benchmarked range; the
+  bundled water + 1-propanol + n-butyl acetate system is benchmarked against Costa et al. 2009
+  at 323.15 K). Refused (exit 1, a finding with its line): no two-phase region, a missing pair
+  (never taken as zero), a temperature outside the parameters' range. Isothermal, no energy
+  balance; solvent regeneration is a separate unit; the flowsheet keeps a component separator
+  citing the result. Writes nothing. Python: `separations.extraction`.
+- **`cheme process energy [--case C] [--json]`** prints the energy balances of blocks and steps
+  (stream `calculated.enthalpy` times molar flow against the energy streams crossing them,
+  `cheme.process-energy-balance`, checked by `validate` in every case with stream states; a
+  `calculated` enthalpy must be in kJ/kmol and a molar mass in kg/kmol, another unit is
+  `cheme.process-unit` and leaves the balance not evaluable, never converted; a block holding
+  a step without an energy stream whose duty is unknown is not evaluable; a reacting node
+  needs `units.enthalpy_reference.state: elements` and values on that basis, else it is
+  unsupported), the energy audit of the recorded
+  simulation run, and the boundary gaps that leave TEA and LCA inventories incomplete:
+  steps that exchange heat or work without an energy stream (`cheme.boundary-utility-unassigned`),
+  terminals without `category` (`raw_material`, `product`, `by_product`, `utility`,
+  `wastewater`, `off_gas`, `solid_waste`, `emission`; `cheme.boundary-unclassified`) and utility
+  terminals without levels. Exit 1 on a warning.
+- **`cheme process furnace [ID] [--json]`** gives the energy basis of a solid-reaction furnace
+  declared in `process/furnaces.yaml` (schema `cheme/furnaces/v1`; today limestone calcination
+  only): the element balance, the product and off-gas composition (calcination and fuel CO2
+  apart), the reaction enthalpy and the furnace energy closure (fuel LHV or electric power,
+  sensible heat of feed, product and off-gas, moisture, losses) from the NASA condensed and gas
+  data Cantera ships (extra `cantera`), never from a fluid flash. A measured fuel flow or power
+  is checked (`cheme.furnace-closure`), an absent one solved; the degree of calcination is
+  given, never predicted. Temperatures outside a species' data, other reactions (carbothermal
+  reduction, dolomite) and missing losses are refused with a finding. `method: specific-energy`
+  is a labelled conceptual fallback (a sourced GJ/t or the lime BREF's range by kiln type).
+  Reference case, data and tolerances: [docs/framework/furnace.md](docs/framework/furnace.md).
+  Exit 1 on a warning or error.
+- **Links.** Blocks, steps, streams, feeds and products link to `equipment`, `line`,
+  `instrument` or `sheet` (several per object, an optional `sheet:` scope). They resolve against
+  the lists and `plant.yaml`; unresolved ones are `cheme.process-link-unresolved` (info), and
+  the gate `kind: process-links` with `level: warning` or `error` reports or requires them.
+- **`cheme process layout [IDS] --view bfd|pfd [--pin]`** prints the generated positions, and
+  `--pin` writes them into `layout.<view>` so later builds keep them.
+
+`validate`, `status`, `diff`, `show` and `render` take BFD and PFD sheets like P&IDs; the
+loader's warning about port reference cycles is demoted to one info line per sheet. The
+template's skill `process-design` walks through it, and `pid-draft` starts the P&IDs from the PFD.
+
+### safety: HAZOP studies
+
+A HAZOP study is one YAML file, `safety/hazop/<study-id>/study.yaml` (`cheme schema
+hazop-study`): scope, operating modes, the analysed P&IDs and control files at the revision
+analysed, nodes with their plant members and design intent, deviations (guide word and
+parameter), scenarios (cause and consequence) with their initial and residual ratings, and the
+study's safeguards and actions, each with a stable id. It rates against a risk matrix
+(`safety/risk-matrix.yaml`, `cheme schema risk-matrix`): bands in their order, likelihood and
+severity codes, categories, and the band of every cell. The matrix `cheme init` writes is
+example data.
+
+```sh
+cheme safety hazop init H-01 --title "Feed section" --input pid/P-01.xml --input control/cause-effect.yaml
+cheme safety hazop check H-01            # findings and state: invalid, draft, assessed, reviewed
+cheme safety hazop rate H-01 [--target S3] [--write]   # bands from the matrix; --write records them
+cheme safety hazop report H-01           # build/hazop/H-01.md and .html
+cheme safety hazop stamp H-01 --write    # record the analysed inputs' current revisions
+cheme safety hazop review H-01 [--write] # a review record (reviews/) for the reviewer to complete
+```
+
+- Judgements are `status: proposed` until the team accepts them; agents only propose.
+- Severity and likelihood are the team's inputs, each with its basis. The tool looks up the
+  configured cell: it never multiplies codes, estimates frequencies, credits safeguards or
+  derives a residual risk. A missing or unknown code stays unresolved.
+- A band is written as `band: {value, provenance: calculated, source, fingerprint}`. A changed
+  rating or matrix makes it stale (`cheme.hazop-band-stale`), and so does a changed analysed
+  input (`cheme.hazop-input-changed`). Other changes to the repository do not.
+- `cheme validate` checks every study: ids, internal references, tags against the lists and
+  P&IDs, interlocks against `control/cause-effect.yaml`, matrix codes and cells, actions.
+  `kind: hazop` gates (`require: [assessed, reviewed, inputs-current, actions-closed,
+  no-example]`) and `kind: review, topic: hazop` gates ask for completion and review per stage.
+- `examples/safety-hazop/` is a small plant with an illustrative study; the skills
+  `hazop-study`, `hazop-assessment` and `hazop-review` describe the workflow.
+
+### check
+
+`cheme check [--stage S [--only-stage]] [--write [--review RECORD] [--by NAME]]` evaluates
+the gates of `checks/checks.yaml` and exits 1 when one fails. `--stage S` runs the gates of every
+stage up to S in `plant.yaml` order (concept and basic for `basic`); `--only-stage` only S's. A
+gate whose `stage:` is not a stage of `plant.yaml` (a typo such as `Concept`) is never left out:
+it fails in every run, and `cheme validate` reports it (`cheme.check-stage-unknown`, error), as
+it does a check id listed twice (`cheme.check-duplicate-id`, error). It only prints, except
+with `--write`, which signs off stage S (default: `plant.yaml`'s `stage`) in
+`checks/status.json`:
+
+```json
+{
+  "stages": {
+    "basic": {
+      "stage": "basic", "commit": "<sha of the checked tree>", "date": "2026-10-18T14:02:11Z",
+      "signed_by": "A. Engineer", "branch": "stage/basic-closeout", "default_branch": "main",
+      "review": "reviews/2026-10-18-basic.md", "review_commit": "<sha>",
+      "reviewer": "...", "reviewer_kind": "human", "stages": ["concept", "basic"],
+      "checks": [{"id": "pids-valid", "title": "...", "stage": "basic", "status": "pass", "detail": ""}]
+    }
+  },
+  "checks": ["... the gates of the latest sign-off, as 0.3 wrote them"]
+}
+```
+
+Each stage has its own entry; signing off `basic` keeps the `concept` entry. `--write` writes
+nothing and exits 1 when the working tree has changes other than `checks/status.json`, when any
+gate fails, when no signer is known (`--by`, else `git config user.name`), when the `--review`
+record has no valid front matter or is the signer's own (`reviewer_kind: self`, or the reviewer
+is the signer) without an `approved_by` naming someone else, or when a critical or high finding
+of any review record is open or is `closed` by a commit that does not exist or is not an
+ancestor of HEAD, or when the `--review` record has `cheme.review-*` warnings. A finding is as
+severe as the most severe rating any record gives it: a later record that carries it forward
+without a severity, or with a lower one, does not lower it (close, accept or supersede it
+instead); an open critical or high row whose id is not `<record>#<n>` blocks on its own.
+`cheme status` and `GET /api/status` show the same severity. Signed off on a branch other than
+the default, it says to merge: a stage counts as signed off only once the sign-off is on the
+default branch. Commit
+`checks/status.json` as the last commit of the stage. `cheme schema status` prints the
+file's schema.
+
+| kind | passes when |
+|---|---|
+| `validate` | no `cheme validate` finding at `fail_on` (`error`, the default; `warning`; `info`) or above, among the `rules` (ids, `*` matches; default all), that neither the gate's `accept: [{id, reason}]` nor the repository-wide `accept:` list names (errors are never accepted); a gate that `cheme.generated-sheet-drift` could fail runs the P&ID generators, as `cheme validate` does, and fails on `cheme.generator-failed` (a generator that cannot run) as on drift: a rule that matches the drift (`cheme.generated-*` included) matches it too |
+| `files` | every glob of `files` matches a file inside the repository |
+| `command` | the shell `command`, run at the repository root, exits 0 |
+| `on-sheet` | the `tags` are drawn on the `sheet` (or each of `sheets`; neither: any sheet), and at least `min_count` (1) items of each of `classes` |
+| `datasheets` | every equipment-list item has a valid `equipment/datasheets/<TAG>.yaml` (`cheme schema datasheet`; an empty list fails) |
+| `layout-model` | the 3D layout meets each item of `require`: `site`, `areas`, `roads`, `racks`, `placed` (every equipment-list item), `separations` (declared in the site plan), `model-current` (`layout/plant-model.yaml` built from the current inputs), `nozzles` (no unknown override, no piped nozzle placed by default), `mounted` (every item above grade on a building or structure level, or on another item), `routed` (every line of DN `min_dn` (25) and above, not matched by `exclude_lines` / `exclude_fluids`, routed or skipped with a reason), `clashes` (no model finding of `rules`, default `cheme.layout-clash-*` and `-headroom`, unaccepted), `zones` (declared), `drawings` (a review record of `topic`, default `layout`, cites the plot plan and `sections` (2) sections) |
+| `review` | a review record for the `topic` (or among the `files` globs) has valid front matter, a reviewer kind in `require_kind` (default `[human, agent]`: a self review does not pass), a `reviewed_commit` that is an ancestor of HEAD, and (`current: true`, the default) no file of its `scope` changed since that commit, committed or not (when git cannot tell, the record is not current) |
+
+The template's `drawing-clean` gate (stage basic) fails while a drawing finding is neither fixed
+nor accepted; the detail of a failing validate gate counts what failed per rule and names the
+first finding's id:
+
+```yaml
+- id: drawing-clean
+  title: No line through a label, crossing, overlapping or misplaced label left unaccepted
+  stage: basic
+  kind: validate
+  fail_on: warning
+  rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
+          cheme.label-far-from-owner]
+```
+
+`on-sheet` asks the loaded model, not the XML text: a tag is the one the P&ID prints
+(`TagName`, the instrument tag `AIA-3103` built from category, letters and number, a piping
+component's first `PipingComponentNumber` / `PositionNumber` / `PipingComponentName` that is not
+a segment-local `C1`, a `LineNumber`), so renaming ids changes
+nothing and an id or substring that merely looks like the tag does not pass. A class matches
+itself, its DEXPI superclasses and classes whose name ends with it (`SafetyValve` matches
+`SpringLoadedGlobeSafetyValve`). With `connected: true` each item must also be connected:
+equipment with a pipe at a nozzle, an instrument function with a measuring or signal line (or a
+sensing location), a piping component on a segment with a pipe or the segment's end at it. A
+failing gate names what is missing, e.g. `P-03: AIA-9999 not drawn; FV-3111 drawn but not
+connected`.
+
+A review record is `reviews/<YYYY-MM-DD>-<topic>.md` starting with YAML front matter
+(`cheme schema review`):
+
+```markdown
+---
+topic: o2-safety
+reviewed_commit: 521473c0d3...      # the commit whose files were reviewed
+scope: [pid/P-03.xml, pid/P-04.xml, DESIGN.md]
+reviewer: A. Engineer
+reviewer_kind: human                # human | agent | self (the author's own review)
+---
+```
+
+A passing review gate names the record and its commit, `(agent-reviewed only)` when the reviewer
+is not a human, and its `evidence` (path, `reviewed_commit`, `reviewer`, `reviewer_kind`) goes
+into `checks/status.json`. A failing one names the record and why: no front matter, a field
+missing, the reviewer kind, `not an ancestor of HEAD`, or `changed since <commit>: pid/P-04.xml`.
+`cheme validate` checks every `reviews/*.md` (but `README.md`):
+
+| rule | level | finds |
+|---|---|---|
+| `cheme.review-front-matter` | warning / info | front matter that is not YAML or misses a field (warning); a record without front matter (info: no review gate accepts it) |
+| `cheme.review-unknown-commit` | warning | a `reviewed_commit` that is not a commit of the repository |
+| `cheme.review-scope-missing` | warning / info | a `scope` path that does not exist (warning); one written with a leading `/` (warning) or `./` (info), which is read from the repository root (`/pid/P-01.xml` as `pid/P-01.xml`, `/` and `./` as `.`, the whole repository) |
+| `cheme.review-finding-id` | warning | a finding id that is not `<record file stem>#<n>` (an earlier record's id under Previous findings), or names no record |
+| `cheme.review-finding-status` | warning / info | a status other than `open`, `closed <commit>` (an existing commit), `accepted: <reason>`, `superseded by <id>`; a severity other than critical, high, medium, low (info); an open finding without a severity (info); an open finding carried forward with no or a lower severity than the critical or high an earlier record gave it (warning: it still counts as that) |
+| `cheme.review-previous-missing` | warning | the newest (or an uncommitted) record does not list, under `## Previous findings`, a finding of an earlier record of overlapping scope that is still open |
+
+A findings table is any Markdown table with an `id` and a `status` column. A finding's status
+is the one in the latest record listing it (by date, then the commit that added the record);
+records are snapshots, and the next record carries open findings forward with their new status.
+
+```yaml
+- id: hydrocarbon-on-pid
+  title: Sump hydrocarbon analyzer and LOX purge drawn
+  stage: basic
+  kind: on-sheet
+  sheet: P-03
+  tags: [AIA-3103, FIC-3111, FV-3111]
+  classes: [SafetyValve]
+  connected: true
+```
+
+### status
+
+`cheme status [--json] [--rev REV] [--no-gates]` summarizes where the repository stands,
+read-only: the stage; per sheet whether it is `drawn`, `empty` (an empty frame), `missing`
+(declared in `plant.yaml`, no file yet) or `not-loaded`, what it draws and which items the lists
+assign to it (`sheet:`) that it does not draw; the next sheet to draw; validation totals by level
+and rule, and the not-on-pid findings by the sheet their list entry names (`unassigned` without
+`sheet:`); every stage's gates (evaluated, not written; `--no-gates` skips them, as they may run
+commands); the sign-offs of `checks/status.json`, flagged when the signed commit is not on the
+default branch; the open review findings; and git branch, head, uncommitted paths (`null` in
+`--json` when git cannot tell) and how far the branch is ahead of / behind the default branch.
+`--rev` summarizes a revision, checked out in a temporary worktree that is removed afterwards. `--json` has the keys `plant`, `sheets`
+(`id`, `file`, `state`, `drawn`, `assigned`, `missing`), `next_sheet`, `validation`, `gates`,
+`signoffs`, `legacy_status` (a 0.3 `status.json`), `reviews` and `git`, documented in
+`chemeascode.project.status`; a script can take the next sheet to draw from `next_sheet`. `GET
+/api/status` returns it (without the gates).
+
+### impact
+
+`cheme impact [--json]` lists, read-only, the artifacts whose recorded source revision or
+fingerprint no longer matches the current source, as `cheme.review-needed` findings at level
+info: a review record whose `scope` changed since its `reviewed_commit` (or git cannot tell),
+except files a later record of the same topic covers (that record supersedes it for them);
+entries of a record's optional `basis:` list (`{path, revision, relation}`, revision a commit or
+`sha256:<hex>`) whose path changed; generated BFD/PFD sheets whose `process/*.yaml` changed; and
+stale calculated stream values. It exits 0, regenerates nothing and declares nothing invalid;
+`validate`, `check` and `status` are unchanged. `--json` prints `{commit, findings}` (each
+finding with its `id`); `GET /api/impact` returns the same. In Python:
+`chemeascode.project.impact.review_needed` (or `impact_report` for the JSON form).
+
+### maturity
+
+`cheme maturity [--json] [--write] [--require LEVEL]` says which calculation maturity level the
+evidence in the repository supports: `sourced` (a sourced process description), `balanced` (a
+balanced conceptual PFD), `predictive` (a converged predictive simulation) or `engineering` (a
+preliminary/basic engineering package), with every requirement `pass`, `fail`, `missing` or
+`unsupported` and its evidence (fingerprints, balance residuals and tolerances, the run record's
+simulator and version). Schema-valid files and drawings never satisfy a calculation level;
+specified splits and conversions count as specified and cap the level at `balanced`. Artifact
+completeness and review status are reported beside the levels and never raise one; nothing sets
+the review status. `--write` writes `checks/maturity.json` (schema `cheme/maturity-report/v1`),
+the only file it writes; `--require` exits 1 below that level. The text ends with the level and
+the manifest's claim (`calculation maturity: balanced (design maturity claimed: screening)`).
+The requirements and the mapping onto the design maturity of the process-library manifest:
+[docs/framework/maturity.md](docs/framework/maturity.md); calculation maturity, design maturity,
+project stage and review status side by side: [docs/concepts/glossary.md](docs/concepts/glossary.md).
+In Python: `chemeascode.project.maturity.maturity_report`.
+
+### skills
+
+`cheme skills status [NAME...] [--json]` compares the skills installed in `.claude/skills/`
+with the bundled ones: each file is `current`, `outdated` (an earlier bundled version, known from
+the package's `templates/skills-manifest.json`), `modified` (changed in this repository) or
+`missing`. `cheme skills update [NAME...]` installs missing and outdated files and keeps a
+modified one, reporting `cheme.skill-modified` (exit 1); `--force` replaces it and still
+reports it. `cheme init` reports a modified skill it kept, or replaced under `--force`.
+
+### git diff
+
+`cheme git-setup` registers a textconv driver for `pid/*.xml`, so `git diff`, `git log -p`
+and `git show` print P&IDs as pyDEXPI's review text (one block per object, attributes sorted)
+instead of XML. Objects are written `Class@<id>` with the id as written in the file
+(`PipeTee@PipeTee_47123_BypassIn`); an object without an id in the file (before `cheme fmt`)
+keeps pyDEXPI's stable hash token. The driver and the pre-commit hook call cheme by the
+absolute path it had when `git-setup` ran, so they work from clients without cheme on PATH
+(rerun `git-setup` after moving the installation). The driver never fails a git command: a file it
+cannot load is shown as its XML under a `(cheme textconv could not load ...)` line.
+
+### serve
+
+`cheme serve [--repo DIR] [--host 127.0.0.1] [--port 8765] [--ui DIST_DIR]` serves the plant
+repository as JSON over HTTP, for the viewer. Every `GET` only reads. It needs the `serve` extra
+(`uv tool install 'cheme-as-code[serve] @ git+...'`). Every endpoint takes an optional `rev` (a
+branch, tag or sha; absent: the working tree) and repo-relative POSIX `path`s:
+
+| endpoint | returns |
+|---|---|
+| `GET /api/repo` | name, root_name, branch, head, stage, stages, sheets (each with `kind` `pid`, `bfd` or `pfd`), dirty, has_layout, has_lca, has_tea (`estimate/tea.yaml`), has_equipment_estimate (the equipment list lists items), has_simulation (`process/simulation.yaml`), has_reactions (`process/reactions.yaml`), has_kinetic_data (`experiments/kinetics/*.yaml`) |
+| `GET /api/streams?case=&rev=` | the stream table of `process/flowsheet.yaml`: streams (values with unit, provenance, source and stale flag, composition, calculated values, links with `resolved`/`problem`, `imbalance`, `on_bfd`), `balances`, `nodes`, `bfd_connections` (BFD connection id to the streams it represents, read from the built BFD sheet's `represents:` descriptions, else from the flowsheet; `bfd_connections_from` says which: `sheet` or `flowsheet`), cases, units, tolerance; 404 without a flowsheet, 422 for one that does not load or an unknown case |
+| `GET /api/simulation?case=&rev=` | `{rev, file, run_file, case, cases, spec, run, stale, staleness, units, problem, findings}`: `spec` is `process/simulation.yaml` parsed (simulator, property_package, components, tolerance, tear_streams, exclude, guesses, specs per step as written, with provenance); `run` the case's entry of `process/simulation-run.json` (null without one); `stale` whether that run was simulated from other inputs (model fingerprint; null without a run or when the flowsheet does not load), `staleness` `{model_fingerprint, current_fingerprint, changed_files}`; `units` one row per step `{id, unit, status (simulated, excluded, refused, not-simulated), reason, spec, run}`; `findings` the translation's; 404 without `process/simulation.yaml`, 422 when it does not load or for an unknown case |
+| `GET /api/reactions?case=&rev=` | `{rev, file, case, cases, reactions, reactors, balance, kinetics}`: each reaction as declared (stoichiometry, equation, phase, reversible, conversion, heat_of_reaction, equilibrium_constant with provenance, catalyst, sources) plus `key_component`, `reaction_smiles` (the reaction's external identifier, `reactants>>products` from the stoichiometry and the components' SMILES; null unless every component has one and every coefficient is whole), `type` (the reactor model it runs in: conversion, equilibrium, gibbs, mixed or null), `units` (`{unit, kind, model, approach_K, conversion}` per block or step naming it) and `element_balance`; `reactors` the `cheme process reactors --json` rows; `balance` `{balances, findings}` (the reactive balances and the reaction, reactor and balance findings of `validate`); per reaction its `rate` as declared (form, basis, driving, `k` {A, Ea, n, T_ref}, orders, adsorption, catalyst, temperature_range, provenance, source) and `rate_law` (null without a rate: `{expression, k_expression, rate_unit, driving_unit, k_unit, catalyst, k_profile: [{temperature_K, k}], k_profile_from}`, k(T) over the rate's temperature range, else its catalyst's window); `kinetics` `{file, catalysts, findings}`: each catalyst of `process/catalysts.yaml` as declared plus `reactions` (ids it catalyses) and `units` (`{unit, kind, reactor, reactions, bed}` per block or step holding it), the `cheme.catalyst-*` and `cheme.process-catalyst` findings (`file` null and `catalysts` empty without the file); a solved fixed bed is the `bed` of its `reactors` row, and each `reactors` row says its gas model (`fugacity`: ideal or peng_robinson); a reaction with a `mechanism` has `microkinetics` (null without one): `{conditions: {unit, stream, temperature_K, pressures_bar}, missing, ...}`, the `cheme chemistry microkinetics --json` analysis (coverages, TOF, degree of rate control, apparent Ea, orders) at the outlet of its first reactor, or `missing` naming why there is none; 404 without `process/reactions.yaml` or a flowsheet, 422 when either does not load or for an unknown case |
+| `GET /api/kinetics?rev=` | `{rev, directory, files: [{file, data, fit, problem}]}`: each kinetic data file of `experiments/kinetics/` as declared and its default fit (`cheme experiments fit-rate --json`: a power law in the reaction's reactants, over 1 − Q/K when the reaction is reversible and K is known; `fit.reverse` says which), or the problem with either (where 1 − Q/K fails at a point, a forward-only fit with a note); a flowsheet that does not load is not needed; `cheme export-static --exclude` leaves out excluded files; 404 without data files or process files |
+| `GET /api/library?rev=` | `{rev, entries}`: the reaction library (`cheme chemistry library`), every entry (window, components, reactions, catalysts, model basis, sources), each item's `in_plant` saying what the plant has (a component: the plant's id with its CAS number, else null; a reaction: the same stoichiometry under its id; a catalyst: its id, with `differs` when the plant's has other data, so `--add` refuses it); without process files nothing is marked, and a flowsheet that does not load leaves the marks from the materials, reactions and catalysts |
+| `GET /api/branches` | `[{name, head, current}]` |
+| `GET /api/log?limit=50&path=&rev=` | `[{sha, short, author, date, subject}]` |
+| `GET /api/tree?rev=` | `[{path, type, kind}]`, kind `pid`, `yaml`, `markdown`, `json` or `other` |
+| `GET /api/file?path=&rev=` | the file as text (400 for binary or over 5 MB) |
+| `GET /api/pid.svg?path=&rev=` | the sheet rendered, as `cheme render` draws it |
+| `GET /api/diff?path=&old=HEAD&new=` | changes, both SVGs, highlight maps, `old_owner`/`new_owner` (changed id to drawn id), `status` (`added`/`removed` for a sheet on one side), review-text diff |
+| `GET /api/interlocks?rev=` | `{rev, file, interlocks, columns (effect tags), rows: [{id, title, cause, condition, sheet, sil, cells}]}`: the cause-and-effect list and matrix; 404 without `control/cause-effect.yaml` |
+| `GET /api/control` | the `cheme control report --json` report of the working tree: loops, sequences, the narrative and the control philosophy with their review status and findings; see docs/framework/control.md; 404 without control records, 422 when they do not load |
+| `GET /api/issues` | the `cheme issues --json` report: the plant's GitHub issues as engineering items (type, gate, discipline, source, status), `open_by_gate`, `blocking` per stage and `new` links to the issue forms; see docs/framework/issues.md; cached two minutes; 404 when plant.yaml declares no issues, 503 when they cannot be read (no token, no network) |
+| `GET /api/status` | the `cheme status --json` summary of the working tree, without evaluating the gates |
+| `GET /api/impact` | the `cheme impact --json` report of the working tree: `{commit, findings}`, every finding `cheme.review-needed` at level info, with its `id` |
+| `GET /api/validate` | the `cheme validate --json` report of the working tree |
+| `GET /api/maturity?through=` | the `cheme maturity --json` report of the working tree, evaluated on every request (one at a time) and never written; without `through` the engineering level runs the whole validation (some 30 s on ASU-1), `through=predictive` or lower skips it; see docs/framework/maturity.md; 400 for an unknown level |
+| `GET /api/checks?rev=` | `checks/status.json` (`{checks: []}` when absent) |
+| `GET /api/session` | `{token, header}`: the per-launch token for `POST /api/checks/run` |
+| `POST /api/checks/run` | the gates evaluated now on the working tree (not written); needs the token header |
+| `GET /api/yaml?path=&rev=` | `{data, kind, schema}` for a `.yaml`/`.yml` mapping or list; kind is a list or layout kind, `plant`, `materials`, `flowsheet` or null |
+| `GET /api/layout?rev=` | `{site, areas, roads, racks, buildings (with footprint), equipment: [{tag, type, service, position, shape, family, size [dx, dy, dz], size_from (list, placement, default), rotation_deg, on, building, level, sheet, sheet_file, bbox, clash, notes}], lines: [{number, from, to, from_point, to_point, distance, length_est, racks, finding}], separations, model, notes, files, rev, findings}` with the layout findings; `separations` as written in the site plan, `model` the generated `layout/plant-model.yaml` (null without one; see docs/framework/layout-model.md); 404 without layout files |
+| `GET /api/layout/plan.svg?rev=&level=&z=` | the plot plan of the committed `layout/plant-model.yaml`, or a level plan (`level=` a structure or building level id, or `z=a,b` an elevation range); see docs/framework/layout-model.md; 404 without a model or for an unknown level, 400 for a bad `z` |
+| `GET /api/layout/section.svg?rev=&x=&y=&depth=6` | a section of the committed model at `x=` or `y=` (one of them), `depth` m thick (0 to 1000); 404 without a model, 400 for bad arguments |
+| `GET /api/mto?rev=` | the material take-off of the committed `layout/plant-model.yaml`: `{rev, model, model_sha256, columns, rows, totals, findings, estimate}`, `estimate` priced with `estimate/rates.yaml` (null without one); see docs/framework/mto.md; 404 without a model |
+| `GET /api/estimate/equipment?rev=` | the equipment estimate (`cheme assess equipment --json`): `{rev, currency, base, index, estimate_class, accuracy, totals, lines, own_costs, findings, source}`; see docs/framework/mto.md; 404 without an equipment list or with no items, 422 for a list that does not load |
+| `GET /api/datasheets?rev=` | the equipment datasheets (`equipment/datasheets/`): `{rev, directory, datasheets: [{tag, file, valid, type, service, draft, counts, drawing, drawing_current, findings, ...}], missing, source}`; see docs/framework/datasheet-drawings.md; 404 without datasheets |
+| `GET /api/datasheets/{tag}?rev=` | one datasheet: `{rev, tag, file, summary, datasheet (parsed, null when it does not validate), data, drawing: {file, state, current}, findings, source}`; 404 without it |
+| `GET /api/datasheets/{tag}.svg?rev=&generated=` | its outline drawing: the committed SVG, or the generated one when none is committed or with `generated=true`; headers `X-Cheme-Drawing` (`committed` or `generated`) and `X-Cheme-Drawing-Current`; 422 for a datasheet that does not validate |
+| `GET /api/lca?rev=` | the LCA (`cheme assess lca --json` without the source): inventory, impacts by scenario, category, phase and contributor, findings; see docs/framework/lca.md; 404 without `lca/lca.yaml` or `plant.yaml`, 422 when it does not compute |
+| `GET /api/tea?rev=` | the techno-economic analysis (`cheme assess tea --json` without the source): premises, capex build-up, flows, cash flow, results, scenarios, tornado, break-even values, Monte Carlo, findings; see docs/framework/tea.md; 404 without `estimate/tea.yaml`, 422 when it does not compute |
+
+Errors are `{"error": "..."}` with 400 (bad path or revision, file over 5 MB), 403 (cross-site
+request, missing token), 404 (absent), 405, 409 (checks already running), 422 (cannot load) or
+500 (`internal error`, no details). `POST /api/checks/run` runs the `kind: command` checks of
+`checks/checks.yaml`, which are shell commands: one run at a time, each command stopped after
+120 s. `/api/*` refuses requests another web site makes (`Sec-Fetch-Site` cross-site or
+same-site, or a foreign `Origin`). YAML is returned with aliases expanded up to 200,000 values;
+self-referencing aliases and `!!binary` are 422. Sheets that `plant.yaml` lists outside the
+repository are never read; `validate` reports them as `cheme.sheet-outside-repo`.
+Paths must stay inside the repository (no `..`, absolute paths, `.git`, or symlinks out);
+revisions are resolved with `git rev-parse --verify --end-of-options` and may not start with `-`.
+The server binds 127.0.0.1 and accepts only local `Host` headers. With `--ui` (or `CHEME_UI`)
+it also serves a built single-page app at `/`, falling back to its `index.html`. Rendered sheets
+and diffs are cached in memory by git blob id.
+
+## The plant repository
+
+`cheme init` creates the layout from `src/chemeascode/templates/project/` and the bundled skills
+(`src/chemeascode/domains/<domain>/skills/`, `src/chemeascode/project/skills/`) (also published as the
+[`project-template`](https://github.com/ChemE-as-Code/project-template) repository): `plant.yaml`, `pid/`, `process/`, `equipment/`, `piping/`,
+`control/`, `checks/`, `reviews/`, `layout/` (3D layout, see its `README.md`), `DESIGN.md`, `PROGRESS.md`, `AGENTS.md`, and Claude Code
+skills in `.claude/skills/`:
+
+| skill | for |
+|---|---|
+| `dexpi-xml` | reading and writing DEXPI 2.0.1 XML by hand: conventions (coordinates, segment ends, tees, instrument bubbles), recipes (tee and branch, remove an item, instrument on a nozzle, change a line's DN) and verbatim snippets from the DEXPI reference P&ID (pump, tank, piping system with valve, tee with branch, instrument function, instrument nozzle) |
+| `process-design` | materials and flowsheet YAML, `process build`, balances, refinement into the PFD, `process props`, links, layout pins, DESIGN.md holding decisions rather than numbers |
+| `reaction-evidence-search` | the evidence behind a reaction model in `process/reaction-evidence.yaml`: searches with the agent's own tools (logged with dates), sources with DOI or patent number, access reached and reuse terms, one observation per experiment or patent example at its exact location (conversion, selectivity and yield kept apart; kinetics with units, basis and range), conflicts and gaps, never a value a source does not give |
+| `route-selection` | comparing the routes (`cheme chemistry evidence`), selecting one with its rationale, the `model_basis` (reactions, evidence, assumptions, validation plan) and the handoff to `reactions.yaml` with each value citing its observation |
+| `reactions` | `process/reactions.yaml` (stoichiometry, conversion, heat of reaction, catalyst, sources), reactions on reactor steps, element and extent balances, conversion reactors in `process propagate` |
+| `process-simulation` | `process/simulation.yaml` (property package, step specs), `process simulate --check` and `--fill` with DWSIM, deviations from assumed values, shortcut before rigorous columns, recycles |
+| `pid-edit` | changing a sheet: edit, fmt, validate, render, diff, commit |
+| `pid-draft` | a new sheet (`cheme sheet new`) started from the PFD, drafted with fragments or with a generator script on `chemeascode.domains.piping.authoring` (`cheme run`), and whether it stays generated |
+| `lists-sync` | equipment, line and instrument lists consistent with the P&IDs and the flowsheet links |
+| `review` | validation, checks, drawing review backed by the drawing counts and a tile sweep, engineering review, layout review backed by the plot plan and section PNGs and `layout report`, a review record with Drawing and Layout sections |
+| `layout-yaml` | site plan, buildings, structures, zones and equipment placement (mount, nozzles, access): placing equipment, avoiding clashes, tags consistent with the equipment list, the `layout build` loop |
+| `pipe-routing` | routing intent in `piping/routing.yaml` (tiers per service, battery limits, pipe-way elevation, vias, pins, skips with a reason), iterating with `layout route`, `report` and plan/section renders, fixing clashes; what the router cannot decide |
+| `structures-access` | what goes on a steel structure, frames, cold boxes and enclosures, platforms, ladders and stairs for manways and valves above 2.5 m, escape routes, maintenance envelopes |
+| `tea` | techno-economic analysis: `estimate/tea.yaml` (decision, basis, capex build-up from the estimate, prices with sources, fixed opex, finance, uncertainty, scenarios), `cheme assess tea`, the dominating premises and break-even values, `--compare` on a shared basis |
+| `area-classification` | `layout/zones.yaml`: hazardous, oxygen-enriched and oxygen-deficient zones from release sources (release grade, substance) and the ASSUMED radius table, keep-clear and escape zones; review by a competent person |
+
+Agents edit the XML files directly. There is deliberately no MCP server and no edit-operation
+API: the experiment is how far direct file editing with validation goes. `copy` and `fragment`
+are text helpers in that spirit: they write XML for the agent to place, and the file stays the
+only state. The builder library `chemeascode.domains.piping.authoring` for generator scripts fits the same
+principle (decided in 0.4, pre-release issue 13): it loads a file, inserts XML built by the same functions as
+`fragment`, writes the file and formats it; it holds no state between runs, and its output is
+validated like any hand edit.
+
+## Agent design runs
+
+[`docs/agent-design-run.md`](docs/agent-design-run.md) describes a repeatable staged agent design
+run: the runner `scripts/agent-run/run_stage.py` (in every plant repository), stage and reviewer
+prompts built from the repository (`cheme status --json`), budgets per stage type and the
+record layout.
+
+## Run records
+
+Every design session leaves a record in the plant repository, one folder per run:
+`runs/<run-id>/` (run id: the start in UTC, `YYYYMMDD-HHMMSS`, then optionally `-<slug>`) with
+`run.yaml` (schema `process-run/v1`, `cheme schema process-run`), `task.md`, an optional
+`report.md` and `session.jsonl.gz`, the gzipped Claude Code transcript. `run.yaml` holds the
+start and end commits, times, the cost as the API reported it (never estimated), budget, model,
+turns, tokens (each API message counted once), the distinct `cheme` commands the session ran and,
+with `--checks`, the exit and a summary of `cheme check` and `cheme maturity` afterwards. A value
+nobody knows is null; `complete: false` and `incomplete_notes` say what is missing and why. A
+record is never edited: a revision is a new run.
+
+- `cheme runs start [--hook | --session-id ID]` remembers the start (HEAD, branch, time, the
+  working tree) in `build/run-records/<session id>.start.json`.
+- `cheme runs record [--hook] [--session-id ID | --transcript F] [--kind K] [--slug S]
+  [--task-file F] [--report-file F] [--cost USD] [--budget USD] [--effort E] [--result R]
+  [--start-commit SHA] [--checks] [--commit]` writes the folder and prints it; `--commit` commits
+  it alone (`<process>: run record <run-id>`).
+- `cheme runs list [--json]`: run id, kind, cost, wall time, complete, turns.
+
+The project template's `.claude/settings.json` runs `cheme runs start --hook` on `SessionStart`
+and `cheme runs record --hook` on `SessionEnd`, so an interactive session records itself (kind
+`interactive`, uncommitted, skipped when HEAD and the working tree did not change); a hook never
+fails the session. A runner that records its sessions itself (`scripts/agent-run/run_stage.py`)
+starts them with `CHEME_RUN_RECORD=off`. The transcript stays out of the run folder when it holds
+`sk-ant-` or the value of `ANTHROPIC_API_KEY` (not exported at all), or when the session used
+WebFetch, WebSearch, `curl` or `wget` (kept in the ignored `build/run-records/`, since it may
+hold third-party text). In Python: `chemeascode.project.run_records.record_run`; the transcript
+reader is `chemeascode.integrations.claude_code`. ADR 0029.
+
+## Running agents headless
+
+Claude Code reads a repository's `.claude/settings.json` (the template's allowlist: `cheme`,
+read-only `git`, `grep`, `ls`, `wc`, `head`, `tail`, `cat`, `cmp`, `sed -n`, Edit and Write) only
+once the folder is **trusted**. In a folder that was never opened interactively, a headless run
+(`claude -p ...`) prints `Ignoring N permissions.allow entries from .claude/settings.json: this
+workspace has not been trusted` and every command outside the defaults is denied. Either open
+the folder in Claude Code once and accept the trust dialog (or set
+`projects["<path>"].hasTrustDialogAccepted: true` in `~/.claude.json`), or
+pass the allowlist explicitly:
+
+```sh
+claude -p "$(cat build/prompt.txt)" --settings .claude/settings.json --output-format json
+# or: --allowedTools "Bash(cheme:*)" "Bash(git log:*)" ... Edit Write
+```
+
+With `--settings` the `Ignoring N permissions.allow entries` line is still printed, because the
+project copy of the file stays untrusted, but the same entries apply from the flag. Check the
+`permission_denials` of the JSON result, not that line: in an untrusted folder freshly made by
+`cheme init` (Claude Code 2.1.311), the same short task (`cheme validate`, `git log`, `wc`, an
+Edit of `DESIGN.md`, `git commit`) had `cheme validate` and the Edit denied without the flag,
+and no denials with `--settings .claude/settings.json`.
+
+The allowlist deliberately leaves out `sed -i`, `awk`, `cp` and heredocs: allowing them would
+approve shell rewrites of 50,000-line sheets. The template's `AGENTS.md` and the `pid-edit` /
+`pid-draft` skills tell agents to change files with Edit/Write only, to run one command per
+Bash call (no loops, `&&` chains or `VAR=...;` prefixes, which prefix rules do not match) and to
+keep scratch files in `build/`. `cheme init` prints a reminder. `docs/agent-design-run.md`
+packages a staged design run with these flags.
+
+## Development
+
+```sh
+uv sync --all-extras
+uv run pytest -n auto   # in parallel (pytest-xdist); plain `uv run pytest` runs serially
+uv run ruff format && uv run ruff check
+uv run python scripts/build_snippets.py tests/data/reference_pid.xml   # regenerate skill snippets
+uv run python scripts/build_skill_manifest.py                          # after changing a skill
+```
+
+The package is organised as a framework of `foundation`, ten engineering `domains`, a `project`
+layer, `interfaces`, `integrations` and `templates`; see
+[docs/framework/architecture.md](docs/framework/architecture.md) for the modules and their import
+rules, and [docs/framework/contributing.md](docs/framework/contributing.md) for where new
+functions, skills, schemas, integrations and tests go. Every capability has a Python function
+that the CLI wraps, for example `chemeascode.domains.process.streams.stream_report(root, case)`
+behind `cheme process streams`.
+
+## License
+
+This work is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) - see LICENSE.
+
+Technische Universiteit Delft hereby disclaims all copyright interest in the program "Cheme-as-Code" written by Artur M. Schweidtmann. Paulien Herder, Dean of Applied Science.
+
+Copyright (C) 2026 Artur Schweidtmann
+
+The same text is in `NOTICE`. Which licence applies where:
+
+- **The code** (the `chemeascode` package, its CLI, scripts, tests and docs): AGPL-3.0-or-later.
+- **Bundled third-party data keeps its own terms**, recorded next to it: the DEXPI excerpts in
+  the `dexpi-xml` skill (`snippets/`, `shapes.md`) are CC BY 4.0 (DEXPI e.V.), see its
+  `NOTICE.md`; the packaged LCA background profiles in
+  `domains/assessment/lca/data/backgrounds/` each state theirs in `sources:` (Ember: CC BY 4.0;
+  EEA: CC BY; DESNZ: Open Government Licence v3.0; UBA: UBA data terms; US EPA eGRID: public
+  domain in the US). The ChemSep SRK data is not shipped (`data/chemsep/SOURCE.md`).
+- **Your plant repository is yours.** The template and skills `cheme init` writes into a plant
+  repository are yours to use under any terms; `cheme init` adds no license, and its README says
+  the content of the plant repository is the user's to license. The
+  ChemE-as-Code/project-template repository generated from it ships without a license too.
+- pyDEXPI and the other dependencies keep their own licenses.

@@ -1,0 +1,63 @@
+# Package data of cheme-as-code's line-loss calculation (domains/process/hydraulics.py). Every value
+# names its source; check the rows against the printed tables before a contractual use.
+#
+# Verification (issue core#66). No table here has been checked against the printed source
+# (`print_checked: false`). Each row's `check` names the independent public reproductions that
+# agree with it (keys of `checks`); a reproduction is not the print. Rows that remain without
+# any independent confirmation: none in roughness and fittings; walls: schedule 40 DN 350, 500
+# and 600 and the ODs of DN 450 and 600 differ in the last digit from the one reproduction read
+# (see `walls.check`).
+schema: cheme/hydraulics/v1
+print_checked: false
+checks:
+  lmno: "LMNO Engineering, Surface roughness values for the Moody friction factor (values compiled from the closed-conduit references), https://www.lmnoeng.com/surface.htm, read 2026-10-23"
+  neutrium: "Neutrium, Pressure loss from fittings - excess head (K) method, K table, https://neutrium.net/articles/fluid-flow/pressure-loss-from-fittings-excess-head-k-method/, read 2026-10-23"
+  powderprocess: "PowderProcess.net, Pressure drop key piping elements K coefficient (cites Perry's 8th ed. p. 6-18 and Midoux 1993), https://www.powderprocess.net/Tools_html/Piping/Pressure_Drop_Key_Piping_Elements_K_Coefficient.html, read 2026-10-23"
+  wikipedia_nps: "Wikipedia, Nominal Pipe Size, NPS tables (OD, schedule 10S and 40 wall in mm), https://en.wikipedia.org/wiki/Nominal_Pipe_Size, read 2026-10-23"
+
+roughness:
+  # Absolute roughness of clean new pipe, mm, from L. F. Moody, "Friction factors for pipe flow",
+  # Transactions of the ASME 66 (1944) 671-684, Fig. 2 (relative roughness of pipe materials;
+  # Fig. 1 is the friction-factor chart), where it is given in ft (ft value kept for the check).
+  source: "Moody, Friction factors for pipe flow, Trans. ASME 66 (1944) 671-684, Fig. 2"
+  rows:
+    drawn_tubing:        {title: "Drawn tubing", mm: 0.0015, ft: 0.000005, check: lmno}
+    commercial_steel:    {title: "Commercial steel or wrought iron", mm: 0.046, ft: 0.00015, check: "lmno (ft value; 0.00015 ft = 0.0457 mm)"}
+    asphalted_cast_iron: {title: "Asphalted cast iron", mm: 0.12, ft: 0.0004, check: lmno}
+    galvanized_iron:     {title: "Galvanized iron", mm: 0.15, ft: 0.0005, check: lmno}
+    cast_iron:           {title: "Cast iron", mm: 0.26, ft: 0.00085, check: lmno}
+
+fittings:
+  # Resistance coefficients K (velocity heads) for turbulent flow, from R. H. Perry, D. W. Green
+  # (eds.), "Perry's Chemical Engineers' Handbook", 7th ed., McGraw-Hill, 1997, Table 6-4
+  # "Additional frictional loss for turbulent flow through fittings and valves", p. 6-18 (the
+  # page not checked against the print; powderprocess cites p. 6-18 of the 8th edition).
+  # The keys are what the layout model names: a bend by its angle, an in-line item by its DEXPI
+  # class. An item without a row is not counted and is named in the result.
+  source: "Perry's Chemical Engineers' Handbook, 7th ed. (1997), Table 6-4, p. 6-18"
+  rows:
+    elbow_90:          {title: "Elbow, 90 deg, standard", k: 0.75, check: neutrium + powderprocess}
+    elbow_45:          {title: "Elbow, 45 deg, standard", k: 0.35, check: neutrium + powderprocess}
+    tee_branch:        {title: "Tee, used as elbow (flow through the branch)", k: 1.0, check: neutrium}
+    tee_run:           {title: "Tee, along run, branch blanked off", k: 0.4, check: neutrium}
+    GateValve:         {title: "Gate valve, open", k: 0.17, check: neutrium + powderprocess}
+    GlobeValve:        {title: "Globe valve, bevel seat, open", k: 6.0, check: "neutrium (powderprocess lists the plug-disk globe, 9)"}
+    AngleValve:        {title: "Angle valve, open", k: 2.0, check: "neutrium (powderprocess: 2 to 4)"}
+    DiaphragmValve:    {title: "Diaphragm valve, open", k: 2.3, check: neutrium + powderprocess}
+    SwingCheckValve:   {title: "Check valve, swing", k: 2.0, check: neutrium + powderprocess}
+
+walls:
+  # Wall thickness by DN, mm. Schedule 40: ASME B36.10M, "Welded and Seamless Wrought Steel
+  # Pipe"; schedule 10S: ASME B36.19M, "Stainless Steel Pipe" (the same outside diameters). The
+  # inside diameter is the ASME outside diameter of the size (od_mm below) less twice the wall:
+  # a schedule's wall belongs to the ASME OD. The ISO 4200 series 1 ODs of the layout model
+  # (piping/data/pipe-od.yaml) differ from the ASME ones at DN 20 (26.9 / 26.7 mm), 25
+  # (33.7 / 33.4), 32 (42.4 / 42.2), 65 (76.1 / 73.0) and 125 (139.7 / 141.3), and by 0.2 mm
+  # or less at DN 300 and 450; the result names the layout OD where it differs.
+  source: "ASME B36.10M (schedule 40) and ASME B36.19M (schedule 10S), wall thickness by NPS"
+  od_source: "ASME B36.10M / B36.19M, outside diameter by NPS (metric column)"
+  check: "wikipedia_nps agrees with every schedule 10S wall, every schedule 40 wall to DN 300 and DN 400 and 450, and every OD to 0.05 mm except: schedule 40 DN 350 11.13 (wikipedia 11.10), DN 500 15.09 (15.06), DN 600 17.48 (17.45); OD DN 450 457.0 (457.20), DN 600 610.0 (609.60). The differences are in the last digit; the values here are kept and stay unverified against the standard."
+  od_mm: {15: 21.3, 20: 26.7, 25: 33.4, 32: 42.2, 40: 48.3, 50: 60.3, 65: 73.0, 80: 88.9, 100: 114.3, 125: 141.3, 150: 168.3, 200: 219.1, 250: 273.0, 300: 323.8, 350: 355.6, 400: 406.4, 450: 457.0, 500: 508.0, 600: 610.0}
+  schedules:
+    "40":  {15: 2.77, 20: 2.87, 25: 3.38, 32: 3.56, 40: 3.68, 50: 3.91, 65: 5.16, 80: 5.49, 100: 6.02, 125: 6.55, 150: 7.11, 200: 8.18, 250: 9.27, 300: 10.31, 350: 11.13, 400: 12.70, 450: 14.27, 500: 15.09, 600: 17.48}
+    "10S": {15: 2.11, 20: 2.11, 25: 2.77, 32: 2.77, 40: 2.77, 50: 2.77, 65: 3.05, 80: 3.05, 100: 3.05, 125: 3.40, 150: 3.40, 200: 3.76, 250: 4.19, 300: 4.57, 350: 4.78, 400: 4.78, 450: 4.78, 500: 5.54, 600: 6.35}

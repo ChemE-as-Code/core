@@ -1,0 +1,376 @@
+# Packaged open background profile egrid-2023: US grid electricity at generation, direct
+# plant emissions only (total output rate, CO2e, AR5), for the US and its 27 eGRID subregions. Use it from
+# lca/factors.yaml with `include: [egrid-2023]`; ids egrid-2023:electricity-us,
+# egrid-2023:electricity-us-<subregion> (e.g. electricity-us-erct, location US-ERCT).
+#
+# Generated from egrid2023_data_rev2.xlsx (US EPA, public domain); each factor names its cell.
+# Scope: no T&D losses (US grid gross loss 4.2 %, GGL23), no upstream or construction. For
+# electricity at the consumer this understates: state it (proxy:) when a study's baseline counts
+# them (e.g. desnz-ghg-2026:electricity-gb includes T&D and well-to-tank). Core issue #268.
+schema: cheme/lca/v1
+kind: lca_factors
+sources:
+- id: egrid-2023
+  title: Emissions & Generation Resource Integrated Database (eGRID2023), revision 2
+  provider: U.S. Environmental Protection Agency (EPA)
+  version: eGRID2023 rev2 (data year 2023, released 2025-06-12)
+  url: https://www.epa.gov/egrid/download-data
+  licence: Public domain in the US (17 U.S.C. 105; https://edg.epa.gov/EPA_Data_License.html; https://www.usa.gov/publicdomain/label/1.0/)
+  attribution: U.S. EPA, Emissions & Generation Resource Integrated Database (eGRID2023, rev2, 2025-06-12).
+  publication: public
+  redistribution: true
+  geography: US
+  year: 2023
+  method: GWP100, IPCC AR5 without climate-carbon feedbacks (CH4 28, N2O 265; eGRID2023 Technical Guide
+    of the original 2025-01-15 release)
+  checksum: sha256:895cd81dd8662406189ad8adf5a2578dcb362cdb5cff7cca81b10ee6bd2447c6
+  notes: >-
+    Total output emission rates (SRC2ERTA, USC2ERTA: CO2, CH4, N2O as CO2e per MWh of all net generation,
+    nuclear and renewables included; not eGRID's combustion output rate) at the point of generation: no
+    transmission and distribution losses, no upstream (pre-combustion) or construction emissions (Technical
+    Guide 3.1). Generation mix of the area: imports and exports are not counted, so a subregion that imports
+    much can differ from its consumption mix in either direction (EPA publishes consumption-based rates
+    separately). CHP emissions are allocated to electricity (thermal output excluded); biogenic CO2 is
+    set to zero, biogenic CH4 and N2O remain. Grid gross loss is 4.2 % for the US (GGL23), none is given
+    for Puerto Rico (PRMS). File egrid2023_data_rev2.xlsx.
+categories:
+- id: climate-change
+  title: Climate change
+  unit: kg CO2-eq
+  method: GWP100 (IPCC AR5, eGRID2023)
+factors:
+- id: electricity-us
+  title: Electricity, US grid average, at generation (total output rate, direct plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.349667
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet US23 X3 (USC2ERTA): 770.884 lb CO2e/MWh x 0.45359237/1000 (CO2 only: 767.209
+    lb/MWh = 0.348 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US
+- id: electricity-us-akgd
+  title: Electricity, eGRID subregion AKGD (ASCC Alaska Grid), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.410551
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z3 (SRC2ERTA, AKGD): 905.109 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 899.633 lb/MWh = 0.408067 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-AKGD
+- id: electricity-us-akms
+  title: Electricity, eGRID subregion AKMS (ASCC Miscellaneous), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.236957
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z4 (SRC2ERTA, AKMS): 522.4 lb CO2e/MWh x 0.45359237/1000 (CO2 only:
+    520.483 lb/MWh = 0.236087 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-AKMS
+- id: electricity-us-aznm
+  title: Electricity, eGRID subregion AZNM (WECC Southwest), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.320322
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z5 (SRC2ERTA, AZNM): 706.189 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 703.703 lb/MWh = 0.319194 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-AZNM
+- id: electricity-us-camx
+  title: Electricity, eGRID subregion CAMX (WECC California), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.195037
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z6 (SRC2ERTA, CAMX): 429.983 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 428.464 lb/MWh = 0.194348 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-CAMX
+- id: electricity-us-erct
+  title: Electricity, eGRID subregion ERCT (ERCOT All), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.334129
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z7 (SRC2ERTA, ERCT): 736.629 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 733.862 lb/MWh = 0.332874 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-ERCT
+- id: electricity-us-frcc
+  title: Electricity, eGRID subregion FRCC (FRCC All), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.355972
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z8 (SRC2ERTA, FRCC): 784.785 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 782.262 lb/MWh = 0.354828 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-FRCC
+- id: electricity-us-hims
+  title: Electricity, eGRID subregion HIMS (HICC Miscellaneous), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.514054
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z9 (SRC2ERTA, HIMS): 1133.294 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1123.371 lb/MWh = 0.509553 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-HIMS
+- id: electricity-us-hioa
+  title: Electricity, eGRID subregion HIOA (HICC Oahu), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.679911
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z10 (SRC2ERTA, HIOA): 1498.947 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1489.548 lb/MWh = 0.675648 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-HIOA
+- id: electricity-us-mroe
+  title: Electricity, eGRID subregion MROE (MRO East), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.63728
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z11 (SRC2ERTA, MROE): 1404.963 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1397.313 lb/MWh = 0.633811 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-MROE
+- id: electricity-us-mrow
+  title: Electricity, eGRID subregion MROW (MRO West), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.420277
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z12 (SRC2ERTA, MROW): 926.552 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 920.13 lb/MWh = 0.417364 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-MROW
+- id: electricity-us-newe
+  title: Electricity, eGRID subregion NEWE (NPCC New England), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.246381
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z13 (SRC2ERTA, NEWE): 543.178 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 539.275 lb/MWh = 0.244611 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-NEWE
+- id: electricity-us-nwpp
+  title: Electricity, eGRID subregion NWPP (WECC Northwest), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.288152
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z14 (SRC2ERTA, NWPP): 635.267 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 631.735 lb/MWh = 0.28655 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-NWPP
+- id: electricity-us-nycw
+  title: Electricity, eGRID subregion NYCW (NPCC NYC/Westchester), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.392695
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z15 (SRC2ERTA, NYCW): 865.744 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 864.469 lb/MWh = 0.392117 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-NYCW
+- id: electricity-us-nyli
+  title: Electricity, eGRID subregion NYLI (NPCC Long Island), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.539472
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z16 (SRC2ERTA, NYLI): 1189.333 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1180.672 lb/MWh = 0.535544 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-NYLI
+- id: electricity-us-nyup
+  title: Electricity, eGRID subregion NYUP (NPCC Upstate NY), at generation (total output rate, direct
+    plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.110121
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z17 (SRC2ERTA, NYUP): 242.776 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 242.089 lb/MWh = 0.10981 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-NYUP
+- id: electricity-us-prms
+  title: Electricity, eGRID subregion PRMS (Puerto Rico Miscellaneous), at generation (total output rate,
+    direct plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.702401
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z18 (SRC2ERTA, PRMS): 1548.53 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1543.073 lb/MWh = 0.699926 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-PRMS
+- id: electricity-us-rfce
+  title: Electricity, eGRID subregion RFCE (RFC East), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.271779
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z19 (SRC2ERTA, RFCE): 599.17 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 596.904 lb/MWh = 0.270751 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-RFCE
+- id: electricity-us-rfcm
+  title: Electricity, eGRID subregion RFCM (RFC Michigan), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.442696
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z20 (SRC2ERTA, RFCM): 975.978 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 970.617 lb/MWh = 0.440264 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-RFCM
+- id: electricity-us-rfcw
+  title: Electricity, eGRID subregion RFCW (RFC West), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.415515
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z21 (SRC2ERTA, RFCW): 916.054 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 911.424 lb/MWh = 0.413415 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-RFCW
+- id: electricity-us-rmpa
+  title: Electricity, eGRID subregion RMPA (WECC Rockies), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.472888
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z22 (SRC2ERTA, RMPA): 1042.539 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1036.601 lb/MWh = 0.470194 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-RMPA
+- id: electricity-us-spno
+  title: Electricity, eGRID subregion SPNO (SPP North), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.3936
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z23 (SRC2ERTA, SPNO): 867.74 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 861.999 lb/MWh = 0.390996 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SPNO
+- id: electricity-us-spso
+  title: Electricity, eGRID subregion SPSO (SPP South), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.397151
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z24 (SRC2ERTA, SPSO): 875.567 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 872.042 lb/MWh = 0.395552 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SPSO
+- id: electricity-us-srmv
+  title: Electricity, eGRID subregion SRMV (SERC Mississippi Valley), at generation (total output rate,
+    direct plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.336448
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z25 (SRC2ERTA, SRMV): 741.741 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 739.72 lb/MWh = 0.335531 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SRMV
+- id: electricity-us-srmw
+  title: Electricity, eGRID subregion SRMW (SERC Midwest), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.566347
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z26 (SRC2ERTA, SRMW): 1248.582 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 1239.839 lb/MWh = 0.562382 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SRMW
+- id: electricity-us-srso
+  title: Electricity, eGRID subregion SRSO (SERC South), at generation (total output rate, direct plant
+    emissions)
+  unit: kWh
+  values:
+    climate-change: 0.383742
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z27 (SRC2ERTA, SRSO): 846.007 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 842.329 lb/MWh = 0.382074 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SRSO
+- id: electricity-us-srtv
+  title: Electricity, eGRID subregion SRTV (SERC Tennessee Valley), at generation (total output rate,
+    direct plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.409733
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z28 (SRC2ERTA, SRTV): 903.306 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 898.079 lb/MWh = 0.407362 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SRTV
+- id: electricity-us-srvc
+  title: Electricity, eGRID subregion SRVC (SERC Virginia/Carolina), at generation (total output rate,
+    direct plant emissions)
+  unit: kWh
+  values:
+    climate-change: 0.270489
+  status: PUBLISHED
+  source: 'eGRID2023 rev2 sheet SRL23 Z29 (SRC2ERTA, SRVC): 596.326 lb CO2e/MWh x 0.45359237/1000 (CO2
+    only: 593.419 lb/MWh = 0.26917 kg/kWh)'
+  source_id: egrid-2023
+  year: 2023
+  location: US-SRVC

@@ -1,0 +1,15 @@
+/* Primary colour close to the Process Atlas (#1f5f99). */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1f5f99;
+  --md-primary-fg-color--light: #4a82b8;
+  --md-primary-fg-color--dark: #164672;
+  --md-accent-fg-color: #2a7bc4;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1f5f99;
+  --md-primary-fg-color--light: #4a82b8;
+  --md-primary-fg-color--dark: #164672;
+  --md-accent-fg-color: #6aa7e0;
+  --md-typeset-a-color: #7db3e6;
+}

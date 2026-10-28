@@ -1,0 +1,50 @@
+name: integration
+# Package, viewer and agent runner together (scripts/integration_smoke.py): a plant checked with
+# cheme, the built viewer against a live cheme serve, and the runner's run-record path with the
+# revisions it records. No LLM provider. Runs when any of the three or their interfaces change,
+# nightly, and on demand.
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "viewer/**"
+      - "agent-cli/**"
+      - "examples/safety-hazop/**"
+      - "scripts/integration_smoke.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/integration.yml"
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+concurrency:
+  group: integration-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
+      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: uv sync --locked --all-extras
+      - run: npm ci && npm run build && npx playwright install --with-deps chromium
+        working-directory: viewer
+      - run: uv sync --locked
+        working-directory: agent-cli
+      - run: uv run python scripts/integration_smoke.py

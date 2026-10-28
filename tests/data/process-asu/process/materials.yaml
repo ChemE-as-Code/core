@@ -1,0 +1,16 @@
+# Components of ASU-1. Schema cheme/process/v1. The property method is a placeholder until
+# `cheme process props` (phase B) configures and validates it.
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: N2, name: Nitrogen, formula: N2, cas: 7727-37-9, chebi: "CHEBI:17997", molar_mass: 28.014, normal_boiling_point: 77.36}
+  - {id: O2, name: Oxygen, formula: O2, cas: 7782-44-7, chebi: "CHEBI:15379", molar_mass: 31.998, normal_boiling_point: 90.19}
+  - {id: AR, name: Argon, formula: Ar, cas: 7440-37-1, chebi: "CHEBI:49475", molar_mass: 39.948, normal_boiling_point: 87.30}
+  - {id: H2O, name: Water, formula: H2O, cas: 7732-18-5, chebi: "CHEBI:15377", molar_mass: 18.015, normal_boiling_point: 373.12}
+  - {id: CO2, name: Carbon dioxide, formula: CO2, cas: 124-38-9, chebi: "CHEBI:16526", molar_mass: 44.009}
+templates:
+  - {id: air, title: Air (wet), components: [N2, O2, AR, H2O, CO2]}
+  - {id: dry, title: Dry air and its products, components: [N2, O2, AR]}
+property_method:
+  adapter: thermo
+  status: placeholder

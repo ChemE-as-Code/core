@@ -1,0 +1,19 @@
+# Instruments and control valves the control records name. Schema: `cheme schema instruments`.
+schema: cheme/instruments/v1
+instruments:
+  - {tag: FT-101, service: Feed flow}
+  - {tag: FIC-101, service: Feed flow controller}
+  - {tag: FV-101, service: Feed let-down valve (step V1)}
+  - {tag: LT-102, service: D-101 level}
+  - {tag: LIC-102, service: D-101 level controller}
+  - {tag: LV-102, service: D-101 liquid outlet valve}
+  - {tag: TT-103, service: Column feed temperature}
+  - {tag: TIC-103, service: Column feed temperature controller}
+  - {tag: PT-104, service: D-101 pressure}
+  - {tag: PIC-104, service: D-101 pressure controller}
+  - {tag: PV-104, service: D-101 flash gas valve}
+  - {tag: FT-105, service: Hot pentane flow}
+  - {tag: FIC-105, service: Hot pentane flow controller}
+  - {tag: FV-105, service: Hot pentane valve}
+  - {tag: LT-106, service: "D-101 level, trip transmitter", notes: independent of LT-102}
+  - {tag: XV-107, service: D-101 liquid outlet shut-off valve}

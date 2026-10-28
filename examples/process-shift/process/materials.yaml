@@ -1,0 +1,53 @@
+# Ideal-gas data from `cheme chemistry thermo "carbon monoxide" water "carbon dioxide" hydrogen
+# methane` (extra props): ATcT formation enthalpies, CRC entropies, Poling heat capacities.
+# InChIKey and SMILES (PubChem) identify each component across databases; cheme validate checks
+# them against each other and the formula (with RDKit), and GET /api/reactions derives the
+# reaction SMILES of WGS from them.
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: CO
+    name: Carbon monoxide
+    formula: CO
+    cas: 630-08-0
+    inchikey: UGFAIRIUMAVXCW-UHFFFAOYSA-N
+    smiles: "[C-]#[O+]"
+    molar_mass: 28.010
+    ideal_gas: {dHf_298: -110525.0, S_298: 197.7, cp_R: [3.912, -0.003913, 1.182e-05, -1.3e-08, 5.15e-12], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: H2O
+    name: Water
+    formula: H2O
+    cas: 7732-18-5
+    inchikey: XLYOFNOQVPJJNP-UHFFFAOYSA-N
+    smiles: O
+    molar_mass: 18.015
+    ideal_gas: {dHf_298: -241822.0, S_298: 188.8, cp_R: [4.395, -0.004186, 1.405e-05, -1.564e-08, 6.32e-12], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: CO2
+    name: Carbon dioxide
+    formula: CO2
+    cas: 124-38-9
+    inchikey: CURLTUGMZLYLDI-UHFFFAOYSA-N
+    smiles: O=C=O
+    molar_mass: 44.009
+    ideal_gas: {dHf_298: -393474.0, S_298: 213.8, cp_R: [3.259, 0.001356, 1.502e-05, -2.374e-08, 1.056e-11], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: H2
+    name: Hydrogen
+    formula: H2
+    cas: 1333-74-0
+    inchikey: UFHFLCQGNIYNRP-UHFFFAOYSA-N
+    smiles: "[H][H]"
+    molar_mass: 2.016
+    ideal_gas: {dHf_298: 0.0, S_298: 130.7, cp_R: [2.883, 0.003681, -7.72e-06, 6.92e-09, -2.13e-12], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+  - id: CH4
+    name: Methane
+    formula: CH4
+    cas: 74-82-8
+    inchikey: VNWKTOKETHGBQD-UHFFFAOYSA-N
+    smiles: C
+    molar_mass: 16.043
+    ideal_gas: {dHf_298: -74534.0, S_298: 186.3, cp_R: [4.568, -0.008975, 3.631e-05, -3.407e-08, 1.091e-11], temperature_range: [50, 1000], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R Poling (5th ed.)"}
+templates:
+  - {id: syngas, title: Reformed gas, components: [CO, H2O, CO2, H2, CH4]}
+property_method:
+  adapter: thermo
+  status: placeholder

@@ -1,0 +1,300 @@
+section,id,description,quantity,unit,rate,basis,cost,status,source,year
+material,pipe DN25 PN16 bare,pipe,32.237,m,1,pipe-small,32.24,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN16 insulation 50 mm cold,pipe,2,m,1,pipe-small,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN25 insulation 50 mm cold,pipe,47.873,m,1,pipe-small,47.87,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN25 insulation 80 mm cold,pipe,14.67,m,1,pipe-small,14.67,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN40 bare,pipe,25.307,m,1,pipe-small,25.31,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN63 insulation 50 mm cold,pipe,22.576,m,1,pipe-small,22.58,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN25 PN63 insulation 80 mm cold,pipe,5.144,m,1,pipe-small,5.14,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN40 PN16 insulation 50 mm cold,pipe,251.027,m,1,pipe-small,251.03,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN40 PN25 insulation 80 mm cold,pipe,47.203,m,1,pipe-small,47.20,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN50 PN10 bare,pipe,2.7,m,1,pipe-small,2.70,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN50 PN16 bare,pipe,104.045,m,1,pipe-small,104.05,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN50 PN2.5 bare,pipe,3.1,m,1,pipe-small,3.10,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN50 PN25 insulation 80 mm cold,pipe,82.764,m,1,pipe-small,82.76,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN50 PN63 insulation 80 mm cold,pipe,75.442,m,1,pipe-small,75.44,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN80 PN10 bare,pipe,2.6,m,2,pipe,5.20,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN80 PN16 bare,pipe,2.5,m,2,pipe,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN80 PN16 insulation 65 mm cold,pipe,28.724,m,2,pipe,57.45,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN80 PN40 bare,pipe,31.781,m,2,pipe,63.56,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN100 PN10 bare,pipe,716.831,m,2,pipe,1433.66,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN100 PN16 bare,pipe,260.46,m,2,pipe,520.92,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN100 PN40 bare,pipe,77.18,m,2,pipe,154.36,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN100 PN6 bare,pipe,24.234,m,2,pipe,48.47,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN150 PN10 bare,pipe,4.011,m,2,pipe,8.02,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN150 PN16 bare,pipe,671.226,m,2,pipe,1342.45,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN150 PN40 bare,pipe,201.745,m,2,pipe,403.49,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN150 PN6 bare,pipe,16.758,m,2,pipe,33.52,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN200 PN16 bare,pipe,123.22,m,2,pipe,246.44,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN200 PN40 bare,pipe,66.058,m,2,pipe,132.12,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN250 PN10 bare,pipe,140.788,m,2,pipe,281.58,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN250 PN16 bare,pipe,60.67,m,2,pipe,121.34,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN300 PN10 bare,pipe,130.322,m,2,pipe,260.64,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN300 PN16 bare,pipe,338.27,m,2,pipe,676.54,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN300 PN40 bare,pipe,18.058,m,2,pipe,36.12,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN350 PN10 bare,pipe,40.572,m,2,pipe,81.14,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN500 PN10 bare,pipe,292.548,m,2,pipe,585.10,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN500 PN6 bare,pipe,131.165,m,2,pipe,262.33,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN600 PN10 bare,pipe,163.363,m,2,pipe,326.73,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN600 PN6 bare,pipe,217.656,m,2,pipe,435.31,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN700 PN10 bare,pipe,39.384,m,2,pipe,78.77,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN700 PN2.5 bare,pipe,99.689,m,2,pipe,199.38,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN800 PN6 bare,pipe,81.554,m,2,pipe,163.11,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN900 PN10 bare,pipe,22.668,m,2,pipe,45.34,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN900 PN6 bare,pipe,34.513,m,2,pipe,69.03,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,pipe DN1400 PN2.5 bare,pipe,13.786,m,2,pipe,27.57,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow bend 180 DN150 PN16,bend 180,1,ea,1,elbow,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN25 PN16,elbow 90,5,ea,1,elbow,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN25 PN25,elbow 90,17,ea,1,elbow,17.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN25 PN40,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN25 PN63,elbow 90,6,ea,1,elbow,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN40 PN16,elbow 90,38,ea,1,elbow,38.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN40 PN25,elbow 90,9,ea,1,elbow,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN50 PN16,elbow 90,19,ea,1,elbow,19.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN50 PN25,elbow 90,13,ea,1,elbow,13.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN50 PN63,elbow 90,12,ea,1,elbow,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN80 PN10,elbow 90,2,ea,1,elbow,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN80 PN16,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN80 PN40,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN100 PN10,elbow 90,44,ea,1,elbow,44.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN100 PN16,elbow 90,54,ea,1,elbow,54.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN100 PN40,elbow 90,12,ea,1,elbow,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN100 PN6,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN150 PN16,elbow 90,80,ea,1,elbow,80.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN150 PN40,elbow 90,35,ea,1,elbow,35.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN150 PN6,elbow 90,4,ea,1,elbow,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN200 PN16,elbow 90,31,ea,1,elbow,31.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN200 PN40,elbow 90,13,ea,1,elbow,13.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN250 PN10,elbow 90,34,ea,1,elbow,34.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN250 PN16,elbow 90,5,ea,1,elbow,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN300 PN10,elbow 90,24,ea,1,elbow,24.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN300 PN16,elbow 90,39,ea,1,elbow,39.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN300 PN40,elbow 90,9,ea,1,elbow,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN350 PN10,elbow 90,3,ea,1,elbow,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN500 PN10,elbow 90,53,ea,1,elbow,53.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN500 PN6,elbow 90,26,ea,1,elbow,26.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN600 PN10,elbow 90,36,ea,1,elbow,36.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN600 PN6,elbow 90,39,ea,1,elbow,39.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN700 PN10,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN700 PN2.5,elbow 90,10,ea,1,elbow,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN800 PN6,elbow 90,15,ea,1,elbow,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN900 PN10,elbow 90,8,ea,1,elbow,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN900 PN6,elbow 90,10,ea,1,elbow,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,elbow elbow 90 DN1400 PN2.5,elbow 90,5,ea,1,elbow,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN40x25 PN16,reducing tee,6,ea,1,tee,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN40x25 PN25,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN50x25 PN25,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN50x25 PN63,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN100x25 PN16,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN100x25 PN40,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN100x40 PN16,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN100x50 PN10,reducing tee,3,ea,1,tee,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN150x25 PN16,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN150x50 PN16,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN150x100 PN16,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x25 PN40,reducing tee,5,ea,1,tee,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x80 PN16,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x80 PN40,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x100 PN40,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x150 PN16,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN200x150 PN40,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN250x100 PN10,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN250x150 PN10,reducing tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN500x150 PN10,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN500x250 PN10,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN500x300 PN10,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN600x100 PN10,reducing tee,4,ea,1,tee,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN600x100 PN6,reducing tee,4,ea,1,tee,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN600x300 PN10,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN600x500 PN6,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN900x500 PN6,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee reducing tee DN900x600 PN6,reducing tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN25 PN25,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN25 PN63,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN50 PN25,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN50 PN63,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN80 PN16,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN100 PN16,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN100 PN40,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN150 PN16,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN150 PN40,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN200 PN16,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN500 PN10,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN500 PN6,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN600 PN10,tee,1,ea,1,tee,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,tee DN600 PN6,tee,2,ea,1,tee,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,reducer DN150x80 PN40,reducer,1,ea,1,reducer,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN25 PN16,weld neck flange,14,ea,1,flange,14.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN25 PN25,weld neck flange,12,ea,1,flange,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN25 PN40,weld neck flange,9,ea,1,flange,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN25 PN63,weld neck flange,6,ea,1,flange,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN40 PN16,weld neck flange,9,ea,1,flange,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN40 PN25,weld neck flange,10,ea,1,flange,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN50 PN10,weld neck flange,6,ea,1,flange,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN50 PN16,weld neck flange,2,ea,1,flange,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN50 PN2.5,weld neck flange,1,ea,1,flange,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN50 PN25,weld neck flange,16,ea,1,flange,16.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN50 PN63,weld neck flange,16,ea,1,flange,16.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN80 PN10,weld neck flange,8,ea,1,flange,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN80 PN16,weld neck flange,21,ea,1,flange,21.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN80 PN40,weld neck flange,2,ea,1,flange,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN100 PN10,weld neck flange,14,ea,1,flange,14.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN100 PN16,weld neck flange,18,ea,1,flange,18.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN100 PN40,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN100 PN6,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN150 PN10,weld neck flange,12,ea,1,flange,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN150 PN16,weld neck flange,44,ea,1,flange,44.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN150 PN40,weld neck flange,5,ea,1,flange,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN150 PN6,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN200 PN16,weld neck flange,21,ea,1,flange,21.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN200 PN40,weld neck flange,11,ea,1,flange,11.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN250 PN10,weld neck flange,6,ea,1,flange,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN250 PN16,weld neck flange,3,ea,1,flange,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN300 PN10,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN300 PN16,weld neck flange,6,ea,1,flange,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN300 PN40,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN350 PN10,weld neck flange,2,ea,1,flange,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN500 PN10,weld neck flange,17,ea,1,flange,17.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN500 PN6,weld neck flange,5,ea,1,flange,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN600 PN10,weld neck flange,13,ea,1,flange,13.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN600 PN6,weld neck flange,15,ea,1,flange,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN700 PN10,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN700 PN2.5,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN800 PN6,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN900 PN10,weld neck flange,4,ea,1,flange,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN900 PN6,weld neck flange,1,ea,1,flange,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,flange weld neck flange DN1400 PN2.5,weld neck flange,3,ea,1,flange,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN25 PN16,gasket and bolt set,14,ea,1,gasket,14.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN25 PN25,gasket and bolt set,12,ea,1,gasket,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN25 PN40,gasket and bolt set,9,ea,1,gasket,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN25 PN63,gasket and bolt set,6,ea,1,gasket,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN40 PN16,gasket and bolt set,9,ea,1,gasket,9.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN40 PN25,gasket and bolt set,10,ea,1,gasket,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN50 PN10,gasket and bolt set,6,ea,1,gasket,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN50 PN16,gasket and bolt set,2,ea,1,gasket,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN50 PN2.5,gasket and bolt set,1,ea,1,gasket,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN50 PN25,gasket and bolt set,16,ea,1,gasket,16.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN50 PN63,gasket and bolt set,16,ea,1,gasket,16.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN80 PN10,gasket and bolt set,8,ea,1,gasket,8.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN80 PN16,gasket and bolt set,21,ea,1,gasket,21.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN80 PN40,gasket and bolt set,2,ea,1,gasket,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN100 PN10,gasket and bolt set,14,ea,1,gasket,14.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN100 PN16,gasket and bolt set,18,ea,1,gasket,18.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN100 PN40,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN100 PN6,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN150 PN10,gasket and bolt set,12,ea,1,gasket,12.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN150 PN16,gasket and bolt set,44,ea,1,gasket,44.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN150 PN40,gasket and bolt set,5,ea,1,gasket,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN150 PN6,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN200 PN16,gasket and bolt set,21,ea,1,gasket,21.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN200 PN40,gasket and bolt set,11,ea,1,gasket,11.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN250 PN10,gasket and bolt set,6,ea,1,gasket,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN250 PN16,gasket and bolt set,3,ea,1,gasket,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN300 PN10,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN300 PN16,gasket and bolt set,6,ea,1,gasket,6.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN300 PN40,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN350 PN10,gasket and bolt set,2,ea,1,gasket,2.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN500 PN10,gasket and bolt set,17,ea,1,gasket,17.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN500 PN6,gasket and bolt set,5,ea,1,gasket,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN600 PN10,gasket and bolt set,13,ea,1,gasket,13.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN600 PN6,gasket and bolt set,15,ea,1,gasket,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN700 PN10,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN700 PN2.5,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN800 PN6,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN900 PN10,gasket and bolt set,4,ea,1,gasket,4.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN900 PN6,gasket and bolt set,1,ea,1,gasket,1.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,gasket gasket and bolt set DN1400 PN2.5,gasket and bolt set,3,ea,1,gasket,3.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN25 PN16,BallValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN25 PN40,BallValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN40 PN16,BallValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN40 PN25,BallValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN50 PN25,BallValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN50 PN63,BallValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN80 PN16,BallValve,6,ea,5,valve,30.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN150 PN16,BallValve,6,ea,5,valve,30.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN150 PN40,BallValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN200 PN16,BallValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN200 PN40,BallValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN500 PN10,BallValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN600 PN10,BallValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve BallValve DN600 PN6,BallValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve ButterflyValve DN500 PN6,ButterflyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN25 PN16,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN25 PN25,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN25 PN40,GlobeValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN25 PN63,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN40 PN16,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN50 PN16,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN100 PN10,GlobeValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN100 PN16,GlobeValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN100 PN40,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN100 PN6,GlobeValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN150 PN16,GlobeValve,4,ea,5,valve,20.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN150 PN40,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN200 PN16,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN250 PN16,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN300 PN10,GlobeValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN500 PN6,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN600 PN6,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve GlobeValve DN700 PN2.5,GlobeValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN25 PN16,SpringLoadedGlobeSafetyValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN25 PN25,SpringLoadedGlobeSafetyValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN25 PN40,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN25 PN63,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN50 PN10,SpringLoadedGlobeSafetyValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN80 PN10,SpringLoadedGlobeSafetyValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN80 PN16,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN80 PN40,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN150 PN10,SpringLoadedGlobeSafetyValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN150 PN16,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SpringLoadedGlobeSafetyValve DN150 PN6,SpringLoadedGlobeSafetyValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN40 PN25,SwingCheckValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN50 PN25,SwingCheckValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN50 PN63,SwingCheckValve,2,ea,5,valve,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN150 PN16,SwingCheckValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN200 PN16,SwingCheckValve,3,ea,5,valve,15.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN200 PN40,SwingCheckValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,valve SwingCheckValve DN600 PN10,SwingCheckValve,1,ea,5,valve,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,inline Silencer DN150 PN40,Silencer,1,ea,5,inline,5.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,inline Silencer DN300 PN10,Silencer,2,ea,5,inline,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,inline Silencer DN600 PN6,Silencer,2,ea,5,inline,10.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB600 crane building,HEB600,15.094,t,10,steel,150.94,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel FL70x12 steel ladder,FL70x12,2.046,t,10,steel,20.46,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB200 steel rack,HEB200,117.8,t,10,steel,1178.00,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB300 steel rack,HEB300,76.518,t,10,steel,765.18,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB400 steel rack,HEB400,96.488,t,10,steel,964.88,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel C200 steel stair,C200,8.519,t,10,steel,85.19,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel FL40x8 handrail stair,FL40x8,0.845,t,10,steel,8.45,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel RHS40x40 handrail stair,RHS40x40,0.464,t,10,steel,4.64,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel RHS50x50 handrail stair,RHS50x50,1.465,t,10,steel,14.65,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel RHS50x50 handrail step-over,RHS50x50,0.047,t,10,steel,0.47,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel FL100x5 steel structure,FL100x5,1.243,t,10,steel,12.43,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel FL40x8 handrail structure,FL40x8,0.794,t,10,steel,7.94,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB200 steel structure,HEB200,2.343,t,10,steel,23.43,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB300 steel structure,HEB300,28.511,t,10,steel,285.11,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB400 steel structure,HEB400,115.89,t,10,steel,1158.90,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel L100x10 steel structure,L100x10,10.258,t,10,steel,102.58,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel RHS40x40 handrail structure,RHS40x40,1.035,t,10,steel,10.35,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel RHS50x50 handrail structure,RHS50x50,1.376,t,10,steel,13.76,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,steel HEB200 steel support-steel,HEB200,98.026,t,10,steel,980.26,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,grating equipment,grating,27.718,m2,1,grating,27.72,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,grating platform,grating,67.963,m2,1,grating,67.96,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,grating stair,grating,182.456,m2,1,grating,182.46,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,grating step-over,grating,3.542,m2,1,grating,3.54,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,grating structure,grating,218.158,m2,1,grating,218.16,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN25 insulation 50 mm cold pipe,pipe insulation,30.499,m2,1,insulation,30.50,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN25 insulation 80 mm cold pipe,pipe insulation,12.076,m2,1,insulation,12.08,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN40 insulation 50 mm cold pipe,pipe insulation,116.716,m2,1,insulation,116.72,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN40 insulation 80 mm cold pipe,pipe insulation,30.845,m2,1,insulation,30.84,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN50 insulation 80 mm cold pipe,pipe insulation,109.344,m2,1,insulation,109.34,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,insulation pipe insulation DN80 insulation 65 mm cold pipe,pipe insulation,19.762,m2,1,insulation,19.76,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete foundation equipment,foundation,39.432,m3,5,concrete,197.16,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete leg-pad equipment,leg-pad,0.113,m3,5,concrete,0.57,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete plinth equipment,plinth,94.983,m3,5,concrete,474.92,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete ring-wall equipment,ring-wall,1.431,m3,5,concrete,7.16,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete saddle-pad equipment,saddle-pad,4.099,m3,5,concrete,20.50,ASSUMED,"EXAMPLE placeholder, not a price",2026
+material,concrete footing support-steel,footing,46.08,m3,5,concrete,230.40,ASSUMED,"EXAMPLE placeholder, not a price",2026
+direct,piping-erection,"Piping erection and testing on pipe, elbow, tee, reducer, flange, gasket, valve, inline, insulation",11242.02,XXX,1,piping-erection,11242.02,ASSUMED,"EXAMPLE placeholder, not a factor",2026
+direct,steel-erection,"Steel and grating erection on steel, grating",6287.46,XXX,1,steel-erection,6287.46,ASSUMED,"EXAMPLE placeholder, not a factor",2026
+indirect,indirects,Engineering and construction management,35989.67,XXX,0.1,indirects,3598.97,ASSUMED,"EXAMPLE placeholder, not a factor",2026
+contingency,contingency,Contingency,39588.64,XXX,0.1,contingency,3958.86,ASSUMED,"EXAMPLE placeholder, not a factor",2026

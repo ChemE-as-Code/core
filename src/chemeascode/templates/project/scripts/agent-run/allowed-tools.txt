@@ -1,0 +1,25 @@
+# Tools a headless stage may use, one per line (passed as --allowedTools). Deliberately no
+# sed -i, awk, cp or heredocs: files are changed with Edit and Write.
+Bash(cheme:*)
+Bash(git status:*)
+Bash(git diff:*)
+Bash(git log:*)
+Bash(git show:*)
+Bash(git add:*)
+Bash(git commit:*)
+Bash(git switch:*)
+Bash(git branch:*)
+Bash(git rev-parse:*)
+Bash(grep:*)
+Bash(ls:*)
+Bash(wc:*)
+Bash(head:*)
+Bash(tail:*)
+Bash(cat:*)
+Bash(cmp:*)
+Bash(sed -n:*)
+Read
+Edit
+Write
+Glob
+Grep

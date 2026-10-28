@@ -1,0 +1,23 @@
+# Minimum clear distances between buildings in plan, by their `use` (layout/building.yaml): a
+# screening table for the rule layout-building-spacing on the 3D model. Every row is ASSUMED:
+# check it against the owner's or insurer's spacing standard and the building code (fire
+# separation between buildings, occupied buildings near process buildings, e.g. the CCPS
+# Guidelines for Siting and Layout of Facilities and API RP 752/753 for occupied buildings).
+# A separation in layout/site-plan.yaml naming both buildings replaces the table for that pair
+# (declare it with its basis: a fire-rated wall, a blast or noise assessment);
+# criteria: {spacing_table: false} switches the table off.
+#
+# A side matches a building by `use` (control, substation, office, electrical, process,
+# compressor, workshop, warehouse, ...); `any: true` matches every building, with or without a
+# use. Measured edge to edge between the footprints; the largest matching row applies.
+schema: cheme/building-spacing/v1
+status: ASSUMED
+rows:
+  - a: {any: true}
+    b: {any: true}
+    min_m: 6.0
+    basis: "Building to building without a fire-rated wall on the facing sides: 6 m clear for fire separation and access around both (screening value, ASSUMED)."
+  - a: {use: [control, substation, electrical, office]}
+    b: {use: [process, compressor]}
+    min_m: 15.0
+    basis: "An occupied or electrical building (control room, substation, office) to a process or machine building (compressors, lube oil, flammable or toxic inventory): 15 m, else a fire- and blast-rated facing wall (screening value after insurer practice, ASSUMED)."

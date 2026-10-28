@@ -1,0 +1,450 @@
+# Reaction evidence for ethyl acetate (schema cheme/reaction-evidence/v1, skills
+# reaction-evidence-search and route-selection). Every number below was read in the full text
+# of its source at the location given; values the sources do not state are listed under
+# missing. The route selection is illustrative: it shows the handoff, not a recommendation.
+# `cheme chemistry evidence` prints the route comparison.
+schema: cheme/reaction-evidence/v1
+kind: reaction-evidence
+product: EtOAc
+question: >-
+  Routes to ethyl acetate for a concept study: which route, catalyst and operating window
+  the literature and patents support, and which reaction model the first flowsheet can use.
+
+searches:
+  - {query: "kinetics esterification acetic acid ethanol Amberlyst 15 open access rate equation activation energy",
+     tool: web search, date: 2026-10-24, found: [S-AHM]}
+  - {query: "Kirbaslar Baykal Dramur Esterification of Acetic Acid with Ethanol Catalysed by an Acidic Ion-Exchange Resin",
+     tool: web search, date: 2026-10-24, found: [S-KIR],
+     notes: "the journal host did not resolve (DNS); full text read from the Internet Archive copy"}
+  - {query: "Calvar Gonzalez Dominguez 2007 esterification acetic acid ethanol reactive distillation doi",
+     tool: web search, date: 2026-10-24, found: [S-CAL]}
+  - {query: "ethanol dehydrogenation ethyl acetate copper catalyst selectivity open access",
+     tool: web search, date: 2026-10-24, found: [S-PET, S-DAVY]}
+  - {query: "Santacesaria 2012 Chemical Engineering Journal ethyl acetate ethanol dehydrogenation copper chromite kinetics doi",
+     tool: web search, date: 2026-10-24, found: [S-SAN, S-CAR]}
+  - {query: "ethylene acetic acid ethyl acetate heteropolyacid silica patent example",
+     tool: web search, date: 2026-10-24, found: [S-BP]}
+
+sources:
+  - id: S-KIR
+    kind: paper
+    title: Esterification of Acetic Acid with Ethanol Catalysed by an Acidic Ion-Exchange Resin
+    authors: Kirbaslar, S. I.; Baykal, Z. B.; Dramur, U.
+    year: 2001
+    url: https://web.archive.org/web/2020id_/https://journals.tubitak.gov.tr/engineering/issues/muh-01-25-6/muh-25-6-2-0001-12.pdf
+    accessed: 2026-10-24
+    access: full-text
+    reuse: "(c) TUBITAK, no open licence stated: citation and extracted facts only"
+    notes: "Turk J Engin Environ Sci 25 (2001) 569-577; no DOI printed"
+  - id: S-AHM
+    kind: paper
+    title: "Heterogeneously Catalyzed Esterification Reaction: Experimental and Modeling Using Langmuir-Hinshelwood Approach"
+    authors: Ahmedzeki, N. S.; Alhassani, M. H.; Al-jandeel, H. A.
+    year: 2013
+    doi: 10.31699/IJCPE.2013.4.6
+    url: https://ijcpe.uobaghdad.edu.iq/index.php/ijcpe/article/view/325
+    accessed: 2026-10-24
+    access: full-text
+    reuse: CC BY-NC 4.0 (journal landing page)
+    notes: Iraqi J. Chem. Petrol. Eng. 14(4) (2013) 45-52
+  - id: S-PET
+    kind: paper
+    title: Ethanol dehydrogenative reactions catalyzed by copper supported on porous Al-Mg mixed oxides
+    authors: Petrolini, D. D.; Cassinelli, W. H.; Pereira, C. A.; Urquieta-Gonzalez, E. A.; Santilli, C. V.; Martins, L.
+    year: 2019
+    doi: 10.1039/c8ra10076d
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC9060265
+    accessed: 2026-10-24
+    access: full-text
+    reuse: CC BY-NC 3.0
+    notes: "RSC Adv. 9 (2019) 3294-3302; electronic supplementary information not read"
+  - id: S-DAVY
+    kind: patent
+    title: Process for the preparation of ethyl acetate
+    authors: Colley, S. W.; Fawcett, C. R.; Rathmell, C.; Tuck, M. W. M. (Davy Process Technology)
+    year: 2004
+    patent: US6809217B1
+    url: https://patents.google.com/patent/US6809217B1/en
+    accessed: 2026-10-24
+    access: full-text
+    reuse: patent text; cite as patent
+  - id: S-DAVY2
+    kind: patent
+    title: Process
+    patent: US7553397B1
+    url: https://patents.google.com/patent/US7553397B1/en
+    accessed: 2026-10-24
+    access: full-text
+    reuse: patent text; cite as patent
+    notes: "same family as S-DAVY with identical Examples 1-5 and Table 2; the observations cite S-DAVY only"
+  - id: S-BP
+    kind: patent
+    title: Ester synthesis
+    authors: Atkins, M. P.; Sharma, B. (BP Chemicals)
+    year: 1999
+    patent: US5861530A
+    url: https://patents.google.com/patent/US5861530A/en
+    accessed: 2026-10-24
+    access: full-text
+    reuse: patent text; cite as patent
+    notes: Example 1 and Tables 1-2 read; the later tables were not examined
+  - id: S-CAL
+    kind: paper
+    title: "Esterification of acetic acid with ethanol: Reaction kinetics and operation in a packed bed reactive distillation column"
+    authors: Calvar, N.; Gonzalez, B.; Dominguez, A.
+    year: 2007
+    doi: 10.1016/j.cep.2006.10.007
+    accessed: 2026-10-24
+    access: unavailable
+    notes: "paywalled; DOI from search listings, not resolved"
+  - id: S-SAN
+    kind: paper
+    title: Ethanol dehydrogenation to ethyl acetate by using copper and copper chromite catalysts
+    authors: Santacesaria, E.; Carotenuto, G.; Tesser, R.; Di Serio, M.
+    year: 2012
+    doi: 10.1016/j.cej.2011.10.043
+    accessed: 2026-10-24
+    access: snippet
+    notes: "paywalled; the search snippet quotes a conversion and a selectivity, which are not used"
+  - id: S-CAR
+    kind: paper
+    title: Carotenuto et al., Catal. Today 203 (2013) 202-210 (LHHW kinetics of ethanol dehydrogenation on copper)
+    year: 2013
+    doi: 10.1016/j.cattod.2012.02.054
+    accessed: 2026-10-24
+    access: unavailable
+    notes: paywalled; known from search results only
+
+routes:
+  - id: ESTER
+    title: Esterification of acetic acid with ethanol over an acid ion-exchange resin
+    equations: ["CH3COOH + C2H5OH <=> CH3COOC2H5 + H2O"]
+    reactants: [AcOH, EtOH]
+    products: [EtOAc, H2O]
+    reactions: [ESTERIF]
+    catalysts: [AMB15]
+    status: selected
+    rationale: >-
+      The only route with a rate law and an equilibrium constant among the sources read in
+      full; liquid phase below 360 K. Illustrative selection for this example: the criteria
+      (feedstock, separation, scale) are the project's to set.
+    gaps:
+      - "a rate law on a catalyst-mass basis (both kinetics sources lump the catalyst into k)"
+      - "the equilibrium constant's temperature dependence (S-KIR takes it as constant)"
+      - "side products: S-KIR's analysis covers water, ethanol, ethyl acetate and acetic acid only"
+      - "catalyst lifetime beyond three batch runs"
+      - "S-CAL (kinetics and reactive distillation) not read"
+  - id: DEHYD
+    title: Dehydrogenative coupling of ethanol over copper
+    equations: ["2 C2H5OH -> CH3COOC2H5 + 2 H2"]
+    reactants: [EtOH]
+    products: [EtOAc, H2]
+    status: candidate
+    gaps:
+      - "kinetics: S-CAR (LHHW on copper) not read"
+      - "selectivity basis (molar or carbon) not defined in S-PET"
+      - "the patent examples state no conversion, selectivity or yield"
+  - id: ADD
+    title: Addition of acetic acid to ethylene over a supported heteropolyacid
+    equations: ["C2H4 + CH3COOH -> CH3COOC2H5"]
+    reactants: [C2H4, AcOH]
+    products: [EtOAc]
+    status: candidate
+    gaps:
+      - "the yield's basis is not defined (Table 1, Run 1: yield 95 above an acetic acid conversion of 66)"
+      - "no kinetics found"
+      - "whether the pressures are absolute or gauge"
+      - "patent examples only: no evidence of industrial performance among the sources read"
+
+observations:
+  - id: O-KIR-KIN
+    source: S-KIR
+    route: ESTER
+    location: "p. 573, Eq. 10; p. 575, Eq. 11 and text"
+    kind: kinetics
+    scale: lab
+    equation: "-dCA/dt = k (CA CB - CE CW / K) / (CB + KW CW)"
+    conditions:
+      temperature: {range: [323, 353], unit: K}
+      phase: liquid
+      catalyst: AMB15
+      catalyst_formulation: "Amberlyst 15, macroporous styrene-DVB (20 %) resin"
+      catalyst_loading: {range: [1.0, 10.0], unit: g per 100 g acetic acid,
+                         note: "p. 571; the Fig. 3 legend gives 1.08 to 10.8 g"}
+      feed:
+        AcOH: {range: [0.5, 4], unit: mol per mol EtOH, note: "molar ratio 1:2 to 4:1 (p. 574)"}
+      notes: "batch reactor 0.250 dm3, about 900 rpm; no transport limitation (p. 570)"
+    kinetics:
+      equation: "rA = 2.6e14 exp(-104129/RT) (CA CB - CE CW / K) / (CB + 3.7 CW)"
+      rate_basis: "volume of liquid (-dCA/dt, concentrations in mol/dm3); the solid acid's concentration is lumped into k (p. 573)"
+      parameters:
+        Ea: {value: 104129, unit: kJ/kmol}
+        A: {value: 2.6e14, unit: "(m3)2 kmol-2 s-1",
+            note: "as printed; not dimensionally consistent with Eq. 11"}
+        KW: {value: 3.7, unit: "1", note: "no unit given"}
+        K: {value: 4.0, uncertainty: 0.2, unit: "1",
+            note: "at 353 K on mole fractions, taken as independent of temperature"}
+      temperature_range: {range: [323, 353], unit: K}
+      fitting: "batch data at 323 to 353 K; mole fractions instead of activities (p. 575)"
+    missing:
+      - rate law per kg of catalyst
+      - consistent units of the frequency factor
+  - id: O-KIR-CONV
+    source: S-KIR
+    route: ESTER
+    location: "p. 574"
+    kind: experiment
+    scale: lab
+    conditions:
+      temperature: {value: 353, unit: K}
+      phase: liquid
+      catalyst: AMB15
+      catalyst_loading: {value: 5.4, unit: g per 100 g acetic acid}
+      feed:
+        AcOH: {value: 0.5, unit: mol per mol EtOH, note: "M = 1/2"}
+    conversion:
+      - component: AcOH
+        value: {value: 0.75, unit: "1", uncertainty: 0.05,
+                note: "'approximately 0.75'; reproducibility about 5 % of conversion"}
+        basis: equilibrium
+    missing:
+      - reaction time to the maximum conversion
+      - by-products (not analysed)
+      - selectivity and yield
+    notes: "batch maximum; activity fell about 5 % in conversion over three runs (p. 574)"
+  - id: O-AHM-KIN
+    source: S-AHM
+    route: ESTER
+    location: "p. 47, Eq. 1; p. 50, Table 2 and text"
+    kind: kinetics
+    scale: lab
+    equation: "-rA = k CA CB / (CB + KW CW)"
+    conditions:
+      temperature: {range: [40, 70], unit: °C}
+      phase: liquid
+      catalyst: AMB15
+      catalyst_formulation: "Amberlyst 15 (Sigma-Aldrich), granules 0.600 to 0.850 mm"
+      feed:
+        AcOH: {range: [0.5, 2], unit: mol per mol EtOH}
+      notes: "500 ml batch flask, 250 rpm; no transport limitation assumed (p. 46)"
+    kinetics:
+      equation: "-rA = k CA CB / (CB + KW CW), k and KW Arrhenius in T"
+      rate_basis: "volume of liquid; catalyst mass lumped into k; mole fractions"
+      parameters:
+        Ea: {value: 113876.9, unit: kJ/kmol, note: "the conclusion (p. 51) prints the same number in kJ/mol"}
+        A: {value: 5.9e15, unit: not stated}
+        dH_ads_water: {value: -49474.95, unit: kJ/kmol}
+      temperature_range: {range: [40, 70], unit: °C}
+      fitting: "initial rates, linearised (p. 47)"
+    missing:
+      - equilibrium constant
+      - rate law per kg of catalyst
+    notes: "Table 2's k rises 17-fold from 40 to 50 °C, more than the fitted Ea implies"
+  - id: O-AHM-CONV
+    source: S-AHM
+    route: ESTER
+    location: "Abstract; p. 48; Conclusion, p. 50-51"
+    kind: experiment
+    scale: lab
+    conditions:
+      temperature: {value: 70, unit: °C}
+      phase: liquid
+      catalyst: AMB15
+      feed:
+        AcOH: {value: 0.5, unit: mol per mol EtOH}
+    conversion:
+      - component: AcOH
+        value: {range: [0.68, 0.75], unit: "1",
+                note: "p. 48: about 0.68 with 5 g; abstract and conclusion: 75 %"}
+    missing:
+      - "catalyst loading of the 75 % run: 10 g in the abstract, 5 g in the conclusion"
+  - id: O-PET-P
+    source: S-PET
+    route: DEHYD
+    location: "Sec. 2.3; Sec. 3.2 and Fig. 4"
+    kind: experiment
+    scale: lab
+    conditions:
+      temperature: {value: 300, unit: °C}
+      pressure: {value: 101.325, unit: kPa(a), status: derived, derived_from: "'at atmospheric pressure' (Sec. 2.3)"}
+      phase: gas
+      catalyst_formulation: "10 wt% Cu (nominal) on porous Al-Mg mixed oxide (Cu/AlMgO-P), 150 mg powder"
+      catalyst_loading: {value: 150, unit: mg}
+      feed:
+        EtOH: {value: 0.1, unit: mL/min liquid, note: "99 wt% ethanol, with 30 mL/min N2"}
+      space_velocity: {value: 31.1, unit: 1/h, note: WHSV}
+    conversion:
+      - component: EtOH
+        value: {value: 61, unit: "%"}
+    byproducts: [ethene, diethyl ether, n-butanal, crotonaldehyde, methyl ethyl ketone, acetone, butanol]
+    missing:
+      - "selectivity to ethyl acetate (the minor products together below 2 %; acetaldehyde is the main product)"
+      - selectivity basis
+    notes: "deactivation over 6 h at 300 °C: 8.2 % (Sec. 3.2)"
+  - id: O-PET-R
+    source: S-PET
+    route: DEHYD
+    location: "Sec. 3.2 and Fig. 5"
+    kind: experiment
+    scale: lab
+    conditions:
+      temperature: {value: 300, unit: °C}
+      phase: gas
+      catalyst_formulation: "10 wt% Cu (nominal) on non-porous Al-Mg mixed oxide (Cu/AlMgO), 240 mg"
+      space_velocity: {value: 4.7, unit: 1/h, note: WHSV}
+    selectivity:
+      - product: EtOAc
+        value: {value: 35, unit: "%"}
+        relative_to: EtOH
+    missing:
+      - "conversion (given only as 3.5 times that at WHSV 31.1 h-1)"
+      - selectivity basis
+  - id: O-PET-ABS
+    source: S-PET
+    route: DEHYD
+    location: Abstract
+    kind: review-summary
+    scale: lab
+    conditions:
+      catalyst_formulation: "Cu on non-porous Al-Mg mixed oxide (Cu/AlMgO)"
+    conversion:
+      - component: EtOH
+        value: {value: 90, unit: "%", note: "'about 90%'"}
+    selectivity:
+      - product: EtOAc
+        value: {value: 20, unit: "%"}
+        relative_to: EtOH
+    missing: [conditions of these values]
+  - id: O-DAVY-1
+    source: S-DAVY
+    route: DEHYD
+    location: "Examples 1-5 procedure; Table 2, Example 1"
+    kind: operating-example
+    scale: patent-example
+    conditions:
+      temperature: {value: 225, unit: °C}
+      pressure: {value: 4.53, unit: bar(a), status: assumed,
+                 note: "Table 2 gives 'bar [10^5 Pa]' without saying absolute or gauge"}
+      phase: gas
+      catalyst_formulation: "200 ml copper oxide catalyst E408Tu (Mallinckrodt), reduced in dilute H2/N2"
+      feed:
+        EtOH: {value: 95.093, unit: wt %, note: "liquid at 200 ml/h with 2 standard l/h H2"}
+    outlet:
+      EtOAc: {value: 25.605, unit: wt %, note: "liquid condensate, GC"}
+      EtOH: {value: 63.184, unit: wt %}
+      AcH: {value: 2.578, unit: wt %}
+    byproducts: [acetaldehyde, acetone, butan-2-one, n-butanol, diethyl ether]
+    missing:
+      - "conversion, selectivity and yield (only the condensate is analysed; the off-gas is not)"
+      - whether the pressure is absolute or gauge
+  - id: O-DAVY-5
+    source: S-DAVY
+    route: DEHYD
+    location: "Table 2, Example 5"
+    kind: operating-example
+    scale: patent-example
+    conditions:
+      temperature: {value: 224, unit: °C}
+      pressure: {value: 47.0, unit: bar(a), status: assumed,
+                 note: "Table 2 gives 'bar [10^5 Pa]' without saying absolute or gauge"}
+      phase: gas
+      catalyst_formulation: "200 ml copper oxide catalyst E408Tu (Mallinckrodt)"
+    outlet:
+      EtOAc: {value: 21.107, unit: wt %, note: "liquid condensate, GC"}
+      EtOH: {value: 72.676, unit: wt %}
+      AcH: {value: 0.027, unit: wt %}
+    byproducts: [acetone, butan-2-one, n-butanol, diethyl ether]
+    missing:
+      - conversion, selectivity and yield
+  - id: O-BP-1
+    source: S-BP
+    route: ADD
+    location: "Example 1, Table 1, Run 1"
+    kind: operating-example
+    scale: patent-example
+    conditions:
+      temperature: {value: 170, unit: °C, note: applied}
+      pressure: {value: 1000, unit: kPa(a), status: assumed,
+                 note: "Table 1 gives 'Pressure (Kpa) 1000' without saying absolute or gauge"}
+      phase: gas
+      catalyst_formulation: "silicotungstic acid on Grace 1371 silica, 92 g/l heteropolyacid; 25 cm3 bed, 1-2 mm pellets"
+      feed:
+        C2H4: {value: 92.3, unit: mol %}
+        AcOH: {value: 6.7, unit: mol %}
+        H2O: {value: 1.0, unit: mol %}
+      space_velocity: {value: 980, unit: 1/h, note: total feed GHSV at STP}
+      contact_time: {value: 4, unit: s}
+    conversion:
+      - component: AcOH
+        value: {value: 66, unit: "%", note: "'HAC Conversion', no unit printed"}
+        basis: per-pass
+    selectivity:
+      - product: EtOAc
+        value: {value: 97.3, unit: "%"}
+        basis: mass
+    yield:
+      - product: EtOAc
+        value: {value: 95, unit: "%"}
+    byproducts: [ethanol, diethyl ether, oligomers]
+    missing:
+      - "the reactant the selectivity and yield are relative to"
+      - "whether the yield is isolated or analytical (95 lies above the acetic acid conversion of 66)"
+  - id: O-BP-4
+    source: S-BP
+    route: ADD
+    location: "Table 2, Run 4"
+    kind: operating-example
+    scale: patent-example
+    conditions:
+      temperature: {value: 180, unit: °C}
+      pressure: {value: 1000, unit: kPa(a), status: assumed,
+                 note: "'Pressure (Kpa) 1000' without saying absolute or gauge"}
+      phase: gas
+      catalyst_formulation: "as Run 1 (Catalyst 1)"
+      space_velocity: {value: 980, unit: 1/h, note: total feed GHSV at STP}
+    conversion:
+      - component: AcOH
+        value: {value: 71, unit: "%"}
+        basis: per-pass
+      - component: C2H4
+        value: {value: 5.3, unit: "%"}
+        basis: per-pass
+    selectivity:
+      - product: EtOAc
+        value: {value: 95.9, unit: "%"}
+        basis: mass
+    yield:
+      - product: EtOAc
+        value: {value: 68, unit: "%"}
+    byproducts: [ethanol, diethyl ether, oligomers]
+    missing:
+      - the reactant the selectivity and yield are relative to
+
+conflicts:
+  - about: "activation energy and water adsorption term of the esterification on Amberlyst 15"
+    observations: [O-KIR-KIN, O-AHM-KIN]
+    note: >-
+      Ea 104.1 kJ/mol (S-KIR) against 113.9 kJ/mol (S-AHM); KW constant at 3.7 (S-KIR) against
+      0.013 to 0.074 depending on temperature (S-AHM); different temperature ranges and fitting
+      methods.
+    resolution: "neither rate law enters the model yet; the conversion reactor uses O-KIR-CONV"
+  - about: "selectivity to ethyl acetate on the non-porous Cu/AlMgO"
+    observations: [O-PET-R, O-PET-ABS]
+    note: "the abstract gives 20 %, the body 35 % (Sec. 3.2)"
+
+model_basis:
+  route: ESTER
+  reactions: [ESTERIF]
+  catalyst: AMB15
+  evidence: [O-KIR-CONV, O-KIR-KIN]
+  assumptions:
+    - >-
+      a conversion reactor at 0.75 of the acetic acid, the batch maximum of O-KIR-CONV at
+      ethanol to acid 2:1 and 353 K, taken as the per-pass conversion of a reactor that comes
+      close to equilibrium at that feed ratio
+    - "no side reactions (not analysed in S-KIR)"
+  validation: >-
+    check the conversion against the equilibrium constant of O-KIR-KIN at the reactor
+    temperature, and against S-CAL once it is read, before the basic stage
+  decided_by: illustrative (example)
+  date: 2026-10-24

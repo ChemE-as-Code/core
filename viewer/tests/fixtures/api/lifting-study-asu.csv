@@ -1,0 +1,16 @@
+tag,weight_t,crane,pad,radius_m,gross_t,moment_tm,required_t,lift_height_m,hook_height_m,lane,laydown,chart,chart_radius_m,chart_capacity_t,utilisation,status
+K-1101,30,building B1,,,34.65,,34.65,0.5,8.5,clear,Z-LAYDOWN-A2,,,40,0.866,building crane 40 t carries it
+E-1101,12,building B1,,,13.86,,13.86,0.5,5.9,clear,Z-LAYDOWN-B1,,,40,0.347,building crane 40 t carries it
+E-1102,12,building B1,,,13.86,,13.86,0.5,5.9,clear,Z-LAYDOWN-B1,,,40,0.347,building crane 40 t carries it
+E-1103,9,building B1,,,10.395,,10.395,0.5,5.7,clear,Z-LAYDOWN-B1,,,40,0.26,building crane 40 t carries it
+E-2101,8,mobile,Z-PAD-A2,8.078,9.24,74.638,12.32,0.5,6.5,clear,Z-SIEVE,,,,,lane clear
+KT-3101,8,mobile,Z-PAD-A3S,15.871,9.24,146.648,12.32,3.5,9.5,clear,Z-LAYDOWN-A2,,,,,lane clear
+K-3101,8,mobile,Z-PAD-A3S,15.939,9.24,147.276,12.32,3.5,9.5,clear,Z-LAYDOWN-A2,,,,,lane clear
+K-4101,45,mobile,Z-PAD-A4,12.5,51.975,649.688,69.3,0.5,8.5,clear,Z-LAYDOWN-A4,,,,,lane clear
+E-4101,24,mobile,Z-PAD-A4C,7.906,27.72,219.146,36.96,0.5,6.7,clear,Z-LAYDOWN-A4,,,,,lane clear
+E-4102,6,mobile,Z-PAD-A4,8.016,6.93,55.548,9.24,0.5,5.5,clear,Z-LAYDOWN-A4,,,,,lane clear
+K-4102,25,mobile,Z-PAD-A4N,10.44,28.875,301.464,38.5,0.5,7.5,clear,Z-LAYDOWN-A4,,,,,lane clear
+E-4105A,6,mobile,Z-PAD-A5,8.246,6.93,57.146,9.24,1.81,12.81,clear,Z-LAYDOWN-A5N,,,,,lane clear
+E-4105B,6,mobile,Z-PAD-A5,8.544,6.93,59.21,9.24,1.49,12.49,clear,Z-LAYDOWN-A5N,,,,,lane clear
+E-4106A,7,mobile,Z-PAD-A5N,7.632,8.085,61.706,10.78,5.11,17.11,clear,Z-LAYDOWN-A5N,,,,,lane clear
+E-4106B,7,mobile,Z-PAD-A5N,6.576,8.085,53.171,10.78,5.057,17.057,clear,Z-LAYDOWN-A5N,,,,,lane clear

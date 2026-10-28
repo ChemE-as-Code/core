@@ -1,0 +1,32 @@
+# A PEM electrolysis cell at the US DOE 2022 stack status: 2.0 A/cm2 at 1.9 V per cell
+# (Hydrogen and Fuel Cell Technologies Office, "Technical Targets for Proton Exchange Membrane
+# Electrolysis", Table "Technical Targets for PEM Electrolyzer Stacks and Systems"), one cell of
+# 1 m2. The Faradaic efficiency of 1 is assumed (ideal): the DOE does not state one. Its
+# 51 / 48 / 43 kWh/kg at 1.9 / 1.8 / 1.6 V equal U 2F / M(H2) at an efficiency of 1, although its
+# footnote e says they include a 2.5 % H2 crossover loss (with 0.975 they would round to
+# 52 / 49 / 44); the 0.975 case of tests/test_electrochemical_cell.py is that footnote.
+schema: cheme/electrochemical-cells/v1
+kind: electrochemical_cells
+cells:
+  - id: PEM-1
+    title: PEM electrolysis cell
+    reaction: WS
+    electrons: 2
+    electrodes:
+      anode: {equation: "H2O -> 1/2 O2 + 2 H+ + 2 e-", species: {H2O: -1, O2: 0.5, H+: 2, e-: 2}}
+      cathode: {equation: "2 H+ + 2 e- -> H2", species: {H+: -2, e-: -2, H2: 1}}
+    cells: 1
+    current: {value: 20, unit: kA, provenance: given, source: "DOE PEM stack 2022 status: 2.0 A/cm2"}
+    active_area: {value: 1, unit: m2, provenance: given, source: "reference cell"}
+    faradaic_efficiency: {value: 1.0, provenance: assumed, source: "ideal current efficiency; reproduces the DOE PEM stack kWh/kg, whose footnote e nevertheless states a 2.5 % H2 crossover loss"}
+    voltage: {value: 1.9, unit: V, provenance: given, source: "DOE PEM stack 2022 status: 1.9 V per cell"}
+    reversible_voltage: {value: 1.229, unit: V, provenance: given, source: "NBS tables (Wagman et al., J. Phys. Chem. Ref. Data 11, Suppl. 2, 1982): dfG(H2O, l) = -237.129 kJ/mol; /(2F)"}
+    thermal:
+      kind: isothermal
+      temperature: {value: 298.15, unit: K, provenance: assumed, source: "enthalpy basis of the reference case"}
+    operating_range:
+      temperature: [293.15, 363.15]
+      current_density: [5000, 30000]
+      source: "DOE PEM stack targets: 2.0-3.0 A/cm2; PEM cells operate up to about 90 °C"
+    electrolyte: "proton-exchange membrane (perfluorosulfonic acid)"
+    sources: ["https://www.energy.gov/eere/fuelcells/technical-targets-proton-exchange-membrane-electrolysis"]

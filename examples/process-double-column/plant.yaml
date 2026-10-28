@@ -1,0 +1,6 @@
+name: process-double-column
+description: Example air separation double column solved by DWSIM (side draws, partial condenser, column without condenser, condenser-reboiler)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

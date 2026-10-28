@@ -1,0 +1,157 @@
+# An ammonia synthesis loop: makeup gas mixes with the recycle, the converter R1 takes the
+# synthesis to equilibrium (Peng-Robinson fugacities, 743.15 K outlet and 200 bar, 20 K
+# approach: K at 763.15 K), the cooled gas is flashed into liquid ammonia and a vapour that is purged (5 %, to
+# keep the argon down) and recycled. The converter, the mixer, the cooler and the purge are
+# solved by `cheme process propagate --fill`; the flash split (all ammonia to the liquid, an
+# idealisation) and the recycle are assumed, from the loop closed at that equilibrium.
+# `cheme process reactors` reports the converter's duty and its distance from equilibrium.
+# Regenerate the sheets with `cheme process build`.
+schema: cheme/process/v1
+kind: flowsheet
+title: Ammonia synthesis loop
+units: {pressure: kPa(a), temperature: K, flow: kmol/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - {id: MAKEUP, title: Makeup synthesis gas, ports: [{id: out, direction: out}]}
+products:
+  - {id: AMMONIA, title: Liquid ammonia, ports: [{id: in, direction: in}]}
+  - {id: PURGE, title: Purge gas, ports: [{id: in, direction: in}]}
+
+blocks:
+  - id: LOOP
+    title: Synthesis loop
+    class: ReactingChemicals
+    ports:
+      - {id: makeup, direction: in}
+      - {id: product, direction: out}
+      - {id: purge, direction: out}
+
+steps:
+  - id: M1
+    block: LOOP
+    title: Makeup and recycle
+    class: MixingSimple
+    ports:
+      - {id: makeup, direction: in, delegates: makeup}
+      - {id: recycle, direction: in}
+      - {id: out, direction: out}
+  - id: R1
+    block: LOOP
+    title: Ammonia converter
+    class: ReactingChemicals
+    reactions: [NH3_SYN]
+    reactor: equilibrium
+    fugacity: peng_robinson
+    approach: 20
+    catalyst: FE_NH3
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out}
+  - id: E1
+    block: LOOP
+    title: Converter effluent cooler
+    class: Cooling
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out}
+  - id: F1
+    block: LOOP
+    title: Ammonia separator
+    class: SeparatingByFlash
+    ports:
+      - {id: in, direction: in}
+      - {id: vapour, direction: out}
+      - {id: liquid, direction: out, delegates: product}
+  - id: SP1
+    block: LOOP
+    title: Purge split
+    class: SplittingMaterial
+    split: {purge: 0.05}
+    ports:
+      - {id: in, direction: in}
+      - {id: purge, direction: out, delegates: purge}
+      - {id: recycle, direction: out}
+
+streams:
+  - id: S1
+    title: Makeup gas
+    from: MAKEUP.out
+    to: M1.makeup
+    template: syngas
+    state:
+      design:
+        pressure: {value: 20000, provenance: given, source: basis of design}
+        temperature: {value: 313.15, provenance: given, source: basis of design}
+        flow: {value: 1000, basis: mole, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {N2: 0.2475, H2: 0.7425, NH3: 0.0, AR: 0.01}, provenance: given, source: basis of design}
+  - id: S2
+    title: Converter feed
+    from: M1.out
+    to: R1.in
+    template: syngas
+    state:
+      design:
+        pressure: {value: 20000, provenance: assumed}
+        temperature: {value: 673.15, provenance: assumed, source: "bed inlet, after the feed-effluent exchanger"}
+        flow: {value: 32313.5, unit: kg/h, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S8', fingerprint: af8ec8bdca880bcf}
+        composition: {basis: mole_fraction, values: {N2: 0.233641, H2: 0.700923, NH3: 0.0, AR: 0.0654357}, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S8', fingerprint: af8ec8bdca880bcf}
+  - id: S3
+    title: Converter effluent
+    from: R1.out
+    to: E1.in
+    template: syngas
+    state:
+      design:
+        pressure: {value: 20000, provenance: assumed}
+        temperature: {value: 743.15, provenance: assumed, source: converter outlet}
+        flow: {value: 32313.5, unit: kg/h, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 5f2a6078d63bdcca}
+        composition: {basis: mole_fraction, values: {N2: 0.188147, H2: 0.56444, NH3: 0.170801, AR: 0.0766122}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: d56039267d06ea0e}
+  - id: S4
+    title: Cooled effluent
+    from: E1.out
+    to: F1.in
+    template: syngas
+    state:
+      design:
+        temperature: {value: 268.15, provenance: assumed, source: chilled to -5 C}
+        flow: {value: 32313.5, unit: kg/h, provenance: calculated, source: 'cheme process propagate: pass-through E1 from S3', fingerprint: c2460d39930a77f4}
+        composition: {basis: mole_fraction, values: {N2: 0.188147, H2: 0.56444, NH3: 0.170801, AR: 0.0766122}, provenance: calculated, source: 'cheme process propagate: pass-through E1 from S3', fingerprint: c2460d39930a77f4}
+  - id: S5
+    title: Separator vapour
+    from: F1.vapour
+    to: SP1.in
+    template: syngas
+    state:
+      design:
+        flow: {value: 2164.657, basis: mole, provenance: assumed, source: "loop balance; all NH3 condensed"}
+        composition: {basis: mole_fraction, values: {N2: 0.226902, H2: 0.680705, NH3: 0.0, AR: 0.092393}, provenance: assumed, source: "loop balance; all NH3 condensed"}
+  - id: S6
+    title: Liquid ammonia
+    from: F1.liquid
+    to: AMMONIA.in
+    template: syngas
+    state:
+      design:
+        flow: {value: 445.8836, basis: mole, provenance: assumed, source: "loop balance; all NH3 condensed"}
+        composition: {basis: mole_fraction, values: {N2: 0.0, H2: 0.0, NH3: 1.0, AR: 0.0}, provenance: assumed, source: "loop balance; all NH3 condensed"}
+  - id: S7
+    title: Purge
+    from: SP1.purge
+    to: PURGE.in
+    template: syngas
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {N2: 0.226902, H2: 0.680705, NH3: 0.0, AR: 0.092393}, provenance: calculated, source: 'cheme process propagate: splitter SP1 from S5', fingerprint: 6e3883418ea3839c}
+        flow: {value: 108.233, basis: mole, provenance: calculated, source: 'cheme process propagate: splitter SP1 from S5', fingerprint: 40866b2e6778134a}
+  - id: S8
+    title: Recycle gas
+    from: SP1.recycle
+    to: M1.recycle
+    template: syngas
+    state:
+      design:
+        flow: {value: 2056.425, basis: mole, provenance: assumed, source: loop balance}
+        composition: {basis: mole_fraction, values: {N2: 0.226902, H2: 0.680705, NH3: 0.0, AR: 0.092393}, provenance: assumed, source: loop balance}

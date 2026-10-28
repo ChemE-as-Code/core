@@ -1,0 +1,4 @@
+name: water-electrolysis
+description: Water electrolysis reference cell (core#366, tests only)
+stage: concept
+sheets: []

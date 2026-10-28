@@ -1,0 +1,3 @@
+# Instrument list. Schema: `cheme schema instruments`.
+schema: cheme/instruments/v1
+instruments: []

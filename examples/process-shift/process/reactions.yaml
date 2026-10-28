@@ -1,0 +1,27 @@
+# The shift reaction with its kinetics (schema cheme/reactions/v1). The rate is a power law with
+# the (1 - Q/K) approach to equilibrium, K from the components' ideal-gas data. Its form and
+# exponents are those of Hla et al. (2009) for commercial Fe-Cr catalysts; the pre-exponential
+# factor is illustrative (provenance assumed): replace it with the vendor's kinetics.
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: WGS
+    title: Water-gas shift
+    equation: CO + H2O <=> CO2 + H2
+    stoichiometry: {CO: -1, H2O: -1, CO2: 1, H2: 1}
+    phase: vapor
+    reversible: true
+    heat_of_reaction: {value: -41127, provenance: given, source: "ATcT formation enthalpies"}
+    catalyst: FE_CR
+    rate:
+      form: power_law
+      basis: catalyst_mass
+      driving: partial_pressure
+      k: {A: 1000.0, Ea: 111000}
+      orders: {CO: 1.0, CO2: -0.36, H2: -0.09}
+      reverse: equilibrium
+      catalyst: FE_CR
+      temperature_range: [573.15, 773.15]
+      provenance: assumed
+      source: "form and Ea of Hla et al., Chem. Eng. J. 146 (2009) 148, doi:10.1016/j.cej.2008.09.023; A illustrative"
+    sources: ["Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989), chapter 6"]

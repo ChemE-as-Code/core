@@ -1,0 +1,30 @@
+# Control loop register: the regulatory loops. Schema: `cheme schema loops`.
+# PROPOSED control intent, not approved for implementation; the review status comes from reviews/.
+# Trips are not loops: they go in control/cause-effect.yaml, which `interlocks` refers to.
+# Conventions (action, fail, travel, split range) and the checks: skill control-loops.
+# Leave a value out until it is known (action, fail, value): validate reports it as
+# cheme.control-incomplete (info), and a stage gate decides when it must be given.
+schema: cheme/loops/v1
+loops: []
+#  - id: FIC-101                        # stable id, usually the loop tag
+#    title: Feed flow
+#    purpose: Hold the feed rate of the operating case.
+#    section: FEED                      # a section of process/narrative.md
+#    cases: [design]                    # operating cases of process/flowsheet.yaml
+#    variable: flow                     # flow, level, temperature, pressure, composition, ...
+#    measurement: [{tag: FT-101}]
+#    controller: FIC-101
+#    action: reverse                    # direct: output rises with the measurement
+#    final_elements:
+#      - {tag: FV-101, kind: valve, actuator: pneumatic, fail: closed}
+#    targets:
+#      - {kind: setpoint, value: 3600, unit: kg/h, provenance: given, source: basis of design,
+#         cases: [design], stream: S1, property: flow}
+#    modes: [manual, auto]
+#    normal_mode: auto
+#    links: []                          # cascade, ratio, feedforward, override
+#    alarms: [{tag: FT-101, condition: FAL, response: check the feed pump}]
+#    interlocks: []                     # related C&E ids
+#    rationale: ""
+#    operator: ""                       # judgement the operator has to make
+#    unresolved: []                     # open points, one per entry

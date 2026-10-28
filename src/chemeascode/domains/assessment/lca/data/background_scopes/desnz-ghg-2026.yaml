@@ -1,0 +1,26 @@
+# Structured scope of the packaged profile desnz-ghg-2026 (core#306), kept beside the profile so
+# that the profile file (and every project's manifest fingerprint of it) stays byte-stable.
+# Read from the profile's own text: electricity includes T&D and well-to-tank (factor `source`).
+# `accounting` is not declared: the profile's notes do not state it.
+sources:
+  desnz-ghg-2026:
+    gases: co2e
+    gwp: AR4/AR5
+    note: "GWP100 of AR4/AR5 (DESNZ 2026 methodology, Table 1)"
+factors:
+  "electricity-*":
+    basis: direct+upstream
+    delivery: consumer
+    mix: grid-average
+    note: "generation + T&D losses + well-to-tank of generation and of T&D; no construction"
+# Years (core#306 step 3): every factor's `year: 2026` is the year of the publication (the 2026
+# conversion factor set, flat file v1.2), not the year the data describe. `publication_year` says
+# so; `year` keeps its value. The data year of the electricity factors is 2025: the DESNZ 2026
+# methodology paper (section 3.8: "the 2026 publication uses 2025 data"; Table 9 note: data from
+# one year before publication, previously two, hence no 2024 data year) states it. The data year
+# of the other factors is not checked, so they stay undeclared and comparisons use `year` there.
+years:
+  "*":
+    publication_year: 2026
+  "electricity-*":
+    data_year: 2025

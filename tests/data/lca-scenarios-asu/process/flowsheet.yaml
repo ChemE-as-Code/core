@@ -1,0 +1,97 @@
+# SYNTHETIC test fixture (core#172): an ASU-like flowsheet, two computed cases. Not a design.
+schema: cheme/process/v1
+kind: flowsheet
+title: Synthetic ASU (scenario fixture)
+units: {pressure: kPa(a), temperature: K, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - id: design
+    description: "Design case: 30 C ambient (synthetic)"
+    default: true
+    capacity: 500 t/d GOX
+    provenance: assumed
+    applicability: {range: "450-550 t/d GOX at 15-30 C ambient", source: "synthetic test envelope", limitations: "test fixture only"}
+  - id: hot
+    description: "Hot-climate case: 40 C ambient, separately computed (synthetic): more compressor work"
+    capacity: 500 t/d GOX
+    provenance: assumed
+tolerance: {abs: 1.0, rel: 0.005}
+feeds:
+  - {id: AIR, title: Ambient air, ports: [{id: out, direction: out}]}
+  - {id: POWER, title: Electric power, ports: [{id: q, direction: out, kind: energy}]}
+products:
+  - {id: GOXP, title: GOX to pipeline, ports: [{id: in, direction: in}]}
+  - {id: GANP, title: GAN to pipeline, ports: [{id: in, direction: in}]}
+  - {id: LOX, title: Liquid oxygen, ports: [{id: in, direction: in}]}
+  - {id: LIN, title: Liquid nitrogen, ports: [{id: in, direction: in}]}
+  - {id: VENT, title: Waste nitrogen vent, ports: [{id: in, direction: in}]}
+  - {id: CW, title: Heat to cooling water, ports: [{id: q, direction: in, kind: energy}]}
+blocks:
+  - id: ASU
+    title: Air separation
+    class: SeparatingByThermalProcess
+    ports:
+      - {id: air, direction: in}
+      - {id: power, direction: in, kind: energy}
+      - {id: gox, direction: out}
+      - {id: gan, direction: out}
+      - {id: lox, direction: out}
+      - {id: lin, direction: out}
+      - {id: vent, direction: out}
+      - {id: cw, direction: out, kind: energy}
+streams:
+  - id: S1
+    from: AIR.out
+    to: ASU.air
+    template: air
+    state:
+      design: {flow: {value: 113000, provenance: assumed}}
+      hot: {flow: {value: 113000, provenance: assumed}}
+  - id: S2
+    from: ASU.gox
+    to: GOXP.in
+    template: air
+    state:
+      design: {flow: {value: 20860, provenance: assumed}}
+      hot: {flow: {value: 20860, provenance: assumed}}
+  - id: S3
+    from: ASU.gan
+    to: GANP.in
+    template: air
+    state:
+      design: {flow: {value: 12510, provenance: assumed}}
+      hot: {flow: {value: 12510, provenance: assumed}}
+  - id: S4
+    from: ASU.lox
+    to: LOX.in
+    template: air
+    state:
+      design: {flow: {value: 600, provenance: assumed}}
+      hot: {flow: {value: 600, provenance: assumed}}
+  - id: S5
+    from: ASU.lin
+    to: LIN.in
+    template: air
+    state:
+      design: {flow: {value: 600, provenance: assumed}}
+      hot: {flow: {value: 600, provenance: assumed}}
+  - id: S6
+    from: ASU.vent
+    to: VENT.in
+    template: air
+    state:
+      design: {flow: {value: 78430, provenance: assumed}}
+      hot: {flow: {value: 78430, provenance: assumed}}
+  - id: E1
+    kind: energy
+    from: POWER.q
+    to: ASU.power
+    state:
+      design: {duty: {value: 10000, provenance: assumed}}
+      hot: {duty: {value: 11000, provenance: assumed}}
+  - id: Q1
+    kind: energy
+    from: ASU.cw
+    to: CW.q
+    state:
+      design: {duty: {value: 9000, provenance: assumed}}
+      hot: {duty: {value: 9900, provenance: assumed}}

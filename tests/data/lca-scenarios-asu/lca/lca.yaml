@@ -1,0 +1,45 @@
+# SYNTHETIC test fixture (core#172): one foreground, several regional background scenarios.
+schema: cheme/lca/v1
+kind: lca
+functional_unit: {product: GOXP, amount: 1, unit: t}
+boundary: cradle-to-gate
+year: 2026
+technology: "cryogenic double-column air separation (synthetic fixture)"
+rights: CC0-1.0
+allocation:
+  method: mass
+  coproducts: [GOXP, GANP, LOX, LIN]
+  source: test
+flows:
+  - {key: feed:AIR, free: true, source: "ambient air"}
+  - {key: feed:POWER, factor: "desnz-ghg-2026:electricity-gb", proxy: "UK grid for a site whose country is not decided", source: "grid supply"}
+  - {key: product:CW, factor: cooling-water, source: "heat rejected to cooling water"}
+  - {key: product:VENT, free: true, source: "atmospheric gases returned"}
+scenarios:
+  - id: nl-grid-2025
+    title: Netherlands grid average 2025 (SYNTHETIC)
+    location: NL
+    year: 2025
+    electricity: grid-average
+    factors: {"desnz-ghg-2026:electricity-gb": electricity-nl-synthetic}
+    source: "SYNTHETIC test factor; demonstrates the contract only"
+  - id: de-grid-2025
+    title: Germany grid average 2025 (SYNTHETIC)
+    location: DE
+    year: 2025
+    electricity: grid-average
+    factors: {"desnz-ghg-2026:electricity-gb": electricity-de-synthetic}
+    missing: {"product:CW": "no DE cooling water factor available"}
+    source: "SYNTHETIC test factor; demonstrates the contract only"
+  - id: nl-ppa
+    title: Netherlands, user-provided wind PPA (SYNTHETIC)
+    location: NL
+    year: 2025
+    electricity: contractual
+    factors: {"desnz-ghg-2026:electricity-gb": electricity-ppa-user}
+    proxy: {"product:CW": "UK cooling estimate stands in for NL"}
+    source: "user-provided PPA certificate (synthetic test value)"
+  - id: hot-climate
+    title: Hot climate, separately computed case (SYNTHETIC)
+    case: hot
+    source: "flowsheet case hot: 40 C ambient"

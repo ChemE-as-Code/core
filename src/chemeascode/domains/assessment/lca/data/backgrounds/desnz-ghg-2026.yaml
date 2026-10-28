@@ -1,0 +1,134 @@
+# Packaged open background profile desnz-ghg-2026: a screening carbon footprint without a
+# licensed database. Use it from lca/factors.yaml with `include: [desnz-ghg-2026]`; the factor
+# ids below are then prefixed: desnz-ghg-2026:electricity-gb.
+#
+# The numbers are the UK Government GHG Conversion Factors for Company Reporting 2026 (DESNZ),
+# flat file version 1.2 (republished 31 July 2026), "GHG Conversion Factor 2026", kg CO2e. Each
+# factor sums the row ids it names. Published under the Open Government Licence v3.0, which
+# permits copying, publishing, distributing and adapting with the attribution below; cheme-as-code
+# records the terms, it does not grant rights. Climate change only (no other impact category),
+# UK geography, GWP100 of AR4/AR5 (methodology Table 1), biogenic CO2 excluded.
+schema: cheme/lca/v1
+kind: lca_factors
+sources:
+  - id: desnz-ghg-2026
+    title: UK Government GHG Conversion Factors for Company Reporting 2026 (flat file)
+    provider: UK Department for Energy Security and Net Zero (DESNZ)
+    version: "2026 v1.2 (flat file republished 2026-07-31)"
+    url: https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-2026
+    licence: OGL-3.0
+    attribution: "Contains public sector information licensed under the Open Government Licence v3.0 (UK Government GHG Conversion Factors for Company Reporting 2026, DESNZ)."
+    publication: public
+    redistribution: true
+    geography: GB
+    year: 2026
+    method: "GWP100, IPCC AR4/AR5 (DESNZ 2026 methodology, Table 1)"
+    checksum: "sha256:a9a455ab396dae226d510c7be6233748416d490c41a5d20f3dc7a0c45feecd5e"
+    notes: >-
+      Company-reporting factors, not LCA datasets: electricity and fuels include well-to-tank
+      and (electricity) transmission and distribution; material use covers extraction, primary
+      processing, manufacture and transport to the point of sale (methodology 12.2) and is not
+      suitable for recycling credits (12.1).
+categories:
+  - {id: climate-change, title: Climate change, unit: kg CO2-eq, method: "GWP100 (IPCC AR4/AR5, DESNZ 2026)"}
+factors:
+  - id: electricity-gb
+    title: Electricity, UK grid, at the consumer
+    unit: kWh
+    values: {climate-change: 0.18436}
+    status: PUBLISHED
+    source: "DESNZ 2026: generation 7_400_4000_5_1 (0.13096) + T&D 13_402_4000_5_1 (0.01299) + WTT generation 15_917_4000_5_1 (0.03682) + WTT T&D 15_918_4000_5_1 (0.00359)"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: natural-gas-gb
+    title: Natural gas, burned (per kWh gross calorific value)
+    unit: kWh
+    values: {climate-change: 0.21252}
+    status: PUBLISHED
+    source: "DESNZ 2026: combustion 1_100_1004_6_1 (0.18231) + WTT 11_100_1004_6_1 (0.03021), kWh gross CV"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+    notes: "Per kWh of fuel (gross CV); heat from a boiler is this divided by its efficiency."
+  - id: lorry-hgv-gb
+    title: Freight by lorry, average non-refrigerated HGV, average laden
+    unit: tkm
+    values: {climate-change: 0.12715}
+    status: PUBLISHED
+    source: "DESNZ 2026: 27_304_3140_14_1 (0.10356) + WTT 28_907_3140_14_1 (0.02359)"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: water-supply-gb
+    title: Water supply (mains)
+    unit: m3
+    values: {climate-change: 0.1913}
+    status: PUBLISHED
+    source: "DESNZ 2026: 17_404_4005_1_1"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: water-treatment-gb
+    title: Water treatment (waste water)
+    unit: m3
+    values: {climate-change: 0.17088}
+    status: PUBLISHED
+    source: "DESNZ 2026: 18_405_4006_1_1"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: metals-construction
+    title: Construction metals, primary production
+    unit: t
+    values: {climate-change: 3821.94858}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Construction / Metals / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: steel-cans
+    title: Steel cans, primary production
+    unit: t
+    values: {climate-change: 2861.58251}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Metal / Metal: steel cans / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: aluminium-cans-foil
+    title: Aluminium cans and foil, primary production (excl. forming)
+    unit: t
+    values: {climate-change: 9113.58251}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Metal / Metal: aluminium cans and foil (excl. forming) / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: concrete
+    title: Concrete, primary production
+    unit: t
+    values: {climate-change: 118.80307}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Construction / Concrete / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: aggregates
+    title: Aggregates, primary production
+    unit: t
+    values: {climate-change: 7.80307}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Construction / Aggregates / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB
+  - id: insulation
+    title: Insulation, primary production
+    unit: t
+    values: {climate-change: 1861.80307}
+    status: PUBLISHED
+    source: "DESNZ 2026: Material use / Construction / Insulation / Primary material production"
+    source_id: desnz-ghg-2026
+    year: 2026
+    location: GB

@@ -1,0 +1,98 @@
+# Liquid-liquid equilibrium systems shipped with core for `cheme process extract`
+# (chemeascode.domains.process.separations.extraction, core#369): components, NRTL interaction
+# parameters with their source and fitted temperature range, and, where a core test benchmarks
+# the system against measured tie lines, the benchmark (`qualification`).
+#
+# NRTL as in thermo: tau_ij = a_ij + b_ij/T + e_ij ln(T/K) + f_ij T, G_ij = exp(-alpha tau_ij).
+# A pair absent here is refused by `cheme process extract`, never taken as zero.
+schema: cheme/lle-systems/v1
+systems:
+  - id: water-1-propanol-butyl-acetate
+    title: 1-propanol from water into n-butyl acetate
+    model: NRTL
+    components:
+      - {name: water, cas: 7732-18-5, molar_mass: 18.015}
+      - {name: 1-propanol, cas: 71-23-8, molar_mass: 60.096}
+      - {name: n-butyl acetate, cas: 123-86-4, molar_mass: 116.16}
+    nrtl:
+      unit: K
+      pairs:
+        # Hajjar and Enders 2024, Table 6 (from Grob 2004, PhD thesis, University of
+        # Stuttgart, fitted to binary LLE data of Grob and Hasse 2005 and the Dortmund Data
+        # Bank); i = water, j = n-butyl acetate; c_ij ln(T) -> e_ij, d_ij T -> f_ij.
+        - i: water
+          j: n-butyl acetate
+          a_ij: 3554.89
+          a_ji: 776.64
+          b_ij: -98998.5
+          b_ji: -23696.4
+          e_ij: -613.04
+          e_ji: -130.77
+          f_ij: 0.9254
+          f_ji: 0.1666
+          alpha: 0.25
+        # Hajjar and Enders 2024, Table 7, fitted to the ternary tie lines of Rao and Rao
+        # (1958, 303.15 K) and Costa et al. (2009, 323.15 K); c = d = 0.
+        - {i: water, j: 1-propanol, a_ij: 3.29014, a_ji: -1.49266, b_ij: -119.623,
+           b_ji: 431.795, alpha: 0.425228}
+        - {i: n-butyl acetate, j: 1-propanol, a_ij: 5.91718, a_ji: -3.67244, b_ij: -1107.03,
+           b_ji: 886.271, alpha: 0.289351}
+    # The temperatures of the ternary tie lines the 1-propanol pairs were fitted to.
+    temperature_K: [303.15, 323.15]
+    source:
+      citation: >-
+        J. Hajjar, S. Enders, Liquid-liquid equilibria and the interfacial properties of the
+        ternary mixtures water + n-propanol + n-butyl acetate and water + n-butanol + n-butyl
+        acetate, Fluid Phase Equilibria 582 (2024) 114104 (open access, CC BY 4.0)
+      doi: 10.1016/j.fluid.2024.114104
+      url: https://publikationen.bibliothek.kit.edu/1000170627
+      location: Table 6 (water + n-butyl acetate), Table 7 (pairs with 1-propanol), Eq. (5)
+      access: full-text
+    qualification:
+      test: tests/test_extraction.py::test_the_bundled_system_reproduces_the_measured_tie_lines
+      reference:
+        citation: >-
+          H. F. Costa, H. Lourenco, I. Johnson, F. A. M. M. Goncalves, A. G. M. Ferreira,
+          I. M. A. Fonseca, Liquid-liquid equilibria, density, viscosity, and surface and
+          interfacial tension of the system water + n-butyl acetate + 1-propanol at 323.15 K and
+          atmospheric pressure, J. Chem. Eng. Data 54 (2009) 2845-2854; tie lines read from the
+          NIST TRC ThermoML file of the article
+        doi: 10.1021/je900337a
+        url: https://trc.nist.gov/ThermoML/10.1021/je900337a.xml
+        location: ThermoML data set 27 (four ternary tie lines and the binary edge, mole fractions)
+        access: secondary
+      carrier: water
+      solute: 1-propanol
+      solvent: n-butyl acetate
+      temperature_K: [323.15, 323.15]
+      basis: mole_fraction
+      # The 1-propanol mole fractions of each phase spanned by the ternary benchmark tie lines.
+      solute_min: {raffinate: 0.0154, extract: 0.1664}
+      solute_max: {raffinate: 0.041, extract: 0.3363}
+      tolerances:
+        # max |x_calc - x_exp| over both phases and all components of a ternary tie line
+        composition_abs: 0.035
+        # |D_calc / D_exp - 1| of 1-propanol (mole basis) and of the selectivity
+        distribution_rel: 0.10
+        selectivity_rel: 0.15
+        # n-butyl acetate in the aqueous phase (the solvent loss), absolute mole fraction
+        solvent_in_raffinate_abs: 0.003
+      observed:
+        composition_abs: 0.029
+        distribution_rel: 0.083
+        selectivity_rel: 0.068
+        solvent_in_raffinate_abs: 0.0023
+      notes:
+        - >-
+          The Costa et al. tie lines are among those the 1-propanol pairs were fitted to: the
+          benchmark qualifies the published correlation as core evaluates it (equation, units,
+          the equilibrium search), not a prediction of unseen data.
+        - >-
+          The model puts 2 to 8 times more n-butyl acetate in the aqueous phase than Costa et
+          al. measured (0.0017 to 0.0033 against 0.0002 to 0.001 mole fraction): the solvent
+          loss is qualified to 0.003 mole fraction absolute and errs on the high side.
+        - >-
+          On the binary edge (no 1-propanol) the model gives 0.076 mole fraction of water in
+          the ester phase against 0.1305 measured by Costa et al.; the parameters of that pair
+          come from other binary data (Grob 2004). A stage more dilute than the ternary tie lines
+          (solute_min) is therefore outside the qualified range.

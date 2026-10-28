@@ -1,0 +1,89 @@
+# The flowsheet of examples/process-recycle/ before refinement: blocks only, every stream between
+# block, feed and product ports. Refining it into steps keeps every stream id (S1-S5, Q1): only
+# the ends move from BLOCK.port to STEP.port, and the step port delegates the block port.
+schema: cheme/process/v1
+kind: flowsheet
+title: Ethanol recovery with recycle (blocks only)
+units: {pressure: kPa(a), temperature: K, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+feeds:
+  - {id: FEED, title: Aqueous feed, ports: [{id: out, direction: out}]}
+  - {id: STEAM, title: LP steam, ports: [{id: q, direction: out, kind: energy}]}
+products:
+  - {id: PROD, title: Ethanol product, ports: [{id: in, direction: in}]}
+  - {id: WATER, title: Waste water, ports: [{id: in, direction: in}]}
+blocks:
+  - id: MIX
+    title: Feed preparation
+    class: Mixing
+    ports: [{id: feed, direction: in}, {id: recycle, direction: in}, {id: out, direction: out}]
+  - id: SEP
+    title: Ethanol separation
+    class: SeparatingByThermalProcess
+    ports:
+      - {id: in, direction: in}
+      - {id: reboil, direction: in, kind: energy}
+      - {id: top, direction: out}
+      - {id: side, direction: out}
+      - {id: bottom, direction: out}
+streams:
+  - id: S1
+    title: Feed
+    from: FEED.out
+    to: MIX.feed
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 300, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 1000, basis: mass, provenance: given, source: basis of design}
+        composition: {basis: mass_fraction, values: {ETOH: 0.4, H2O: 0.6}, provenance: given, source: basis of design}
+  - id: S2
+    title: Column feed
+    from: MIX.out
+    to: SEP.in
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 250, provenance: assumed}
+        temperature: {value: 330, provenance: assumed}
+        flow: {value: 1500, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.3, H2O: 0.7}, provenance: assumed}
+  - id: S3
+    title: Distillate
+    from: SEP.top
+    to: PROD.in
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 110, provenance: assumed}
+        flow: {value: 400, provenance: given, source: product specification}
+        composition: {basis: mass_fraction, values: {ETOH: 0.95, H2O: 0.05}, provenance: given, source: product specification}
+  - id: S4
+    title: Recycle
+    from: SEP.side
+    to: MIX.recycle
+    template: aqueous
+    state:
+      design:
+        flow: {value: 500, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.1, H2O: 0.9}, provenance: assumed}
+  - id: S5
+    title: Bottoms
+    from: SEP.bottom
+    to: WATER.in
+    template: aqueous
+    state:
+      design:
+        flow: {value: 600, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.0333333, H2O: 0.9666667}, provenance: assumed}
+  - id: Q1
+    title: Reboiler duty
+    kind: energy
+    from: STEAM.q
+    to: SEP.reboil
+    state:
+      design:
+        duty: {value: 350, provenance: assumed}

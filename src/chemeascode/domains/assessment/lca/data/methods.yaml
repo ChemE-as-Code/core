@@ -1,0 +1,28 @@
+# Characterisation methods cheme packages for the plant's own (direct) emissions to air,
+# matched by the emitted component's CAS number (process/materials.yaml) and its origin. A
+# study names them in lca/lca.yaml (methods: [ipcc2021]) and maps an emission:<component>
+# elementary: {compartment: air, origin: fossil}. A row matches every sub-compartment of its
+# compartment (GWPs do not depend on the release point); resources are outside the method. Only what the cited source states is here;
+# background (supply chain) impacts come from the factors or the Brightway database.
+ipcc2021:
+  title: IPCC 2021 (AR6)
+  source: >-
+    IPCC, 2021: Climate Change 2021: The Physical Science Basis. Contribution of Working Group I
+    to the Sixth Assessment Report, Chapter 7 (Forster et al.), Table 7.15 and 7.SM.7: global
+    warming potentials, including climate-carbon feedbacks; non-fossil methane excludes the CO2
+    of its oxidation. Biogenic CO2 is 0 by the carbon-neutrality convention of most LCA methods.
+  categories:
+    gwp100: {title: "Climate change, GWP100 (IPCC 2021)", unit: kg CO2-eq}
+    gwp20: {title: "Climate change, GWP20 (IPCC 2021)", unit: kg CO2-eq}
+  factors:
+    - {cas: "124-38-9", name: carbon dioxide, origin: fossil, compartment: air, gwp100: 1.0, gwp20: 1.0}
+    - {cas: "124-38-9", name: carbon dioxide, origin: biogenic, compartment: air, gwp100: 0.0, gwp20: 0.0}
+    # CO2 is the reference gas (GWP 1 by definition); CO2 from land-use change is not covered by
+    # the biogenic carbon-neutrality convention (ISO 14067). Methane from land-use change has no
+    # row until a source states its factor: it is a gap (elementary-origin), not outside the
+    # method, since the method characterises methane.
+    - {cas: "124-38-9", name: carbon dioxide, origin: land-use-change, compartment: air, gwp100: 1.0, gwp20: 1.0}
+    - {cas: "74-82-8", name: methane, origin: fossil, compartment: air, gwp100: 29.8, gwp20: 82.5}
+    - {cas: "74-82-8", name: methane, origin: biogenic, compartment: air, gwp100: 27.0, gwp20: 79.7}
+    - {cas: "10024-97-2", name: dinitrogen monoxide, compartment: air, gwp100: 273.0, gwp20: 273.0}
+    - {cas: "2551-62-4", name: sulfur hexafluoride, compartment: air, gwp100: 25200.0, gwp20: 18300.0}

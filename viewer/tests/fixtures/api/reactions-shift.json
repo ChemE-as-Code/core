@@ -1,0 +1,674 @@
+{
+  "rev": null,
+  "file": "process/reactions.yaml",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "reactions": [
+    {
+      "id": "WGS",
+      "title": "Water-gas shift",
+      "equation": "CO + H2O <=> CO2 + H2",
+      "stoichiometry": {
+        "CO": -1.0,
+        "H2O": -1.0,
+        "CO2": 1.0,
+        "H2": 1.0
+      },
+      "phase": "vapor",
+      "reversible": true,
+      "conversion": null,
+      "heat_of_reaction": {
+        "value": -41127.0,
+        "unit": "kJ/kmol",
+        "temperature": 298.15,
+        "provenance": "given",
+        "source": "ATcT formation enthalpies"
+      },
+      "equilibrium_constant": null,
+      "rate": {
+        "form": "power_law",
+        "basis": "catalyst_mass",
+        "driving": "partial_pressure",
+        "k": {
+          "A": 1000.0,
+          "Ea": 111000.0,
+          "n": 0.0,
+          "T_ref": 1.0
+        },
+        "orders": {
+          "CO": 1.0,
+          "CO2": -0.36,
+          "H2": -0.09
+        },
+        "reverse": "equilibrium",
+        "adsorption": [],
+        "power": 1.0,
+        "catalyst": "FE_CR",
+        "temperature_range": [
+          573.15,
+          773.15
+        ],
+        "provenance": "assumed",
+        "source": "form and Ea of Hla et al., Chem. Eng. J. 146 (2009) 148, doi:10.1016/j.cej.2008.09.023; A illustrative"
+      },
+      "mechanism": null,
+      "catalyst": "FE_CR",
+      "sources": [
+        "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989), chapter 6"
+      ],
+      "key_component": null,
+      "type": "pfr",
+      "units": [
+        {
+          "unit": "R1",
+          "kind": "step",
+          "model": "pfr",
+          "approach_K": 0.0,
+          "conversion": null
+        }
+      ],
+      "rate_law": {
+        "expression": "r = k(T) · p_CO · p_CO2^-0.36 · p_H2^-0.09 · (1 - Q/K)",
+        "k_expression": "k(T) = A (T/T_ref)^n exp(-Ea/(R T))",
+        "rate_unit": "kmol/(kg s)",
+        "driving_unit": "bar",
+        "k_unit": "kmol/(kg s) / bar^0.55",
+        "catalyst": "FE_CR",
+        "k_profile": [
+          {
+            "temperature_K": 573.15,
+            "k": 7.657613804535849e-08
+          },
+          {
+            "temperature_K": 583.15,
+            "k": 1.1417302813123383e-07
+          },
+          {
+            "temperature_K": 593.15,
+            "k": 1.6795172426184014e-07
+          },
+          {
+            "temperature_K": 603.15,
+            "k": 2.4391989789543646e-07
+          },
+          {
+            "temperature_K": 613.15,
+            "k": 3.4996431030871504e-07
+          },
+          {
+            "temperature_K": 623.15,
+            "k": 4.963277314200874e-07
+          },
+          {
+            "temperature_K": 633.15,
+            "k": 6.961775233799134e-07
+          },
+          {
+            "temperature_K": 643.15,
+            "k": 9.66277156632518e-07
+          },
+          {
+            "temperature_K": 653.15,
+            "k": 1.3277722272610822e-06
+          },
+          {
+            "temperature_K": 663.15,
+            "k": 1.8071026976401131e-06
+          },
+          {
+            "temperature_K": 673.15,
+            "k": 2.4370530764245574e-06
+          },
+          {
+            "temperature_K": 683.15,
+            "k": 3.2579520807924423e-06
+          },
+          {
+            "temperature_K": 693.15,
+            "k": 4.3190329793003434e-06
+          },
+          {
+            "temperature_K": 703.15,
+            "k": 5.679965297006222e-06
+          },
+          {
+            "temperature_K": 713.15,
+            "k": 7.412567878523114e-06
+          },
+          {
+            "temperature_K": 723.15,
+            "k": 9.60271245564705e-06
+          },
+          {
+            "temperature_K": 733.15,
+            "k": 1.2352425863556499e-05
+          },
+          {
+            "temperature_K": 743.15,
+            "k": 1.578219790552732e-05
+          },
+          {
+            "temperature_K": 753.15,
+            "k": 2.0033500595306953e-05
+          },
+          {
+            "temperature_K": 763.15,
+            "k": 2.527152312542417e-05
+          },
+          {
+            "temperature_K": 773.15,
+            "k": 3.168812543703601e-05
+          }
+        ],
+        "k_profile_from": "temperature_range"
+      },
+      "microkinetics": null,
+      "element_balance": {
+        "evaluable": true,
+        "balanced": true,
+        "change": {}
+      }
+    }
+  ],
+  "reactors": [
+    {
+      "node": "SHIFT",
+      "kind": "block",
+      "bed": null,
+      "model": null,
+      "balance": "ok",
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S2"
+      ],
+      "temperature_out_K": 704.415,
+      "pressure_out_kPa": 2999.25,
+      "approach_K": 0.0,
+      "fugacity": "ideal",
+      "reactions": [
+        {
+          "id": "WGS",
+          "extent_kmol_h": 73.07201872241072,
+          "heat_of_reaction_kJ_kmol": -37832.09532887493,
+          "ln_k": 2.193099253562831,
+          "ln_q_over_k": -4.5505776404830556e-06,
+          "rate": 1.0499830584964272e-11,
+          "rate_unit": "kmol/(kg s)"
+        }
+      ],
+      "duty_kW": 0.01574315871039289,
+      "missing": []
+    },
+    {
+      "node": "R1",
+      "kind": "step",
+      "bed": {
+        "catalyst_mass_kg": 40000.0,
+        "catalyst_volume_m3": 35.39823008849557,
+        "outlet_temperature_K": 704.4151967775136,
+        "outlet_pressure_kPa": 2999.2508826254566,
+        "pressure_drop_kPa": 0.7491173745434025,
+        "hot_spot_K": 704.4151967775136,
+        "profile": [
+          {
+            "catalyst_mass_kg": 0.0,
+            "temperature_K": 623.15,
+            "pressure_kPa": 3000.0
+          },
+          {
+            "catalyst_mass_kg": 800.0,
+            "temperature_K": 626.4832291629449,
+            "pressure_kPa": 2999.986410850385
+          },
+          {
+            "catalyst_mass_kg": 1600.0,
+            "temperature_K": 630.0110968902422,
+            "pressure_kPa": 2999.9727470538064
+          },
+          {
+            "catalyst_mass_kg": 2400.0,
+            "temperature_K": 633.7490371865395,
+            "pressure_kPa": 2999.959004207737
+          },
+          {
+            "catalyst_mass_kg": 3200.0,
+            "temperature_K": 637.7118054542844,
+            "pressure_kPa": 2999.9451775792872
+          },
+          {
+            "catalyst_mass_kg": 4000.0,
+            "temperature_K": 641.9120768954788,
+            "pressure_kPa": 2999.9312621339886
+          },
+          {
+            "catalyst_mass_kg": 4800.0,
+            "temperature_K": 646.358234456472,
+            "pressure_kPa": 2999.917252603344
+          },
+          {
+            "catalyst_mass_kg": 5600.0,
+            "temperature_K": 651.0510290590345,
+            "pressure_kPa": 2999.903143612148
+          },
+          {
+            "catalyst_mass_kg": 6400.0,
+            "temperature_K": 655.9787962631594,
+            "pressure_kPa": 2999.8889298936574
+          },
+          {
+            "catalyst_mass_kg": 7200.0,
+            "temperature_K": 661.1110921519635,
+            "pressure_kPa": 2999.874606626082
+          },
+          {
+            "catalyst_mass_kg": 8000.0,
+            "temperature_K": 666.3911683988289,
+            "pressure_kPa": 2999.860169921724
+          },
+          {
+            "catalyst_mass_kg": 8800.0,
+            "temperature_K": 671.728880721324,
+            "pressure_kPa": 2999.8456174794565
+          },
+          {
+            "catalyst_mass_kg": 9600.0,
+            "temperature_K": 676.9974291305682,
+            "pressure_kPa": 2999.8309493577494
+          },
+          {
+            "catalyst_mass_kg": 10400.0,
+            "temperature_K": 682.0389563980546,
+            "pressure_kPa": 2999.8161687320176
+          },
+          {
+            "catalyst_mass_kg": 11200.0,
+            "temperature_K": 686.6833422728442,
+            "pressure_kPa": 2999.8012823914587
+          },
+          {
+            "catalyst_mass_kg": 12000.0,
+            "temperature_K": 690.7791272368199,
+            "pressure_kPa": 2999.786300685493
+          },
+          {
+            "catalyst_mass_kg": 12800.0,
+            "temperature_K": 694.2265292536774,
+            "pressure_kPa": 2999.771236749034
+          },
+          {
+            "catalyst_mass_kg": 13600.0,
+            "temperature_K": 696.9972836286303,
+            "pressure_kPa": 2999.756105126302
+          },
+          {
+            "catalyst_mass_kg": 14400.0,
+            "temperature_K": 699.131825089227,
+            "pressure_kPa": 2999.740920203864
+          },
+          {
+            "catalyst_mass_kg": 15200.0,
+            "temperature_K": 700.7176988476951,
+            "pressure_kPa": 2999.725694927495
+          },
+          {
+            "catalyst_mass_kg": 16000.0,
+            "temperature_K": 701.8620506083379,
+            "pressure_kPa": 2999.710440078185
+          },
+          {
+            "catalyst_mass_kg": 16800.0,
+            "temperature_K": 702.6695553968708,
+            "pressure_kPa": 2999.695164101985
+          },
+          {
+            "catalyst_mass_kg": 17600.0,
+            "temperature_K": 703.2300629607378,
+            "pressure_kPa": 2999.6798733156566
+          },
+          {
+            "catalyst_mass_kg": 18400.0,
+            "temperature_K": 703.6145683489113,
+            "pressure_kPa": 2999.664572285089
+          },
+          {
+            "catalyst_mass_kg": 19200.0,
+            "temperature_K": 703.8761693448299,
+            "pressure_kPa": 2999.6492642310463
+          },
+          {
+            "catalyst_mass_kg": 20000.0,
+            "temperature_K": 704.0531404703097,
+            "pressure_kPa": 2999.6339513869025
+          },
+          {
+            "catalyst_mass_kg": 20800.0,
+            "temperature_K": 704.1723951206212,
+            "pressure_kPa": 2999.61863528314
+          },
+          {
+            "catalyst_mass_kg": 21600.0,
+            "temperature_K": 704.2525450250445,
+            "pressure_kPa": 2999.6033169601337
+          },
+          {
+            "catalyst_mass_kg": 22400.0,
+            "temperature_K": 704.3063167649552,
+            "pressure_kPa": 2999.587997121181
+          },
+          {
+            "catalyst_mass_kg": 23200.0,
+            "temperature_K": 704.342348669478,
+            "pressure_kPa": 2999.5726762400195
+          },
+          {
+            "catalyst_mass_kg": 24000.0,
+            "temperature_K": 704.3664738748497,
+            "pressure_kPa": 2999.557354634916
+          },
+          {
+            "catalyst_mass_kg": 24800.0,
+            "temperature_K": 704.382618232518,
+            "pressure_kPa": 2999.542032519344
+          },
+          {
+            "catalyst_mass_kg": 25600.0,
+            "temperature_K": 704.3934179878776,
+            "pressure_kPa": 2999.526710036326
+          },
+          {
+            "catalyst_mass_kg": 26400.0,
+            "temperature_K": 704.4006407348929,
+            "pressure_kPa": 2999.511387281613
+          },
+          {
+            "catalyst_mass_kg": 27200.0,
+            "temperature_K": 704.4054704445895,
+            "pressure_kPa": 2999.496064319276
+          },
+          {
+            "catalyst_mass_kg": 28000.0,
+            "temperature_K": 704.4086996307695,
+            "pressure_kPa": 2999.4807411921715
+          },
+          {
+            "catalyst_mass_kg": 28800.0,
+            "temperature_K": 704.4108585389229,
+            "pressure_kPa": 2999.465417928962
+          },
+          {
+            "catalyst_mass_kg": 29600.0,
+            "temperature_K": 704.4123018325644,
+            "pressure_kPa": 2999.450094548811
+          },
+          {
+            "catalyst_mass_kg": 30400.0,
+            "temperature_K": 704.4132666866805,
+            "pressure_kPa": 2999.4347710645325
+          },
+          {
+            "catalyst_mass_kg": 31200.0,
+            "temperature_K": 704.4139116866531,
+            "pressure_kPa": 2999.419447484692
+          },
+          {
+            "catalyst_mass_kg": 32000.0,
+            "temperature_K": 704.4143428600356,
+            "pressure_kPa": 2999.404123815015
+          },
+          {
+            "catalyst_mass_kg": 32800.0,
+            "temperature_K": 704.4146310908957,
+            "pressure_kPa": 2999.3888000593297
+          },
+          {
+            "catalyst_mass_kg": 33600.0,
+            "temperature_K": 704.4148237664842,
+            "pressure_kPa": 2999.3734762201943
+          },
+          {
+            "catalyst_mass_kg": 34400.0,
+            "temperature_K": 704.4149525651975,
+            "pressure_kPa": 2999.3581522993186
+          },
+          {
+            "catalyst_mass_kg": 35200.0,
+            "temperature_K": 704.4150386636985,
+            "pressure_kPa": 2999.3428282978452
+          },
+          {
+            "catalyst_mass_kg": 36000.0,
+            "temperature_K": 704.4150962182016,
+            "pressure_kPa": 2999.327504216538
+          },
+          {
+            "catalyst_mass_kg": 36800.0,
+            "temperature_K": 704.4151346918133,
+            "pressure_kPa": 2999.3121800559056
+          },
+          {
+            "catalyst_mass_kg": 37600.0,
+            "temperature_K": 704.4151604103777,
+            "pressure_kPa": 2999.2968558162897
+          },
+          {
+            "catalyst_mass_kg": 38400.0,
+            "temperature_K": 704.4151776025489,
+            "pressure_kPa": 2999.281531497917
+          },
+          {
+            "catalyst_mass_kg": 39200.0,
+            "temperature_K": 704.4151890950633,
+            "pressure_kPa": 2999.266207100939
+          },
+          {
+            "catalyst_mass_kg": 40000.0,
+            "temperature_K": 704.4151967775136,
+            "pressure_kPa": 2999.2508826254566
+          }
+        ],
+        "notes": []
+      },
+      "model": "pfr",
+      "balance": "ok",
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S2"
+      ],
+      "temperature_out_K": 704.415,
+      "pressure_out_kPa": 2999.25,
+      "approach_K": 0.0,
+      "fugacity": "ideal",
+      "reactions": [
+        {
+          "id": "WGS",
+          "extent_kmol_h": 73.07201872241072,
+          "heat_of_reaction_kJ_kmol": -37832.09532887493,
+          "ln_k": 2.193099253562831,
+          "ln_q_over_k": -4.5505776404830556e-06,
+          "rate": 1.0499830584964272e-11,
+          "rate_unit": "kmol/(kg s)"
+        }
+      ],
+      "duty_kW": 0.01574315871039289,
+      "missing": []
+    }
+  ],
+  "balance": {
+    "balances": [
+      {
+        "node": "SHIFT",
+        "kind": "block",
+        "status": "ok",
+        "in_kg_h": 12735.51,
+        "out_kg_h": 12735.5,
+        "missing": [],
+        "failing": [],
+        "streams_in": [
+          "S1"
+        ],
+        "streams_out": [
+          "S2"
+        ],
+        "extents_kmol_h": {
+          "WGS": 73.072019
+        }
+      },
+      {
+        "node": "R1",
+        "kind": "step",
+        "status": "ok",
+        "in_kg_h": 12735.51,
+        "out_kg_h": 12735.5,
+        "missing": [],
+        "failing": [],
+        "streams_in": [
+          "S1"
+        ],
+        "streams_out": [
+          "S2"
+        ],
+        "extents_kmol_h": {
+          "WGS": 73.072019
+        }
+      }
+    ],
+    "findings": []
+  },
+  "kinetics": {
+    "file": "process/catalysts.yaml",
+    "catalysts": [
+      {
+        "id": "FE_CR",
+        "name": "Iron-chromium high-temperature shift catalyst",
+        "active_phase": "Fe3O4 (from Fe2O3)",
+        "promoters": [
+          "Cr2O3",
+          "CuO"
+        ],
+        "support": "",
+        "physical": {
+          "form": "pellet",
+          "particle_diameter": 0.006,
+          "sphericity": 0.86,
+          "particle_density": 1950.0,
+          "bulk_density": 1130.0,
+          "bed_voidage": 0.42,
+          "surface_area": 80.0,
+          "provenance": "assumed",
+          "source": "6 x 6 mm pellets, typical of Fe-Cr HTS catalysts (Twigg, Catalyst Handbook)"
+        },
+        "window": {
+          "temperature": [
+            583.15,
+            773.15
+          ],
+          "pressure": [
+            100.0,
+            8000.0
+          ],
+          "provenance": "assumed",
+          "source": "310-500 C (Twigg, Catalyst Handbook)"
+        },
+        "space_velocity": {
+          "basis": "GHSV",
+          "range": [
+            2000.0,
+            6000.0
+          ],
+          "provenance": "assumed",
+          "source": "dry gas basis, typical"
+        },
+        "poisons": [
+          "sulfur compounds",
+          "chlorides"
+        ],
+        "deactivation": {
+          "lifetime": 5.0,
+          "mechanisms": [
+            "sintering",
+            "poisoning"
+          ],
+          "regeneration": "",
+          "provenance": "assumed",
+          "source": "3-8 years in service (Twigg, Catalyst Handbook)"
+        },
+        "price": {
+          "value": 12.0,
+          "unit": "USD/kg",
+          "year": 2024,
+          "provenance": "assumed",
+          "source": "order of magnitude; ask for a quotation"
+        },
+        "sources": [],
+        "reactions": [
+          "WGS"
+        ],
+        "units": [
+          {
+            "unit": "R1",
+            "kind": "step",
+            "reactor": "pfr",
+            "reactions": [
+              "WGS"
+            ],
+            "bed": {
+              "catalyst_mass": 40000.0,
+              "volume": null,
+              "diameter": 3.0,
+              "length": null,
+              "tubes": 1,
+              "heat": "adiabatic",
+              "coolant_temperature": null,
+              "heat_transfer_coefficient": null,
+              "viscosity": 2.6e-05,
+              "provenance": "assumed",
+              "source": "a 3 m bed of 40 t; gas viscosity at 650 K, 30 bar (typical)"
+            }
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_CR: poison sulfur compounds is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_CR"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_CR"
+      },
+      {
+        "file": "process/catalysts.yaml",
+        "level": "info",
+        "rule": "cheme.catalyst-poison",
+        "message": "catalyst FE_CR: poison chlorides is no declared component; it is not checked against the feeds",
+        "line": 26,
+        "ids": [
+          "FE_CR"
+        ],
+        "hint": "name it by a component id of process/materials.yaml to have it checked",
+        "key": "",
+        "box": null,
+        "crop": null,
+        "accepted": null,
+        "measured": null,
+        "id": "process/catalysts.yaml#catalyst-poison:FE_CR"
+      }
+    ]
+  }
+}

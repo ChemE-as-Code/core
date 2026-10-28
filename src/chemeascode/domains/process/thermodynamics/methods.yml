@@ -1,0 +1,557 @@
+# The supported-method contract (pre-release issue 137): every thermodynamic model the selection tree
+# (model_selection_rules.yml) can recommend, and whether each execution route of cheme-as-code
+# runs it.
+#
+# Routes:
+#   phase       thermodynamics/phase.py (phase_determination, `cheme process phase`): a thermo flash
+#   simulation  the DWSIM worker (integrations/dwsim_worker.py PACKAGES, `cheme process simulate`)
+#
+# A method a route does not run is never replaced silently: `substitutes` lists, in order, the
+# nearest methods a route does run and what each loses. A recommendation reports the first one
+# executable on the route, marked as a substitution, for an engineer to accept or reject.
+# `substitutes: []` with `no_substitute` means no executable method stands in (the regime is
+# unsupported). This file holds no model parameters and claims no application range except
+# where a test benchmarks it: a route says "no range claimed" otherwise, and a simulation
+# package's benchmarked range is its `application_range` (methods[].simulation; the kij there
+# are what the benchmark read from DWSIM, recorded so that a change in DWSIM is detected, not
+# parameters cheme-as-code sets).
+#
+# tests/test_thermo_methods.py checks that every recommendation of the tree is here exactly
+# once, that the simulation packages are the worker's PACKAGES and the phase models the ones
+# phase.py accepts.
+
+meta:
+  version: 1
+  description: >-
+    Which recommended thermodynamic models phase.py and the DWSIM simulation route execute,
+    with declared limitations and the explicit substitutions for the ones they do not.
+
+routes:
+  phase:
+    title: "phase.py: thermo flash (FlashVL, FlashVLN, FlashPureVLS)"
+    limitations:
+      - "no solid phase: flashes are built with no solids; a state below the melting point is reported as fluid"
+      - "no electrolytes: components with a charge (ions) are refused"
+      - "no pseudocomponents: every component must be a compound thermo identifies; a petroleum fraction is refused"
+      - "a missing binary interaction parameter counts as zero (thermo's default); interaction_parameter_coverage reports which"
+    application_range: "no range claimed: tests check phase counts and convergence only, not values against reference data"
+  simulation:
+    title: "DWSIM worker: cheme process simulate"
+    limitations:
+      - "no electrolytes: the worker exposes no electrolyte property package"
+      - "no pseudocomponents: every compound must be in DWSIM's database (by CAS number or the name in simulation.yaml); no assay characterisation"
+      - "no solid phase: simulation.yaml has no solid compounds or solid-phase input, and none is tested"
+      - "binary interaction parameters: DWSIM's own database (not inspected by cheme-as-code) unless simulation.yaml interaction_parameters set them (equation-of-state packages only)"
+    application_range: "no range claimed by cheme-as-code, except the per-package ranges a test benchmarks (methods[].simulation.application_range)"
+
+# Coverage decisions for regimes the issue names; status: supported | limited |
+# external_integration | unsupported, from what the code does (tests/test_thermo_methods.py).
+regimes:
+  electrolytes:
+    selection: "the tree recommends Electrolyte NRTL or Pitzer (outcome polar_electrolyte); the electrolyte route runs Pitzer's liquid model for the qualified systems of electrolytes.yml only (NaCl-H2O); the phase and simulation routes run neither and nothing is substituted"
+    phase: {status: unsupported, evidence: "phase_determination refuses a component with a charge, and an apparent electrolyte of electrolytes.yml together with water (ValueError)"}
+    simulation: {status: unsupported, evidence: "no electrolyte package in the worker's PACKAGES; translate refuses any other property_package (cheme.process-sim-property-package) and an apparent electrolyte of electrolytes.yml together with water (cheme.process-sim-electrolyte)"}
+    elsewhere:
+      electrolyte: {status: limited, evidence: "cheme process electrolyte (electrolytes.yml): NaCl-H2O, one liquid phase, 273.15-373.15 K, up to 1000 kPa(a) and 6 mol/kg (relative enthalpy 313.15-373.15 K), benchmarked against Hamer and Wu (1972) and Pitzer, Peiper and Busey (1984) in tests/test_electrolytes.py; any other electrolyte is refused"}
+  solid_equilibrium:
+    selection: "the tree has no solid-phase branch; outside the property routes, a flowsheet crystallizer: (basis: solubility, process.crystallization) uses sourced solubility data for one solute in one solvent, not a solid-liquid equilibrium model"
+    phase: {status: unsupported, evidence: "no solid phase in the flash: water at 250 K and 1 bar is reported as one liquid; the result lists the limitation"}
+    simulation: {status: unsupported, evidence: "no solid-phase specification in simulation.yaml or the translation; translate refuses a phase: solid component (cheme.process-sim-solid) and props --fill a stream holding one (cheme.process-property-unsupported)"}
+    elsewhere:
+      crystallizer: {status: limited, evidence: "flowsheet crystallizer: and solid_separation: (domains/process/crystallization.py), solved by cheme process propagate: one solute in one solvent, anhydrous or hydrate, sourced solubility data interpolated and never extrapolated, specified filter and mother-liquor recycle; checked against Felder & Rousseau Ex. 4.5-2 and Geankoplis Ex. 12.11-1 and 12.11-2 (tests/test_crystallization.py); no SLE model, impurities or several solutes"}
+  high_temperature_solid_reaction:
+    selection: "the tree has no solid-reaction branch: a calciner or furnace is not a fluid flash"
+    phase: {status: unsupported, evidence: "no solid phase in the flash; a fluid-only flash never gives a furnace duty"}
+    simulation: {status: unsupported, evidence: "no solid compounds in simulation.yaml or the translation; not tested"}
+    elsewhere:
+      furnace: {status: limited, evidence: "cheme process furnace (domains/process/furnace.py): limestone calcination CaCO3 -> CaO + CO2 only, condensed-phase NASA data through Cantera, given conversion; element, off-gas and furnace-energy closure checked against Sagastume Gutierrez et al. 2013 kiln No. 1 (tests/test_furnace.py); carbothermal reduction, dolomite and alumina calcination unsupported"}
+  petroleum_pseudocomponents:
+    selection: "the tree recommends Braun K-10, ideal, Chao-Seader or Grayson-Streed; no route executes them and nothing is substituted"
+    phase: {status: unsupported, evidence: "a component thermo does not identify (e.g. a C7+ fraction) is refused (ValueError)"}
+    simulation: {status: unsupported, evidence: "the worker looks every compound up in DWSIM's database and fails for one it does not find; no pseudocomponent input in simulation.yaml"}
+    # pre-release issue 367: assays characterised into pseudocomponents (thermodynamics/assay.py, `cheme
+    # process assay`), flashed with Peng-Robinson (kij = 0) through thermo; neither route above
+    # takes them, so a flowsheet with a petroleum fraction is still not simulated.
+    elsewhere:
+      assay: {status: limited, evidence: "assay.FLASH_CLAIM: bubble and dew temperatures, enthalpy differences, molar mass and 15 degC liquid density of pseudocomponents with Tb 340-448 K and SG 0.66-0.875 at 300-550 K and 50-500 kPa(a), against CoolProp 8.0.0 reference multi-fluid models of two naphtha surrogates (tests/test_assay.py); insufficient assays and correlations outside their fitted range are refused (cheme.assay-insufficient, cheme.assay-extrapolation)"}
+
+methods:
+  # -- electrolytes ---------------------------------------------------------------------------
+  - id: ENRTL-PR
+    name: Electrolyte NRTL with Peng-Robinson vapour
+    recommended_as:
+      - "Electrolyte NRTL (for liquid phase activity coefficient model with Peng-Robinson vapor phase fugacity coefficient model)"
+    limitations: [electrolytes]
+    substitutes: []
+    no_substitute: "neither route models ions; a non-electrolyte model would ignore dissociation and ionic interactions"
+  - id: PITZER-RKS
+    name: Pitzer with Redlich-Kwong-Soave vapour
+    recommended_as:
+      - "Pitzer (for liquid phase activity coefficient model with Redlich-Kwong-Soave vapor phase fugacity coefficient model)"
+    limitations: [electrolytes]
+    electrolyte:
+      systems: [NaCl-H2O]
+      note: "cheme process electrolyte: Pitzer's liquid model (Cantera HMW-electrolyte) in the claimed range of electrolytes.yml; the vapour is pure water as an ideal gas, not Redlich-Kwong-Soave; no flash"
+    substitutes: []
+    no_substitute: "neither route models ions; a non-electrolyte model would ignore dissociation and ionic interactions"
+
+  # -- polar, high pressure -------------------------------------------------------------------
+  - id: SR-POLAR
+    name: Schwartzentruber-Renon polar equation of state
+    recommended_as: ["Schwartzentruber-Renon-Polar"]
+    substitutes:
+      - {method: RKS, loses: "the polar alpha function and the Schwartzentruber-Renon mixing rules; classical one-fluid mixing with kij"}
+      - {method: PR, loses: "the polar alpha function and the Schwartzentruber-Renon mixing rules; classical one-fluid mixing with kij"}
+  - id: PR-WS
+    name: Peng-Robinson with Wong-Sandler mixing rules
+    recommended_as: ["Peng-Robinson with Wong-Sandler mixing rules"]
+    substitutes:
+      - {method: PR, loses: "the Wong-Sandler (excess Gibbs energy) mixing rules; classical one-fluid mixing with kij"}
+  - id: RKS-WS
+    name: Redlich-Kwong-Soave with Wong-Sandler mixing rules
+    recommended_as: ["Redlich-Kwong-Soave with Wong-Sandler mixing rules"]
+    substitutes:
+      - {method: RKS, loses: "the Wong-Sandler (excess Gibbs energy) mixing rules; classical one-fluid mixing with kij"}
+  - id: PR-MHV2
+    name: Peng-Robinson with modified Huron-Vidal mixing rules
+    recommended_as: ["Peng-Robinson with modified Huron-Vidal mixing rules"]
+    substitutes:
+      - {method: PR, loses: "the modified Huron-Vidal (excess Gibbs energy) mixing rules; classical one-fluid mixing with kij"}
+  - id: RKS-MHV2
+    name: Redlich-Kwong-Soave with modified Huron-Vidal mixing rules
+    recommended_as: ["Redlich-Kwong-Soave with modified Huron-Vidal mixing rules"]
+    substitutes:
+      - {method: RKS, loses: "the modified Huron-Vidal (excess Gibbs energy) mixing rules; classical one-fluid mixing with kij"}
+  - id: PSRK
+    name: Predictive Redlich-Kwong-Soave
+    recommended_as: ["Predictive Redlich-Kwong-Soave"]
+    substitutes:
+      - {method: RKS, loses: "the predictive UNIFAC-based mixing rule; classical one-fluid mixing with kij, which the tree chose PSRK to avoid (no interaction parameters)"}
+
+  # -- nonpolar -------------------------------------------------------------------------------
+  - id: PR
+    name: Peng-Robinson
+    recommended_as: ["Peng-Robinson"]
+    phase:
+      model: {eos_model: Peng-Robinson}
+      interaction_parameters: "kij: ChemSep PR (thermo's IPDB table 'ChemSep PR')"
+    simulation:
+      package: "Peng-Robinson (PR)"
+      interaction_parameters: "kij: DWSIM's database; simulation.yaml interaction_parameters override"
+      # The air-separation claim: DWSIM 9.0.5's PR against CoolProp 8.0.0 reference equations
+      # of state (tests/test_process_simulate_property_package.py, live). Every box edge is a
+      # grid point of the test; the near-critical region (100-170 K above 2000 kPa(a)) is left
+      # out: enthalpy differences miss the tolerance there (argon at 150 K, 5000 kPa(a): 315
+      # kJ/kmol), DWSIM applies its Rackett liquid density beyond the critical point (wrong by
+      # orders of magnitude) and its PV flash fails for nitrogen-rich mixtures above 3000
+      # kPa(a).
+      application_range:
+        simulator: dwsim
+        simulator_version: "9.0.5"
+        components: {7727-37-9: nitrogen, 7782-44-7: oxygen, 7440-37-1: argon}
+        phases: [vapor, liquid, two-phase]
+        regions:
+          7727-37-9:
+            - {temperature_K: [65, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [65, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+          7782-44-7:
+            - {temperature_K: [65, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [65, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+          7440-37-1:
+            - {temperature_K: [85, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [90, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+        properties:
+          - "bubble and dew temperatures (and at vapour fraction 0.5) at a given pressure and composition"
+          - "equilibrium phase compositions (vapour fraction 0.5)"
+          - "enthalpy differences, every phase and saturation state, from the gas at 300 K and 100 kPa(a)"
+          - "liquid density of the pure fluids where the fluid is a subcritical liquid (below its saturation temperature up to 2000 kPa(a), and at or below 100 K up to 6000 kPa(a)); not in the 170-320 K gas box, where DWSIM labels supercritical oxygen and argon liquid"
+        not_claimed:
+          - "liquid density of mixtures: DWSIM's Rackett mixture density misses the reference by up to 8 % below 110 K (nitrogen-argon 50/50: -7.8 %) and up to 13 % nearer the critical point (120 K, 2000 kPa(a))"
+          - "gas density: within 2.2 % of the reference up to 2000 kPa(a) except at isolated states where DWSIM 9.0.5 returns a wrong vapour density while its enthalpy agrees (air at 260 K, 200 kPa(a): -3.6 %; nitrogen-oxygen 50/50 at 250 K, 700 kPa(a): -32 %; crude oxygen at 190 K, 300 kPa(a): -20 %); up to 5 % at 170 K and 6000 kPa(a); at 170 K and 10000 kPa(a) DWSIM labels supercritical oxygen and argon liquid and its Rackett density is wrong by orders of magnitude"
+          - "transport properties, solids (argon freezes at 83.8 K), other components"
+        tolerances:
+          saturation_temperature_abs_K: 0.3
+          equilibrium_mole_fraction_abs: 0.005
+          enthalpy_difference_abs_kJ_per_kmol: 200.0
+          liquid_density_rel_pure: 0.02
+        interaction_parameters:
+          source: "DWSIM 9.0.5's own PR database (the package's InteractionParameters as the worker reads them); none set by cheme-as-code. A simulation.yaml interaction_parameters override leaves the claim"
+          kij: {"7727-37-9&7782-44-7": -0.0159, "7440-37-1&7727-37-9": -0.0026, "7440-37-1&7782-44-7": 0.0107}
+        package_settings:
+          LiquidDensityCalculationMode_Subcritical: Rackett_and_ExpData
+          LiquidDensityCalculationMode_Supercritical: Rackett_and_ExpData
+          LiquidDensity_UsePenelouxVolumeTranslation: "True"
+          LiquidDensity_CorrectExpDataForPressure: "True"
+        benchmark:
+          test: tests/test_process_simulate_property_package.py
+          reference: >-
+            CoolProp 8.0.0 (HEOS), evaluated by the test: Span-JPCRD-2000 (N2),
+            Schmidt-FPE-1985/Stewart-JPCRD-1991 (O2), Tegeler-JPCRD-1999 (Ar); mixtures with the
+            Gernert-Thesis-2013 (EOS-CG) reducing functions of the three pairs
+        notes:
+          - "pure fluids, each pair at 10/50/90 mol-% and three ternaries (air, crude oxygen, argon-column feed) on a grid of 65-320 K and 100-10000 kPa(a); saturation states 100-2000 kPa(a)"
+          - "two-phase states lie below 2000 kPa(a): the boxes above it hold one phase (subcooled liquid at or below 100 K, gas at or above 170 K)"
+    substitutes: []
+  - id: RKS
+    name: Redlich-Kwong-Soave
+    recommended_as: ["Redlich-Kwong-Soave"]
+    phase:
+      model: {eos_model: Redlich-Kwong-Soave}
+      interaction_parameters: "kij: ChemSep SRK, user-installed with `cheme data fetch chemsep-srk` (not shipped, pre-release issue 55)"
+    simulation:
+      package: "Soave-Redlich-Kwong (SRK)"
+      interaction_parameters: "kij: DWSIM's database; simulation.yaml interaction_parameters override"
+      # DWSIM 9.0.5's SRK against CoolProp 8.0.0 reference equations of state
+      # (tests/test_process_simulate_property_package_srk.py, live), on the grid and with the
+      # tolerances of the PR benchmark. Nitrogen, oxygen and argon each alone only: DWSIM's SRK
+      # database holds no kij for their pairs (the worker reads none, so kij = 0), and every
+      # tested mixture but nitrogen-argon 90/10 (which meets them narrowly) misses the
+      # saturation-temperature or phase-composition tolerance. The pure
+      # fluids hold PR's boxes; the near-critical region is left out as for PR (argon at 150 K,
+      # 5000 kPa(a): 322 kJ/kmol, liquid density -9 %).
+      application_range:
+        simulator: dwsim
+        simulator_version: "9.0.5"
+        components: {7727-37-9: nitrogen, 7782-44-7: oxygen, 7440-37-1: argon}
+        mixtures: false
+        phases: [vapor, liquid, two-phase]
+        regions:
+          7727-37-9:
+            - {temperature_K: [65, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [65, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+          7782-44-7:
+            - {temperature_K: [65, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [65, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+          7440-37-1:
+            - {temperature_K: [85, 320], pressure_kPa: [100, 2000]}
+            - {temperature_K: [90, 100], pressure_kPa: [100, 6000]}
+            - {temperature_K: [170, 320], pressure_kPa: [100, 10000]}
+        properties:
+          - "saturation temperature (vapour fractions 0, 0.5 and 1) of each pure fluid at a given pressure"
+          - "enthalpy differences of each pure fluid, every phase and saturation state, from the gas at 300 K and 100 kPa(a)"
+          - "liquid density of the pure fluids where the fluid is a subcritical liquid (below its saturation temperature up to 2000 kPa(a), and at or below 100 K up to 6000 kPa(a)); not in the 170-320 K gas box, where DWSIM labels supercritical oxygen and argon liquid"
+        not_claimed:
+          - "mixtures of any two or three of the components: DWSIM 9.0.5's SRK has no kij for these pairs; every tested mixture but nitrogen-argon 90/10 misses a tolerance; bubble and dew temperatures miss the reference by up to 0.72 K (nitrogen-oxygen 50/50, bubble point at 2000 kPa(a)) and equilibrium phase compositions by up to 0.0115 mole fraction (nitrogen-oxygen 50/50, 100 kPa(a)), beyond the tolerances"
+          - "gas density: within 0.8 % of the reference up to 2000 kPa(a) for the pure fluids, -4.7 % for nitrogen at 170 K and 10000 kPa(a); at 170 K and 10000 kPa(a) DWSIM labels supercritical oxygen and argon liquid and its Rackett density is wrong by orders of magnitude"
+          - "transport properties, solids (argon freezes at 83.8 K), other components"
+        tolerances:
+          saturation_temperature_abs_K: 0.3
+          equilibrium_mole_fraction_abs: 0.005
+          enthalpy_difference_abs_kJ_per_kmol: 200.0
+          liquid_density_rel_pure: 0.02
+        interaction_parameters:
+          source: "none: DWSIM 9.0.5's SRK database has no kij for nitrogen, oxygen and argon pairs (the worker reads none); the claim holds no mixture. A simulation.yaml interaction_parameters override leaves the claim"
+          kij: {}
+        package_settings:
+          LiquidDensityCalculationMode_Subcritical: Rackett_and_ExpData
+          LiquidDensityCalculationMode_Supercritical: Rackett_and_ExpData
+          LiquidDensity_UsePenelouxVolumeTranslation: "True"
+          LiquidDensity_CorrectExpDataForPressure: "True"
+        benchmark:
+          test: tests/test_process_simulate_property_package_srk.py
+          reference: >-
+            CoolProp 8.0.0 (HEOS), evaluated by the test: Span-JPCRD-2000 (N2),
+            Schmidt-FPE-1985/Stewart-JPCRD-1991 (O2), Tegeler-JPCRD-1999 (Ar); mixtures (shown
+            to fail) with the Gernert-Thesis-2013 (EOS-CG) reducing functions of the three pairs
+        notes:
+          - "the grid of the PR benchmark: 65-320 K and 100-10000 kPa(a), saturation states 100-2000 kPa(a); the pure fluids are claimed, the pairs at 10/50/90 mol-% and the three ternaries are evaluated to show why mixtures are not"
+    substitutes: []
+  - id: LKP
+    name: Lee-Kesler-Plocker
+    recommended_as: ["Lee-Kesler-Plocker"]
+    substitutes:
+      - {method: PR, loses: "the Lee-Kesler-Plocker corresponding-states formulation; a cubic equation of state instead"}
+  - id: PR-BM
+    name: Peng-Robinson with Boston-Mathias alpha function
+    recommended_as: ["Peng-Robinson with Boston-Mathias alpha function"]
+    substitutes:
+      - {method: PR, loses: "the Boston-Mathias alpha function above the critical temperature; the standard Peng-Robinson alpha"}
+  - id: RKS-BM
+    name: Redlich-Kwong-Soave with Boston-Mathias alpha function
+    recommended_as: ["Redlich-Kwong-Soave with Boston-Mathias alpha function"]
+    substitutes:
+      - {method: RKS, loses: "the Boston-Mathias alpha function above the critical temperature; the standard Soave alpha"}
+
+  # -- nonpolar with pseudocomponents ---------------------------------------------------------
+  - id: BK10
+    name: Braun K-10
+    recommended_as: ["Braun K-10"]
+    limitations: [pseudocomponents]
+    substitutes: []
+    no_substitute: "recommended for petroleum pseudocomponents, which no route represents"
+  - id: IDEAL
+    name: Ideal (Raoult's law, ideal gas)
+    recommended_as: ["ideal"]
+    limitations: [pseudocomponents]
+    substitutes: []
+    no_substitute: "recommended for petroleum pseudocomponents, which no route represents"
+  - id: CHAO-SEADER
+    name: Chao-Seader
+    recommended_as: ["Chao-Seader"]
+    limitations: [pseudocomponents]
+    substitutes: []
+    no_substitute: "recommended for petroleum pseudocomponents, which no route represents"
+  - id: GRAYSON-STREED
+    name: Grayson-Streed
+    recommended_as: ["Grayson-Streed"]
+    limitations: [pseudocomponents]
+    substitutes: []
+    no_substitute: "recommended for petroleum pseudocomponents, which no route represents"
+
+  # -- polar, low pressure, vapour association ------------------------------------------------
+  - id: NRTL-NTH
+    name: NRTL with Nothnagel vapour
+    recommended_as: ["NRTL liquid phase activity coefficient model with Nothagel vapor phase model (NRTL-NTH)"]
+    substitutes:
+      - {method: NRTL, loses: "vapour-phase association (Nothnagel); an ideal-gas (phase) or the package's own (simulation) vapour"}
+  - id: NRTL-HOC
+    name: NRTL with Hayden-O'Connell vapour
+    recommended_as: ["NRTL liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (NRTL-HOC)"]
+    substitutes:
+      - {method: NRTL, loses: "vapour-phase association (Hayden-O'Connell); an ideal-gas (phase) or the package's own (simulation) vapour"}
+  - id: UNIQ-NTH
+    name: UNIQUAC with Nothnagel vapour
+    recommended_as: ["UNIQUAC liquid phase activity coefficient model with Nothagel vapor phase fugacity coefficient model (UNIQUAC-NTH)"]
+    substitutes:
+      - {method: UNIQUAC, loses: "vapour-phase association (Nothnagel)"}
+      - {method: NRTL, loses: "vapour-phase association (Nothnagel), and NRTL instead of UNIQUAC with its own parameters"}
+  - id: UNIQ-HOC
+    name: UNIQUAC with Hayden-O'Connell vapour
+    recommended_as: ["UNIQUAC liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (UNIQUAC-HOC)"]
+    substitutes:
+      - {method: UNIQUAC, loses: "vapour-phase association (Hayden-O'Connell)"}
+      - {method: NRTL, loses: "vapour-phase association (Hayden-O'Connell), and NRTL instead of UNIQUAC with its own parameters"}
+  - id: WILS-NTH
+    name: Wilson with Nothnagel vapour
+    recommended_as: ["Wilson liquid phase activity coefficient model with Nothagel vapor phase fugacity coefficient model (WILS-NTH)"]
+    substitutes:
+      - {method: WILSON, loses: "vapour-phase association (Nothnagel)"}
+      - {method: NRTL, loses: "vapour-phase association (Nothnagel), and NRTL instead of Wilson with its own parameters"}
+  - id: WILS-HOC
+    name: Wilson with Hayden-O'Connell vapour
+    recommended_as: ["Wilson liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (WILS-HOC)"]
+    substitutes:
+      - {method: WILSON, loses: "vapour-phase association (Hayden-O'Connell)"}
+      - {method: NRTL, loses: "vapour-phase association (Hayden-O'Connell), and NRTL instead of Wilson with its own parameters"}
+  - id: WILS-HF
+    name: Wilson with HF hexamerisation vapour
+    recommended_as: ["Wilson liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (WILS-HF)"]
+    substitutes:
+      - {method: WILSON, loses: "HF hexamerisation in the vapour"}
+      - {method: NRTL, loses: "HF hexamerisation in the vapour, and NRTL instead of Wilson with its own parameters"}
+  - id: NRTL-HF
+    name: NRTL with HF hexamerisation vapour
+    recommended_as: ["NRTL liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (NRTL-HF)"]
+    substitutes:
+      - {method: NRTL, loses: "HF hexamerisation in the vapour"}
+  - id: UNIQ-HF
+    name: UNIQUAC with HF hexamerisation vapour
+    recommended_as: ["UNIQUAC liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (UNIQ-HF)"]
+    substitutes:
+      - {method: UNIQUAC, loses: "HF hexamerisation in the vapour"}
+      - {method: NRTL, loses: "HF hexamerisation in the vapour, and NRTL instead of UNIQUAC with its own parameters"}
+  - id: UNIF-HF
+    name: UNIFAC with HF hexamerisation vapour
+    recommended_as: ["UNIFAC liquid phase activity coefficient model with HF Hexamerization vapor phase fugacity coefficient model (UNIF-HF)"]
+    substitutes:
+      - {method: UNIFAC, loses: "HF hexamerisation in the vapour"}
+  - id: UNIF-HOC
+    name: UNIFAC with Hayden-O'Connell vapour
+    recommended_as: ["UNIFAC liquid phase activity coefficient model with Hayden-O'Connell vapor phase fugacity coefficient model (UNIF-HOC)"]
+    substitutes:
+      - {method: UNIFAC, loses: "vapour-phase association (Hayden-O'Connell)"}
+
+  # -- polar, low pressure, no association ----------------------------------------------------
+  - id: NRTL
+    name: NRTL with ideal-gas vapour
+    recommended_as: ["NRTL (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)"]
+    phase:
+      model: {liquid_phase_model: NRTL, vapor_phase_model: ideal_gas}
+      interaction_parameters: "bij, alphaij: ChemSep NRTL (thermo's IPDB table 'ChemSep NRTL')"
+    simulation:
+      package: "NRTL"
+      interaction_parameters: "DWSIM's database (read by the benchmark for the claimed pair only); simulation.yaml cannot set them"
+      note: "vapour phase: ideal gas (DWSIM's VaporPhaseFugacityCalculationMode Ideal), liquid fugacity with the Poynting correction; a pair missing from DWSIM's database is estimated by DWSIM (AutoEstimateMissingNRTLUNIQUACParameters)"
+      # DWSIM 9.0.5's NRTL for ethanol + water against two independent measured isobars at
+      # 101.3 kPa (tests/test_process_simulate_property_package_nrtl.py, live; the data in
+      # tests/data/vle_ethanol_water.yaml), with thermo's NRTL on the same ChemSep parameters
+      # as a second implementation. Bubble points only (vapour fraction 0: temperature and
+      # incipient vapour), as the data measure them. DWSIM's pure ethanol boils 0.35 K above the
+      # measured, which sets most of its deviation at the ethanol end; its azeotrope lies at an
+      # ethanol mole fraction of 0.869 (measured 0.891), and its flash at a vapour fraction
+      # between 0 and 1 near the azeotrope returns Raoult's law.
+      application_range:
+        simulator: dwsim
+        simulator_version: "9.0.5"
+        components: {64-17-5: ethanol, 7732-18-5: water}
+        phases: [two-phase]
+        regions:
+          64-17-5:
+            - {temperature_K: [351.2, 373.2], pressure_kPa: [101.25, 101.35]}
+          7732-18-5:
+            - {temperature_K: [351.2, 373.2], pressure_kPa: [101.25, 101.35]}
+        properties:
+          - "bubble temperature at a given liquid composition, over the whole composition range, at 101.3 kPa(a) (as the data give it: 101.25-101.35 kPa(a))"
+          - "the vapour composition in equilibrium with that liquid (the incipient vapour at the bubble point)"
+        not_claimed:
+          - "the azeotropic composition: DWSIM's NRTL puts the azeotrope at an ethanol mole fraction of 0.869, measured 0.891 +- 0.004 (Lai et al. 2014); its temperature (351.52 K) is within the tolerance of the measured 351.32 +- 0.23 K, and vapour compositions near it are within the tolerance because the curve is flat there. From 0.86 to 0.875 DWSIM 9.0.5's bubble point returns the trivial solution (the incipient vapour equal to the liquid, off by up to 0.002); its temperature there is smooth"
+          - "a state between the bubble and dew points (a flash at a vapour fraction between 0 and 1, or at a temperature and pressure inside the two-phase region), at any composition: not compared with data; at an ethanol mole fraction of 0.5 the flash at a vapour fraction of 0.5 lies between DWSIM's bubble and dew temperatures (only checked for that), but near the azeotrope DWSIM 9.0.5's flash at given pressure and vapour fraction returns Raoult's law (its own vapour pressures, no activity coefficients) for liquid ethanol mole fractions 0.835 and 0.869, 2.7-2.9 K above its own bubble and dew temperatures, with no message; the bubble (0) and dew (1) points are right"
+          - "dew points (only bubble points are compared), other pressures, enthalpies and heats of mixing, densities, liquid-liquid equilibrium, other components"
+        tolerances:
+          bubble_temperature_abs_K: 0.5
+          vapour_mole_fraction_abs: 0.015
+        interaction_parameters:
+          source: "DWSIM 9.0.5's own NRTL database (the pair's entry as the worker reads it; DWSIM's comment for it: 'Ethanol/Water'): ChemSep's NRTL table, which thermo ships too (b12 = A12 / R, R = 1.98721 cal/(mol K)); none set by cheme-as-code"
+          kij: {}
+          activity:
+            "64-17-5&7732-18-5": {A12: -57.9601, A21: 1241.7396, B12: 0.0, B21: 0.0, C12: 0.0, C21: 0.0, alpha12: 0.2937}
+        package_settings:
+          LiquidDensityCalculationMode_Subcritical: COSTALD
+          LiquidDensityCalculationMode_Supercritical: Rackett_and_ExpData
+          LiquidDensity_UsePenelouxVolumeTranslation: "True"
+          LiquidDensity_CorrectExpDataForPressure: "True"
+          VaporPhaseFugacityCalculationMode: Ideal
+          LiquidFugacity_UsePoyntingCorrectionFactor: "True"
+          AutoEstimateMissingNRTLUNIQUACParameters: "True"
+          ActivityCoefficientModels_IgnoreMissingInteractionParameters: "False"
+        benchmark:
+          test: tests/test_process_simulate_property_package_nrtl.py
+          reference: >-
+            Measured isobaric VLE at 101.3 kPa from the NIST ThermoML archive, with the
+            combined expanded uncertainties given there: Kamihama et al., J. Chem. Eng. Data 57
+            (2012) 339-344, doi:10.1021/je2008704 (21 points); Lai et al., J. Chem. Thermodyn.
+            68 (2014) 13-19, doi:10.1016/j.jct.2013.08.020 (16 points and the azeotrope).
+            thermo's NRTL (ChemSep parameters, ideal gas) evaluated by the test as a second
+            implementation
+        notes:
+          - "a point's tolerance is the larger of the claimed one and its measured combined expanded uncertainty (95 %): up to 1.76 K and 0.056 mole fraction in the dilute ethanol region of Kamihama et al., where the bubble curve is steep"
+          - "the bubble-temperature tolerance is wider than the equation-of-state claims' 0.3 K: the reference is measured, not a reference equation of state, and DWSIM's pure ethanol boils 0.35 K above the measured (its vapour pressure, not the NRTL model)"
+          - "the vapour-composition tolerance is above the scatter between the two data sets: Lai et al.'s vapour at a liquid ethanol mole fraction of 0.501 (0.648) is below Kamihama et al.'s at 0.488 (0.652), although it rises with the liquid's, so the sets differ by about 0.01 there, more than Lai et al.'s stated 0.005"
+          - "thermo meets the same tolerances against both data sets, and DWSIM's bubble points are thermo's within 0.3 K and 0.005 mole fraction (the same parameters; their pure-component vapour pressures differ)"
+    substitutes: []
+  - id: NRTL-RK
+    name: NRTL with Redlich-Kwong vapour
+    recommended_as: ["NRTL liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (NRTL-RK)"]
+    phase:
+      model: {liquid_phase_model: NRTL, vapor_phase_model: Redlich-Kwong}
+      interaction_parameters: "bij, alphaij: ChemSep NRTL; vapour kij: none (zero)"
+    substitutes:
+      - {method: NRTL, loses: "the Redlich-Kwong vapour; the package's own vapour model"}
+  - id: NRTL-2
+    name: NRTL with Aspen Plus dataset 2
+    recommended_as: ["NRTL (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (NRTL-2)"]
+    substitutes:
+      - {method: NRTL, loses: "Aspen Plus parameter dataset 2; the route's own NRTL parameters"}
+  - id: UNIQUAC
+    name: UNIQUAC with ideal-gas vapour
+    recommended_as: ["UNIQUAC (for liquid phase activity coefficient model, and an ideal gas vapor phase fugacity coefficient model)"]
+    simulation:
+      package: "UNIQUAC"
+      interaction_parameters: "DWSIM's database (not inspected); simulation.yaml cannot set them"
+      note: "vapour phase: the DWSIM package's own model (not inspected)"
+    substitutes:
+      - {method: NRTL, loses: "NRTL instead of UNIQUAC, with its own parameters"}
+  - id: UNIQ-RK
+    name: UNIQUAC with Redlich-Kwong vapour
+    recommended_as: ["UNIQUAC liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (UNIQ-RK)"]
+    substitutes:
+      - {method: UNIQUAC, loses: "the Redlich-Kwong vapour; the package's own vapour model"}
+      - {method: NRTL-RK, loses: "NRTL instead of UNIQUAC, with its own parameters"}
+  - id: UNIQ-2
+    name: UNIQUAC with Aspen Plus dataset 2
+    recommended_as: ["UNIQUAC (using dataset 2) liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (UNIQ-2)"]
+    substitutes:
+      - {method: UNIQUAC, loses: "Aspen Plus parameter dataset 2; the route's own UNIQUAC parameters"}
+      - {method: NRTL, loses: "Aspen Plus parameter dataset 2, and NRTL instead of UNIQUAC with its own parameters"}
+  - id: WILSON
+    name: Wilson with ideal-gas vapour
+    recommended_as: ["Wilson (for liquid phase activity coefficient model, together with an ideal gas vapor phase fugacity coefficient model)"]
+    phase:
+      model: {liquid_phase_model: Wilson, vapor_phase_model: ideal_gas}
+      interaction_parameters: "aij, bij: ChemSep Wilson (thermo's IPDB table 'ChemSep Wilson')"
+    substitutes:
+      - {method: NRTL, loses: "NRTL instead of Wilson, with its own parameters"}
+  - id: WILS-RK
+    name: Wilson with Redlich-Kwong vapour
+    recommended_as: ["Wilson liquid phase activity coefficient model with Redlich-Kwong vapor phase fugacity coefficient model (Wils-RK)"]
+    phase:
+      model: {liquid_phase_model: Wilson, vapor_phase_model: Redlich-Kwong}
+      interaction_parameters: "aij, bij: ChemSep Wilson; vapour kij: none (zero)"
+    substitutes:
+      - {method: NRTL, loses: "NRTL instead of Wilson with its own parameters, and the package's own vapour model"}
+  - id: WILS-LR
+    name: Wilson with liquid enthalpy reference state
+    recommended_as: ["Wilson with liquid enthalpy reference state as liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (Wils-LR)"]
+    substitutes:
+      - {method: WILSON, loses: "the liquid enthalpy reference state convention"}
+      - {method: NRTL, loses: "the liquid enthalpy reference state convention, and NRTL instead of Wilson with its own parameters"}
+  - id: WILS-GLR
+    name: Wilson with ideal-gas and liquid enthalpy reference state
+    recommended_as: ["Wilson with ideal gas and liquid enthalpy reference state as liquid phase activity coefficient model with ideal gas vapor phase fugacity coefficient model (Wils-GLR)"]
+    substitutes:
+      - {method: WILSON, loses: "the ideal-gas and liquid enthalpy reference state convention"}
+      - {method: NRTL, loses: "the ideal-gas and liquid enthalpy reference state convention, and NRTL instead of Wilson with its own parameters"}
+  - id: UNIFAC-LL
+    name: UNIFAC with liquid-liquid parameters
+    recommended_as: ["UNIFAC for liquid-liquid systems (UNIFAC-LL)"]
+    substitutes:
+      - {method: UNIFAC, loses: "the liquid-liquid UNIFAC parameter set; the original (vapour-liquid) group parameters"}
+  - id: UNIFAC-RK
+    name: UNIFAC with Redlich-Kwong vapour
+    recommended_as: ["UNIFAC (for liquid phase activity coefficient model and a Redlich-Kwong vapor phase fugacity coefficient model)"]
+    phase:
+      model: {liquid_phase_model: UNIFAC, vapor_phase_model: Redlich-Kwong}
+      interaction_parameters: "group interactions: thermo's original UNIFAC (UFIP); vapour kij: none (zero)"
+    substitutes: []
+  - id: UNIF-LBY
+    name: Lyngby-modified UNIFAC
+    recommended_as: ["Lyngby-modified UNIFAC (UNIF-LBY)"]
+    substitutes:
+      - {method: UNIFAC-RK, loses: "the Lyngby-modified UNIFAC parameters; the original UNIFAC groups"}
+  - id: UNIF-DMD
+    name: Dortmund-modified UNIFAC
+    recommended_as: ["Dortmund-modified UNIFAC (UNIF-DMD)"]
+    substitutes:
+      - {method: UNIFAC-RK, loses: "the Dortmund-modified UNIFAC parameters; the original UNIFAC groups"}
+
+  # -- executable, never recommended by the tree ----------------------------------------------
+  - id: UNIFAC
+    name: UNIFAC with ideal-gas vapour
+    recommended_as: []
+    phase:
+      model: {liquid_phase_model: UNIFAC, vapor_phase_model: ideal_gas}
+      interaction_parameters: "group interactions: thermo's original UNIFAC (UFIP)"
+    substitutes: []
+  - id: RK
+    name: Redlich-Kwong
+    recommended_as: []
+    phase:
+      model: {eos_model: Redlich-Kwong}
+      interaction_parameters: "kij: none (zero)"
+    substitutes: []
+  - id: PR78
+    name: Peng-Robinson 1978
+    recommended_as: []
+    simulation:
+      package: "Peng-Robinson 1978 (PR78)"
+      interaction_parameters: "kij: DWSIM's database; simulation.yaml interaction_parameters override"
+    substitutes: []
+  - id: STEAM-IF97
+    name: Steam tables (IAPWS-IF97)
+    recommended_as: []
+    limitations: [pure water only]
+    simulation:
+      package: "Steam Tables (IAPWS-IF97)"
+    substitutes: []
+  - id: COOLPROP
+    name: CoolProp
+    recommended_as: []
+    simulation:
+      package: "CoolProp"
+      note: "DWSIM's CoolProp package; which fluids and mixtures it covers is not inspected by cheme-as-code"
+    substitutes: []

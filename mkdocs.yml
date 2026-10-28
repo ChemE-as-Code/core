@@ -1,0 +1,158 @@
+site_name: ChemE-as-Code
+site_description: "Plant design as code: DEXPI P&IDs, BFD/PFD and engineering YAML kept in git, checked by cheme."
+site_url: https://docs.cheme-as-code.org/
+repo_url: https://github.com/ChemE-as-Code/core
+repo_name: ChemE-as-Code/core
+edit_uri: edit/main/docs/
+copyright: Copyright (C) 2026 Artur Schweidtmann. cheme-as-code is licensed under AGPL-3.0-or-later.
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+# Pages generated or assembled at build time from the code, README.md and the project template.
+hooks:
+  - docs/hooks/includes.py
+  - docs/hooks/reference.py
+
+exclude_docs: |
+  hooks/
+
+watch:
+  - README.md
+  - src/chemeascode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Install: getting-started/install.md
+      - Your first plant: getting-started/first-plant.md
+      - The project template: getting-started/project-template.md
+  - Concepts:
+      - Repository layout: concepts/repository-layout.md
+      - plant.yaml: concepts/plant-yaml.md
+      - Stages and gates: concepts/stages-and-gates.md
+      - Provenance: concepts/provenance.md
+      - Glossary: concepts/glossary.md
+  - Guides:
+      - P&IDs and DEXPI: guides/pids.md
+      - Editing and generating sheets: guides/editing.md
+      - "Process: BFD, PFD and streams": guides/process.md
+      - "Furnace energy basis (lime calcination)": framework/furnace.md
+      - Petroleum assays and pseudocomponents: framework/assay.md
+      - 3D layout: guides/layout.md
+      - Layout model: framework/layout-model.md
+      - Electrical and cable trays: framework/electrical.md
+      - Control loops, sequences, narratives: framework/control.md
+      - Issues, holds and gates: framework/issues.md
+      - MTO and estimate: guides/mto-estimate.md
+      - MTO rows and rules: framework/mto.md
+      - Equipment sizing: framework/sizing.md
+      - Datasheet drawings: framework/datasheet-drawings.md
+      - LCA and Brightway: framework/lca.md
+      - Design cases and regional LCI scenarios: framework/lci-scenarios.md
+      - Comparison basis of electricity backgrounds: framework/lci-comparison-basis.md
+      - Tiered LCI estimates: framework/lci-estimate.md
+      - TEA: framework/tea.md
+      - HAZOP studies: framework/hazop.md
+      - Viewer and cheme serve: guides/serve.md
+      - Static viewer snapshots: framework/static-snapshot.md
+      - Agents and skills: guides/agents.md
+      - Agent design runs: agent-design-run.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Schemas: reference/schemas.md
+      - Serve API: reference/serve-api.md
+  - Framework:
+      - Architecture: framework/architecture.md
+      - Engineering contract: framework/contract.md
+      - Calculation maturity: framework/maturity.md
+      - Electrochemical cells: framework/electrochemical-cells.md
+      - Restructuring summary: framework/SUMMARY.md
+      - Contributing: framework/contributing.md
+      - Repository baseline: framework/monorepo-baseline.md
+      - Rename from plantcode: framework/rename.md
+      - Migration table: framework/migration-table.md
+      - LLM4ChemE migration: framework/llm4cheme-migration.md
+      - Companion inventory: framework/companion-inventory.md
+  - Architecture decisions:
+      - Overview: adr/README.md
+      - "0001 Record architecture decisions": adr/0001-record-architecture-decisions.md
+      - "0002 Plant data as plain files in git": adr/0002-plant-data-as-plain-files-in-git.md
+      - "0003 DEXPI 2.0.1 XML via pyDEXPI as the P&ID format": adr/0003-dexpi-xml-via-pydexpi-as-the-pid-format.md
+      - "0004 Pin pyDEXPI by git commit": adr/0004-pin-pydexpi-by-git-commit.md
+      - "0005 Versioned YAML schemas and cheme migrate": adr/0005-versioned-yaml-schemas-and-cheme-migrate.md
+      - "0006 Findings with stable ids as the agent interface": adr/0006-findings-with-stable-ids-as-the-agent-interface.md
+      - "0007 Agents edit files directly, no MCP server": adr/0007-agents-edit-files-directly-no-mcp-server.md
+      - "0008 Skills shipped as copies into plant repositories": adr/0008-skills-shipped-as-copies-into-plant-repositories.md
+      - "0009 Layered package with enforced import rules": adr/0009-layered-package-with-enforced-import-rules.md
+      - "0010 Deterministic domains, no LLM calls": adr/0010-deterministic-domains-no-llm-calls.md
+      - "0011 Per-value provenance and fingerprints": adr/0011-per-value-provenance-and-fingerprints.md
+      - "0012 Stages, gates and sign-offs on the default branch": adr/0012-stages-gates-and-sign-offs-on-the-default-branch.md
+      - "0013 Calculation maturity separate from completeness and review": adr/0013-calculation-maturity-separate-from-completeness-and-review.md
+      - "0014 DWSIM as an out-of-process simulation worker": adr/0014-dwsim-as-an-out-of-process-simulation-worker.md
+      - "0015 Optional backends and licensed data not shipped": adr/0015-optional-backends-and-licensed-data-not-shipped.md
+      - "0016 Read-only serve API and static snapshots": adr/0016-read-only-serve-api-and-static-snapshots.md
+      - "0017 Project template generated from cheme init": adr/0017-project-template-generated-from-cheme-init.md
+      - "0018 Rename plantcode to cheme-as-code without aliases": adr/0018-rename-plantcode-to-cheme-as-code-without-aliases.md
+      - "0019 Liquid-liquid extraction as qualified equilibrium stages": adr/0019-liquid-liquid-extraction-as-qualified-equilibrium-stages-outside-the-simulation.md
+      - "0020 Review currency ignores digest-only changes": adr/0020-review-currency-ignores-digest-only-changes.md
+      - "0021 Furnace energy basis for solid reactions": adr/0021-furnace-energy-basis-for-solid-reactions.md
+      - "0022 ISO 10628-2 symbol library and PFD symbols": adr/0022-iso-10628-symbol-library-and-pfd-symbols.md
+      - "0023 Electrochemical cell contract": adr/0023-electrochemical-cell-contract.md
+      - "0024 Adsorber performance basis outside the simulation": adr/0024-adsorber-performance-basis-outside-the-simulation.md
+      - "0025 Solids as components and a bounded crystallizer adapter": adr/0025-solid-components-and-a-bounded-crystallizer-adapter.md
+      - "0026 Petroleum assays as versioned pseudocomponents": adr/0026-petroleum-assays-as-versioned-pseudocomponents.md
+      - "0027 Qualified electrolyte systems through Pitzer in Cantera": adr/0027-qualified-electrolyte-systems-through-pitzer-in-cantera.md
+      - "0028 Composition limits in property package claims": adr/0028-composition-limits-in-property-package-claims.md
+      - "0029 Run records per run": adr/0029-run-records-per-run.md
+      - "0030 Conversion reactors checked against the declared conversion": adr/0030-conversion-reactors-checked-against-the-declared-conversion.md
+      - "0031 One glossary and qualified maturity": adr/0031-one-glossary-and-qualified-maturity.md
+      - Template: adr/template.md

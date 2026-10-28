@@ -1,0 +1,94 @@
+# Measured vapour-liquid equilibrium of ethanol (1) + water (2) at 101.3 kPa, the reference of
+# the DWSIM NRTL benchmark (tests/test_process_simulate_property_package_nrtl.py).
+#
+# Every value is copied unchanged from the NIST TRC ThermoML archive (IUPAC ThermoML files of
+# the papers, retrieved 2026-10-27 from the URLs under `thermoml`), dataset numbers as there:
+# x and y are the ethanol mole fractions of the liquid and the vapour, T the boiling
+# (equilibrium) temperature in K. U_T and U_y are the combined expanded uncertainties (95 %
+# level of confidence) the ThermoML file gives with each value ("propagation of evaluated
+# standard uncertainties", evaluated by the data file compiler); they include the effect of
+# the composition uncertainty, hence the large U_T where the bubble curve is steep (dilute
+# ethanol). The pressure is given as 101.3 kPa (four digits), without an uncertainty.
+#
+# The two papers are independent measurements (different laboratories and stills). Nothing is
+# fitted to them here: DWSIM and thermo use ChemSep's NRTL parameters as they ship them, and
+# which data ChemSep fitted those to is not stated with them.
+
+kamihama-2012:
+  citation: >-
+    Kamihama, N.; Matsuda, H.; Kurihara, K.; Tochigi, K.; Oba, S. Isobaric Vapor-Liquid
+    Equilibria for Ethanol + Water + Ethylene Glycol and Its Constituent Three Binary Systems.
+    J. Chem. Eng. Data 2012, 57 (2), 339-344
+  doi: 10.1021/je2008704
+  thermoml: https://trc.nist.gov/ThermoML/10.1021/je2008704.xml
+  method: modified Rogalski-Malanowski equilibrium still; composition by gas chromatography
+  pressure_kPa: 101.3
+  # ThermoML datasets 4 (T) and 5 (y)
+  points:
+    - {x: 0.018, T: 368.18, U_T: 1.76, y: 0.180, U_y: 0.056}
+    - {x: 0.079, T: 360.50, U_T: 1.18, y: 0.418, U_y: 0.038}
+    - {x: 0.090, T: 359.70, U_T: 1.21, y: 0.441, U_y: 0.039}
+    - {x: 0.147, T: 357.27, U_T: 0.39, y: 0.510, U_y: 0.018}
+    - {x: 0.244, T: 355.38, U_T: 0.25, y: 0.567, U_y: 0.016}
+    - {x: 0.311, T: 354.55, U_T: 0.19, y: 0.589, U_y: 0.015}
+    - {x: 0.353, T: 354.11, U_T: 0.16, y: 0.604, U_y: 0.015}
+    - {x: 0.425, T: 353.45, U_T: 0.15, y: 0.627, U_y: 0.015}
+    - {x: 0.488, T: 352.96, U_T: 0.13, y: 0.652, U_y: 0.016}
+    - {x: 0.570, T: 352.39, U_T: 0.13, y: 0.688, U_y: 0.016}
+    - {x: 0.616, T: 352.11, U_T: 0.12, y: 0.713, U_y: 0.016}
+    - {x: 0.670, T: 351.82, U_T: 0.11, y: 0.736, U_y: 0.016}
+    - {x: 0.711, T: 351.64, U_T: 0.10, y: 0.760, U_y: 0.017}
+    - {x: 0.802, T: 351.37, U_T: 0.09, y: 0.819, U_y: 0.017}
+    - {x: 0.835, T: 351.30, U_T: 0.09, y: 0.844, U_y: 0.018}
+    - {x: 0.869, T: 351.27, U_T: 0.09, y: 0.873, U_y: 0.018}
+    - {x: 0.901, T: 351.26, U_T: 0.09, y: 0.900, U_y: 0.019}
+    - {x: 0.914, T: 351.26, U_T: 0.09, y: 0.912, U_y: 0.019}
+    - {x: 0.922, T: 351.27, U_T: 0.09, y: 0.920, U_y: 0.019}
+    - {x: 0.940, T: 351.29, U_T: 0.09, y: 0.937, U_y: 0.020}
+    - {x: 0.972, T: 351.35, U_T: 0.09, y: 0.969, U_y: 0.020}
+  # ThermoML datasets 1 (ethanol) and 3 (water): the measured vapour pressure P (kPa) at the
+  # temperature T (K), with its combined expanded uncertainty U_P (kPa, 95 %)
+  vapour_pressure:
+    ethanol:
+      - {T: 329.67, P: 40.00, U_P: 0.08}
+      - {T: 336.06, P: 53.33, U_P: 0.08}
+      - {T: 341.23, P: 66.66, U_P: 0.09}
+      - {T: 345.59, P: 79.99, U_P: 0.10}
+      - {T: 349.38, P: 93.32, U_P: 0.10}
+      - {T: 351.03, P: 99.74, U_P: 0.11}
+    water:
+      - {T: 349.09, P: 40.00, U_P: 0.07}
+      - {T: 356.17, P: 53.33, U_P: 0.07}
+      - {T: 361.87, P: 66.66, U_P: 0.08}
+      - {T: 366.69, P: 79.99, U_P: 0.09}
+      - {T: 370.88, P: 93.32, U_P: 0.09}
+      - {T: 372.76, P: 100.00, U_P: 0.10}
+
+lai-2014:
+  citation: >-
+    Lai, H.-S.; Lin, Y.-F.; Tu, C.-H. Isobaric (vapor + liquid) equilibria for the ternary
+    system of (ethanol + water + 1,3-propanediol) and three constituent binary systems at
+    P = 101.3 kPa. J. Chem. Thermodyn. 2014, 68, 13-19
+  doi: 10.1016/j.jct.2013.08.020
+  thermoml: https://trc.nist.gov/ThermoML/10.1016/j.jct.2013.08.020.xml
+  pressure_kPa: 101.3
+  # ThermoML datasets 9 (T) and 10 (y); the pure components (x = 0, 1) have no U_y
+  points:
+    - {x: 0.000, T: 373.15, U_T: 0.13, y: 0.000}
+    - {x: 0.015, T: 369.27, U_T: 0.45, y: 0.139, U_y: 0.015}
+    - {x: 0.035, T: 365.61, U_T: 0.25, y: 0.261, U_y: 0.008}
+    - {x: 0.100, T: 359.79, U_T: 0.18, y: 0.436, U_y: 0.007}
+    - {x: 0.183, T: 356.66, U_T: 0.14, y: 0.525, U_y: 0.006}
+    - {x: 0.292, T: 354.88, U_T: 0.14, y: 0.585, U_y: 0.005}
+    - {x: 0.394, T: 353.89, U_T: 0.13, y: 0.611, U_y: 0.005}
+    - {x: 0.501, T: 353.06, U_T: 0.13, y: 0.648, U_y: 0.005}
+    - {x: 0.543, T: 352.73, U_T: 0.13, y: 0.669, U_y: 0.005}
+    - {x: 0.631, T: 352.04, U_T: 0.13, y: 0.714, U_y: 0.005}
+    - {x: 0.749, T: 351.67, U_T: 0.13, y: 0.781, U_y: 0.005}
+    - {x: 0.794, T: 351.64, U_T: 0.13, y: 0.814, U_y: 0.005}
+    - {x: 0.848, T: 351.40, U_T: 0.13, y: 0.855, U_y: 0.005}
+    - {x: 0.899, T: 351.33, U_T: 0.13, y: 0.898, U_y: 0.005}
+    - {x: 0.949, T: 351.37, U_T: 0.13, y: 0.946, U_y: 0.005}
+    - {x: 1.000, T: 351.45, U_T: 0.13, y: 1.000}
+  # ThermoML datasets 11 and 12: the azeotrope at 101.3 kPa
+  azeotrope: {T: 351.32, U_T: 0.23, x: 0.891, U_x: 0.004}

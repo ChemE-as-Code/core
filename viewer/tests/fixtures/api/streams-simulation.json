@@ -1,0 +1,498 @@
+{
+  "rev": null,
+  "case": "design",
+  "cases": [
+    {
+      "id": "design",
+      "description": "Design case",
+      "default": true
+    }
+  ],
+  "default_case": "design",
+  "units": {
+    "pressure": "kPa(a)",
+    "temperature": "K",
+    "flow": "kg/h",
+    "duty": "kW",
+    "enthalpy": "kJ/kmol"
+  },
+  "tolerance": {
+    "abs": 1.0,
+    "rel": 0.005
+  },
+  "streams": [
+    {
+      "id": "S1",
+      "title": "Ambient air",
+      "kind": "material",
+      "from": "AIR.out",
+      "to": "K1.in",
+      "from_block": "AIR",
+      "to_block": "COMP",
+      "on_bfd": true,
+      "template": "air",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 101.325,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "given",
+          "source": "site data",
+          "stale": false
+        },
+        "temperature": {
+          "value": 298.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "given",
+          "source": "site data",
+          "stale": false
+        },
+        "flow": {
+          "value": 1000.0,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "given",
+          "source": "basis of design",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.7812,
+          "O2": 0.2096,
+          "AR": 0.0092
+        },
+        "provenance": "given",
+        "source": "dry air",
+        "fingerprint": null
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S2",
+      "title": "Compressed air, hot",
+      "kind": "material",
+      "from": "K1.out",
+      "to": "E1.in",
+      "from_block": "COMP",
+      "to_block": "COMP",
+      "on_bfd": false,
+      "template": "air",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 800.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "temperature": {
+          "value": 598.0,
+          "unit": "K",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "flow": {
+          "value": 1000.0,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.7812,
+          "O2": 0.2096,
+          "AR": 0.0092
+        },
+        "provenance": "calculated",
+        "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+        "fingerprint": "aa92c1c90ad4962a"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S3",
+      "title": "Compressed air",
+      "kind": "material",
+      "from": "E1.out",
+      "to": "X1.in",
+      "from_block": "COMP",
+      "to_block": "DIST",
+      "on_bfd": true,
+      "template": "air",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 780.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "temperature": {
+          "value": 308.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "flow": {
+          "value": 1000.0,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.7812,
+          "O2": 0.2096,
+          "AR": 0.0092
+        },
+        "provenance": "calculated",
+        "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+        "fingerprint": "aa92c1c90ad4962a"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S4",
+      "title": "Instrument air",
+      "kind": "material",
+      "from": "X1.a",
+      "to": "HP.in",
+      "from_block": "DIST",
+      "to_block": "HP",
+      "on_bfd": true,
+      "template": "air",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 780.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "temperature": {
+          "value": 308.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "flow": {
+          "value": 700.0,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.7812,
+          "O2": 0.2096,
+          "AR": 0.0092
+        },
+        "provenance": "calculated",
+        "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+        "fingerprint": "aa92c1c90ad4962a"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "S5",
+      "title": "Plant air",
+      "kind": "material",
+      "from": "X1.b",
+      "to": "PLANT.in",
+      "from_block": "DIST",
+      "to_block": "PLANT",
+      "on_bfd": true,
+      "template": "air",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 780.0,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "temperature": {
+          "value": 308.15,
+          "unit": "K",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "flow": {
+          "value": 300.0,
+          "unit": "kg/h",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        },
+        "duty": null
+      },
+      "composition": {
+        "basis": "mole_fraction",
+        "values": {
+          "N2": 0.7812,
+          "O2": 0.2096,
+          "AR": 0.0092
+        },
+        "provenance": "calculated",
+        "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+        "fingerprint": "aa92c1c90ad4962a"
+      },
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "W1",
+      "title": "Compressor power",
+      "kind": "energy",
+      "from": "POWER.w",
+      "to": "K1.w",
+      "from_block": "POWER",
+      "to_block": "COMP",
+      "on_bfd": true,
+      "template": null,
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": null,
+        "duty": {
+          "value": 84.2,
+          "unit": "kW",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: DWSIM 9.0.5.0, Peng-Robinson (PR)",
+          "stale": false
+        }
+      },
+      "composition": null,
+      "phase": null,
+      "calculated": {},
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    }
+  ],
+  "balances": [
+    {
+      "node": "COMP",
+      "kind": "block",
+      "status": "ok",
+      "in_kg_h": 1000.0,
+      "out_kg_h": 1000.0,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S3"
+      ],
+      "title": "Air compression"
+    },
+    {
+      "node": "DIST",
+      "kind": "block",
+      "status": "ok",
+      "in_kg_h": 1000.0,
+      "out_kg_h": 1000.0,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S3"
+      ],
+      "streams_out": [
+        "S4",
+        "S5"
+      ],
+      "title": "Air distribution"
+    },
+    {
+      "node": "K1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 1000.0,
+      "out_kg_h": 1000.0,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S1"
+      ],
+      "streams_out": [
+        "S2"
+      ],
+      "title": "Air compressor"
+    },
+    {
+      "node": "E1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 1000.0,
+      "out_kg_h": 1000.0,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S2"
+      ],
+      "streams_out": [
+        "S3"
+      ],
+      "title": "Aftercooler"
+    },
+    {
+      "node": "X1",
+      "kind": "step",
+      "status": "ok",
+      "in_kg_h": 1000.0,
+      "out_kg_h": 1000.0,
+      "missing": [],
+      "failing": [],
+      "streams_in": [
+        "S3"
+      ],
+      "streams_out": [
+        "S4",
+        "S5"
+      ],
+      "title": "Air header"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "AIR",
+      "kind": "feed",
+      "title": "Ambient air",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "POWER",
+      "kind": "feed",
+      "title": "Electric power",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "HP",
+      "kind": "product",
+      "title": "Instrument air",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "PLANT",
+      "kind": "product",
+      "title": "Plant air",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "COMP",
+      "kind": "block",
+      "title": "Air compression",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "DIST",
+      "kind": "block",
+      "title": "Air distribution",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "K1",
+      "kind": "step",
+      "title": "Air compressor",
+      "block": "COMP",
+      "links": []
+    },
+    {
+      "id": "E1",
+      "kind": "step",
+      "title": "Aftercooler",
+      "block": "COMP",
+      "links": []
+    },
+    {
+      "id": "X1",
+      "kind": "step",
+      "title": "Air header",
+      "block": "DIST",
+      "links": []
+    }
+  ],
+  "bfd_connections": {
+    "S1": [
+      "S1"
+    ],
+    "S3": [
+      "S3"
+    ],
+    "S4": [
+      "S4"
+    ],
+    "S5": [
+      "S5"
+    ],
+    "W1": [
+      "W1"
+    ]
+  },
+  "bfd_connections_from": "sheet"
+}

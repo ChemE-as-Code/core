@@ -1,0 +1,54 @@
+<!-- How the off-page connector is drawn. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<!-- In PipingNetworkSegment1_Drawing1: the arrow (Shape2, scale 0.7, tip at the node) and the node position the first pipe starts at -->
+<Object id="FlowInPipeOffPageConnector1_Drawing1" type="Core/Diagram.RepresentationGroup">
+  <Components property="Groups">
+    <Object id="PipingNode1_Drawing1" type="Core/Diagram.RepresentationGroup">
+      <Components property="NodePositions">
+        <Object id="PipingNodePosition1" type="Plant/Diagram.PipingNodePosition">
+          <References objects="#PipingNode1" property="Node"/>
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>38.0</Double>
+              </Data>
+              <Data property="Y">
+                <Double>154.0</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+        </Object>
+      </Components>
+      <References objects="#PipingNode1" property="Represents"/>
+    </Object>
+    <Object id="FlowInPipeOffPageConnector1_Drawing1_Groups1" type="Core/Diagram.Static">
+      <Components property="Elements">
+        <Object id="FlowInPipeOffPageConnector1_Drawing1_Groups1_Elements1" type="Core/Diagram.ShapeUsage">
+          <References objects="#Shape2" property="Shape"/>
+          <Data property="IsMirrored">
+            <Boolean>false</Boolean>
+          </Data>
+          <Data property="Position">
+            <AggregatedDataValue type="Core/Diagram.Point">
+              <Data property="X">
+                <Double>38.0</Double>
+              </Data>
+              <Data property="Y">
+                <Double>154.0</Double>
+              </Data>
+            </AggregatedDataValue>
+          </Data>
+          <Data property="Rotation">
+            <Double>0.0</Double>
+          </Data>
+          <Data property="ScaleX">
+            <Double>0.7</Double>
+          </Data>
+          <Data property="ScaleY">
+            <Double>0.7</Double>
+          </Data>
+        </Object>
+      </Components>
+    </Object>
+  </Components>
+  <References objects="#FlowInPipeOffPageConnector1" property="Represents"/>
+</Object>

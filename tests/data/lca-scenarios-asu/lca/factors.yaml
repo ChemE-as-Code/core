@@ -1,0 +1,23 @@
+# SYNTHETIC test factors (core#172): the regional electricity values are invented for the tests
+# and demonstrate the scenario contract only. The baseline uses the packaged DESNZ UK profile as
+# a proxy, like the process library's ASU.
+schema: cheme/lca/v1
+kind: lca_factors
+include: [desnz-ghg-2026]
+publication: public
+sources:
+  - id: synthetic-test
+    title: Synthetic test factors (not real data)
+    provider: cheme-as-code tests
+    version: "1"
+    licence: CC0-1.0
+    publication: public
+    redistribution: true
+    notes: SYNTHETIC values for tests; never use them in a study
+categories:
+  - {id: climate-change, title: Climate change, unit: kg CO2-eq, method: "GWP100 (AR5)"}
+factors:
+  - {id: electricity-nl-synthetic, title: "NL grid average (SYNTHETIC)", unit: kWh, values: {climate-change: 0.30}, status: ASSUMED, source: "synthetic test value", source_id: synthetic-test, year: 2025, location: NL}
+  - {id: electricity-de-synthetic, title: "DE grid average (SYNTHETIC)", unit: kWh, values: {climate-change: 0.40}, status: ASSUMED, source: "synthetic test value", source_id: synthetic-test, year: 2025, location: DE}
+  - {id: electricity-ppa-user, title: "User-provided wind PPA (SYNTHETIC)", unit: kWh, values: {climate-change: 0.012}, status: ASSUMED, source: "user-provided contract value (synthetic)", source_id: synthetic-test, year: 2025, location: NL}
+  - {id: cooling-water, title: Cooling water per heat rejected, unit: MWh, values: {climate-change: 1.8436}, status: ESTIMATE, source: "10 kWh/MWh x UK grid", source_id: synthetic-test, year: 2026, location: GB, basis: "pumps and fans on the UK grid (synthetic)", validity: "UK cooling tower"}

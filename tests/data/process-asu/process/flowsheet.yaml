@@ -1,0 +1,380 @@
+# ASU-1 flowsheet, seeded once from DESIGN.md section 3 (main-stream balance). From now on the
+# numbers live here; DESIGN.md keeps decisions and prose (`cheme process streams --md`).
+# BFD and PFD: `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: ASU-1 (500 t/d GOX)
+units: {pressure: bar(a), temperature: °C, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: "Design case: 30 C ambient, 94 % O2 recovery (ASSUMED)", default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - {id: AIR, title: Ambient air, ports: [{id: out, direction: out}]}
+products:
+  - {id: GOXP, title: GOX to pipeline, ports: [{id: in, direction: in}]}
+  - {id: GANP, title: GAN to battery limit, ports: [{id: in, direction: in}]}
+  - {id: LOX, title: LOX to storage, ports: [{id: in, direction: in}], links: [{target: equipment, ref: T-4101}]}
+  - {id: LIN, title: LIN to storage, ports: [{id: in, direction: in}], links: [{target: equipment, ref: T-4102}]}
+  - id: VENT
+    title: Vent to atmosphere
+    ports: [{id: v1, direction: in}, {id: v2, direction: in}, {id: v3, direction: in}]
+
+blocks:
+  - id: MAC
+    title: Main air compression and precooling
+    class: Compressing
+    links: [{target: sheet, ref: P-01}]
+    ports:
+      - {id: air, direction: in}
+      - {id: evap, direction: in}
+      - {id: out, direction: out}
+      - {id: evap_out, direction: out}
+  - id: PUR
+    title: Front-end purification (TSA)
+    class: Adsorbing
+    links: [{target: sheet, ref: P-02}]
+    ports:
+      - {id: in, direction: in}
+      - {id: regen, direction: in}
+      - {id: out, direction: out}
+      - {id: regen_out, direction: out}
+  - id: CB
+    title: Cold box
+    class: SeparatingByThermalProcess
+    links: [{target: sheet, ref: P-03}]
+    ports:
+      - {id: air, direction: in}
+      - {id: gox, direction: out}
+      - {id: gan, direction: out}
+      - {id: lox, direction: out}
+      - {id: lin, direction: out}
+      - {id: regen, direction: out}
+      - {id: evap, direction: out}
+      - {id: vent, direction: out}
+  - id: PRD
+    title: Product compression
+    class: Compressing
+    links: [{target: sheet, ref: P-04}]
+    ports:
+      - {id: gox, direction: in}
+      - {id: gan, direction: in}
+      - {id: goxp, direction: out}
+      - {id: ganp, direction: out}
+
+steps:
+  - id: K1101
+    block: MAC
+    title: Main air compressor
+    class: Compressing
+    method: CentrifugalMotion
+    links: [{target: equipment, ref: K-1101}]
+    ports: [{id: in, direction: in, delegates: air}, {id: out, direction: out}]
+  - id: C1101
+    block: MAC
+    title: Direct contact aftercooler
+    class: Cooling
+    links: [{target: equipment, ref: C-1101}]
+    ports: [{id: in, direction: in}, {id: out, direction: out, delegates: out}]
+  - id: C1102
+    block: MAC
+    title: Evaporative cooler
+    class: Cooling
+    links: [{target: equipment, ref: C-1102}]
+    ports: [{id: in, direction: in, delegates: evap}, {id: out, direction: out, delegates: evap_out}]
+  - id: V2101
+    block: PUR
+    title: Adsorbers
+    class: Adsorbing
+    links: [{target: equipment, ref: V-2101}, {target: equipment, ref: V-2102}]
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: regen_in, direction: in}
+      - {id: out, direction: out, delegates: out}
+      - {id: regen_out, direction: out, delegates: regen_out}
+  - id: E2101
+    block: PUR
+    title: Regeneration heater
+    class: ExchangingThermalEnergy
+    links: [{target: equipment, ref: E-2101}]
+    ports: [{id: in, direction: in, delegates: regen}, {id: out, direction: out}]
+  - id: E3101
+    block: CB
+    title: Main heat exchanger
+    class: ExchangingThermalEnergy
+    links: [{target: equipment, ref: E-3101}]
+    ports:
+      - {id: air, direction: in, delegates: air}
+      - {id: gox_c, direction: in}
+      - {id: gan_c, direction: in}
+      - {id: waste_c, direction: in}
+      - {id: hp, direction: out}
+      - {id: exp, direction: out}
+      - {id: gox, direction: out, delegates: gox}
+      - {id: gan, direction: out, delegates: gan}
+      - {id: waste, direction: out}
+  - id: KT3101
+    block: CB
+    title: Expander (braked by booster K-3101)
+    class: ProcessStep
+    links: [{target: equipment, ref: KT-3101}, {target: equipment, ref: K-3101}]
+    ports: [{id: in, direction: in}, {id: out, direction: out}]
+  - id: C3101
+    block: CB
+    title: HP column
+    class: Distilling
+    links: [{target: equipment, ref: C-3101}]
+    ports:
+      - {id: feed, direction: in}
+      - {id: n2, direction: out}
+      - {id: lin, direction: out, delegates: lin}
+      - {id: crude, direction: out}
+  - id: C3102
+    block: CB
+    title: LP column
+    class: Distilling
+    links: [{target: equipment, ref: C-3102}]
+    ports:
+      - {id: crude, direction: in}
+      - {id: lachmann, direction: in}
+      - {id: gox, direction: out}
+      - {id: lox, direction: out, delegates: lox}
+      - {id: waste, direction: out}
+  - id: X3101
+    block: CB
+    title: Waste nitrogen split
+    class: SplittingMaterial
+    ports:
+      - {id: in, direction: in}
+      - {id: regen, direction: out, delegates: regen}
+      - {id: evap, direction: out, delegates: evap}
+      - {id: vent, direction: out, delegates: vent}
+  - id: K4101
+    block: PRD
+    title: GOX compressor
+    class: Compressing
+    links: [{target: equipment, ref: K-4101}]
+    ports: [{id: in, direction: in, delegates: gox}, {id: out, direction: out, delegates: goxp}]
+  - id: K4102
+    block: PRD
+    title: GAN compressor
+    class: Compressing
+    links: [{target: equipment, ref: K-4102}]
+    ports: [{id: in, direction: in, delegates: gan}, {id: out, direction: out, delegates: ganp}]
+
+streams:
+  # -- DESIGN.md section 3, streams 1-12c (values ASSUMED there unless a requirement) ----------
+  - id: S1
+    title: Air feed
+    from: AIR.out
+    to: K1101.in
+    template: air
+    state:
+      design:
+        flow: {value: 98270, provenance: assumed, source: "DESIGN.md 3, stream 1 (76,000 Nm3/h)"}
+        pressure: {value: 1.01, provenance: assumed, source: "DESIGN.md 3, stream 1"}
+        temperature: {value: 30, provenance: given, source: "DESIGN.md 3 basis: 30 C ambient"}
+        composition: {basis: mole_fraction, values: {N2: 0.7808, O2: 0.2095, AR: 0.0093, H2O: 0.0, CO2: 0.0004}, provenance: assumed, source: "standard dry air; humidity not stated"}
+  - id: S2
+    title: Compressed air
+    from: K1101.out
+    to: C1101.in
+    template: air
+    state:
+      design:
+        flow: {value: 98270, provenance: assumed, source: "DESIGN.md 3, stream 2"}
+        pressure: {value: 5.8, provenance: assumed, source: "DESIGN.md 3, stream 2"}
+        temperature: {value: 40, provenance: assumed, source: "DESIGN.md 3, stream 2"}
+  - id: S3
+    title: Precooled air
+    from: C1101.out
+    to: V2101.in
+    template: air
+    state:
+      design:
+        flow: {value: 98270, provenance: assumed, source: "DESIGN.md 3, stream 3"}
+        pressure: {value: 5.7, provenance: assumed, source: "DESIGN.md 3, stream 3"}
+        temperature: {value: 12, provenance: assumed, source: "DESIGN.md 3, stream 3"}
+  - id: S4
+    title: Dry air to cold box
+    from: V2101.out
+    to: E3101.air
+    template: dry
+    state:
+      design:
+        flow: {value: 98000, provenance: assumed, source: "DESIGN.md 3, stream 4"}
+        pressure: {value: 5.6, provenance: assumed, source: "DESIGN.md 3, stream 4"}
+        temperature: {value: 15, provenance: assumed, source: "DESIGN.md 3, stream 4"}
+  - id: S5
+    title: HP column feed
+    from: E3101.hp
+    to: C3101.feed
+    template: dry
+    state:
+      design:
+        flow: {value: 83400, provenance: assumed, source: "DESIGN.md 3, stream 5 (64,500 Nm3/h)"}
+        pressure: {value: 5.5, provenance: assumed, source: "DESIGN.md 3, stream 5"}
+        temperature: {value: -173, provenance: assumed, source: "DESIGN.md 3, stream 5"}
+  - id: S5B
+    title: Expander feed
+    from: E3101.exp
+    to: KT3101.in
+    template: dry
+    state:
+      design:
+        flow: {value: 14870, provenance: assumed, source: "DESIGN.md 3, stream 6 (11,500 Nm3/h)"}
+  - id: S6
+    title: Lachmann air
+    from: KT3101.out
+    to: C3102.lachmann
+    template: dry
+    state:
+      design:
+        flow: {value: 14870, provenance: assumed, source: "DESIGN.md 3, stream 6"}
+        pressure: {value: 1.35, provenance: assumed, source: "DESIGN.md 3, stream 6"}
+        temperature: {value: -178, provenance: assumed, source: "DESIGN.md 3, stream 6"}
+  - id: S13
+    title: Crude oxygen
+    from: C3101.crude
+    to: C3102.crude
+    template: dry
+  - id: S14
+    title: Cold HP nitrogen
+    from: C3101.n2
+    to: E3101.gan_c
+    template: dry
+  - id: S15
+    title: Cold GOX
+    from: C3102.gox
+    to: E3101.gox_c
+    template: dry
+  - id: S16
+    title: Cold waste nitrogen
+    from: C3102.waste
+    to: E3101.waste_c
+    template: dry
+  - id: S17
+    title: Warm waste nitrogen
+    from: E3101.waste
+    to: X3101.in
+    template: dry
+    state:
+      design:
+        flow: {value: 63530, provenance: assumed, source: "DESIGN.md 3, stream 12"}
+        pressure: {value: 1.15, provenance: assumed, source: "DESIGN.md 3, stream 12"}
+        temperature: {value: 25, provenance: assumed, source: "DESIGN.md 3, stream 12"}
+        composition: {basis: mole_fraction, values: {N2: 0.968, O2: 0.019, AR: 0.013}, provenance: assumed, source: "DESIGN.md 3, stream 12"}
+  - id: S7
+    title: GOX product
+    from: E3101.gox
+    to: K4101.in
+    template: dry
+    state:
+      design:
+        flow: {value: 20860, provenance: given, source: "plant.yaml: 500 t/d GOX; DESIGN.md 3, stream 7"}
+        pressure: {value: 1.15, provenance: assumed, source: "DESIGN.md 3, stream 7"}
+        temperature: {value: 25, provenance: assumed, source: "DESIGN.md 3, stream 7"}
+  - id: S8
+    title: GOX to pipeline
+    from: K4101.out
+    to: GOXP.in
+    template: dry
+    state:
+      design:
+        flow: {value: 20860, provenance: given, source: "DESIGN.md 3, stream 8"}
+        pressure: {value: 31.0, provenance: given, source: "plant.yaml: 30 barg; DESIGN.md 3, stream 8"}
+        temperature: {value: 40, provenance: assumed, source: "DESIGN.md 3, stream 8"}
+  - id: S9
+    title: GAN product
+    from: E3101.gan
+    to: K4102.in
+    template: dry
+    state:
+      design:
+        flow: {value: 12510, provenance: given, source: "plant.yaml: 10,000 Nm3/h GAN; DESIGN.md 3, stream 9"}
+        pressure: {value: 5.2, provenance: assumed, source: "DESIGN.md 3, stream 9"}
+        temperature: {value: 25, provenance: assumed, source: "DESIGN.md 3, stream 9"}
+  - id: S9B
+    title: GAN to battery limit
+    from: K4102.out
+    to: GANP.in
+    template: dry
+    state:
+      design:
+        flow: {value: 12510, provenance: given, source: "DESIGN.md 3, stream 9"}
+        pressure: {value: 9.0, provenance: given, source: "plant.yaml: 8 barg; DESIGN.md 3, stream 9"}
+        temperature: {value: 40, provenance: assumed, source: "DESIGN.md 3, stream 9"}
+  - id: S10
+    title: LOX to storage
+    from: C3102.lox
+    to: LOX.in
+    template: dry
+    state:
+      design:
+        flow: {value: 470, provenance: assumed, source: "DESIGN.md 3, stream 10 (D-017)"}
+        pressure: {value: 1.3, provenance: assumed, source: "DESIGN.md 3, stream 10"}
+        temperature: {value: -180, provenance: assumed, source: "DESIGN.md 3, stream 10"}
+  - id: S11
+    title: LIN to storage
+    from: C3101.lin
+    to: LIN.in
+    template: dry
+    state:
+      design:
+        flow: {value: 470, provenance: assumed, source: "DESIGN.md 3, stream 11 (D-017)"}
+        pressure: {value: 5.2, provenance: assumed, source: "DESIGN.md 3, stream 11"}
+        temperature: {value: -178, provenance: assumed, source: "DESIGN.md 3, stream 11"}
+  - id: S12A
+    title: Waste N2 to regeneration
+    from: X3101.regen
+    to: E2101.in
+    template: dry
+    state:
+      design:
+        flow: {value: 16350, provenance: assumed, source: "DESIGN.md 3, stream 12a"}
+        pressure: {value: 1.1, provenance: assumed, source: "DESIGN.md 3, stream 12a"}
+  - id: S12H
+    title: Hot regeneration gas
+    from: E2101.out
+    to: V2101.regen_in
+    template: dry
+    state:
+      design:
+        flow: {value: 16350, provenance: assumed, source: "DESIGN.md 3, stream 12a"}
+        temperature: {value: 200, provenance: assumed, source: "DESIGN.md 3, stream 12a (heating)"}
+  - id: S12B
+    title: Waste N2 to evaporative cooler
+    from: X3101.evap
+    to: C1102.in
+    template: dry
+    state:
+      design:
+        flow: {value: 31450, provenance: assumed, source: "DESIGN.md 3, stream 12b"}
+        pressure: {value: 1.05, provenance: assumed, source: "DESIGN.md 3, stream 12b"}
+        temperature: {value: 25, provenance: assumed, source: "DESIGN.md 3, stream 12b"}
+  - id: S12C
+    title: Waste N2 vent
+    from: X3101.vent
+    to: VENT.v1
+    template: dry
+    state:
+      design:
+        flow: {value: 15730, provenance: assumed, source: "DESIGN.md 3, stream 12c"}
+        pressure: {value: 1.02, provenance: assumed, source: "DESIGN.md 3, stream 12c"}
+        temperature: {value: 25, provenance: assumed, source: "DESIGN.md 3, stream 12c"}
+  - id: S12D
+    title: Regeneration gas out (with water and CO2 removed)
+    from: V2101.regen_out
+    to: VENT.v2
+    template: air
+    state:
+      design:
+        flow: {value: 16620, provenance: assumed, source: "12a 16,350 + 270 kg/h water/CO2 removed (DESIGN.md 3, mass closure)"}
+  - id: S12E
+    title: Evaporative cooler gas out
+    from: C1102.out
+    to: VENT.v3
+    template: air
+    state:
+      design:
+        flow: {value: 31450, provenance: assumed, source: "= stream 12b (water uptake not stated)"}

@@ -1,0 +1,36 @@
+# Air velocity limits and standard sizes of rectangular ducts, for the HVAC ducts of the 3D
+# model (chemeascode.domains.spatial.hvac): a duct is the smallest standard rectangle whose
+# cross-section carries its air flow at or below the velocity limit of its kind; a room whose
+# air changes its ducts cannot carry at the limit is the finding layout-hvac-capacity.
+#
+# Every value is ASSUMED: typical low-velocity design values for industrial and plant
+# buildings (of the order the CIBSE Guide B and ASHRAE Fundamentals duct design tables give for
+# low-pressure systems). They screen the duct space at basic engineering; the HVAC design
+# (heat loads, pressure drop, noise, fan selection) sizes the ducts. A plant overrides a limit
+# under rules.velocities in layout/hvac.yaml.
+schema: cheme/duct-sizing/v1
+status: ASSUMED
+velocities:            # m/s, at most
+  main:
+    max_m_s: 8.0
+    basis: "Main ducts of a low-pressure system in a plant building: 6-8 m/s (ASSUMED)."
+  header:
+    max_m_s: 6.0
+    basis: "Distribution ducts in the room, along the terminals: 4-6 m/s (ASSUMED)."
+  intake:
+    max_m_s: 6.0
+    basis: "Outdoor air duct from the intake louvre to the air handling unit: 4-6 m/s (ASSUMED)."
+  exhaust:
+    max_m_s: 8.0
+    basis: "Exhaust duct from the air handling unit to the exhaust louvre: 6-8 m/s (ASSUMED)."
+  louvre:
+    max_m_s: 2.5
+    basis: "Weather louvre, velocity through its free area: 2-2.5 m/s to keep rain out (ASSUMED)."
+#: Free area of a weather louvre over its gross face, fraction (ASSUMED).
+louvre_free_area: 0.5
+#: Standard sides of a rectangular duct, mm (both width and height are taken from the list).
+sides_mm: [200, 250, 300, 400, 500, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2500]
+#: Width over height at most.
+max_aspect: 4.0
+#: Supply or extract air one terminal (grille, diffuser) takes at most, m3/h (ASSUMED).
+terminal_max_m3h: 2500

@@ -1,0 +1,6 @@
+{
+  "status": 503,
+  "body": {
+    "error": "issues not read: no GitHub token: set GITHUB_TOKEN or log in with `gh auth login`"
+  }
+}

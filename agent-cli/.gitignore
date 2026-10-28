@@ -1,0 +1,9 @@
+.venv/
+logs/
+runs.jsonl
+__pycache__/
+# generated prompts and the case list of a night: project-specific, kept out of git
+/tasks/gen/
+/cases.json
+jobs/*
+!jobs/examples/

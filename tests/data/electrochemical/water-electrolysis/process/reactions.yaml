@@ -1,0 +1,16 @@
+# Water splitting with liquid water fed (core#366). dH = -dfH(H2O, l) = 285.830 +- 0.040 kJ/mol
+# (H2 and O2 are reference states): CODATA Key Values for Thermodynamics (Cox, Wagman,
+# Medvedev, Hemisphere, New York, 1989).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: WS
+    title: Water splitting
+    equation: H2O(l) -> H2 + 1/2 O2
+    stoichiometry: {H2O: -1, H2: 1, O2: 0.5}
+    heat_of_reaction:
+      value: 285830
+      temperature: 298.15
+      provenance: given
+      source: "CODATA Key Values for Thermodynamics (Cox, Wagman, Medvedev 1989): dfH(H2O, l) = -285.830 kJ/mol"
+    sources: ["Cox, Wagman, Medvedev, CODATA Key Values for Thermodynamics, Hemisphere, New York (1989)"]

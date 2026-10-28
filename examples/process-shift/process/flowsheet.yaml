@@ -1,0 +1,68 @@
+# High-temperature water-gas shift: reformed gas (after the waste heat boiler, 350 C and 30 bar)
+# passes an adiabatic bed of Fe-Cr catalyst (reactor: pfr). `cheme process propagate --fill`
+# integrates the bed: the outlet composition, flow, temperature and pressure (Ergun) are
+# calculated; `cheme process reactors` shows the bed (catalyst mass, hot spot, pressure drop) and
+# how close the outlet comes to equilibrium. Regenerate the sheets with `cheme process build`.
+schema: cheme/process/v1
+kind: flowsheet
+title: High-temperature shift
+units: {pressure: kPa(a), temperature: K, flow: kmol/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - {id: REFORMER, title: Reformed gas, ports: [{id: out, direction: out}]}
+products:
+  - {id: LTS, title: To low-temperature shift, ports: [{id: in, direction: in}]}
+
+blocks:
+  - id: SHIFT
+    title: High-temperature shift
+    class: ReactingChemicals
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out}
+
+steps:
+  - id: R1
+    block: SHIFT
+    title: HT shift converter
+    class: ReactingChemicals
+    reactions: [WGS]
+    reactor: pfr
+    catalyst: FE_CR
+    bed:
+      catalyst_mass: 40000
+      diameter: 3.0
+      heat: adiabatic
+      viscosity: 2.6e-5
+      provenance: assumed
+      source: "a 3 m bed of 40 t; gas viscosity at 650 K, 30 bar (typical)"
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: out, direction: out, delegates: out}
+
+streams:
+  - id: S1
+    title: Reformed gas
+    from: REFORMER.out
+    to: R1.in
+    template: syngas
+    state:
+      design:
+        pressure: {value: 3000, provenance: given, source: basis of design}
+        temperature: {value: 623.15, provenance: given, source: basis of design}
+        flow: {value: 1000, basis: mole, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {CO: 0.10, H2O: 0.35, CO2: 0.05, H2: 0.47, CH4: 0.03}, provenance: given, source: basis of design}
+  - id: S2
+    title: Shifted gas
+    from: R1.out
+    to: LTS.in
+    template: syngas
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {CO: 0.0269278, H2O: 0.276928, CO2: 0.123072, H2: 0.543072, CH4: 0.03}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1', fingerprint: 53070d3ecd0fee40}
+        flow: {value: 12735.5, unit: kg/h, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1', fingerprint: bc23c1e2ca83ade5}
+        temperature: {value: 704.415, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1', fingerprint: 53070d3ecd0fee40}
+        pressure: {value: 2999.25, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1', fingerprint: 53070d3ecd0fee40}

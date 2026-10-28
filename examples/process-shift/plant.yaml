@@ -1,0 +1,6 @@
+name: process-shift
+description: High-temperature water-gas shift in an adiabatic fixed bed (cheme process, reactor pfr)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

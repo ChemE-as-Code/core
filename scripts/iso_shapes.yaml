@@ -1,0 +1,121 @@
+# The ISO 10628-2 symbols cheme-as-code ships: input of scripts/import_iso_shapes.py.
+#
+# Each entry: `source` (the symbol's name in the source catalogue), `name` (the catalogue name
+# in cheme-as-code, ending in _SHAPE), `meaning`, `size` (longest side in mm at scale 1),
+# `scale` (how big to draw it on an A3 sheet), optional `inline: true` (a piping component,
+# drawn in the piping colour) and `classes` (the DEXPI classes it is the default symbol for in
+# `cheme fragment equipment`/`valve`; a class the DEXPI reference already draws keeps the
+# reference's shape) and `template: true` (also in the P&ID template's empty-sheet.xml;
+# the others are added to a sheet's catalogue on first use). An optional `iso` overrides the
+# registration number of the source annotations where those are wrong; its comment gives the
+# evidence.
+
+# -- pumps and gas movers (15 mm, as the reference's centrifugal pump) -------------------------
+- {source: PumpGeneric, name: PUMP_SHAPE, meaning: "pump, general", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: PumpCentrifugalShape_1, name: PUMP_CENTRIFUGAL_SHAPE, meaning: "pump, centrifugal", size: 15, scale: "1.0 (15 mm circle)"}
+# The annotations give X8095, the diaphragm pump's number; the reciprocating piston pump is X8094
+# (DEXPI 2.0.1 reference RECIPROCATING_PUMP_SHAPE, and Wikimedia Commons "Pump, reciprocating
+# piston type (ISO 10628-2).svg").
+- {source: PumpReciprocatingShape_1, name: PUMP_RECIPROCATING_SHAPE, meaning: "pump, reciprocating (piston)", size: 15, scale: "1.0 (15 mm circle)", iso: X8094}
+- {source: PumpGear, name: PUMP_GEAR_SHAPE, meaning: "pump, gear (rotary)", size: 15, scale: "1.0 (15 mm circle)", classes: [RotaryPump]}
+- {source: PumpScrewShape_1, name: PUMP_SCREW_SHAPE, meaning: "pump, screw", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: PumpProgressiveCavityShape_1, name: PUMP_PROGRESSIVE_CAVITY_SHAPE, meaning: "pump, progressive cavity (eccentric screw)", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: PumpDiaphragm, name: PUMP_DIAPHRAGM_SHAPE, meaning: "pump, diaphragm", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: PumpVacuum, name: PUMP_VACUUM_SHAPE, meaning: "vacuum pump", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: EjectorShape_1, name: EJECTOR_SHAPE, meaning: "ejector or jet pump: motive inlet left, suction below, discharge right", size: 20, scale: "1.0 (20 x 8 mm)", classes: [EjectorPump, AirEjector]}
+- {source: CompressorGeneric, name: COMPRESSOR_SHAPE, meaning: "compressor, general", size: 15, scale: "1.0 (15 mm circle); 1.5 for a main air compressor", classes: [Compressor]}
+- {source: CompressorCentrifugal, name: COMPRESSOR_CENTRIFUGAL_SHAPE, meaning: "compressor, centrifugal", size: 15, scale: "1.0 (15 mm circle); 1.5 for a main air compressor", classes: [CentrifugalCompressor], template: true}
+- {source: CompressorReciprocating, name: COMPRESSOR_RECIPROCATING_SHAPE, meaning: "compressor, reciprocating (piston)", size: 15, scale: "1.0 (15 mm circle)", classes: [ReciprocatingCompressor]}
+- {source: CompressorRotary, name: COMPRESSOR_ROTARY_SHAPE, meaning: "compressor, rotary", size: 15, scale: "1.0 (15 mm circle)", classes: [RotaryCompressor]}
+- {source: CompressorScrewShape_1, name: COMPRESSOR_SCREW_SHAPE, meaning: "compressor, screw", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: CompressorLiquidRingShape_1, name: COMPRESSOR_LIQUID_RING_SHAPE, meaning: "compressor or vacuum pump, liquid ring", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: CompressorTurbo, name: COMPRESSOR_TURBO_SHAPE, meaning: "compressor, turbo", size: 15, scale: "1.0 (15 mm circle)"}
+- {source: BlowerGeneric, name: BLOWER_SHAPE, meaning: "blower", size: 15, scale: "1.0 (15 mm circle)", classes: [Blower, CentrifugalBlower, AxialBlower], template: true}
+- {source: FanGeneric, name: FAN_SHAPE, meaning: "fan", size: 15, scale: "1.0 (15 x 3 mm)", classes: [Fan, RadialFan, AxialFan]}
+# The annotations give 2517 (next to the heat exchangers' X2511-X2517); the general turbine is
+# 2571 (Wikimedia Commons "Turbine (general) (ISO 10628-2).svg").
+- {source: TurbineGeneric, name: TURBINE_SHAPE, meaning: "turbine or expander: narrow inlet left, wide outlet right", size: 15, scale: "1.0 (9 x 15 mm); mirror for flow right to left", classes: [Turbine, GasTurbine, SteamTurbine], template: true, iso: "2571"}
+- {source: MotorElectricGenericShape_1, name: MOTOR_SHAPE, meaning: "electric motor (drive)", size: 10, scale: "1.0 (10 mm circle)", classes: [Motor, AlternatingCurrentMotor]}
+
+# -- vessels and storage (25-30 mm high, as the reference's vessel) ----------------------------
+- {source: VesselGeneric, name: VESSEL_SHAPE, meaning: "vessel, general", size: 25, scale: "1.0 (15 x 25 mm)"}
+- {source: VesselDishedEndsGeneric, name: VESSEL_DISHED_ENDS_SHAPE, meaning: "vessel with dished ends (drum, reactor, flash drum)", size: 25, scale: "1.0 (18 x 25 mm); stretch with ScaleY"}
+- {source: VesselDishedEndsJacket, name: VESSEL_DISHED_ENDS_JACKET_SHAPE, meaning: "vessel with dished ends and heating/cooling jacket", size: 25, scale: "1.0 (18 x 25 mm)"}
+# ISO 10628-2:2012 Table 2 item 1.25 (X8000): the full-tube coil is drawn on the outside of the shell.
+- {source: VesselFullTubeCoil, name: VESSEL_TUBE_COIL_SHAPE, meaning: "vessel with full-tube heating/cooling coil", size: 25, scale: "1.0 (25 mm)"}
+- {source: VesselConicalRoofAndBottom, name: VESSEL_CONICAL_ENDS_SHAPE, meaning: "vessel with conical roof and bottom", size: 25, scale: "1.0 (18 x 25 mm)"}
+# ISO 10628-2:2012 Table 2 item 1.23 (X8007) is "vessel with dished bottom and surface indication"
+# (the line under the roof with the liquid-surface triangle); the name keeps its old spelling.
+- {source: VesselDishedBottomFlatRoof, name: VESSEL_DISHED_BOTTOM_FLAT_ROOF_SHAPE, meaning: "vessel with dished bottom and surface indication", size: 25, scale: "1.0 (20 x 25 mm)"}
+- {source: TankOpenRoof, name: TANK_OPEN_SHAPE, meaning: "tank, open (basin)", size: 30, scale: "1.0 (30 x 21 mm)"}
+- {source: TankConicalRoofFlatBottom, name: TANK_CONE_ROOF_SHAPE, meaning: "storage tank with flat bottom and cone roof", size: 25, scale: "1.0-2.0 (20 x 25 mm at 1.0)", template: true}
+- {source: TankDishedRoof, name: TANK_DISHED_ROOF_SHAPE, meaning: "storage tank with flat bottom and dished roof", size: 30, scale: "1.0-2.0 (20 x 30 mm at 1.0)"}
+- {source: TankConicalBottom, name: TANK_CONICAL_BOTTOM_SHAPE, meaning: "tank with conical bottom", size: 30, scale: "1.0 (18 x 30 mm)"}
+- {source: Silo, name: SILO_SHAPE, meaning: "bunker or silo with conical bottom (bulk solids)", size: 30, scale: "1.0 (18 x 30 mm)", classes: [Silo]}
+
+# -- columns (20 mm wide, so COLUMN_TRAY/COLUMN_PACKED_BED markers fit at ScaleX 1) ------------
+- {source: ColumnGenericShape_1, name: COLUMN_SHAPE, meaning: "column, general (20 x 50 mm); stretch it with ScaleY", size: 50, scale: "ScaleX 1.0, ScaleY 1.0-3.0 (50-150 mm high); draw beds/trays as markers on it", template: true}
+- {source: ColumnTraysGeneric, name: COLUMN_TRAYS_SHAPE, meaning: "column with trays, general", size: 50, scale: "ScaleX 1.0, ScaleY 1.0-3.0", classes: [ProcessColumn]}
+- {source: ColumnFixedBed, name: COLUMN_FIXED_BED_SHAPE, meaning: "column with fixed bed (packed column, absorber, adsorber)", size: 50, scale: "ScaleX 1.0, ScaleY 1.0-3.0"}
+- {source: ColumnBubbleCapTrays, name: COLUMN_BUBBLE_CAP_TRAYS_SHAPE, meaning: "column with bubble-cap trays", size: 50, scale: "ScaleX 1.0, ScaleY 1.0-3.0"}
+- {source: ColumnValveTrays, name: COLUMN_VALVE_TRAYS_SHAPE, meaning: "column with valve trays", size: 50, scale: "ScaleX 1.0, ScaleY 1.0-3.0"}
+
+# -- heat transfer ------------------------------------------------------------------------------
+- {source: HeatExchangerGenericShape_1, name: HEAT_EXCHANGER_SHAPE, meaning: "heat exchanger, cooler or heater, general", size: 15, scale: "1.0 (15 mm)", classes: [HeatExchanger, Heater], template: true}
+# The annotations give X2511, X2512, X2513 and X2516. ISO 10628-2:2012 Table 2 items 3.3-3.6 list
+# them as the ISO 14617 symbols 2511, 2512, 2513 and 2516 (no X: X2nnn marks ISO 14617 symbol
+# *examples*, clause 5), as the DEXPI 2.0.1 reference P&ID writes 2512 and 2516.
+- {source: HeatExchangerFixedStraightTubesShape_1, name: HEAT_EXCHANGER_FIXED_TUBES_SHAPE, meaning: "shell-and-tube heat exchanger, fixed tube sheets", size: 35, scale: "1.0 (35 x 14 mm)", template: true, iso: "2511"}
+- {source: HeatExchangerFloatingHeadShape_1, name: HEAT_EXCHANGER_FLOATING_HEAD_SHAPE, meaning: "shell-and-tube heat exchanger, floating head", size: 35, scale: "1.0 (35 x 14 mm)", iso: "2512"}
+- {source: HeatExchangerUShapedTubesShape_1, name: HEAT_EXCHANGER_U_TUBE_SHAPE, meaning: "shell-and-tube heat exchanger, U tubes", size: 35, scale: "1.0 (35 x 11 mm)", iso: "2513"}
+- {source: HeatExchangerPlate, name: HEAT_EXCHANGER_PLATE_SHAPE, meaning: "plate heat exchanger", size: 20, scale: "1.0 (20 x 8 mm)", iso: "2516"}
+- {source: HeatExchangerSpiral, name: HEAT_EXCHANGER_SPIRAL_SHAPE, meaning: "spiral heat exchanger", size: 15, scale: "1.0 (15 mm circle)", classes: [SpiralHeatExchanger]}
+- {source: HeatExchangerDoublePipeShape_1, name: HEAT_EXCHANGER_DOUBLE_PIPE_SHAPE, meaning: "double-pipe heat exchanger", size: 25, scale: "1.0 (25 x 12 mm)"}
+- {source: HeatExchangerFinnedTubeAndFan, name: AIR_COOLER_SHAPE, meaning: "air cooler: finned tubes with fan", size: 25, scale: "1.0 (20 x 25 mm)", classes: [AirCoolingSystem], template: true}
+- {source: KettleReboilerShape_1, name: KETTLE_REBOILER_SHAPE, meaning: "kettle reboiler", size: 35, scale: "1.0 (35 x 23 mm)"}
+- {source: HeaterElectricShape_1, name: ELECTRIC_HEATER_SHAPE, meaning: "electric heater", size: 20, scale: "1.0 (20 x 16 mm)", classes: [ElectricHeater], template: true}
+- {source: Furnace, name: FURNACE_SHAPE, meaning: "furnace, fired heater", size: 25, scale: "1.0 (20 x 25 mm)", classes: [Furnace]}
+- {source: Boiler, name: BOILER_SHAPE, meaning: "boiler, steam generator", size: 20, scale: "1.0 (20 mm)", classes: [Boiler, SteamGenerator]}
+- {source: ThinFilmEvaporator, name: THIN_FILM_EVAPORATOR_SHAPE, meaning: "thin-film evaporator", size: 25, scale: "1.0 (20 x 25 mm)", classes: [ThinFilmEvaporator]}
+- {source: CoolingTowerGeneric, name: COOLING_TOWER_SHAPE, meaning: "cooling tower, general", size: 25, scale: "1.0 (25 mm)", classes: [CoolingTower, DryCoolingTower]}
+- {source: CoolingTowerWetInducedDraughtShape_1, name: COOLING_TOWER_WET_SHAPE, meaning: "wet cooling tower, induced draught", size: 25, scale: "1.0 (15 x 25 mm)", classes: [WetCoolingTower]}
+
+# -- separation ---------------------------------------------------------------------------------
+- {source: SeparatorGeneric, name: SEPARATOR_SHAPE, meaning: "separator, general", size: 25, scale: "1.0 (15 x 25 mm)", classes: [Separator, MechanicalSeparator]}
+- {source: SeparatorGravitational, name: SEPARATOR_GRAVITY_SHAPE, meaning: "gravity separator, settler", size: 25, scale: "1.0 (15 x 25 mm)", classes: [GravitationalSeparator]}
+- {source: SeparatorCyclone, name: CYCLONE_SHAPE, meaning: "cyclone", size: 25, scale: "1.0 (15 x 25 mm)"}
+- {source: ScrubberWet, name: SCRUBBER_SHAPE, meaning: "wet scrubber", size: 25, scale: "1.0 (15 x 25 mm)", classes: [ScrubbingSeparator]}
+- {source: FilterLiquidGeneric, name: LIQUID_FILTER_SHAPE, meaning: "filter, liquid (also a general filter)", size: 25, scale: "1.0 (15 x 25 mm)", classes: [Filter, LiquidFilter]}
+- {source: FilterGasGenericShape_1, name: GAS_FILTER_SHAPE, meaning: "filter, gas", size: 25, scale: "1.0 (15 x 25 mm)", classes: [GasFilter], template: true}
+- {source: DryerGeneric, name: DRYER_SHAPE, meaning: "dryer, general", size: 25, scale: "1.0 (20 x 25 mm)", classes: [Dryer]}
+
+# -- mixing -------------------------------------------------------------------------------------
+- {source: MixerStaticShape_1, name: STATIC_MIXER_SHAPE, meaning: "static mixer", size: 15, scale: "1.0 (15 mm)", classes: [StaticMixer]}
+- {source: MixerRotary, name: MIXER_SHAPE, meaning: "mixer, rotary", size: 20, scale: "1.0 (20 x 12 mm)", classes: [Mixer, RotaryMixer]}
+- {source: AgitatorGeneric, name: AGITATOR_SHAPE, meaning: "agitator, general: draw it inside its vessel", size: 10, scale: "1.0 (7 x 10 mm)", classes: [Agitator]}
+- {source: AgitatorImpeller, name: AGITATOR_IMPELLER_SHAPE, meaning: "agitator, impeller", size: 10, scale: "1.0 (9 x 10 mm)"}
+- {source: AgitatorTurbine, name: AGITATOR_TURBINE_SHAPE, meaning: "agitator, turbine (disc)", size: 10, scale: "1.0 (6 x 10 mm)"}
+- {source: AgitatorAnchor, name: AGITATOR_ANCHOR_SHAPE, meaning: "agitator, anchor", size: 10, scale: "1.0 (10 mm)"}
+
+# -- valves and fittings (10 mm long, as the reference's valves: draw at 0.4) ------------------
+- {source: ValveGeneric, name: VALVE_SHAPE, meaning: "valve, general (two-way)", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true}
+- {source: ValveGateGeneric, name: GATE_VALVE_SHAPE, meaning: "gate valve", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true, classes: [GateValve], template: true}
+- {source: ValveGlobeGeneric, name: GLOBE_VALVE_ISO_SHAPE, meaning: "globe valve", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true}
+- {source: ValveBallGenericShape_1, name: BALL_VALVE_ISO_SHAPE, meaning: "ball valve", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true}
+- {source: ValveButterflyGenericShape_1, name: BUTTERFLY_VALVE_ISO_SHAPE, meaning: "butterfly valve", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true}
+- {source: ValveCheckGenericShape_1, name: CHECK_VALVE_SHAPE, meaning: "check (non-return) valve, general: flow left to right", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true, classes: [CheckValve]}
+- {source: ValveCheckSwing, name: SWING_CHECK_VALVE_ISO_SHAPE, meaning: "swing check valve", size: 10, scale: "0.4 inline", inline: true}
+- {source: ValveNeedleShape_1, name: NEEDLE_VALVE_SHAPE, meaning: "needle valve", size: 10, scale: "0.4 inline (ends 2 mm from the centre)", inline: true, classes: [NeedleValve]}
+- {source: ValveAngleGenericShape_1, name: ANGLE_VALVE_SHAPE, meaning: "angle valve: inlet below, outlet right", size: 10, scale: "0.4", inline: true, classes: [AngleValve]}
+- {source: ValveThreeWayGenericShape_1, name: THREE_WAY_VALVE_SHAPE, meaning: "three-way valve", size: 10, scale: "0.4", inline: true}
+- {source: ValveControlContinuouslyOperated, name: CONTROL_VALVE_SHAPE, meaning: "control valve (continuously operated)", size: 10, scale: "0.4 inline", inline: true}
+- {source: SpringLoadedGlobeSafetyValve, name: SAFETY_VALVE_SPRING_LOADED_SHAPE, meaning: "safety valve, spring loaded", size: 10, scale: "0.4-0.6", inline: true}
+- {source: SpringLoadedAngleGlobeSafetyValve, name: ANGLE_SAFETY_VALVE_ISO_SHAPE, meaning: "angle safety valve, spring loaded: inlet below, outlet right", size: 10, scale: "0.4-0.6", inline: true}
+- {source: RuptureDiscShape_1, name: RUPTURE_DISC_SHAPE, meaning: "rupture (bursting) disc", size: 10, scale: "0.4-0.6", inline: true, classes: [RuptureDisc]}
+- {source: SteamTrapShape_1, name: STEAM_TRAP_SHAPE, meaning: "steam trap", size: 10, scale: "0.4-0.6", inline: true, classes: [SteamTrap]}
+- {source: FlameArrestorGenericShape_1, name: FLAME_ARRESTOR_SHAPE, meaning: "flame arrestor", size: 10, scale: "0.4-0.6", inline: true, classes: [FlameArrestor]}
+- {source: PipeReducer, name: REDUCER_ISO_SHAPE, meaning: "reducer", size: 10, scale: "0.4", inline: true}
+- {source: StrainerConicalShape_1, name: STRAINER_SHAPE, meaning: "strainer (conical)", size: 10, scale: "0.4-0.6", inline: true, classes: [Strainer, ConicalStrainer]}
+- {source: SightGlassIlluminated, name: SIGHT_GLASS_ILLUMINATED_SHAPE, meaning: "sight glass with lighting (illuminated)", size: 10, scale: "0.4-0.6", inline: true, classes: [IlluminatedSightGlass]}
+- {source: Flare, name: FLARE_SHAPE, meaning: "flare stack", size: 25, scale: "1.0 (25 mm)", classes: [Flare]}
+- {source: Chimney, name: CHIMNEY_SHAPE, meaning: "chimney, stack", size: 25, scale: "1.0 (25 mm)", classes: [Chimney]}

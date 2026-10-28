@@ -1,0 +1,149 @@
+# EXAMPLE: an illustrative HAZOP study of the small plant in pid/P-01.xml, to show the file and
+# the workflow (safety/README.md, skills hazop-study, hazop-assessment, hazop-review). It is not
+# an assessment: the matrix is example data and the ratings are made up for the illustration.
+schema: cheme/hazop-study/v1
+kind: hazop-study
+id: H-01
+title: Feed vessel V-101 and transfer pump P-101
+example: true
+scope: >-
+  V-101 from its inlet to the pump suction, P-101 and its discharge through FV-104 to the
+  battery limit (pid/P-01.xml). Not covered: the supply upstream of V-101, the receiving unit.
+modes:
+  - {id: normal, title: Normal operation}
+  - {id: startup, title: Start-up of P-101}
+analysed:
+  - {path: pid/P-01.xml, revision: 'sha256:f4280cae0c127d85f4f83cfdd2b0e520f6d7d5bed1f3cd3ae51e20b6dd637ca2', relation: analyses}
+  - {path: control/cause-effect.yaml, revision: 'sha256:bbe683cf5956a65cac17128c46b5edcc06e17362afac34ec867f00f259dcebac', relation: analyses}
+risk_matrix: safety/risk-matrix.yaml
+assessment_basis: >-
+  Each scenario is rated per category before its safeguards (initial) and, by the team's
+  judgement, with them (residual). Severity is the credible worst outcome; likelihood that of
+  the cause. No frequencies are calculated and no safeguard is credited by a tool.
+nodes:
+  - id: N1
+    title: V-101 feed vessel and P-101 suction
+    design_intent: >-
+      Hold water at ambient temperature between the low and high level alarms of LT-102 and
+      feed the suction of P-101 through 80-P-101.
+    members: [V-101, LT-102, PI-103, 80-P-101]
+    status: accepted
+    deviations:
+      - id: N1-LL
+        guide_word: less
+        parameter: level
+        scenarios:
+          - id: S1
+            cause: The supply to V-101 stops while P-101 keeps running; the vessel drains.
+            consequence: P-101 loses suction and cavitates; seal damage and a water release at the seal.
+            refs: [V-101, P-101]
+            safeguards: [SG1, SG2]
+            status: accepted
+            risk:
+              initial:
+                - category: people
+                  severity: "1"
+                  likelihood: C
+                  basis: A release of cold water at the seal; first aid at most.
+                  status: accepted
+                  band: {value: low, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: bfc1e9d2a9aa32cb, inputs: {matrix: b6caa11838fe6bc7, severity: '1', likelihood: C}}
+                - category: asset
+                  severity: "3"
+                  likelihood: C
+                  basis: Pump seal and impeller damage; weeks without the transfer.
+                  status: accepted
+                  band: {value: medium, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: 4255ea3f73fe5efe, inputs: {matrix: b6caa11838fe6bc7, severity: '3', likelihood: C}}
+              residual:
+                - category: asset
+                  severity: "3"
+                  likelihood: A
+                  basis: The team credits interlock I-01 (LT-102 LALL stops P-101); the alarm is not credited separately.
+                  status: accepted
+                  band: {value: low, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: f04923bf0bf2e0ec, inputs: {matrix: b6caa11838fe6bc7, severity: '3', likelihood: A}}
+      - id: N1-HL
+        guide_word: more
+        parameter: level
+        scenarios:
+          - id: S2
+            cause: FV-104 closes (or FIC-104 fails low) while the supply continues; V-101 fills up.
+            consequence: Water leaves through the vent on top of V-101 and floods the area around the vessel.
+            refs: [V-101, FV-104, FIC-104]
+            status: accepted
+            risk:
+              initial:
+                - category: environment
+                  severity: "2"
+                  likelihood: C
+                  basis: Clean water spill, contained on site.
+                  status: accepted
+                  band: {value: medium, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: 286f676bb8108832, inputs: {matrix: b6caa11838fe6bc7, severity: '2', likelihood: C}}
+            notes: No high level alarm is configured on LT-102.
+  - id: N2
+    title: P-101 discharge through FV-104 to the battery limit
+    design_intent: >-
+      Transfer water from V-101 to the battery limit at the flow FIC-104 sets, through 50-P-102
+      and FV-104.
+    members: [P-101, PT-101, FIC-104, FV-104, 50-P-102]
+    status: accepted
+    deviations:
+      - id: N2-NF
+        guide_word: "no"
+        parameter: flow
+        scenarios:
+          - id: S3
+            cause: FV-104 fails closed while P-101 runs.
+            consequence: P-101 runs against a closed valve, heats the water in its casing and fails its seal; hot water release.
+            refs: [FV-104, P-101]
+            safeguards: [SG3]
+            actions: [A1]
+            status: accepted
+            risk:
+              initial:
+                - category: people
+                  severity: "3"
+                  likelihood: C
+                  basis: Hot water release near the pump while an operator is present.
+                  status: accepted
+                  band: {value: high, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: b6fe1208a949a698, inputs: {matrix: b6caa11838fe6bc7, severity: '3', likelihood: C}}
+              residual:
+                - category: people
+                  severity: "3"
+                  likelihood: B
+                  basis: Operator response to the PT-101 high pressure alarm, as judged by the team.
+                  status: accepted
+                  band: {value: medium, provenance: calculated, source: 'cheme safety hazop rate: example-4x4 (safety/risk-matrix.yaml)', fingerprint: aa86891dd127d418, inputs: {matrix: b6caa11838fe6bc7, severity: '3', likelihood: B}}
+      - id: N2-RF
+        guide_word: reverse
+        parameter: flow
+        scenarios:
+          - id: S4
+            cause: P-101 stops while the receiving side is under pressure.
+            consequence: Back flow through P-101 into V-101; the pump turns backwards.
+            refs: [P-101, 50-P-102]
+            status: proposed
+            by: agent (skill hazop-study)
+            notes: >-
+              Proposed from the P&ID, which shows no check valve on 50-P-102. The pressure of the
+              receiving side is not known here: the team to say whether back flow is credible.
+safeguards:
+  - id: SG1
+    title: LT-102 low level alarm; the operator stops P-101
+    kind: alarm
+    refs: [LT-102]
+    status: accepted
+  - id: SG2
+    title: Interlock I-01, LT-102 low-low level stops P-101
+    kind: interlock
+    interlock: I-01
+    refs: [LT-102, P-101]
+    status: accepted
+  - id: SG3
+    title: PT-101 high discharge pressure alarm; the operator stops P-101
+    kind: alarm
+    refs: [PT-101]
+    status: accepted
+actions:
+  - id: A1
+    text: Provide a minimum-flow recirculation for P-101, or a low-flow trip of P-101 on FIC-104.
+    owner: process engineer
+    status: open

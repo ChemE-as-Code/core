@@ -1,0 +1,11 @@
+# Structured scope of egrid-2023 (core#306); the profile file stays byte-stable.
+# From the profile notes: total output rate (CO2, CH4, N2O as CO2e) of all net generation at the
+# point of generation, no T&D losses, no upstream, generation mix of the area (no imports).
+sources:
+  egrid-2023:
+    basis: direct
+    delivery: generation
+    gases: co2e
+    gwp: AR5
+    mix: grid-average
+    accounting: generation

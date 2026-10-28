@@ -1,0 +1,81 @@
+# Architecture Decision Records
+
+This directory records the architecturally significant decisions about **cheme-as-code
+itself**: the package, the `cheme` CLI, its file formats and schemas, the agent interface
+(commands, findings, skills) and its contracts with the other ChemE-as-Code repositories
+(project-template, viewer, process-library). Each record says what was decided, why, what it
+costs, and where the evidence is (pull request, commit, files).
+
+**Not here: a plant's engineering decisions.** Why a plant uses a given column, material or
+safeguard is recorded in that plant repository's `DESIGN.md`, as `D-NNN` entries, and cited
+from values (`assumed` with a basis), `accept:` reasons and review records. An ADR is about the
+software that checks plants; a `D-NNN` decision is about one plant. Do not mix the two.
+
+The format is Michael Nygard's lightweight one (Title, Status, Context, Decision,
+Consequences) with an added Evidence section. [ADR 0001](0001-record-architecture-decisions.md)
+records the decision to keep these records.
+
+## When to write one
+
+A pull request that changes any of the following adds a new ADR, or supersedes an existing one,
+in the same pull request:
+
+- the architecture: layers, module ownership, import rules, a new integration boundary or
+  out-of-process worker, base versus optional dependencies;
+- a public file format or schema: a new file kind, a breaking schema version, fingerprint or id
+  formats, rule-id conventions;
+- the agent interface: how agents call the tool, finding format, skill distribution, an MCP or
+  other adapter;
+- a cross-repository contract: the `cheme serve` API or static snapshot format used by the
+  viewer, the generated project template, what the process library relies on.
+
+Bug fixes, new rules or commands inside an existing decision, and documentation need no ADR.
+
+## How to add one
+
+1. Copy [template.md](template.md) to `NNNN-kebab-title.md` with the next free number.
+2. Fill in Context, Decision, Consequences (positive and negative, including known limitations)
+   and Evidence. Keep it short; link the detailed docs rather than copying them.
+3. Status `Accepted` when the pull request is merged (`Proposed` while under discussion).
+4. To change an accepted decision, do not rewrite it: write a new ADR and set the old one's
+   status to `Superseded by [NNNN](...)`. Typos and broken links may be fixed in place.
+5. Add the record to the index below and to `nav` in `mkdocs.yml`.
+
+## Index
+
+ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's history
+(0.1.0 to 0.8.0); the date is when the decision was taken according to git.
+
+| ADR | Title | Status | Date |
+|---|---|---|---|
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted | 2026-10-25 |
+| [0002](0002-plant-data-as-plain-files-in-git.md) | Plant data as plain files in git, the single source of truth | Accepted | 2026-10-17 |
+| [0003](0003-dexpi-xml-via-pydexpi-as-the-pid-format.md) | DEXPI 2.0.1 XML through pyDEXPI as the P&ID format, kept canonical for small diffs | Accepted | 2026-10-17 |
+| [0004](0004-pin-pydexpi-by-git-commit.md) | Pin pyDEXPI as a git dependency by commit | Accepted | 2026-10-22 |
+| [0005](0005-versioned-yaml-schemas-and-cheme-migrate.md) | Engineering YAML with versioned schemas, additive changes and `cheme migrate` | Accepted | 2026-10-19 |
+| [0006](0006-findings-with-stable-ids-as-the-agent-interface.md) | Findings with `file:line`, rule id, hint and a stable id as the agent interface | Accepted | 2026-10-17 |
+| [0007](0007-agents-edit-files-directly-no-mcp-server.md) | Agents edit files directly; the CLI, not an MCP server, is the tool interface | Accepted | 2026-10-17 |
+| [0008](0008-skills-shipped-as-copies-into-plant-repositories.md) | Skills ship with the package and are installed as copies into plant repositories | Accepted | 2026-10-17 |
+| [0009](0009-layered-package-with-enforced-import-rules.md) | One package in layers, foundation, domains, project, interfaces, with enforced imports | Accepted | 2026-10-21 |
+| [0010](0010-deterministic-domains-no-llm-calls.md) | Deterministic engineering functions: no LLM or agent calls in the package | Accepted | 2026-10-21 |
+| [0011](0011-per-value-provenance-and-fingerprints.md) | Per-value provenance (given/assumed/calculated) and sha256 fingerprints for staleness | Accepted | 2026-10-19 |
+| [0012](0012-stages-gates-and-sign-offs-on-the-default-branch.md) | Stages, gates and sign-offs count only on the default branch, with no unapproved self-review | Accepted | 2026-10-18 |
+| [0013](0013-calculation-maturity-separate-from-completeness-and-review.md) | Calculation maturity levels, with "unsupported" blocking, kept apart from completeness and review | Accepted | 2026-10-24 |
+| [0014](0014-dwsim-as-an-out-of-process-simulation-worker.md) | DWSIM as an out-of-process simulation worker, and property methods claimed only where benchmarked | Accepted | 2026-10-22 |
+| [0015](0015-optional-backends-and-licensed-data-not-shipped.md) | Brightway as an optional LCA backend; licensed third-party data is linked or fetched, never shipped | Accepted | 2026-10-22 |
+| [0016](0016-read-only-serve-api-and-static-snapshots.md) | A read-only `cheme serve` API and static snapshots for the viewer | Accepted | 2026-10-17 |
+| [0017](0017-project-template-generated-from-cheme-init.md) | The project-template repository is generated from `cheme init` by CI | Accepted | 2026-10-24 |
+| [0018](0018-rename-plantcode-to-cheme-as-code-without-aliases.md) | Rename plantcode to cheme-as-code, and no compatibility aliases before 1.0 | Accepted | 2026-10-22 |
+| [0019](0019-liquid-liquid-extraction-as-qualified-equilibrium-stages-outside-the-simulation.md) | Liquid-liquid extraction as qualified equilibrium stages, solved by core outside the simulation | Accepted | 2026-10-27 |
+| [0020](0020-review-currency-ignores-digest-only-changes.md) | A review stays current through a change of nothing but full digests | Accepted | 2026-10-27 |
+| [0021](0021-furnace-energy-basis-for-solid-reactions.md) | A furnace energy basis for high-temperature solid reactions from condensed-phase data, never a fluid flash | Proposed | 2026-10-27 |
+| [0022](0022-iso-10628-symbol-library-and-pfd-symbols.md) | An ISO 10628-2 symbol library for the P&ID catalogue and the PFD steps | Accepted | 2026-10-27 |
+| [0023](0023-electrochemical-cell-contract.md) | Electrochemical cells as a versioned contract with specified performance | Accepted | 2026-10-27 |
+| [0024](0024-adsorber-performance-basis-outside-the-simulation.md) | Adsorber performance basis: an equilibrium TSA cycle and external results, outside the simulation | Accepted | 2026-10-27 |
+| [0025](0025-solid-components-and-a-bounded-crystallizer-adapter.md) | Solids as components and a bounded crystallizer adapter outside the simulation | Accepted | 2026-10-27 |
+| [0026](0026-petroleum-assays-as-versioned-pseudocomponents.md) | Petroleum assays characterised into versioned pseudocomponents, claimed only where benchmarked | Accepted | 2026-10-27 |
+| [0027](0027-qualified-electrolyte-systems-through-pitzer-in-cantera.md) | Qualified electrolyte systems through Pitzer's equations in Cantera, refused everywhere else | Accepted | 2026-10-27 |
+| [0028](0028-composition-limits-in-property-package-claims.md) | A property package claim may limit composition, per box and per pair | Accepted | 2026-10-27 |
+| [0029](0029-run-records-per-run.md) | Run records per run in the plant repository, written by core | Proposed | 2026-10-27 |
+| [0030](0030-conversion-reactors-checked-against-the-declared-conversion.md) | Conversion reactors checked against the declared conversion, an error beyond 0.001 | Accepted | 2026-10-27 |
+| [0031](0031-one-glossary-and-qualified-maturity.md) | One glossary for the project name and the maturity, stage and review axes | Accepted | 2026-10-27 |

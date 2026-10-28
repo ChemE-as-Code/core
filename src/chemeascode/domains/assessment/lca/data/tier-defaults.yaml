@@ -1,0 +1,153 @@
+# The defaults of tiered LCI generation (core#182): what `cheme assess lci-estimate` uses where
+# an estimate gives no sourced value. Versioned: a change of a value or a rule bumps `version`,
+# and every generated dataset records the version it was built with (generation.defaults).
+#
+# Each value states its source and `status`:
+#   confirmed - the value was read in the cited publication (`checked` says where and when);
+#   ASSUMED   - the value is the approach's commonly quoted number, attributed to the source but
+#               not read in it (no open copy prints it): confirm it before the dataset is used
+#               for more than screening.
+# The numbers are published facts restated in our own form (no text or table is copied).
+#
+# `pedigree` is the ecoinvent pedigree (Weidema et al. 2013) every exchange taking the default
+# gets: [reliability, completeness, temporal, geographical, technological], cheme's convention
+# (ASSUMED, docs/framework/lci-estimate.md gives the reasons). `floors` are the best scores a
+# tier allows on any exchange of its datasets; the DQR floor follows from them.
+schema: cheme/lci_defaults/v1
+id: cheme tier-defaults
+version: 1.0.0
+sources:
+  - id: hischier-2005
+    citation: >-
+      Hischier, R., Hellweg, S., Capello, C., Primas, A. (2005): Establishing life cycle
+      inventories of chemicals based on differing data availability. Int J LCA 10(1) 59-67,
+      doi:10.1065/lca2004.10.181.7
+    open_version: https://www.dora.lib4ri.ch/empa/dload/empa:29119/PDF/view
+  - id: althaus-2007
+    citation: >-
+      Althaus, H.-J., Chudacoff, M., Hischier, R., Jungbluth, N., Osses, M., Primas, A. (2007):
+      Life cycle inventories of chemicals. ecoinvent report No. 8, v2.0. Empa / Swiss Centre
+      for Life Cycle Inventories, Dübendorf
+    open_version: ""
+  - id: gendorf-2000
+    citation: >-
+      Werk Gendorf (2000): Umwelterklärung 2000, Burgkirchen (the site averages the two
+      sources above derive their energy and water defaults from). NOT VERIFIED: the title and
+      place are reconstructed from the description in Hischier et al. 2005, the report itself
+      was not seen
+    open_version: ""
+defaults:
+  yield:
+    title: Efficiency over the entire stoichiometric equation
+    value: 0.95
+    unit: fraction
+    status: confirmed
+    source: >-
+      Hischier et al. 2005, section 2.3 ("an efficiency of 95% is assumed" over the entire
+      stoichiometric equation), as applied in Althaus et al. 2007 (ecoinvent report No. 8; not
+      read directly)
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 61"
+    pedigree: [4, 5, 5, 5, 4]
+  loss-air:
+    title: Share of the input materials emitted to air
+    value: 0.002
+    unit: fraction of the input mass
+    status: confirmed
+    source: >-
+      Hischier et al. 2005, section 2.3: emissions to air estimated as 0.2 % of the input
+      materials
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 61"
+    pedigree: [4, 5, 5, 5, 4]
+  loss-water:
+    title: The rest of the unconverted input, to water
+    value: 1.0
+    unit: fraction of the loss left after the air share
+    status: confirmed
+    source: >-
+      Hischier et al. 2005, section 2.3: the water emissions are the difference between the
+      input materials and the air emissions (here: the unconverted input less its air share).
+      Routed to wastewater treatment (a technosphere output) by default, as the library's
+      cut-off system model puts treatment without recovery in the producer's system
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 61"
+    pedigree: [4, 5, 5, 5, 4]
+  loss-waste:
+    title: Share of the loss to solid waste
+    value: 0.0
+    unit: fraction of the loss
+    status: confirmed
+    source: >-
+      Hischier et al. 2005, section 2.3: solid wastes omitted (rarely produced in processes
+      with liquid or gaseous educts)
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 61"
+    pedigree: [4, 5, 5, 5, 4]
+  electricity:
+    title: Electricity per kg of product
+    value: 0.3333
+    unit: kWh
+    carrier: electricity
+    status: ASSUMED
+    source: >-
+      1.2 MJ (0.333 kWh) per kg of product, attributed to the Gendorf (2000) site average that
+      the ecoinvent v2-era chemicals proxies used. ASSUMED, not read in either source:
+      Hischier et al. 2005 (p. 61) names the Gendorf (2000) average as the default but prints
+      no value, and the number could not be confirmed in an open copy of Althaus et al. 2007
+      (ecoinvent report No. 8). Dated: newer ecoinvent proxies
+      rest on later Gendorf reports, so this value may be low for a present-day process
+    checked: "2026-10-25: not confirmed (Hischier et al. 2005, p. 61 names the Gendorf (2000) average but prints no number; no open copy of report No. 8 found)"
+    pedigree: [4, 5, 5, 4, 5]
+  heat:
+    title: Heat from fossil fuel per kg of product
+    value: 0.5556
+    unit: kWh
+    carrier: heat
+    carrier_note: >-
+      heat generated from fossil fuel (Hischier et al. 2005, p. 61: fossil fuel generates the
+      heat for preheating and distillation); a heat flow in kWh, not a fuel input
+    status: ASSUMED
+    source: >-
+      2.0 MJ (0.556 kWh) of heat per kg of product, generated from fossil fuel (the carrier is
+      a heat flow, not a fuel input), attributed to the Gendorf (2000) site average that the
+      ecoinvent v2-era chemicals proxies used. ASSUMED, not read in either source (see
+      electricity); dated, and possibly low against newer ecoinvent proxies
+    checked: "2026-10-25: not confirmed (Hischier et al. 2005, p. 61 names the Gendorf (2000) average but prints no number; no open copy of report No. 8 found)"
+    pedigree: [4, 5, 5, 4, 5]
+  infrastructure:
+    title: Chemical plant (organics) per kg of product
+    value: 4.0e-10
+    unit: ea
+    status: confirmed
+    apply: false
+    source: >-
+      Hischier et al. 2005, section 2.3: 4e-10 units of the generic plant 'chemical plant,
+      organics' (50 000 t/a, 50 years) per kg. Not applied by default: the library states
+      infrastructure as excluded unless the design provides it
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 61"
+    pedigree: [4, 5, 5, 5, 5]
+  transport-lorry:
+    title: Standard lorry transport distance of an input of a basic chemical
+    value: 100
+    unit: km
+    status: confirmed
+    apply: false
+    source: >-
+      Hischier et al. 2005, section 2.1: the ecoinvent team's standard distance for basic
+      chemicals within Europe, after Frischknecht et al. 2004. Not applied: the generator
+      builds no transport exchanges (the input masses are known, the transport datasets are
+      the background's); the system boundary states transport as excluded
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 60"
+    pedigree: [4, 5, 5, 5, 4]
+  transport-train:
+    title: Standard train transport distance of an input of a basic chemical
+    value: 600
+    unit: km
+    status: confirmed
+    apply: false
+    source: >-
+      Hischier et al. 2005, section 2.1: the standard distance for basic chemicals within
+      Europe, after Frischknecht et al. 2004 (HCl: 200 km by train only). Not applied, see
+      transport-lorry
+    checked: "2026-10-25: Hischier et al. 2005, open version (Empa DORA), p. 60"
+    pedigree: [4, 5, 5, 5, 4]
+floors:
+  0: [4, 4, 3, 3, 4]
+  1: [3, 4, 3, 3, 3]

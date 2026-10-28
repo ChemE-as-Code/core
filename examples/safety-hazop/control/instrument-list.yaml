@@ -1,0 +1,6 @@
+schema: cheme/instruments/v1
+instruments:
+  - {tag: PT-101, service: P-101 discharge pressure, sheet: P-01}
+  - {tag: LT-102, service: V-101 level, sheet: P-01}
+  - {tag: PI-103, service: V-101 local gauge, sheet: P-01}
+  - {tag: FIC-104, service: Discharge flow control to FV-104, sheet: P-01}

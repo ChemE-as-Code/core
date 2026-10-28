@@ -1,0 +1,10 @@
+{
+  "preamble_file": "implement.md",
+  "defaults": {"budget": 10, "approve": "auto", "effort": "high", "max_restarts": 3},
+  "jobs": [
+    {"name": "issue-1", "cwd": "../../..", "budget": 8,
+     "task": "# Your issue: <owner/repo>#<n>\nRead it with `gh issue view <n> -R <owner/repo> --comments` and implement exactly its acceptance criteria.",
+     "then": {"name": "review-1", "budget": 6, "preamble_file": "review.md",
+              "task": "Review and merge the PR for <owner/repo>#<n>."}}
+  ]
+}

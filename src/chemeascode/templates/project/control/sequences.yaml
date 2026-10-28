@@ -1,0 +1,28 @@
+# Operating sequences: startup, shutdown and abnormal modes. Schema: `cheme schema sequences`.
+# PROPOSED operating intent, not approved for implementation; the review status comes from reviews/.
+# Start permissives are not trips: trips stay in control/cause-effect.yaml, named by id here.
+# Skill control-sequences.
+schema: cheme/sequences/v1
+sequences: []
+#  - id: SEQ-START
+#    title: Start up the feed section
+#    mode: startup                      # startup, shutdown, abnormal, normal, other
+#    section: FEED
+#    permissives:
+#      - {interlock: I-01, state: reset}
+#      - {all: [{loop: FIC-101, state: in manual}, {tag: XV-107, state: open}]}
+#    interlocks: [I-01]
+#    steps:
+#      - id: S1
+#        title: Admit feed
+#        actions:
+#          - {loop: FIC-101, action: setpoint, setpoint: {value: 1200, unit: kg/h, provenance: assumed}}
+#          - {loop: FIC-101, action: auto, by: operator}
+#        complete: {tag: LT-102, state: "> 30 %", delay: {value: 30, unit: s}}
+#        timeout: {value: 30, unit: min}
+#        on_timeout: abort
+#    abort:
+#      condition: {interlock: I-01, state: tripped}
+#      actions: [{tag: FV-101, action: close}]
+#      then: SEQ-STOP
+#    reset: {latching: true, manual: true, condition: {interlock: I-01, state: reset}}

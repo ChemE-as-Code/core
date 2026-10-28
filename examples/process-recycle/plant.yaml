@@ -1,0 +1,6 @@
+name: process-recycle
+description: Example flowsheet with a recycle loop (cheme process, schema cheme/process/v1)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

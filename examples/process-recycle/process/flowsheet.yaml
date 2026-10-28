@@ -1,0 +1,148 @@
+# A small flowsheet with a recycle loop, refined into PFD steps. examples/process-blocks/ holds
+# the same flowsheet before refinement: the stream ids are the same and so are the block
+# balances. Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Ethanol recovery with recycle
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - id: FEED
+    title: Aqueous feed
+    ports: [{id: out, direction: out}]
+  - id: STEAM
+    title: LP steam
+    ports: [{id: q, direction: out, kind: energy}]
+products:
+  - id: PROD
+    title: Ethanol product
+    ports: [{id: in, direction: in}]
+  - id: WATER
+    title: Waste water
+    ports: [{id: in, direction: in}]
+
+blocks:
+  - id: MIX
+    title: Feed preparation
+    class: Mixing
+    ports:
+      - {id: feed, direction: in}
+      - {id: recycle, direction: in}
+      - {id: out, direction: out}
+  - id: SEP
+    title: Ethanol separation
+    class: SeparatingByThermalProcess
+    ports:
+      - {id: in, direction: in}
+      - {id: reboil, direction: in, kind: energy}
+      - {id: top, direction: out}
+      - {id: side, direction: out}
+      - {id: bottom, direction: out}
+
+steps:
+  - id: M1
+    block: MIX
+    title: Feed mixer
+    class: MixingSimple
+    ports:
+      - {id: feed, direction: in, delegates: feed}
+      - {id: recycle, direction: in, delegates: recycle}
+      - {id: out, direction: out, delegates: out}
+    links: [{target: equipment, ref: M-101}]
+  - id: C1
+    block: SEP
+    title: Column
+    class: Distilling
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: reboil, direction: in, kind: energy, delegates: reboil}
+      - {id: vapour, direction: out}
+      - {id: side, direction: out, delegates: side}
+      - {id: bottom, direction: out, delegates: bottom}
+    links: [{target: equipment, ref: C-101}]
+  - id: E1
+    block: SEP
+    title: Condenser
+    class: Cooling
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out, delegates: top}
+    links: [{target: equipment, ref: E-101}]
+
+streams:
+  - id: S1
+    title: Feed
+    from: FEED.out
+    to: M1.feed
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 300, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 1000, basis: mass, provenance: given, source: basis of design}
+        composition: {basis: mass_fraction, values: {ETOH: 0.4, H2O: 0.6}, provenance: given, source: basis of design}
+  - id: S2
+    title: Column feed
+    from: M1.out
+    to: C1.in
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 250, provenance: assumed}
+        temperature: {value: 330, provenance: assumed}
+        flow: {value: 1500, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.3, H2O: 0.7}, provenance: assumed}
+  - id: S3
+    title: Distillate
+    from: E1.out
+    to: PROD.in
+    template: aqueous
+    state:
+      design:
+        pressure: {value: 110, provenance: assumed}
+        flow: {value: 400, provenance: given, source: product specification}
+        composition: {basis: mass_fraction, values: {ETOH: 0.95, H2O: 0.05}, provenance: given, source: product specification}
+  - id: S4
+    title: Recycle
+    from: C1.side
+    to: M1.recycle
+    template: aqueous
+    state:
+      design:
+        flow: {value: 500, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.1, H2O: 0.9}, provenance: assumed}
+  - id: S5
+    title: Bottoms
+    from: C1.bottom
+    to: WATER.in
+    template: aqueous
+    state:
+      design:
+        flow: {value: 600, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.0333333, H2O: 0.9666667}, provenance: assumed}
+  - id: S6
+    title: Overhead vapour
+    from: C1.vapour
+    to: E1.in
+    template: aqueous
+    state:
+      design:
+        flow: {value: 400, provenance: assumed}
+        composition: {basis: mass_fraction, values: {ETOH: 0.95, H2O: 0.05}, provenance: assumed}
+        phase: {value: vapor, vapor_fraction: 1.0, provenance: assumed}
+  - id: Q1
+    title: Reboiler duty
+    kind: energy
+    from: STEAM.q
+    to: C1.reboil
+    state:
+      design:
+        duty: {value: 350, provenance: assumed}

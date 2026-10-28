@@ -1,0 +1,11 @@
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: N2, name: Nitrogen, formula: N2, cas: 7727-37-9, chebi: "CHEBI:17997", molar_mass: 28.014, normal_boiling_point: 77.36}
+  - {id: O2, name: Oxygen, formula: O2, cas: 7782-44-7, chebi: "CHEBI:15379", molar_mass: 31.998, normal_boiling_point: 90.19}
+  - {id: AR, name: Argon, formula: Ar, cas: 7440-37-1, chebi: "CHEBI:49475", molar_mass: 39.948, normal_boiling_point: 87.30}
+templates:
+  - {id: air, title: Dry air and its products, components: [N2, O2, AR]}
+property_method:
+  adapter: thermo
+  status: placeholder

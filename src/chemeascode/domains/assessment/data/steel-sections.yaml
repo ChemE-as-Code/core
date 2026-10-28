@@ -1,0 +1,117 @@
+# Mass per metre of the steel sections the 3D layout model uses, kg/m: the material take-off
+# turns member lengths into tonnage with it. Rolled sections (HEB, HEA, IPE, UPN, equal angles)
+# are the nominal masses of the European section tables (EN 10365); hollow sections and flat
+# bars the model names without a wall thickness are ASSUMED (the thickness used is given). A
+# take-off is a quantity estimate, not a structural design: connections, base plates, bolts
+# and coating are not in these masses (the estimate's factors carry them). A section name is
+# compared without blanks and in upper case ("HEB 300" is HEB300); "C" is a UPN channel.
+schema: cheme/steel-sections/v1
+status: ASSUMED
+basis: "nominal masses of the EN 10365 section tables; hollow sections and flat bars as noted (ASSUMED)"
+sections:
+  HEB100: 20.4
+  HEB120: 26.7
+  HEB140: 33.7
+  HEB160: 42.6
+  HEB180: 51.2
+  HEB200: 61.3
+  HEB220: 71.5
+  HEB240: 83.2
+  HEB260: 93.0
+  HEB280: 103.0
+  HEB300: 117.0
+  HEB320: 127.0
+  HEB340: 134.0
+  HEB360: 142.0
+  HEB400: 155.0
+  HEB450: 171.0
+  HEB500: 187.0
+  HEB550: 199.0
+  HEB600: 212.0
+  HEB650: 225.0
+  HEB700: 241.0
+  HEB800: 262.0
+  HEB900: 291.0
+  HEB1000: 314.0
+  HEA100: 16.7
+  HEA120: 19.9
+  HEA140: 24.7
+  HEA160: 30.4
+  HEA180: 35.5
+  HEA200: 42.3
+  HEA220: 50.5
+  HEA240: 60.3
+  HEA260: 68.2
+  HEA280: 76.4
+  HEA300: 88.3
+  HEA320: 97.6
+  HEA340: 105.0
+  HEA360: 112.0
+  HEA400: 125.0
+  HEA450: 140.0
+  HEA500: 155.0
+  HEA550: 166.0
+  HEA600: 178.0
+  HEA650: 190.0
+  HEA700: 204.0
+  HEA800: 224.0
+  HEA900: 252.0
+  HEA1000: 272.0
+  IPE100: 8.1
+  IPE120: 10.4
+  IPE140: 12.9
+  IPE160: 15.8
+  IPE180: 18.8
+  IPE200: 22.4
+  IPE220: 26.2
+  IPE240: 30.7
+  IPE270: 36.1
+  IPE300: 42.2
+  IPE330: 49.1
+  IPE360: 57.1
+  IPE400: 66.3
+  IPE450: 77.6
+  IPE500: 90.7
+  IPE550: 106.0
+  IPE600: 122.0
+  UPN100: 10.6
+  UPN120: 13.4
+  UPN140: 16.0
+  UPN160: 18.8
+  UPN180: 22.0
+  UPN200: 25.3
+  UPN220: 29.4
+  UPN240: 33.2
+  UPN260: 37.9
+  UPN280: 41.8
+  UPN300: 46.2
+  L50x5: 3.77
+  L60x6: 5.42
+  L70x7: 7.38
+  L80x8: 9.63
+  L90x9: 12.2
+  L100x10: 15.0
+  L120x12: 21.6
+  L150x15: 33.8
+  # hollow sections without a wall thickness: 3 mm wall (ASSUMED), EN 10219 cold formed
+  RHS40x40: 3.41
+  RHS50x50: 4.35
+  RHS60x60: 5.29
+  # flat bars: width x thickness x 7850 kg/m3
+  FL40x8: 2.51
+  FL70x12: 6.59
+  FL100x5: 3.93
+  FL100x10: 7.85
+# other names for the same section
+aliases:
+  C100: UPN100
+  C120: UPN120
+  C140: UPN140
+  C160: UPN160
+  C180: UPN180
+  C200: UPN200
+  C220: UPN220
+  C240: UPN240
+  C260: UPN260
+  C280: UPN280
+  C300: UPN300

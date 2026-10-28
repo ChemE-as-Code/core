@@ -1,0 +1,48 @@
+# EXAMPLE DATA: an illustrative risk matrix to try the HAZOP workflow with. It is not anyone's
+# risk criteria and must not be used to assess a real plant: replace it with your company's
+# matrix (its procedure under source:) and remove `example: true`.
+# Schema: cheme schema risk-matrix. Bands: lowest risk first (that list is the band order).
+schema: cheme/risk-matrix/v1
+kind: risk-matrix
+id: example-4x4
+title: Illustrative 4x4 risk matrix
+example: true
+status: proposed  # the team accepts its matrix: status: accepted, accepted_by: <who, procedure>
+source: illustrative only; not derived from any standard or company procedure
+bands:
+  - {id: low, title: Low, description: Acceptable; no further action needed}
+  - {id: medium, title: Medium, description: Tolerable; reduce as low as reasonably practicable}
+  - {id: high, title: High, description: Not tolerable; an action is required, requires_action: true}
+likelihood:  # least likely first
+  - {code: A, title: Remote, description: Not expected in the life of the plant}
+  - {code: B, title: Unlikely, description: Could happen once in the life of the plant}
+  - {code: C, title: Possible, description: Could happen several times in the life of the plant}
+  - {code: D, title: Likely, description: Expected about once a year or more often}
+severity:  # least severe first
+  - code: "1"
+    title: Minor
+    descriptions: {people: First aid case, environment: Release contained on site, asset: Repair within a shift}
+  - code: "2"
+    title: Moderate
+    descriptions: {people: Recordable injury, environment: Minor release off site, asset: Plant down for days}
+  - code: "3"
+    title: Serious
+    descriptions: {people: Lost-time injury, environment: Reportable release, asset: Plant down for weeks}
+  - code: "4"
+    title: Major
+    descriptions: {people: Permanent injury or fatality, environment: Lasting damage off site, asset: Loss of the unit}
+categories:
+  - {id: people, title: People}
+  - {id: environment, title: Environment}
+  - id: asset
+    title: Asset
+    cells:  # the asset category's own cells
+      "1": {A: low, B: low, C: low, D: low}
+      "2": {A: low, B: low, C: low, D: medium}
+      "3": {A: low, B: low, C: medium, D: high}
+      "4": {A: low, B: medium, C: high, D: high}
+cells:  # severity -> likelihood -> band, for the categories without their own
+  "1": {A: low, B: low, C: low, D: medium}
+  "2": {A: low, B: low, C: medium, D: medium}
+  "3": {A: low, B: medium, C: high, D: high}
+  "4": {A: medium, B: high, C: high, D: high}

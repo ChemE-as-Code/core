@@ -1,0 +1,8 @@
+# What the plant must do. Schema: `cheme schema design_basis`.
+schema: cheme/design_basis/v1
+capacity: {}
+feeds: []
+products: []
+utilities: []
+site: {}
+assumptions: []

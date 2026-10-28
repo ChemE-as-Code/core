@@ -1,0 +1,943 @@
+"""Schema ``cheme/process/v1``: ``process/materials.yaml`` and ``process/flowsheet.yaml``.
+
+Every object has a stable ``id`` (its title is free text: renaming it changes nothing else).
+Every quantity carries a unit (its own, else the flowsheet's ``units``), flows a basis, and every
+stream property its provenance: ``given`` (a design input), ``assumed`` or ``calculated``.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from chemeascode.domains.chemistry.eos import Critical
+from chemeascode.domains.chemistry.thermochemistry import IdealGas
+from chemeascode.domains.process import SCHEMA
+from chemeascode.foundation.schema_base import INCHIKEY_RE, Origin, unsupported_schema
+from chemeascode.foundation.uncertainty import Uncertainty
+from chemeascode.foundation.units import PRESSURE_UNITS as PRESSURE_UNITS  # the unit convention
+from chemeascode.foundation.units import TEMPERATURE_UNITS as TEMPERATURE_UNITS
+
+
+class Strict(BaseModel):
+    """Unknown keys are refused (as in ``chemeascode.schemas``, which imports this module)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+Provenance = Literal["given", "assumed", "calculated"]
+Direction = Literal["in", "out"]
+FlowKind = Literal["material", "energy", "information"]
+
+#: Flow units: basis and factor to kg/h, kmol/h or Nm3/h.
+FLOW_UNITS = {
+    "kg/h": ("mass", 1.0),
+    "kg/s": ("mass", 3600.0),
+    "t/h": ("mass", 1000.0),
+    "kmol/h": ("mole", 1.0),
+    "kmol/s": ("mole", 3600.0),
+    "Nm3/h": ("normal_volume", 1.0),
+}
+DUTY_UNITS = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
+ENTHALPY_UNITS = ("kJ/kmol",)
+#: The one unit of each ``state.calculated`` property that is read as a number (energy
+#: balances, exergy flows, sheets); another unit is ``cheme.process-unit``, never converted.
+CALCULATED_UNITS = {
+    "molar_mass": "kg/kmol",
+    "density": "kg/m3",
+    "enthalpy": "kJ/kmol",
+    "exergy": "kJ/kmol",
+}
+FlowBasis = Literal["mass", "mole", "normal_volume"]
+
+
+class Versioned(Strict):
+    """What every process file starts with."""
+
+    schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
+
+    @model_validator(mode="after")
+    def _version(self) -> Versioned:
+        if self.schema_ != SCHEMA:
+            raise ValueError(unsupported_schema(self.schema_, SCHEMA))
+        return self
+
+
+# -- materials.yaml -----------------------------------------------------------------------------
+
+
+class Component(Strict):
+    id: str
+    name: str
+    formula: str = ""
+    cas: str = ""
+    chebi: str = ""
+    inchikey: str | None = Field(
+        default=None,
+        pattern=INCHIKEY_RE.pattern,
+        description="Standard InChIKey: the component's key across databases.",
+    )
+    smiles: str | None = Field(
+        default=None,
+        description="SMILES; with the RDKit extra, checked against inchikey and formula.",
+    )
+    molar_mass: float | None = Field(default=None, gt=0, description="kg/kmol")
+    normal_boiling_point: float | None = Field(default=None, gt=0, description="K at 101.325 kPa")
+    liquid_heat_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/(kmol K) of the liquid near the reaction temperature: adiabatic liquid "
+        "tanks and batches (with the reactions' heat_of_reaction).",
+    )
+    liquid_molar_volume: float | None = Field(
+        default=None,
+        gt=0,
+        description="m3/kmol near the reaction temperature: the concentrations of a liquid-phase "
+        "reaction (ideal mixing).",
+    )
+    critical: Critical | None = Field(
+        default=None,
+        description="Critical constants: Peng-Robinson fugacities in equilibria (fugacity: "
+        "peng_robinson); cheme chemistry thermo prints them.",
+    )
+    ideal_gas: IdealGas | None = Field(
+        default=None,
+        description="Formation data and ideal-gas heat capacity: heats of reaction, equilibrium "
+        "constants and reactor duties (cheme chemistry thermo prints it).",
+    )
+    phase: Literal["solid"] | None = Field(
+        default=None,
+        description="solid: the component is a solid (a crystal, a hydrate with its water of "
+        "crystallization in the formula, e.g. MgSO4(H2O)7), a separate component from the same "
+        "substance dissolved. A stream's dry solid is the sum of its solid components, the rest "
+        "is liquid (mother liquor or moisture): see chemeascode.domains.process.solids.",
+    )
+
+
+class Template(Strict):
+    """An ordered component list a stream names."""
+
+    id: str
+    title: str = ""
+    components: list[str] = Field(min_length=1)
+
+
+class Region(Strict):
+    """A temperature-pressure box a component is claimed in."""
+
+    temperature: tuple[float, float] = Field(description="K, min and max")
+    pressure: tuple[float, float] = Field(description="kPa(a), min and max")
+    max_mole_fraction: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description="The box holds only while the component's mole fraction is at most this "
+        "(a box benchmarked in mixtures only). None: at any mole fraction.",
+    )
+
+
+class ApplicationRange(Strict):
+    temperature: tuple[float, float] | None = Field(default=None, description="K, min and max")
+    pressure: tuple[float, float] | None = Field(default=None, description="kPa(a), min and max")
+    vle_pressure: tuple[float, float] | None = Field(
+        default=None,
+        description="kPa(a): where liquid and two-phase results are claimed (vapour: pressure).",
+    )
+    phases: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list, description="CAS numbers.")
+    component_regions: dict[str, list[Region]] | None = Field(
+        default=None,
+        description="CAS number -> the boxes the component is benchmarked in; a state is "
+        "claimed only inside a box of every component present. None: temperature and pressure "
+        "above apply to every component.",
+    )
+    pairs: list[str] | None = Field(
+        default=None,
+        description="Benchmarked binary pairs, 'CAS&CAS' (sorted); a mixture is claimed only "
+        "when every pair of its components is listed. None: any mixture of the components.",
+    )
+    pair_limits: dict[str, dict[str, Annotated[float, Field(gt=0.0, le=1.0)]]] | None = Field(
+        default=None,
+        description="Pair ('CAS&CAS') -> CAS number -> the largest mole fraction of that "
+        "component in a mixture holding both at which the pair is claimed. None: no limits.",
+    )
+
+
+class Benchmark(Strict):
+    """The evidence behind a property package's claim."""
+
+    test: str = Field(description="The test file that benchmarks the claim.")
+    reference: str = Field(description="What the values are compared against.")
+    tolerances: dict[str, float] = Field(
+        default_factory=dict, description="What the test asserts inside the claimed range."
+    )
+
+
+class PropertyMethod(Strict):
+    """How properties are calculated: written by ``cheme process props --fill``
+    (``status: configured``) with the package versions; a placeholder until then."""
+
+    adapter: str = "thermo"
+    status: Literal["placeholder", "configured"] = "placeholder"
+    package: str | None = Field(
+        default=None,
+        description="The property package (cheme process props --coverage lists them); "
+        "chosen from the streams' components when not given.",
+    )
+    phase_models: dict[str, str] = Field(default_factory=dict)
+    eos: str = ""
+    binary_interaction: str = ""
+    application_range: ApplicationRange | None = None
+    versions: dict[str, str] = Field(default_factory=dict)
+    benchmark: Benchmark | None = None
+
+
+class Materials(Versioned):
+    """Components, templates and the property method of the process."""
+
+    kind: Literal["materials"]
+    components: list[Component] = Field(default_factory=list)
+    templates: list[Template] = Field(default_factory=list)
+    property_method: PropertyMethod | None = None
+
+
+# -- flowsheet.yaml -----------------------------------------------------------------------------
+
+
+class NormalConditions(Strict):
+    temperature: float = Field(gt=0, description="K")
+    pressure: float = Field(gt=0, description="kPa(a)")
+    basis: Literal["ideal_gas"] = "ideal_gas"
+
+
+class EnthalpyReference(Strict):
+    state: str = Field(description="e.g. ideal_gas or elements")
+    temperature: float = Field(gt=0, description="K")
+    pressure: float | None = Field(default=None, gt=0, description="kPa(a)")
+
+
+class Units(Strict):
+    """The units a property without its own ``unit`` is in."""
+
+    pressure: str = "kPa(a)"
+    temperature: str = "K"
+    flow: str = "kg/h"
+    duty: str = "kW"
+    enthalpy: str = "kJ/kmol"
+    normal_conditions: NormalConditions | None = Field(
+        default=None, description="Required when any flow is in Nm3/h."
+    )
+    enthalpy_reference: EnthalpyReference | None = Field(
+        default=None, description="Required once any enthalpy is given."
+    )
+
+
+#: How a case's operating point is known. ``extrapolated``: outside what a model or data were
+#: checked for; such a case is labelled, never read as predictive.
+CaseProvenance = Literal["given", "calculated", "assumed", "extrapolated"]
+
+
+class CaseApplicability(Strict):
+    """Where a case's flows and duties hold: an envelope with its source, not a scaling law."""
+
+    range: str = Field(min_length=1, description="e.g. 350-550 t/d GOX, 70-105 % load.")
+    source: str = Field(min_length=3, description="What supports the envelope.")
+    limitations: str = ""
+
+
+class Case(Strict):
+    id: str
+    description: str = ""
+    default: bool = False
+    capacity: str | None = Field(
+        default=None, description="The declared capacity of this case, e.g. 500 t/d GOX."
+    )
+    provenance: CaseProvenance | None = Field(
+        default=None,
+        description="How the case's operating point is known (given, calculated, assumed, "
+        "extrapolated).",
+    )
+    applicability: CaseApplicability | None = None
+    source: str | None = Field(
+        default=None, description="What the case's operating point rests on."
+    )
+
+
+class Tolerance(Strict):
+    """``|in - out| <= abs + rel * max(in, out)``, in kg/h."""
+
+    abs: float = Field(default=1.0, ge=0)
+    rel: float = Field(default=0.005, ge=0)
+
+
+class Link(Strict):
+    """What a process object is in the plant: equipment, a line, an instrument or a sheet."""
+
+    target: Literal["equipment", "line", "instrument", "sheet"]
+    ref: str
+    sheet: str | None = None
+    role: str = ""
+
+
+class Port(Strict):
+    id: str
+    direction: Direction
+    kind: FlowKind = "material"
+    delegates: str | None = Field(
+        default=None,
+        description="Steps and nested blocks: the port of the step's block (the nested block's "
+        "parent) this port stands for, when a stream crosses that boundary here.",
+    )
+
+
+class Node(Strict):
+    id: str
+    title: str = ""
+    ports: list[Port] = Field(default_factory=list)
+    links: list[Link] = Field(default_factory=list)
+
+
+class Bed(Strict):
+    """A packed catalyst bed (``reactor: pfr``; the model: :mod:`.fixed_bed`). Its size is the
+    catalyst mass, else the bed volume, else ``tubes`` tubes of ``diameter`` and ``length``;
+    the catalyst (``catalyst:``) gives the bulk density, particle and voidage."""
+
+    catalyst_mass: float | None = Field(default=None, gt=0, description="kg")
+    volume: float | None = Field(default=None, gt=0, description="m3 of bed")
+    diameter: float | None = Field(
+        default=None, gt=0, description="m, of a tube (or the vessel): pressure drop, cooling"
+    )
+    length: float | None = Field(default=None, gt=0, description="m")
+    tubes: int = Field(default=1, ge=1)
+    heat: Literal["adiabatic", "isothermal", "cooled"] = "adiabatic"
+    coolant_temperature: float | None = Field(default=None, gt=0, description="K, cooled beds")
+    heat_transfer_coefficient: float | None = Field(
+        default=None, gt=0, description="W/(m2 K), overall, bed to coolant (cooled beds)"
+    )
+    viscosity: float | None = Field(
+        default=None, gt=0, description="Pa s, of the gas (Ergun pressure drop)"
+    )
+    diffusivity: float | None = Field(
+        default=None,
+        gt=0,
+        description="m2/s: the key reactants' diffusivity in the gas (effectiveness factor, "
+        "Weisz-Prater, Mears)",
+        exclude_if=lambda value: value is None,
+    )
+    time_on_stream: float | None = Field(
+        default=None,
+        ge=0,
+        description="h: the catalyst's age the bed is solved at (its deactivation law); the "
+        "end of run sizes the bed. None: fresh.",
+        exclude_if=lambda value: value is None,  # a fresh bed's fingerprint stays as it was
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class Tank(Strict):
+    """A continuous stirred tank (``reactor: cstr``; the model: :mod:`.stirred_tank`): its
+    volume, or the space time V / Q0 on the inlet's volumetric flow, of each of ``count`` equal
+    tanks in series; isothermal (at the outlet's temperature, else the inlet's) or adiabatic."""
+
+    volume: float | None = Field(default=None, gt=0, description="m3 of liquid or gas, per tank")
+    residence_time: float | None = Field(
+        default=None, gt=0, description="s, V / Q0 per tank (instead of volume)"
+    )
+    count: int = Field(default=1, ge=1, description="Equal tanks in series.")
+    heat: Literal["isothermal", "adiabatic"] = "isothermal"
+    catalyst_loading: float | None = Field(
+        default=None,
+        gt=0,
+        description="kg of catalyst per m3 of reactor: for rate laws per kg of catalyst.",
+    )
+    time_on_stream: float | None = Field(
+        default=None,
+        ge=0,
+        description="h: the age of the step's catalyst (catalyst:, its deactivation law) the "
+        "tank is solved at. None: fresh.",
+        exclude_if=lambda value: value is None,  # a fresh tank's fingerprint stays as it was
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _size(self) -> Tank:
+        if (self.volume is None) == (self.residence_time is None):
+            raise ValueError("give volume or residence_time, one of them")
+        return self
+
+
+class BatchTarget(Strict):
+    key: str = Field(description="The component whose conversion ends the batch.")
+    conversion: float = Field(gt=0, lt=1)
+
+
+class Batch(Strict):
+    """A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge
+    (its flow the charge per hour), the outlet its composition when the batch ends, after
+    ``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its
+    composition's volume (ideal mixing), a gas batch its volume (the pressure changes)."""
+
+    time: float | None = Field(default=None, gt=0, description="s of reaction")
+    target: BatchTarget | None = None
+    heat: Literal["isothermal", "adiabatic"] = "isothermal"
+    catalyst_loading: float | None = Field(
+        default=None, gt=0, description="kg of catalyst per m3: rate laws per kg of catalyst."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _end(self) -> Batch:
+        if (self.time is None) == (self.target is None):
+            raise ValueError("give time or target, one of them")
+        return self
+
+
+class SelectivityUncertainty(Strict):
+    """The uncertainty of a ``selectivity:``'s figures, each relative to its value: sampled by
+    cheme process reactor-uncertainty, never part of an outlet's fingerprint."""
+
+    conversion: Uncertainty | None = Field(default=None, description="Of the key's conversion.")
+    products: dict[str, Uncertainty] = Field(
+        default_factory=dict, description="Product id -> the uncertainty of its selectivity."
+    )
+
+
+class Selectivity(Strict):
+    """A conversion reactor given as reported: the per-pass ``conversion`` of the ``key``
+    component and the molar selectivity to each product, ``F_p formed / F_key converted``. The
+    extents of the reactions follow (series and parallel side reactions in one step)."""
+
+    key: str = Field(description="The component converted (a reactant of the reactions).")
+    conversion: float = Field(gt=0, le=1, description="Per pass, of the key's inlet flow.")
+    products: dict[str, float] = Field(
+        min_length=1, description="Product id -> kmol formed per kmol of the key converted."
+    )
+    provenance: Provenance
+    source: str = ""
+    uncertainty: SelectivityUncertainty | None = Field(
+        default=None,
+        description="Of the conversion and the selectivities, e.g. {conversion: {gsd2: 1.1}, "
+        "products: {B: {distribution: triangular, low: 0.9, high: 1.1}}}: sampled by cheme "
+        "process reactor-uncertainty.",
+        exclude_if=lambda value: value is None,
+    )
+
+    @model_validator(mode="after")
+    def _positive(self) -> Selectivity:
+        if any(v < 0 for v in self.products.values()):
+            raise ValueError("a selectivity is not negative")
+        uncertain = self.uncertainty.products if self.uncertainty is not None else {}
+        if stray := [p for p in uncertain if p not in self.products]:
+            raise ValueError(
+                "an uncertainty of a selectivity not given: " + ", ".join(sorted(stray))
+            )
+        return self
+
+
+class ReactionHazard(Strict):
+    """What the thermal screening of a reactor (``cheme process reactor-hazards``) needs beyond
+    the reactions: the decomposition and the technical limit, from calorimetry and the design."""
+
+    td24: float | None = Field(
+        default=None,
+        gt=0,
+        description="K: the temperature at which the decomposition's adiabatic time to maximum "
+        "rate is 24 h (DSC, ARC; never estimated here).",
+    )
+    mtt: float | None = Field(
+        default=None,
+        gt=0,
+        description="K: the maximum technical temperature (the boiling point at the reactor's "
+        "pressure, a relief set temperature); default: the lowest normal boiling point of the "
+        "liquid's components at about atmospheric pressure.",
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class Reacting(Strict):
+    """What blocks and steps say about the reactions taking place in them."""
+
+    reactions: list[str] = Field(
+        default_factory=list,
+        description="Reaction ids of process/reactions.yaml that take place here: the balance "
+        "is reactive (elements and extents instead of components).",
+    )
+    conversion: dict[str, float] = Field(
+        default_factory=dict,
+        description="Reaction id -> conversion of its key component here, instead of the "
+        "reaction's own conversion (cheme process propagate).",
+    )
+    reactor: Literal["conversion", "equilibrium", "gibbs", "pfr", "cstr", "batch"] | None = Field(
+        default=None,
+        description="How cheme process propagate solves the outlet: conversion (of each "
+        "reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's "
+        "temperature and pressure), gibbs (every reaction among the stream's components) or "
+        "pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the "
+        "rate laws at the outlet) or batch (the rate laws over the batch time); none: "
+        "conversion when every reaction has one.",
+    )
+    bed: Bed | None = Field(default=None, description="reactor: pfr: the catalyst bed.")
+    tank: Tank | None = Field(default=None, description="reactor: cstr: the tank(s).")
+    hazard: ReactionHazard | None = Field(
+        default=None, description="TD24 and MTT for the thermal screening of the reactor."
+    )
+    selectivity: Selectivity | None = Field(
+        default=None,
+        description="A conversion reactor by the key's conversion and the selectivities to its "
+        "products (instead of a conversion per reaction).",
+    )
+    batch: Batch | None = Field(default=None, description="reactor: batch: the batch.")
+    catalyst: str | None = Field(
+        default=None, description="The catalyst its bed holds: an id of process/catalysts.yaml."
+    )
+    fugacity: Literal["ideal", "peng_robinson"] = Field(
+        default="ideal",
+        description="Equilibrium and Gibbs reactors: the gas as ideal, or with Peng-Robinson "
+        "fugacity coefficients (the components' critical constants) for high pressures.",
+    )
+    approach: float = Field(
+        default=0.0,
+        description="Equilibrium and Gibbs reactors: K is taken at the outlet temperature plus "
+        "this approach, K (positive: less conversion of an exothermic reaction).",
+    )
+
+
+class Solubility(Strict):
+    """The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,
+    value), interpolated linearly at the crystallizer's temperature and never extrapolated, or
+    one ``value`` that holds at the crystallizer's conditions as stated by its source (the
+    saturated mother liquor; no temperature dependence claimed)."""
+
+    unit: Literal["kg/kg_solvent", "mass_fraction"] = Field(
+        description="kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the "
+        "solute's mass fraction in the saturated solution."
+    )
+    points: list[tuple[float, float]] = Field(
+        default_factory=list, description="(K, value) pairs, increasing in temperature."
+    )
+    value: float | None = Field(default=None, gt=0)
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _form(self) -> Solubility:
+        if bool(self.points) == (self.value is not None):
+            raise ValueError("give points or value, one of them")
+        temperatures = [t for t, _ in self.points]
+        if any(t <= 0 for t in temperatures) or temperatures != sorted(set(temperatures)):
+            raise ValueError("points: temperatures in K, positive and strictly increasing")
+        values = [v for _, v in self.points] + ([self.value] if self.value is not None else [])
+        if any(v <= 0 for v in values):
+            raise ValueError("solubility values must be positive")
+        if self.unit == "mass_fraction" and any(v >= 1 for v in values):
+            raise ValueError("a mass fraction solubility must be below 1")
+        return self
+
+
+class ImposedYield(Strict):
+    """The fraction of the anhydrous solute entering the crystallizer that crystallizes,
+    specified (an empirical or vendor yield), not predicted."""
+
+    value: float = Field(ge=0, lt=1)
+    provenance: Provenance
+    source: str = ""
+
+
+class Evaporation(Strict):
+    """Solvent removed as vapour before or in the crystallizer, one of: ``flow`` (kg/h),
+    ``feed_fraction`` (of the crystallizer feed's total mass), ``solvent_fraction`` (of the
+    feed's solvent) or ``concentration`` (the solute's mass fraction in the liquid after
+    evaporation, crystals not yet formed)."""
+
+    flow: float | None = Field(default=None, ge=0, description="kg/h of solvent")
+    feed_fraction: float | None = Field(default=None, ge=0, lt=1)
+    solvent_fraction: float | None = Field(default=None, ge=0, lt=1)
+    concentration: float | None = Field(default=None, gt=0, lt=1)
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _one(self) -> Evaporation:
+        given = [
+            n
+            for n in ("flow", "feed_fraction", "solvent_fraction", "concentration")
+            if getattr(self, n) is not None
+        ]
+        if len(given) != 1:
+            raise ValueError("give one of flow, feed_fraction, solvent_fraction or concentration")
+        return self
+
+
+class CakeLiquid(Strict):
+    """The liquid (mother liquor) held in a filter or centrifuge cake."""
+
+    value: float = Field(ge=0)
+    basis: Literal["mass_fraction", "per_kg_solid"] = Field(
+        description="mass_fraction: liquid over the wet cake's mass (below 1); per_kg_solid: kg "
+        "of liquid per kg of dry solid."
+    )
+
+    @model_validator(mode="after")
+    def _range(self) -> CakeLiquid:
+        if self.basis == "mass_fraction" and self.value >= 1:
+            raise ValueError("a cake liquid mass fraction must be below 1")
+        return self
+
+
+class SolidSeparation(Strict):
+    """A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid
+    the cake holds, specified (no filtration or centrifuge model); the liquid divides with the
+    same composition between cake and filtrate. ``outlets`` maps ``cake`` and ``filtrate`` to
+    the step's outlet ports (inside a ``crystallizer:``, the crystallizer's own outlets)."""
+
+    solid_recovery: float = Field(gt=0, le=1, description="Fraction of the solid to the cake.")
+    cake_liquid: CakeLiquid
+    outlets: dict[Literal["cake", "filtrate"], str] = Field(default_factory=dict)
+    provenance: Provenance
+    source: str = ""
+
+
+class MotherLiquorRecycle(Strict):
+    """The fraction of the filtrate returned to the crystallizer's feed (before evaporation);
+    the rest leaves as the purge."""
+
+    fraction: float = Field(ge=0, le=1)
+    provenance: Provenance
+    source: str = ""
+
+
+class CrystallizerEnergy(Strict):
+    """Data of the crystallizer's lumped energy balance, from the feed's temperature to the
+    crystallizer's (every outlet leaves at it)."""
+
+    heat_capacity: float = Field(gt=0, description="kJ/(kg K) of the feed solution, constant")
+    heat_of_crystallization: float = Field(
+        description="kJ per kg of crystal formed, at the crystallizer's temperature: the "
+        "enthalpy change, negative when crystallization releases heat."
+    )
+    latent_heat: float | None = Field(
+        default=None, gt=0, description="kJ per kg of solvent evaporated (with evaporation)"
+    )
+    feed_temperature: float | None = Field(
+        default=None, gt=0, description="K; default: the inlet stream's temperature"
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class Crystallizer(Strict):
+    """A cooling or evaporative crystallizer for one solute in one solvent (the model:
+    :mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid
+    component ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n
+    solvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``
+    (the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a
+    filter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``
+    outlet; ``recycle`` returns part of the filtrate to the feed."""
+
+    solute: str = Field(description="The dissolved component that crystallizes.")
+    solvent: str
+    crystal: str = Field(description="The solid component formed (phase: solid).")
+    basis: Literal["solubility", "yield"]
+    temperature: float | None = Field(
+        default=None, gt=0, description="K, the crystallizer's (the mother liquor's)"
+    )
+    solubility: Solubility | None = None
+    yield_: ImposedYield | None = Field(default=None, alias="yield")
+    evaporation: Evaporation | None = None
+    separation: SolidSeparation | None = None
+    recycle: MotherLiquorRecycle | None = None
+    energy: CrystallizerEnergy | None = None
+    outlets: dict[Literal["slurry", "cake", "mother_liquor", "vapour"], str] = Field(
+        description="Role -> the step's outlet port."
+    )
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Crystallizer:
+        if self.basis == "solubility" and self.solubility is None:
+            raise ValueError("basis: solubility needs solubility:")
+        if self.basis == "yield" and self.yield_ is None:
+            raise ValueError("basis: yield needs yield:")
+        if self.solubility is not None and self.solubility.points and self.temperature is None:
+            raise ValueError("solubility points need the crystallizer's temperature:")
+        if self.recycle is not None and self.separation is None:
+            raise ValueError("recycle: needs separation: (the filtrate is what is recycled)")
+        if self.separation is not None and self.separation.outlets:
+            raise ValueError(
+                "separation.outlets: inside a crystallizer the outlets are the crystallizer's "
+                "(cake, mother_liquor)"
+            )
+        roles = set(self.outlets)
+        want = {"cake", "mother_liquor"} if self.separation is not None else {"slurry"}
+        if self.evaporation is not None:
+            want.add("vapour")
+        if roles != want:
+            raise ValueError(f"outlets: give exactly {', '.join(sorted(want))}")
+        if len({self.solute, self.solvent, self.crystal}) != 3:
+            raise ValueError("solute, solvent and crystal must be three different components")
+        return self
+
+
+class Solids(Strict):
+    """The solid-handling models of a block or step (:mod:`.crystallization`)."""
+
+    crystallizer: Crystallizer | None = Field(
+        default=None, description="A crystallizer (with its filter and recycle)."
+    )
+    solid_separation: SolidSeparation | None = Field(
+        default=None, description="A filter or centrifuge on its own."
+    )
+
+    @model_validator(mode="after")
+    def _one_model(self) -> Solids:
+        if self.crystallizer is not None and self.solid_separation is not None:
+            raise ValueError("give crystallizer or solid_separation, not both")
+        if self.solid_separation is not None and set(self.solid_separation.outlets) != {
+            "cake",
+            "filtrate",
+        }:
+            raise ValueError("solid_separation.outlets: give cake and filtrate")
+        return self
+
+
+class Block(Node, Reacting, Solids):
+    class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
+    method: str | None = Field(
+        default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
+    )
+    parent: str | None = Field(
+        default=None,
+        description="The block this block is drawn inside on the PFD (the BFD shows top-level "
+        "blocks); its ports delegate the parent's ports where streams cross the parent boundary.",
+    )
+    balance_scope: Literal["steady_state_nonreactive", "reactive", "dynamic"] = (
+        "steady_state_nonreactive"
+    )
+    tolerance: Tolerance | None = None
+    split: dict[str, float] = Field(
+        default_factory=dict,
+        description="A splitter block without steps: outlet port -> fraction of the inlet flow.",
+    )
+
+
+class Step(Node, Reacting, Solids):
+    block: str
+    class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
+    method: str | None = Field(
+        default=None, description="The class's method where DEXPI has one (e.g. Cooling)."
+    )
+    split: dict[str, float] = Field(
+        default_factory=dict,
+        description="Splitters (SplittingMaterial): outlet port -> fraction of the inlet flow, "
+        "for cheme process propagate.",
+    )
+
+
+class Quantity(Strict):
+    value: float
+    unit: str | None = None
+    basis: FlowBasis | None = None
+    provenance: Provenance
+    source: str = ""
+    fingerprint: str | None = Field(
+        default=None,
+        description="Calculated values: the inputs (T, P, composition, method) they were "
+        "calculated from; a mismatch is cheme.process-calculated-stale.",
+    )
+    uncertainty: Uncertainty | None = Field(
+        default=None,
+        description="Relative to the value, e.g. {gsd2: 1.2} or {distribution: triangular, "
+        "low: 0.9, high: 1.1}; cheme assess lca samples a feed's or product's flow with it "
+        "instead of the default for its provenance. No calculated value's fingerprint "
+        "includes it.",
+    )
+    origin: Origin | None = Field(
+        default=None,
+        description="What kind of figure it is, refining the provenance: given measured, "
+        "vendor or literature; assumed design-rule, estimate or literature; calculated "
+        "simulated (cheme process simulate) or correlation (cheme process props). Another "
+        "pairing is cheme.provenance-origin. No calculated value's fingerprint includes it.",
+    )
+
+
+#: What crosses the plant boundary at a terminal (``Terminal.category``): what the TEA and LCA
+#: inventories need to know to count it, and what the boundary-completeness check
+#: (:func:`chemeascode.domains.assessment.flows.boundary_gaps`) looks for.
+TerminalCategory = Literal[
+    "raw_material",
+    "product",
+    "by_product",
+    "utility",
+    "wastewater",
+    "off_gas",
+    "solid_waste",
+    "emission",
+]
+#: The utilities a ``utility`` terminal supplies or takes back.
+UtilityKind = Literal[
+    "steam",
+    "hot_oil",
+    "fired_heat",
+    "cooling_water",
+    "air_cooling",
+    "refrigerant",
+    "electricity",
+    "fuel",
+    "other",
+]
+
+
+class UtilityLevel(Strict):
+    """What a utility terminal supplies: its kind and, for heat, its temperature levels, which
+    ``cheme process simulate`` checks against the temperatures of the duty it serves, and, for
+    steam, its pressure. ``cheme assess lca`` gives the energy exchange's carrier the level,
+    the supply temperature and the steam pressure (core#313)."""
+
+    kind: UtilityKind
+    level: str = Field(
+        default="",
+        description="The utility level's name in the design basis, e.g. LP, MP or HP steam, "
+        "a hot-oil circuit or a refrigeration level.",
+    )
+    pressure: Quantity | None = Field(
+        default=None,
+        description="Steam: its supply pressure (flowsheet units; a gauge pressure is read "
+        "against 101.325 kPa). It does not set the temperature: give supply_temperature "
+        "(saturated steam: the saturation temperature at this pressure).",
+    )
+    supply_temperature: Quantity | None = Field(
+        default=None, description="Where the utility enters the exchanger (flowsheet units)."
+    )
+    return_temperature: Quantity | None = Field(
+        default=None,
+        description="Where it leaves; not given: the same as the supply (condensing steam, "
+        "a boiling refrigerant).",
+    )
+    min_approach: Quantity | None = Field(
+        default=None, description="Least temperature difference to the process side, K."
+    )
+
+
+class Terminal(Node):
+    """An external feed (DEXPI Source) or product (DEXPI Sink)."""
+
+    category: TerminalCategory | None = Field(
+        default=None,
+        description="What crosses the boundary here; not given: unclassified (a gap the "
+        "boundary-completeness check reports).",
+    )
+    utility: UtilityLevel | None = Field(
+        default=None, description="category utility: the utility and its temperature levels."
+    )
+
+
+class CompositionValue(Strict):
+    basis: Literal["mole_fraction", "mass_fraction"]
+    values: dict[str, float] = Field(min_length=1)
+    provenance: Provenance
+    source: str = ""
+    fingerprint: str | None = Field(
+        default=None,
+        description="Calculated compositions: the inputs they were derived from (cheme "
+        "process propagate); a mismatch is cheme.process-calculated-stale.",
+    )
+    uncertainty: Uncertainty | None = Field(
+        default=None,
+        description="Of every fraction, relative to it (as on a quantity).",
+    )
+    origin: Origin | None = Field(
+        default=None, description="What kind of figure it is (as on a quantity)."
+    )
+
+
+class PhaseValue(Strict):
+    value: Literal["vapor", "liquid", "two-phase"]
+    vapor_fraction: float | None = Field(default=None, ge=0, le=1)
+    provenance: Provenance
+    source: str = ""
+    fingerprint: str | None = None
+
+
+class State(Strict):
+    pressure: Quantity | None = None
+    temperature: Quantity | None = None
+    flow: Quantity | None = None
+    composition: CompositionValue | None = None
+    phase: PhaseValue | None = None
+    duty: Quantity | None = Field(default=None, description="Energy streams.")
+    calculated: dict[str, Quantity] = Field(default_factory=dict)
+
+
+class StreamDef(Strict):
+    id: str
+    title: str = ""
+    kind: FlowKind = "material"
+    from_: str = Field(alias="from", description="NODE.port")
+    to: str = Field(description="NODE.port")
+    template: str | None = None
+    state: dict[str, State] = Field(default_factory=dict, description="By case id.")
+    links: list[Link] = Field(default_factory=list)
+
+
+class ViewItem(Strict):
+    """A persisted layout override of one object in one view.
+
+    Blocks, feeds and products: ``x``/``y`` (top left, sheet mm), optional ``width``/``height``.
+    PFD steps: ``x``/``y`` relative to their block's top left. Streams: ``waypoints``.
+    """
+
+    x: float | None = None
+    y: float | None = None
+    width: float | None = Field(default=None, gt=0)
+    height: float | None = Field(default=None, gt=0)
+    waypoints: list[tuple[float, float]] = Field(default_factory=list)
+    label: tuple[float, float] | None = Field(default=None, description="Label offset, mm.")
+    pinned: bool = True
+
+
+class Layout(Strict):
+    bfd: dict[str, ViewItem] = Field(default_factory=dict)
+    pfd: dict[str, ViewItem] = Field(default_factory=dict)
+
+
+class BfdView(Strict):
+    """How the BFD draws the boundary streams."""
+
+    aggregate: bool | list[tuple[str, str]] = Field(
+        default=False,
+        description="Draw parallel boundary streams between the same two BFD nodes as one "
+        "connection: true for every pair, or a list of [NODE, NODE] pairs. Streams of different "
+        "kinds (material, energy, information) or directions stay separate; balances use the "
+        "streams, not the connections.",
+    )
+
+    def aggregates(self, a: str, b: str) -> bool:
+        """Whether streams between BFD nodes *a* and *b* are drawn as one connection."""
+        if isinstance(self.aggregate, bool):
+            return self.aggregate
+        return any({a, b} == set(pair) for pair in self.aggregate)
+
+
+class Flowsheet(Versioned):
+    """Feeds, products, blocks, steps and streams: the source of the BFD and PFD."""
+
+    kind: Literal["flowsheet"]
+    title: str = ""
+    units: Units = Field(default_factory=Units)
+    cases: list[Case] = Field(default_factory=lambda: [Case(id="design", default=True)])
+    tolerance: Tolerance = Field(default_factory=Tolerance)
+    feeds: list[Terminal] = Field(default_factory=list)
+    products: list[Terminal] = Field(default_factory=list)
+    blocks: list[Block] = Field(default_factory=list)
+    steps: list[Step] = Field(default_factory=list)
+    streams: list[StreamDef] = Field(default_factory=list)
+    bfd: BfdView | None = Field(default=None, description="How the BFD draws the streams.")
+    layout: Layout = Field(default_factory=Layout)
+
+    def default_case(self) -> str:
+        marked = [c.id for c in self.cases if c.default]
+        return marked[0] if marked else (self.cases[0].id if self.cases else "design")

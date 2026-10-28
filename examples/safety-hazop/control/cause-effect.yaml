@@ -1,0 +1,8 @@
+schema: cheme/interlocks/v1
+interlocks:
+  - id: I-01
+    title: V-101 low-low level stops P-101
+    cause: {tag: LT-102, condition: LALL}
+    effects:
+      - {tag: P-101, action: stop}
+    sheet: P-01

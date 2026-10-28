@@ -1,0 +1,99 @@
+# Layout criteria of the rules on the 3D model (operability, escape, lifting). Screening values
+# for a basic engineering layout: every value is ASSUMED until the owner's or site's standard
+# replaces it. A plant overrides any of them in layout/site-plan.yaml under `criteria:`.
+schema: cheme/layout-criteria/v1
+status: ASSUMED
+criteria:
+  operator_max_height_m:
+    value: 1.8
+    basis: "Handwheels and levers are operated from the floor up to about 1.8 m above it; higher ones need a platform, a step or a chain wheel (common owner practice, ASSUMED)."
+  operator_reach_m:
+    value: 0.6
+    basis: "An operator may stand at most about 0.6 m out from the edge of the floor it is worked from (reach over a handrail, ASSUMED)."
+  instrument_max_height_m:
+    value: 2.0
+    basis: "Transmitter heads are read and calibrated from the floor up to about 2 m above it (ASSUMED)."
+  stair_travel_m:
+    value: 25.0
+    basis: "No point of a floor that needs a stair (6 m or higher, or in regular use) farther than 25 m in plan from its nearest stair (screening value for travel to escape, ASSUMED)."
+  escape_remote_fraction:
+    value: 0.5
+    basis: "Two ways down a structure floor count as two only when they arrive at it at least half the floor's diagonal apart in plan, so one incident does not block both (the remoteness of exits in NFPA 101 7.5.1.3.2; OSHA 1910.36(b) asks exit routes as far apart as practical; ASSUMED for open platforms). A fraction of the diagonal, not metres."
+  dead_end_m:
+    value: 7.5
+    basis: "Dead-end limit on every structure floor and platform: the walk in plan from any point of it in one direction only, to its only way down or to the nearest point where two of its ways down lie 45 degrees or more apart, at most 7.5 m, else another way down. The 45 degrees and the measure follow Approved Document B Vol. 2 (2019 edition), 2.7, 2.10 and Diagrams 2.1 and 2.2; its Table 2.1 allows 12 m of travel in one direction only in higher-hazard industrial premises (note 3: manufacturing, processing or storage of significant amounts of hazardous materials, such as compressed or liquefied gases), and its note 1 takes the direct distance as two-thirds of the travel distance (8 m); 7.5 m in plan is a screening value just below that (ASSUMED; NFPA 101 and local codes set their own dead-end limits per occupancy: use the site's code)."
+  heavy_lift_t:
+    value: 5.0
+    basis: "Items of 5 t or more are lifted by a crane (mobile on a crane pad, or the building's overhead crane); lighter ones by hoists and small equipment (ASSUMED)."
+  crane_reach_m:
+    value: 30.0
+    basis: "Working radius of a mobile crane standing on a crane pad, when the pad gives no reach_m (ASSUMED)."
+  lane_margin_m:
+    value: 1.0
+    basis: "Clearance either side of a load in its crane lane (ASSUMED)."
+  lift_clearance_m:
+    value: 0.5
+    basis: "A load is lifted at least this much over what it passes; anything in its lane higher than the item's top plus this blocks the lift (ASSUMED)."
+  vent_plan_clearance_m:
+    value: 1.5
+    basis: "A vent or relief outlet within 1.5 m in plan of a walking surface above it discharges into it (the plume rises into the grating, stair or landing; ASSUMED)."
+  vent_overhead_m:
+    value: 6.0
+    basis: "A walking surface up to 6 m above such an outlet is in its discharge (a free jet or plume of a vent, ASSUMED screening value; the zone sphere covers the rest)."
+  vent_side_clearance_m:
+    value: 1.5
+    basis: "A vent or relief outlet beside a walking surface (within 1.5 m of its edge in plan, from the floor up to the walkway headroom above it) discharges into the space of a person standing there (ASSUMED screening value, as the plan clearance above)."
+  support_pipe_clearance_m:
+    value: 0.1
+    basis: "A proposed support post (its column and crossbar) keeps at least 0.1 m from the pipes it does not carry, insulation included: room to erect, paint and insulate (ASSUMED; the piping standard sets it)."
+  support_stub_max_m:
+    value: 1.5
+    basis: "A stub (a short post welded on the steel below a pipe) is at most about 1.5 m tall and stands on a beam of a rack or structure, or on its own line's support steel; a taller column, or one on the crossbar of another line's T-post, is a support of its own that needs its own design, bracing and the carrying steel checked for the load (ASSUMED screening value; the piping support standard sets it)."
+  casing_reach_m:
+    value: 1.0
+    basis: "An item inside a casing (a cold box) is worked from outside only through a declared access hatch within 1.0 m of it (an extended bonnet or spindle to the casing face; ASSUMED)."
+  access_headroom_m:
+    value: 2.1
+    basis: "Clear height over every walking surface above grade (structure floors, platforms, stair treads and landings, an item's stair and roof platform): nothing lower than 2.1 m above it (the minimum clear height of a walkway as in ISO 14122-2; ISO 14122-3 asks more over stairs: use the site's standard, ASSUMED)."
+  ladder_clearance_m:
+    value: 0.2
+    basis: "Nothing closer than about 0.2 m to a ladder's rails (the toe space behind the rungs, and the climbing and step-off space at its head), and nothing through its cage (common practice for fixed ladders, ASSUMED; use the site's standard, e.g. after ISO 14122-4)."
+  walkway_clear_m:
+    value: 0.6
+    basis: "A riser through an item's ring platform leaves at least 0.6 m clear walkway width beside it and does not cut the handrail (the minimum clear width of a walkway as in ISO 14122-2, which prefers 0.8 m; ASSUMED)."
+  standing_space_m:
+    value: 0.6
+    basis: "An operator needs a free square of about 0.6 m x 0.6 m, as high as the access headroom, on the floor in front of a valve, a transmitter or a hatch; stair flights, ladders, steel and other items in it block it, and a stair flight is no operating position (ASSUMED)."
+  chainwheel_max_height_m:
+    value: 6.0
+    basis: "A chain wheel serves a valve declared for infrequent use whose handwheel is at most about 6 m above the floor under it (the chain hangs to about 1 m above the floor; ASSUMED, check the owner's practice)."
+  extension_max_m:
+    value: 6.0
+    basis: "An extension spindle or a remote operator (universal joints, a pedestal at the floor) up to about 6 m long; longer ones need the valve supplier's confirmation (ASSUMED)."
+  impulse_max_m:
+    value: 6.0
+    basis: "A remote-mounted transmitter on impulse lines at most about 6 m from its tapping (lines kept short against plugging, gas pockets and lag; ASSUMED, check the instrument standard)."
+  capillary_max_m:
+    value: 10.0
+    basis: "A remote-mounted transmitter on a diaphragm seal with a capillary at most about 10 m long (response time and temperature error grow with it; ASSUMED, check the supplier's data)."
+  lift_dynamic_factor:
+    value: 1.1
+    basis: "The load in a lift is the item's weight times a dynamic allowance of 1.1 for hoisting with a mobile crane (ASSUMED; the lifting plan sets it)."
+  lift_rigging_fraction:
+    value: 0.05
+    basis: "Slings, shackles, spreader and hook block weigh about 5 % of the load (ASSUMED; replace with the rigging's weight from the lifting plan)."
+  lift_rigging_height_m:
+    value: 3.0
+    basis: "Height of the rigging between the hook and the top of the load (slings and spreader, ASSUMED)."
+  lift_chart_utilisation:
+    value: 0.75
+    basis: "A lift may use at most 75 % of the crane's chart capacity at its working radius; above that it is a critical lift with its own plan (ASSUMED; the site's lifting procedure sets the limit)."
+  valve_platform_group_m:
+    value: 3.0
+    basis: "Valves out of reach whose handwheels lie within 3 m of each other in plan (and within the operating height of one floor) share one proposed valve access platform (ASSUMED)."
+  valve_platform_operating_m:
+    value: 1.2
+    basis: "A proposed valve access platform's floor is 1.2 m below the highest handwheel it serves, about elbow height (ASSUMED; at most operator_max_height_m)."
+  valve_platform_depth_m:
+    value: 1.2
+    basis: "A proposed valve access platform is 1.2 m wide out from the pipes, room to stand and pass (ASSUMED)."

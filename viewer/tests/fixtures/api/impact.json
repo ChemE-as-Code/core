@@ -1,0 +1,39 @@
+{
+  "commit": "e66535e359fd73946ed3eadb60de2db9015addbd",
+  "findings": [
+    {
+      "file": "process/BFD.xml",
+      "level": "info",
+      "rule": "cheme.review-needed",
+      "message": "bfd sheet BFD is derived from process/*.yaml, which changed since it was generated (source bec1430f2991, now b1f27c85d71b)",
+      "line": null,
+      "ids": [
+        "BFD"
+      ],
+      "hint": "rebuild with cheme process build BFD when the change is meant, then review the sheet and the P&IDs drawn from it",
+      "key": "source",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/BFD.xml#review-needed:source"
+    },
+    {
+      "file": "process/PFD.xml",
+      "level": "info",
+      "rule": "cheme.review-needed",
+      "message": "pfd sheet PFD is derived from process/*.yaml, which changed since it was generated (source a264e7976695, now 4aa01e4dfa9b)",
+      "line": null,
+      "ids": [
+        "PFD"
+      ],
+      "hint": "rebuild with cheme process build PFD when the change is meant, then review the sheet and the P&IDs drawn from it",
+      "key": "source",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/PFD.xml#review-needed:source"
+    }
+  ]
+}

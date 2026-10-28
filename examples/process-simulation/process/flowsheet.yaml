@@ -1,0 +1,110 @@
+# Compressed air: compressor, aftercooler, split to two users. The feed S1 is given; every other
+# stream is left to `cheme process simulate --fill` (specs in process/simulation.yaml).
+# Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Compressed air
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - id: AIR
+    title: Ambient air
+    ports: [{id: out, direction: out}]
+  - id: POWER
+    title: Electric power
+    ports: [{id: w, direction: out, kind: energy}]
+products:
+  - id: HP
+    title: Instrument air
+    ports: [{id: in, direction: in}]
+  - id: PLANT
+    title: Plant air
+    ports: [{id: in, direction: in}]
+
+blocks:
+  - id: COMP
+    title: Air compression
+    class: Compressing
+    ports:
+      - {id: in, direction: in}
+      - {id: w, direction: in, kind: energy}
+      - {id: out, direction: out}
+  - id: DIST
+    title: Air distribution
+    class: SplittingMaterial
+    ports:
+      - {id: in, direction: in}
+      - {id: a, direction: out}
+      - {id: b, direction: out}
+
+steps:
+  - id: K1
+    block: COMP
+    title: Air compressor
+    class: Compressing
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: w, direction: in, kind: energy, delegates: w}
+      - {id: out, direction: out}
+  - id: E1
+    block: COMP
+    title: Aftercooler
+    class: Cooling
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out, delegates: out}
+  - id: X1
+    block: DIST
+    title: Air header
+    class: SplittingMaterial
+    split: {a: 0.7}
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: a, direction: out, delegates: a}
+      - {id: b, direction: out, delegates: b}
+
+streams:
+  - id: S1
+    title: Ambient air
+    from: AIR.out
+    to: K1.in
+    template: air
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: site data}
+        temperature: {value: 298.15, provenance: given, source: site data}
+        flow: {value: 1000, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {N2: 0.7812, O2: 0.2096, AR: 0.0092}, provenance: given, source: dry air}
+  - id: S2
+    title: Compressed air, hot
+    from: K1.out
+    to: E1.in
+    template: air
+  - id: S3
+    title: Compressed air
+    from: E1.out
+    to: X1.in
+    template: air
+  - id: S4
+    title: Instrument air
+    from: X1.a
+    to: HP.in
+    template: air
+  - id: S5
+    title: Plant air
+    from: X1.b
+    to: PLANT.in
+    template: air
+  - id: W1
+    title: Compressor power
+    kind: energy
+    from: POWER.w
+    to: K1.w

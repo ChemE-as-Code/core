@@ -1,0 +1,310 @@
+{
+  "datasheets": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/C-1101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/C-1101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/C-1102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/C-1102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/C-3101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/C-3101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/C-3102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/C-3102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-1101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-1101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-1102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-1102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-1103": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-1103.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-2101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-2101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-3101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-3101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-3102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-3102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-3103": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-3103.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-3104": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-3104.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4103": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4103.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4105A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4105A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4105B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4105B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4106A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4106A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/E-4106B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/E-4106B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/F-1101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/F-1101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/F-2101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/F-2101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/K-1101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/K-1101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/K-3101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/K-3101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/K-4101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/K-4101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/K-4102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/K-4102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/KT-3101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/KT-3101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-1101A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-1101A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-1101B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-1101B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-1102A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-1102A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-1102B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-1102B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-4101A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-4101A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-4101B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-4101B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/P-4102A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/P-4102A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/T-4101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/T-4101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/T-4102": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/T-4102.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/V-2101A": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/V-2101A.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/V-2101B": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/V-2101B.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  },
+  "datasheets/V-3101": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "datasheets/V-3101.svg": {
+    "status": 200,
+    "type": "image/svg+xml"
+  }
+}

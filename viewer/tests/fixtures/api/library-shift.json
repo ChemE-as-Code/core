@@ -1,0 +1,2343 @@
+{
+  "rev": null,
+  "entries": [
+    {
+      "id": "acrylonitrile",
+      "title": "Acrylonitrile (propylene ammoxidation, SOHIO)",
+      "window": {
+        "temperature": [
+          673.15,
+          773.15
+        ],
+        "pressure": [
+          150.0,
+          300.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C3H6",
+          "name": "Propylene",
+          "cas": "115-07-1",
+          "formula": "C3H6",
+          "in_plant": null
+        },
+        {
+          "id": "NH3",
+          "name": "Ammonia",
+          "cas": "7664-41-7",
+          "formula": "NH3",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "ACN",
+          "name": "Acrylonitrile",
+          "cas": "107-13-1",
+          "formula": "C3H3N",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "AMMOX",
+          "equation": "C3H6 + NH3 + 3/2 O2 -> C3H3N + 3 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "BIMO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "BIMO",
+          "name": "Multicomponent bismuth molybdate",
+          "active_phase": "Bi-Mo oxide",
+          "promoters": [
+            "Fe",
+            "Co",
+            "Ni",
+            "K"
+          ],
+          "support": "SiO2 (fluidised bed)",
+          "window": {
+            "temperature": [
+              673.15,
+              773.15
+            ],
+            "pressure": [
+              150.0,
+              300.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "molybdenum loss (makeup)"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "ammonia",
+      "title": "Ammonia synthesis (Haber-Bosch)",
+      "window": {
+        "temperature": [
+          643.15,
+          803.15
+        ],
+        "pressure": [
+          10000.0,
+          35000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "N2",
+          "name": "Nitrogen",
+          "cas": "7727-37-9",
+          "formula": "N2",
+          "in_plant": null
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "NH3",
+          "name": "Ammonia",
+          "cas": "7664-41-7",
+          "formula": "NH3",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "NH3_SYN",
+          "equation": "N2 + 3 H2 <=> 2 NH3",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "FE_NH3",
+          "heat_of_reaction": {
+            "value": -91800.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "2 x dHf(NH3, g), NIST WebBook"
+          },
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "FE_NH3",
+          "name": "Promoted iron (fused magnetite)",
+          "active_phase": "Fe (reduced Fe3O4)",
+          "promoters": [
+            "K2O",
+            "Al2O3",
+            "CaO"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              643.15,
+              803.15
+            ],
+            "pressure": [
+              10000.0,
+              35000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2O",
+            "CO",
+            "CO2",
+            "O2",
+            "H2S",
+            "sulfur compounds",
+            "chlorides"
+          ],
+          "in_plant": false,
+          "differs": false
+        },
+        {
+          "id": "RU_NH3",
+          "name": "Ruthenium on graphitised carbon",
+          "active_phase": "Ru",
+          "promoters": [
+            "Ba",
+            "Cs"
+          ],
+          "support": "graphitised carbon",
+          "window": {
+            "temperature": [
+              623.15,
+              773.15
+            ],
+            "pressure": [
+              7000.0,
+              11000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2O",
+            "CO",
+            "O2",
+            "sulfur compounds"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "claus",
+      "title": "Claus sulfur recovery",
+      "window": {
+        "temperature": [
+          473.15,
+          1473.15
+        ],
+        "pressure": [
+          100.0,
+          200.0
+        ]
+      },
+      "components": [
+        {
+          "id": "H2S",
+          "name": "Hydrogen sulfide",
+          "cas": "7783-06-4",
+          "formula": "H2S",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "SO2",
+          "name": "Sulfur dioxide",
+          "cas": "7446-09-5",
+          "formula": "SO2",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "S2",
+          "name": "Disulfur (gas)",
+          "cas": "23550-45-0",
+          "formula": "S2",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "H2S_BURN",
+          "equation": "H2S + 3/2 O2 -> SO2 + H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "CLAUS",
+          "equation": "2 H2S + SO2 <=> 3/2 S2 + 2 H2O",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "AL2O3_CLAUS",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "AL2O3_CLAUS",
+          "name": "Activated alumina (or titania) Claus catalyst",
+          "active_phase": "gamma-Al2O3",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              473.15,
+              623.15
+            ],
+            "pressure": [
+              100.0,
+              200.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfation",
+            "carbon",
+            "ammonium salts"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "cumene",
+      "title": "Cumene (benzene alkylation with propylene)",
+      "window": {
+        "temperature": [
+          393.15,
+          453.15
+        ],
+        "pressure": [
+          2000.0,
+          4000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "BZ",
+          "name": "Benzene",
+          "cas": "71-43-2",
+          "formula": "C6H6",
+          "in_plant": null
+        },
+        {
+          "id": "C3H6",
+          "name": "Propylene",
+          "cas": "115-07-1",
+          "formula": "C3H6",
+          "in_plant": null
+        },
+        {
+          "id": "CUM",
+          "name": "Cumene",
+          "cas": "98-82-8",
+          "formula": "C9H12",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "CUM_ALK",
+          "equation": "C6H6 + C3H6 -> C9H12",
+          "reversible": false,
+          "phase": "liquid",
+          "catalyst": "ZEO_ALK",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "ZEO_ALK",
+          "name": "Zeolite (beta or MWW) alkylation catalyst",
+          "active_phase": "Bronsted acid sites",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              393.15,
+              453.15
+            ],
+            "pressure": [
+              2000.0,
+              4000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "basic nitrogen compounds",
+            "water"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "ethane_cracking",
+      "title": "Ethylene by steam cracking of ethane (molecular reactions, no catalyst)",
+      "window": {
+        "temperature": [
+          1073.15,
+          1173.15
+        ],
+        "pressure": [
+          150.0,
+          250.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C2H6",
+          "name": "Ethane",
+          "cas": "74-84-0",
+          "formula": "C2H6",
+          "in_plant": null
+        },
+        {
+          "id": "C2H4",
+          "name": "Ethylene",
+          "cas": "74-85-1",
+          "formula": "C2H4",
+          "in_plant": null
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "C3H8",
+          "name": "Propane",
+          "cas": "74-98-6",
+          "formula": "C3H8",
+          "in_plant": null
+        },
+        {
+          "id": "CH4",
+          "name": "Methane",
+          "cas": "74-82-8",
+          "formula": "CH4",
+          "in_plant": "CH4"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "C2H6_DH",
+          "equation": "C2H6 <=> C2H4 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "C2H6_TO_C3",
+          "equation": "2 C2H6 -> C3H8 + CH4",
+          "reversible": false,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "ethylbenzene",
+      "title": "Ethylbenzene (benzene alkylation with ethylene)",
+      "window": {
+        "temperature": [
+          473.15,
+          533.15
+        ],
+        "pressure": [
+          2000.0,
+          4000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "BZ",
+          "name": "Benzene",
+          "cas": "71-43-2",
+          "formula": "C6H6",
+          "in_plant": null
+        },
+        {
+          "id": "C2H4",
+          "name": "Ethylene",
+          "cas": "74-85-1",
+          "formula": "C2H4",
+          "in_plant": null
+        },
+        {
+          "id": "EB",
+          "name": "Ethylbenzene",
+          "cas": "100-41-4",
+          "formula": "C8H10",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "EB_ALK",
+          "equation": "C6H6 + C2H4 -> C8H10",
+          "reversible": false,
+          "phase": "liquid",
+          "catalyst": "ZEO_EB",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "ZEO_EB",
+          "name": "Zeolite alkylation catalyst",
+          "active_phase": "Bronsted acid sites",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              473.15,
+              533.15
+            ],
+            "pressure": [
+              2000.0,
+              4000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "basic nitrogen compounds",
+            "water"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "ethylene_oxide",
+      "title": "Ethylene oxide (direct oxidation)",
+      "window": {
+        "temperature": [
+          473.15,
+          573.15
+        ],
+        "pressure": [
+          1000.0,
+          3000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C2H4",
+          "name": "Ethylene",
+          "cas": "74-85-1",
+          "formula": "C2H4",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "EO",
+          "name": "Ethylene oxide",
+          "cas": "75-21-8",
+          "formula": "C2H4O",
+          "in_plant": null
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "EO_SYN",
+          "equation": "C2H4 + 1/2 O2 -> C2H4O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "AG_EO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "EO_BURN",
+          "equation": "C2H4 + 3 O2 -> 2 CO2 + 2 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "AG_EO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "AG_EO",
+          "name": "Silver on alpha-alumina",
+          "active_phase": "Ag",
+          "promoters": [
+            "Cs",
+            "Re",
+            "chloride moderator"
+          ],
+          "support": "alpha-Al2O3",
+          "window": {
+            "temperature": [
+              473.15,
+              573.15
+            ],
+            "pressure": [
+              1000.0,
+              3000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfur compounds",
+            "acetylene"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "fischer_tropsch",
+      "title": "Fischer-Tropsch synthesis (lumped, n-octane as the product)",
+      "window": {
+        "temperature": [
+          473.15,
+          623.15
+        ],
+        "pressure": [
+          2000.0,
+          4000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "C8H18",
+          "name": "n-Octane",
+          "cas": "111-65-9",
+          "formula": "C8H18",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CH4",
+          "name": "Methane",
+          "cas": "74-82-8",
+          "formula": "CH4",
+          "in_plant": "CH4"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "FT",
+          "equation": "8 CO + 17 H2 -> C8H18 + 8 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "CO_FT",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "FT_METH",
+          "equation": "CO + 3 H2 -> CH4 + H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "CO_FT",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "CO_FT",
+          "name": "Cobalt on alumina (low-temperature FT)",
+          "active_phase": "Co",
+          "promoters": [
+            "Pt",
+            "Re"
+          ],
+          "support": "Al2O3",
+          "window": {
+            "temperature": [
+              473.15,
+              513.15
+            ],
+            "pressure": [
+              2000.0,
+              3000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfur compounds",
+            "NH3",
+            "HCN"
+          ],
+          "in_plant": false,
+          "differs": false
+        },
+        {
+          "id": "FE_FT",
+          "name": "Promoted iron (high-temperature FT)",
+          "active_phase": "Fe (carbides)",
+          "promoters": [
+            "K2O",
+            "Cu"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              573.15,
+              623.15
+            ],
+            "pressure": [
+              2000.0,
+              4000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfur compounds"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "formaldehyde",
+      "title": "Formaldehyde (methanol oxidation and dehydrogenation)",
+      "window": {
+        "temperature": [
+          523.15,
+          923.15
+        ],
+        "pressure": [
+          100.0,
+          200.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CH3OH",
+          "name": "Methanol",
+          "cas": "67-56-1",
+          "formula": "CH4O",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "HCHO",
+          "name": "Formaldehyde",
+          "cas": "50-00-0",
+          "formula": "CH2O",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "FORMOX",
+          "equation": "CH3OH + 1/2 O2 -> CH2O + H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "FEMO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "MEOH_DH",
+          "equation": "CH3OH <=> CH2O + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "AG_FORM",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "FEMO",
+          "name": "Iron molybdate (Formox)",
+          "active_phase": "Fe2(MoO4)3 with MoO3",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              523.15,
+              673.15
+            ],
+            "pressure": [
+              100.0,
+              200.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "molybdenum loss",
+            "iron carbonyl"
+          ],
+          "in_plant": false,
+          "differs": false
+        },
+        {
+          "id": "AG_FORM",
+          "name": "Silver crystals or gauze",
+          "active_phase": "Ag",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              873.15,
+              923.15
+            ],
+            "pressure": [
+              100.0,
+              200.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfur compounds",
+            "halides"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "hcn_andrussow",
+      "title": "Hydrogen cyanide (Andrussow process)",
+      "window": {
+        "temperature": [
+          1273.15,
+          1423.15
+        ],
+        "pressure": [
+          100.0,
+          200.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CH4",
+          "name": "Methane",
+          "cas": "74-82-8",
+          "formula": "CH4",
+          "in_plant": "CH4"
+        },
+        {
+          "id": "NH3",
+          "name": "Ammonia",
+          "cas": "7664-41-7",
+          "formula": "NH3",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "HCN",
+          "name": "Hydrogen cyanide",
+          "cas": "74-90-8",
+          "formula": "CHN",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "ANDRUSSOW",
+          "equation": "CH4 + NH3 + 3/2 O2 -> HCN + 3 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "PT_RH_HCN",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "PT_RH_HCN",
+          "name": "Platinum-rhodium gauze",
+          "active_phase": "Pt-Rh",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              1273.15,
+              1423.15
+            ],
+            "pressure": [
+              100.0,
+              200.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "iron",
+            "sulfur compounds"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "ht_shift",
+      "title": "High-temperature water-gas shift",
+      "window": {
+        "temperature": [
+          583.15,
+          773.15
+        ],
+        "pressure": [
+          100.0,
+          8000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "WGS",
+          "equation": "CO + H2O <=> CO2 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": {
+            "value": -41200.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": true
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "FE_CR",
+          "name": "Iron-chromium oxide",
+          "active_phase": "Fe3O4",
+          "promoters": [
+            "Cr2O3",
+            "CuO"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              583.15,
+              773.15
+            ],
+            "pressure": [
+              100.0,
+              8000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "sulfur compounds",
+            "chlorides"
+          ],
+          "in_plant": true,
+          "differs": true
+        }
+      ],
+      "sources": [
+        "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
+      ]
+    },
+    {
+      "id": "hydrodesulfurization",
+      "title": "Hydrodesulfurisation (thiophene as the sulfur compound)",
+      "window": {
+        "temperature": [
+          573.15,
+          673.15
+        ],
+        "pressure": [
+          3000.0,
+          13000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C4H4S",
+          "name": "Thiophene",
+          "cas": "110-02-1",
+          "formula": "C4H4S",
+          "in_plant": null
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "C4H10",
+          "name": "n-Butane",
+          "cas": "106-97-8",
+          "formula": "C4H10",
+          "in_plant": null
+        },
+        {
+          "id": "H2S",
+          "name": "Hydrogen sulfide",
+          "cas": "7783-06-4",
+          "formula": "H2S",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "HDS",
+          "equation": "C4H4S + 4 H2 -> C4H10 + H2S",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "COMO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "COMO",
+          "name": "Cobalt-molybdenum sulfide on alumina",
+          "active_phase": "MoS2 (Co-promoted)",
+          "promoters": [
+            "Co"
+          ],
+          "support": "gamma-Al2O3",
+          "window": {
+            "temperature": [
+              573.15,
+              673.15
+            ],
+            "pressure": [
+              3000.0,
+              13000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "nitrogen compounds",
+            "metals (Ni",
+            "V)",
+            "coke"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "lt_shift",
+      "title": "Low-temperature water-gas shift",
+      "window": {
+        "temperature": [
+          463.15,
+          533.15
+        ],
+        "pressure": [
+          100.0,
+          8000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "WGS",
+          "equation": "CO + H2O <=> CO2 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": {
+            "value": -41200.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": true
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "CU_ZNO_LTS",
+          "name": "Copper-zinc oxide shift catalyst",
+          "active_phase": "Cu",
+          "promoters": [
+            "ZnO",
+            "Al2O3"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              463.15,
+              533.15
+            ],
+            "pressure": [
+              100.0,
+              8000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2S",
+            "sulfur compounds",
+            "chlorides"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
+      ]
+    },
+    {
+      "id": "maleic_anhydride",
+      "title": "Maleic anhydride (n-butane oxidation)",
+      "window": {
+        "temperature": [
+          653.15,
+          703.15
+        ],
+        "pressure": [
+          100.0,
+          400.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C4H10",
+          "name": "n-Butane",
+          "cas": "106-97-8",
+          "formula": "C4H10",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "MA",
+          "name": "Maleic anhydride",
+          "cas": "108-31-6",
+          "formula": "C4H2O3",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "MA_SYN",
+          "equation": "C4H10 + 7/2 O2 -> C4H2O3 + 4 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "VPO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "C4_BURN",
+          "equation": "C4H10 + 13/2 O2 -> 4 CO2 + 5 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "VPO",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "VPO",
+          "name": "Vanadyl pyrophosphate",
+          "active_phase": "(VO)2P2O7",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              653.15,
+              703.15
+            ],
+            "pressure": [
+              100.0,
+              400.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "phosphorus loss (dosed)"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "methanation",
+      "title": "Methanation (syngas purification, substitute natural gas)",
+      "window": {
+        "temperature": [
+          523.15,
+          723.15
+        ],
+        "pressure": [
+          100.0,
+          8000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "CH4",
+          "name": "Methane",
+          "cas": "74-82-8",
+          "formula": "CH4",
+          "in_plant": "CH4"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "METH_CO",
+          "equation": "CO + 3 H2 <=> CH4 + H2O",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "NI_METH",
+          "heat_of_reaction": {
+            "value": -206100.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        },
+        {
+          "id": "METH_CO2",
+          "equation": "CO2 + 4 H2 <=> CH4 + 2 H2O",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "NI_METH",
+          "heat_of_reaction": {
+            "value": -165000.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "NI_METH",
+          "name": "Nickel methanation catalyst",
+          "active_phase": "Ni",
+          "promoters": [],
+          "support": "Al2O3",
+          "window": {
+            "temperature": [
+              523.15,
+              723.15
+            ],
+            "pressure": [
+              100.0,
+              8000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2S",
+            "sulfur compounds",
+            "chlorides"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
+      ]
+    },
+    {
+      "id": "methanol",
+      "title": "Methanol synthesis (low pressure)",
+      "window": {
+        "temperature": [
+          493.15,
+          553.15
+        ],
+        "pressure": [
+          5000.0,
+          10000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "CH3OH",
+          "name": "Methanol",
+          "cas": "67-56-1",
+          "formula": "CH4O",
+          "in_plant": null
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "MEOH_CO",
+          "equation": "CO + 2 H2 <=> CH3OH",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "CU_ZNO",
+          "heat_of_reaction": {
+            "value": -90600.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        },
+        {
+          "id": "MEOH_CO2",
+          "equation": "CO2 + 3 H2 <=> CH3OH + H2O",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "CU_ZNO",
+          "heat_of_reaction": {
+            "value": -49400.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        },
+        {
+          "id": "WGS",
+          "equation": "CO + H2O <=> CO2 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": {
+            "value": -41200.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": true
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "CU_ZNO",
+          "name": "Copper-zinc oxide on alumina",
+          "active_phase": "Cu",
+          "promoters": [
+            "ZnO",
+            "Al2O3"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              473.15,
+              573.15
+            ],
+            "pressure": [
+              5000.0,
+              10000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2S",
+            "sulfur compounds",
+            "chlorides",
+            "carbonyls"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "mtbe",
+      "title": "Methyl tert-butyl ether",
+      "window": {
+        "temperature": [
+          313.15,
+          363.15
+        ],
+        "pressure": [
+          1000.0,
+          2000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "IB",
+          "name": "Isobutene",
+          "cas": "115-11-7",
+          "formula": "C4H8",
+          "in_plant": null
+        },
+        {
+          "id": "CH3OH",
+          "name": "Methanol",
+          "cas": "67-56-1",
+          "formula": "CH4O",
+          "in_plant": null
+        },
+        {
+          "id": "MTBE",
+          "name": "Methyl tert-butyl ether",
+          "cas": "1634-04-4",
+          "formula": "C5H12O",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "MTBE_SYN",
+          "equation": "C4H8 + CH3OH <=> C5H12O",
+          "reversible": true,
+          "phase": "liquid",
+          "catalyst": "RESIN",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "RESIN",
+          "name": "Sulfonic acid ion-exchange resin",
+          "active_phase": "sulfonic acid groups",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              313.15,
+              363.15
+            ],
+            "pressure": [
+              1000.0,
+              2000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "basic nitrogen compounds",
+            "metal cations"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "nitric_acid",
+      "title": "Nitric acid (Ostwald process, ammonia oxidation)",
+      "window": {
+        "temperature": [
+          1073.15,
+          1223.15
+        ],
+        "pressure": [
+          100.0,
+          1200.0
+        ]
+      },
+      "components": [
+        {
+          "id": "NH3",
+          "name": "Ammonia",
+          "cas": "7664-41-7",
+          "formula": "NH3",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "NO",
+          "name": "Nitric oxide",
+          "cas": "10102-43-9",
+          "formula": "NO",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "N2",
+          "name": "Nitrogen",
+          "cas": "7727-37-9",
+          "formula": "N2",
+          "in_plant": null
+        },
+        {
+          "id": "NO2",
+          "name": "Nitrogen dioxide",
+          "cas": "10102-44-0",
+          "formula": "NO2",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "NH3_OX",
+          "equation": "4 NH3 + 5 O2 -> 4 NO + 6 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "PT_RH",
+          "heat_of_reaction": {
+            "value": -905500.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        },
+        {
+          "id": "NH3_TO_N2",
+          "equation": "4 NH3 + 3 O2 -> 2 N2 + 6 H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "PT_RH",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "NO_OX",
+          "equation": "2 NO + O2 <=> 2 NO2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": {
+            "value": -114100.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "PT_RH",
+          "name": "Platinum-rhodium gauze",
+          "active_phase": "Pt-Rh (5-10 % Rh)",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              1073.15,
+              1223.15
+            ],
+            "pressure": [
+              100.0,
+              1200.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "iron oxide",
+            "phosphorus",
+            "sulfur compounds"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "propylene_oxide",
+      "title": "Propylene oxide (hydrogen peroxide route, HPPO)",
+      "window": {
+        "temperature": [
+          313.15,
+          333.15
+        ],
+        "pressure": [
+          2000.0,
+          3000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C3H6",
+          "name": "Propylene",
+          "cas": "115-07-1",
+          "formula": "C3H6",
+          "in_plant": null
+        },
+        {
+          "id": "H2O2",
+          "name": "Hydrogen peroxide",
+          "cas": "7722-84-1",
+          "formula": "H2O2",
+          "in_plant": null
+        },
+        {
+          "id": "PO",
+          "name": "Propylene oxide",
+          "cas": "75-56-9",
+          "formula": "C3H6O",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "HPPO",
+          "equation": "C3H6 + H2O2 -> C3H6O + H2O",
+          "reversible": false,
+          "phase": "liquid",
+          "catalyst": "TS1",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "TS1",
+          "name": "Titanium silicalite-1",
+          "active_phase": "Ti in MFI framework",
+          "promoters": [],
+          "support": "",
+          "window": {
+            "temperature": [
+              313.15,
+              333.15
+            ],
+            "pressure": [
+              2000.0,
+              3000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "bases",
+            "metal ions"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "steam_reforming",
+      "title": "Steam methane reforming",
+      "window": {
+        "temperature": [
+          723.15,
+          1223.15
+        ],
+        "pressure": [
+          1500.0,
+          4000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "CH4",
+          "name": "Methane",
+          "cas": "74-82-8",
+          "formula": "CH4",
+          "in_plant": "CH4"
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "CO",
+          "name": "Carbon monoxide",
+          "cas": "630-08-0",
+          "formula": "CO",
+          "in_plant": "CO"
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        },
+        {
+          "id": "CO2",
+          "name": "Carbon dioxide",
+          "cas": "124-38-9",
+          "formula": "CO2",
+          "in_plant": "CO2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "SMR",
+          "equation": "CH4 + H2O <=> CO + 3 H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "NI_REF",
+          "heat_of_reaction": {
+            "value": 206100.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        },
+        {
+          "id": "WGS",
+          "equation": "CO + H2O <=> CO2 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": {
+            "value": -41200.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": true
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "NI_REF",
+          "name": "Nickel reforming catalyst",
+          "active_phase": "Ni",
+          "promoters": [
+            "K2O"
+          ],
+          "support": "alpha-Al2O3 or calcium aluminate",
+          "window": {
+            "temperature": [
+              723.15,
+              1223.15
+            ],
+            "pressure": [
+              1500.0,
+              4000.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "H2S",
+            "sulfur compounds",
+            "chlorides"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product",
+        "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
+      ]
+    },
+    {
+      "id": "styrene",
+      "title": "Styrene (ethylbenzene dehydrogenation)",
+      "window": {
+        "temperature": [
+          853.15,
+          923.15
+        ],
+        "pressure": [
+          40.0,
+          150.0
+        ]
+      },
+      "components": [
+        {
+          "id": "EB",
+          "name": "Ethylbenzene",
+          "cas": "100-41-4",
+          "formula": "C8H10",
+          "in_plant": null
+        },
+        {
+          "id": "STY",
+          "name": "Styrene",
+          "cas": "100-42-5",
+          "formula": "C8H8",
+          "in_plant": null
+        },
+        {
+          "id": "H2",
+          "name": "Hydrogen",
+          "cas": "1333-74-0",
+          "formula": "H2",
+          "in_plant": "H2"
+        }
+      ],
+      "reactions": [
+        {
+          "id": "EB_DH",
+          "equation": "C8H10 <=> C8H8 + H2",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "FE_K",
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "FE_K",
+          "name": "Potassium-promoted iron oxide",
+          "active_phase": "Fe2O3 / KFeO2",
+          "promoters": [
+            "K2O",
+            "Ce",
+            "Mo"
+          ],
+          "support": "",
+          "window": {
+            "temperature": [
+              853.15,
+              923.15
+            ],
+            "pressure": [
+              40.0,
+              150.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "chlorides",
+            "coke (removed by steam)"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "sulfuric_acid",
+      "title": "Sulfuric acid (contact process, SO2 oxidation)",
+      "window": {
+        "temperature": [
+          663.15,
+          903.15
+        ],
+        "pressure": [
+          100.0,
+          250.0
+        ]
+      },
+      "components": [
+        {
+          "id": "SO2",
+          "name": "Sulfur dioxide",
+          "cas": "7446-09-5",
+          "formula": "SO2",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "SO3",
+          "name": "Sulfur trioxide",
+          "cas": "7446-11-9",
+          "formula": "SO3",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "SO2_OX",
+          "equation": "SO2 + 1/2 O2 <=> SO3",
+          "reversible": true,
+          "phase": null,
+          "catalyst": "V2O5",
+          "heat_of_reaction": {
+            "value": -98900.0,
+            "unit": "kJ/kmol",
+            "temperature": 298.15,
+            "provenance": "given",
+            "source": "standard enthalpies of formation, 298 K"
+          },
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "V2O5",
+          "name": "Vanadium pentoxide on silica",
+          "active_phase": "V2O5 in molten alkali pyrosulfate",
+          "promoters": [
+            "K2SO4",
+            "Cs2SO4"
+          ],
+          "support": "SiO2 (diatomaceous earth)",
+          "window": {
+            "temperature": [
+              663.15,
+              903.15
+            ],
+            "pressure": [
+              100.0,
+              250.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "arsenic",
+            "fluorides",
+            "chlorides"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    },
+    {
+      "id": "vinyl_chloride",
+      "title": "Vinyl chloride (balanced EDC route)",
+      "window": {
+        "temperature": [
+          323.15,
+          823.15
+        ],
+        "pressure": [
+          100.0,
+          3000.0
+        ]
+      },
+      "components": [
+        {
+          "id": "C2H4",
+          "name": "Ethylene",
+          "cas": "74-85-1",
+          "formula": "C2H4",
+          "in_plant": null
+        },
+        {
+          "id": "CL2",
+          "name": "Chlorine",
+          "cas": "7782-50-5",
+          "formula": "Cl2",
+          "in_plant": null
+        },
+        {
+          "id": "EDC",
+          "name": "1,2-Dichloroethane",
+          "cas": "107-06-2",
+          "formula": "C2H4Cl2",
+          "in_plant": null
+        },
+        {
+          "id": "HCL",
+          "name": "Hydrogen chloride",
+          "cas": "7647-01-0",
+          "formula": "HCl",
+          "in_plant": null
+        },
+        {
+          "id": "O2",
+          "name": "Oxygen",
+          "cas": "7782-44-7",
+          "formula": "O2",
+          "in_plant": null
+        },
+        {
+          "id": "H2O",
+          "name": "Water",
+          "cas": "7732-18-5",
+          "formula": "H2O",
+          "in_plant": "H2O"
+        },
+        {
+          "id": "VCM",
+          "name": "Vinyl chloride",
+          "cas": "75-01-4",
+          "formula": "C2H3Cl",
+          "in_plant": null
+        }
+      ],
+      "reactions": [
+        {
+          "id": "DIRECT_CL",
+          "equation": "C2H4 + Cl2 -> C2H4Cl2",
+          "reversible": false,
+          "phase": "liquid",
+          "catalyst": null,
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "OXYCHLOR",
+          "equation": "C2H4 + 2 HCl + 1/2 O2 -> C2H4Cl2 + H2O",
+          "reversible": false,
+          "phase": null,
+          "catalyst": "CUCL2",
+          "heat_of_reaction": null,
+          "in_plant": false
+        },
+        {
+          "id": "EDC_CRACK",
+          "equation": "C2H4Cl2 <=> C2H3Cl + HCl",
+          "reversible": true,
+          "phase": null,
+          "catalyst": null,
+          "heat_of_reaction": null,
+          "in_plant": false
+        }
+      ],
+      "catalysts": [
+        {
+          "id": "CUCL2",
+          "name": "Copper(II) chloride on alumina",
+          "active_phase": "CuCl2",
+          "promoters": [
+            "KCl"
+          ],
+          "support": "gamma-Al2O3",
+          "window": {
+            "temperature": [
+              493.15,
+              573.15
+            ],
+            "pressure": [
+              100.0,
+              600.0
+            ],
+            "provenance": "assumed",
+            "source": "typical industrial range; confirm with the licensor's or vendor's data"
+          },
+          "poisons": [
+            "iron",
+            "CuCl2 volatilisation"
+          ],
+          "in_plant": false,
+          "differs": false
+        }
+      ],
+      "sources": [
+        "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
+      ]
+    }
+  ]
+}

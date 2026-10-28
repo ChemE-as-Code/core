@@ -1,0 +1,308 @@
+<!-- Tank T4750 with chambers and nozzles: the conceptual object, under TaggedPlantItems. Excerpt of the DEXPI 2.0.1 reference P&ID, CC BY 4.0. -->
+<Object id="Tank1" type="Plant/ProcessEquipment.Tank">
+  <Components property="Nozzles">
+    <Object id="Nozzle5" type="Plant/ProcessEquipment.ProcessNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode8" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>80</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 80</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N1</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle6" type="Plant/ProcessEquipment.ProcessNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode9" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>80</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 80</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N2</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle18" type="Plant/ProcessEquipment.ProcessNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode60" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>80</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 80</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn80"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N3</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle8" type="Plant/ProcessEquipment.ProcessNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode22" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>50</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 50</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn50"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N5</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle12" type="Plant/ProcessEquipment.ProcessNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode53" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>50</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 50</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn50"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N6</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle17" type="Plant/ProcessEquipment.InstrumentNozzle">
+      <Components property="Nodes">
+        <Object id="PipingNode61" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>25</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 25</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Din2448ObjectDn25"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N7</String>
+      </Data>
+    </Object>
+    <Object id="Nozzle19" type="Plant/ProcessEquipment.AccessNozzle">
+      <Components property="Nodes">
+        <Object id="Nozzle19_Nodes1" type="Plant/Piping.PipingNode">
+          <Data property="NominalDiameterNumericalValueRepresentation">
+            <String>800</String>
+          </Data>
+          <Data property="NominalDiameterRepresentation">
+            <String>DN 800</String>
+          </Data>
+          <Data property="NominalDiameterStandard">
+            <DataReference data="Plant/Enumerations.NominalDiameterStandardClassification.Iso6708ObjectDn800"/>
+          </Data>
+          <Data property="NominalDiameterTypeRepresentation">
+            <String>DN</String>
+          </Data>
+        </Object>
+      </Components>
+      <Data property="SubTagName">
+        <String>N8</String>
+      </Data>
+    </Object>
+  </Components>
+  <Components property="Chambers">
+    <Object id="Chamber7" type="Plant/ProcessEquipment.Chamber">
+      <Data property="LowerLimitDesignPressure">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.PressureGaugeUnit.Bar"/>
+          </Data>
+          <Data property="Value">
+            <Double>-0.1</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="LowerLimitDesignTemperature">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.TemperatureUnit.DegreeCelsius"/>
+          </Data>
+          <Data property="Value">
+            <Double>-45.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="MaterialOfConstructionCode">
+        <String>1.4306</String>
+      </Data>
+      <Data property="NominalDiameter">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.LengthUnit.Millimetre"/>
+          </Data>
+          <Data property="Value">
+            <Double>20000.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="NominalDiameterTypeRepresentation">
+        <String>DN</String>
+      </Data>
+      <Data property="SubTagName">
+        <String>Chamber 1</String>
+      </Data>
+      <Data property="UpperLimitDesignPressure">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.PressureGaugeUnit.Bar"/>
+          </Data>
+          <Data property="Value">
+            <Double>0.1</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="UpperLimitDesignTemperature">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.TemperatureUnit.DegreeCelsius"/>
+          </Data>
+          <Data property="Value">
+            <Double>100.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+    </Object>
+    <Object id="Chamber8" type="Plant/ProcessEquipment.Chamber">
+      <Data property="LowerLimitDesignPressure">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.PressureGaugeUnit.Bar"/>
+          </Data>
+          <Data property="Value">
+            <Double>-0.1</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="LowerLimitDesignTemperature">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.TemperatureUnit.DegreeCelsius"/>
+          </Data>
+          <Data property="Value">
+            <Double>-45.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="MaterialOfConstructionCode">
+        <String>1.4305</String>
+      </Data>
+      <Data property="NominalDiameter">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.LengthUnit.Millimetre"/>
+          </Data>
+          <Data property="Value">
+            <Double>20000.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="NominalDiameterTypeRepresentation">
+        <String>DN</String>
+      </Data>
+      <Data property="SubTagName">
+        <String>Chamber 2</String>
+      </Data>
+      <Data property="UpperLimitDesignPressure">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.PressureGaugeUnit.Bar"/>
+          </Data>
+          <Data property="Value">
+            <Double>0.05</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+      <Data property="UpperLimitDesignTemperature">
+        <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+          <Data property="Unit">
+            <DataReference data="Core/PhysicalQuantities.TemperatureUnit.DegreeCelsius"/>
+          </Data>
+          <Data property="Value">
+            <Double>100.0</Double>
+          </Data>
+        </AggregatedDataValue>
+      </Data>
+    </Object>
+  </Components>
+  <Data property="TagName">
+    <String>T4750</String>
+  </Data>
+  <Data property="TagNamePrefix">
+    <String>T</String>
+  </Data>
+  <Data property="TagNameSequenceNumber">
+    <String>4750</String>
+  </Data>
+  <Data property="TagNameSuffix">
+    <String/>
+  </Data>
+  <Data property="NominalCapacityVolume">
+    <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+      <Data property="Unit">
+        <DataReference data="Core/PhysicalQuantities.VolumeUnit.MetreCubed"/>
+      </Data>
+      <Data property="Value">
+        <Double>26.0</Double>
+      </Data>
+    </AggregatedDataValue>
+  </Data>
+  <Data property="CylinderLength">
+    <AggregatedDataValue type="Core/PhysicalQuantities.PhysicalQuantity">
+      <Data property="Unit">
+        <DataReference data="Core/PhysicalQuantities.LengthUnit.Metre"/>
+      </Data>
+      <Data property="Value">
+        <Double>4.0</Double>
+      </Data>
+    </AggregatedDataValue>
+  </Data>
+</Object>

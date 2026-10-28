@@ -1,0 +1,2259 @@
+{
+  "schema": "cheme/maturity-report/v1",
+  "kind": "maturity-report",
+  "core_version": "0.7.0",
+  "checked_at": "2026-10-27T17:29:23Z",
+  "level": null,
+  "level_index": 0,
+  "evaluated_through": "engineering",
+  "library_maturity": null,
+  "levels": [
+    {
+      "id": "sourced",
+      "title": "Sourced process description",
+      "library_maturity": "concept",
+      "status": "fail",
+      "reached": false,
+      "requirements": [
+        {
+          "id": "sourced.flowsheet",
+          "title": "process flowsheet loads",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-sourced-flowsheet",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "sourced.design-basis",
+          "title": "design basis: capacity, feeds and products",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-sourced-design-basis",
+          "file": "process/design-basis.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "fingerprint": "sha256:874fae3230d2485c032146398de9f120ac8e651fbf5395dc628c41f7a18e26a2",
+            "assumptions": 7
+          }
+        },
+        {
+          "id": "sourced.boundary",
+          "title": "feeds and products declared; feed flows and compositions given with a source",
+          "status": "fail",
+          "required": true,
+          "rule": "cheme.maturity-sourced-boundary",
+          "file": "process/flowsheet.yaml",
+          "line": 247,
+          "detail": "not given with a source: S1 flow (design), S1 composition (design)",
+          "hint": "give the feed flows and compositions with provenance given and a source",
+          "evidence": {
+            "feed_values_unsourced": [
+              "S1 flow (design)",
+              "S1 composition (design)"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "balanced",
+      "title": "Balanced conceptual PFD",
+      "library_maturity": "screening",
+      "status": "fail",
+      "reached": false,
+      "requirements": [
+        {
+          "id": "balanced.process-rules",
+          "title": "no error in the process rules (units, ports, reactions, reactors)",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-balanced-process-rules",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "errors": 0
+          }
+        },
+        {
+          "id": "balanced.balances-evaluable",
+          "title": "every block and step balance evaluable in every case (mass and components or elements)",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-balanced-balances-evaluable",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "not_evaluable": []
+          }
+        },
+        {
+          "id": "balanced.balances-closed",
+          "title": "every balance closes within the flowsheet's explicit tolerance",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-balanced-balances-closed",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "balances": {
+              "design": [
+                {
+                  "node": "MAC",
+                  "kind": "block",
+                  "status": "ok",
+                  "in_kg_h": 131685.0,
+                  "out_kg_h": 131704.824,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S1",
+                    "S12B"
+                  ],
+                  "streams_out": [
+                    "S3",
+                    "S1C",
+                    "S3C",
+                    "S12E"
+                  ],
+                  "residual_kg_h": -19.824,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "PUR",
+                  "kind": "block",
+                  "status": "ok",
+                  "in_kg_h": 114620.0,
+                  "out_kg_h": 114600.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S3",
+                    "S12A"
+                  ],
+                  "streams_out": [
+                    "S4",
+                    "S12D"
+                  ],
+                  "residual_kg_h": 20.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "CB",
+                  "kind": "block",
+                  "status": "ok",
+                  "in_kg_h": 98060.0,
+                  "out_kg_h": 98060.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S4"
+                  ],
+                  "streams_out": [
+                    "S7",
+                    "S9",
+                    "S10",
+                    "S11",
+                    "S12A",
+                    "S12B",
+                    "S12C"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "PRD",
+                  "kind": "block",
+                  "status": "ok",
+                  "in_kg_h": 33370.0,
+                  "out_kg_h": 33370.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S7",
+                    "S9"
+                  ],
+                  "streams_out": [
+                    "S8",
+                    "S9B"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "K1101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 100235.0,
+                  "out_kg_h": 100235.06,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S1"
+                  ],
+                  "streams_out": [
+                    "S2",
+                    "S1C"
+                  ],
+                  "residual_kg_h": -0.06,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "C1101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 98836.9,
+                  "out_kg_h": 98856.664,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S2"
+                  ],
+                  "streams_out": [
+                    "S3",
+                    "S3C"
+                  ],
+                  "residual_kg_h": -19.764,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "C1102",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 31450.0,
+                  "out_kg_h": 31450.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S12B"
+                  ],
+                  "streams_out": [
+                    "S12E"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "V2101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 114620.0,
+                  "out_kg_h": 114600.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S3",
+                    "S12H"
+                  ],
+                  "streams_out": [
+                    "S4",
+                    "S12D"
+                  ],
+                  "residual_kg_h": 20.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "E2101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 16350.0,
+                  "out_kg_h": 16350.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S12A"
+                  ],
+                  "streams_out": [
+                    "S12H"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "X3102",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 98060.0,
+                  "out_kg_h": 98060.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S4"
+                  ],
+                  "streams_out": [
+                    "S4A",
+                    "S4B"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "K3101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 14870.0,
+                  "out_kg_h": 14870.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S4B"
+                  ],
+                  "streams_out": [
+                    "S4C"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "E3104",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 14870.0,
+                  "out_kg_h": 14870.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S4C"
+                  ],
+                  "streams_out": [
+                    "S4D"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "E3101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 195180.0,
+                  "out_kg_h": 195180.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S4A",
+                    "S4D",
+                    "S14",
+                    "S15",
+                    "S16"
+                  ],
+                  "streams_out": [
+                    "S5",
+                    "S5B",
+                    "S17",
+                    "S7",
+                    "S9"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "KT3101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 14870.0,
+                  "out_kg_h": 14870.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S5B"
+                  ],
+                  "streams_out": [
+                    "S6"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "C3101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 83190.0,
+                  "out_kg_h": 83190.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S5"
+                  ],
+                  "streams_out": [
+                    "S13",
+                    "S18",
+                    "S14",
+                    "S11"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "C3102",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 85080.0,
+                  "out_kg_h": 85080.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S6",
+                    "S13",
+                    "S18"
+                  ],
+                  "streams_out": [
+                    "S15",
+                    "S16",
+                    "S10"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "X3101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 63750.0,
+                  "out_kg_h": 63750.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S17"
+                  ],
+                  "streams_out": [
+                    "S12A",
+                    "S12B",
+                    "S12C"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "K4101",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 20860.0,
+                  "out_kg_h": 20860.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S7"
+                  ],
+                  "streams_out": [
+                    "S8"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                },
+                {
+                  "node": "K4102",
+                  "kind": "step",
+                  "status": "ok",
+                  "in_kg_h": 12510.0,
+                  "out_kg_h": 12510.0,
+                  "missing": [],
+                  "failing": [],
+                  "streams_in": [
+                    "S9"
+                  ],
+                  "streams_out": [
+                    "S9B"
+                  ],
+                  "residual_kg_h": 0.0,
+                  "tolerance": {
+                    "abs_kg_h": 1.0,
+                    "rel": 0.005
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "balanced.model-basis",
+          "title": "every reactor and separator rests on a sourced model or sourced specified values",
+          "status": "fail",
+          "required": true,
+          "rule": "cheme.maturity-balanced-model-basis",
+          "file": "process/flowsheet.yaml",
+          "line": 130,
+          "detail": "V2101: stream-values, outlet values as written in the flowsheet (specified, no model); assumed or without a source: S4 flow (design), S4 composition (design), S12D flow (design), S12D composition (design)",
+          "hint": "give the specified values with provenance given and a source (a conversion: or observations of the decided model basis of process/reaction-evidence.yaml that cover it), or declare a reactor/separator model whose data are given",
+          "evidence": {
+            "units": {
+              "V2101": "stream-values",
+              "C3101": "equilibrium-stage",
+              "C3102": "equilibrium-stage"
+            }
+          }
+        },
+        {
+          "id": "balanced.energy-closure",
+          "title": "energy balances of the blocks and steps (stream enthalpies against energy streams)",
+          "status": "fail",
+          "required": false,
+          "rule": "cheme.maturity-balanced-energy-closure",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "imbalance: PRD (design), K4101 (design), K4102 (design)",
+          "hint": "check the duties and the calculated enthalpies of those nodes",
+          "evidence": {
+            "balances": {
+              "design": [
+                {
+                  "node": "MAC",
+                  "kind": "block",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 6608.51,
+                  "energy_out_kW": 7887.83,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S1 enthalpy",
+                    "S3 enthalpy",
+                    "S1C enthalpy",
+                    "S3C enthalpy",
+                    "S12E enthalpy"
+                  ],
+                  "energy_streams": [
+                    "E1",
+                    "E2",
+                    "Q1",
+                    "Q2"
+                  ]
+                },
+                {
+                  "node": "PUR",
+                  "kind": "block",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 333.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S3 enthalpy",
+                    "S12A enthalpy",
+                    "S12D enthalpy"
+                  ],
+                  "energy_streams": [
+                    "E3"
+                  ]
+                },
+                {
+                  "node": "CB",
+                  "kind": "block",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S12A enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "PRD",
+                  "kind": "block",
+                  "status": "imbalance",
+                  "enthalpy_in_kW": -114.423827,
+                  "enthalpy_out_kW": 78.903065,
+                  "energy_in_kW": 2546.069,
+                  "energy_out_kW": 2208.94,
+                  "residual_kW": -143.802108,
+                  "tolerance_kW": 47.661532,
+                  "missing": [],
+                  "energy_streams": [
+                    "E4",
+                    "E5",
+                    "Q3",
+                    "Q4"
+                  ]
+                },
+                {
+                  "node": "K1101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 6308.51,
+                  "energy_out_kW": 6686.41,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S1 enthalpy",
+                    "S2 enthalpy",
+                    "S1C enthalpy"
+                  ],
+                  "energy_streams": [
+                    "E1",
+                    "Q1"
+                  ]
+                },
+                {
+                  "node": "C1101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 300.0,
+                  "energy_out_kW": 1201.42,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S2 enthalpy",
+                    "S3 enthalpy",
+                    "S3C enthalpy"
+                  ],
+                  "energy_streams": [
+                    "E2",
+                    "Q2"
+                  ]
+                },
+                {
+                  "node": "C1102",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S12E enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "V2101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S3 enthalpy",
+                    "S12H enthalpy",
+                    "S12D enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "E2101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 333.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S12A enthalpy",
+                    "S12H enthalpy"
+                  ],
+                  "energy_streams": [
+                    "E3"
+                  ]
+                },
+                {
+                  "node": "X3102",
+                  "kind": "step",
+                  "status": "no-energy-streams",
+                  "enthalpy_in_kW": -319.143195,
+                  "enthalpy_out_kW": -319.143195,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": 0.0,
+                  "tolerance_kW": null,
+                  "missing": [],
+                  "energy_streams": []
+                },
+                {
+                  "node": "K3101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S4C enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "E3104",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S4C enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "E3101",
+                  "kind": "step",
+                  "status": "no-energy-streams",
+                  "enthalpy_in_kW": -7897.495955,
+                  "enthalpy_out_kW": -5798.005612,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": 2099.490343,
+                  "tolerance_kW": null,
+                  "missing": [],
+                  "energy_streams": []
+                },
+                {
+                  "node": "KT3101",
+                  "kind": "step",
+                  "status": "no-energy-streams",
+                  "enthalpy_in_kW": -651.951335,
+                  "enthalpy_out_kW": -850.356982,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": -198.405646,
+                  "tolerance_kW": null,
+                  "missing": [],
+                  "energy_streams": []
+                },
+                {
+                  "node": "C3101",
+                  "kind": "step",
+                  "status": "no-energy-streams",
+                  "enthalpy_in_kW": -4807.205525,
+                  "enthalpy_out_kW": -8941.454579,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": -4134.249054,
+                  "tolerance_kW": null,
+                  "missing": [],
+                  "energy_streams": []
+                },
+                {
+                  "node": "C3102",
+                  "kind": "step",
+                  "status": "no-energy-streams",
+                  "enthalpy_in_kW": -8373.293536,
+                  "enthalpy_out_kW": -6366.298715,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": 2006.994821,
+                  "tolerance_kW": null,
+                  "missing": [],
+                  "energy_streams": []
+                },
+                {
+                  "node": "X3101",
+                  "kind": "step",
+                  "status": "not-evaluable",
+                  "enthalpy_in_kW": 0.0,
+                  "enthalpy_out_kW": 0.0,
+                  "energy_in_kW": 0.0,
+                  "energy_out_kW": 0.0,
+                  "residual_kW": null,
+                  "tolerance_kW": null,
+                  "missing": [
+                    "S12A enthalpy"
+                  ],
+                  "energy_streams": []
+                },
+                {
+                  "node": "K4101",
+                  "kind": "step",
+                  "status": "imbalance",
+                  "enthalpy_in_kW": -65.732754,
+                  "enthalpy_out_kW": 32.355809,
+                  "energy_in_kW": 2308.44,
+                  "energy_out_kW": 2085.58,
+                  "residual_kW": -124.771437,
+                  "tolerance_kW": 44.046773,
+                  "missing": [],
+                  "energy_streams": [
+                    "E4",
+                    "Q3"
+                  ]
+                },
+                {
+                  "node": "K4102",
+                  "kind": "step",
+                  "status": "imbalance",
+                  "enthalpy_in_kW": -48.691073,
+                  "enthalpy_out_kW": 46.547256,
+                  "energy_in_kW": 237.629,
+                  "energy_out_kW": 123.36,
+                  "residual_kW": -19.030671,
+                  "tolerance_kW": 3.714759,
+                  "missing": [],
+                  "energy_streams": [
+                    "E5",
+                    "Q4"
+                  ]
+                }
+              ]
+            },
+            "by_status": {
+              "not-evaluable": [
+                "MAC (design)",
+                "PUR (design)",
+                "CB (design)",
+                "K1101 (design)",
+                "C1101 (design)",
+                "C1102 (design)",
+                "V2101 (design)",
+                "E2101 (design)",
+                "K3101 (design)",
+                "E3104 (design)",
+                "X3101 (design)"
+              ],
+              "imbalance": [
+                "PRD (design)",
+                "K4101 (design)",
+                "K4102 (design)"
+              ],
+              "no-energy-streams": [
+                "X3102 (design)",
+                "E3101 (design)",
+                "KT3101 (design)",
+                "C3101 (design)",
+                "C3102 (design)"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "predictive",
+      "title": "Converged predictive simulation",
+      "library_maturity": "screening",
+      "status": "fail",
+      "reached": false,
+      "requirements": [
+        {
+          "id": "predictive.simulation-spec",
+          "title": "process/simulation.yaml translates into a simulator model for every case",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-predictive-simulation-spec",
+          "file": "process/simulation.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.run-record",
+          "title": "a run record for every case",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-run-record",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded in process/simulation-run.json",
+          "hint": "run cheme process simulate --fill (it records the run)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.current",
+          "title": "every run record is current: simulated from the inputs as they are (fingerprints)",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-current",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded in process/simulation-run.json",
+          "hint": "run cheme process simulate --fill (it records the run)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.converged",
+          "title": "every recorded run converged without errors",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-converged",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded in process/simulation-run.json",
+          "hint": "run cheme process simulate --fill (it records the run)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.solver",
+          "title": "simulator, simulator version, property package and core version recorded",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-solver",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded in process/simulation-run.json",
+          "hint": "run cheme process simulate --fill (it records the run)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.coverage",
+          "title": "every step simulated: none excluded and left at specified values",
+          "status": "fail",
+          "required": true,
+          "rule": "cheme.maturity-predictive-coverage",
+          "file": "process/simulation.yaml",
+          "line": null,
+          "detail": "excluded: C1102, E2101, E3101, KT3101, PUR, V2101 and 1 more",
+          "hint": "their streams stay specified; simulate them to claim predictive",
+          "evidence": {
+            "excluded": {
+              "PUR": "exclude: in process/simulation.yaml",
+              "E3101": "exclude: in process/simulation.yaml",
+              "KT3101": "exclude: in process/simulation.yaml",
+              "X3101": "exclude: in process/simulation.yaml",
+              "C1102": "exclude: in process/simulation.yaml",
+              "V2101": "inside PUR, excluded in process/simulation.yaml",
+              "E2101": "inside PUR, excluded in process/simulation.yaml"
+            }
+          }
+        },
+        {
+          "id": "predictive.balances",
+          "title": "physical validity: the balances of the simulated flowsheet close within tolerance",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-predictive-balances",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.model-basis",
+          "title": "every reactor and separator predicted by a model: specified splits, conversions and stream values cap the level at balanced",
+          "status": "fail",
+          "required": true,
+          "rule": "cheme.maturity-predictive-model-basis",
+          "file": "process/flowsheet.yaml",
+          "line": 130,
+          "detail": "specified: V2101 (stream-values)",
+          "hint": "replace specified splits and conversions by predictive unit models",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.property-package",
+          "title": "the property package is supported and recommended by a recorded method selection (or a recorded substitution)",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-property-package",
+          "file": "process/simulation.yaml",
+          "line": 8,
+          "detail": "no method_selection recorded for property package 'Peng-Robinson (PR)'",
+          "hint": "record method_selection.facts (thermodynamic-model-selection) so the package is checked against the recommendation",
+          "evidence": {
+            "property_package": "Peng-Robinson (PR)",
+            "findings": [
+              {
+                "rule": "cheme.process-sim-method-unrecorded",
+                "level": "info",
+                "message": "no method_selection recorded for property package 'Peng-Robinson (PR)'"
+              }
+            ]
+          }
+        },
+        {
+          "id": "predictive.property-regime",
+          "title": "the property methods are used inside their declared regimes",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-property-regime",
+          "file": "process/simulation.yaml",
+          "line": null,
+          "detail": "no run recorded in process/simulation-run.json",
+          "hint": "run cheme process simulate --fill (the regime is checked on its streams)",
+          "evidence": {
+            "property_package": "Peng-Robinson (PR)",
+            "claim": {
+              "simulator_version": "9.0.5",
+              "components": {
+                "7727-37-9": "nitrogen",
+                "7782-44-7": "oxygen",
+                "7440-37-1": "argon"
+              },
+              "properties": [
+                "bubble and dew temperatures (and at vapour fraction 0.5) at a given pressure and composition",
+                "equilibrium phase compositions (vapour fraction 0.5)",
+                "enthalpy differences, every phase and saturation state, from the gas at 300 K and 100 kPa(a)",
+                "liquid density of the pure fluids where the fluid is a subcritical liquid (below its saturation temperature up to 2000 kPa(a), and at or below 100 K up to 6000 kPa(a)); not in the 170-320 K gas box, where DWSIM labels supercritical oxygen and argon liquid"
+              ],
+              "not_claimed": [
+                "liquid density of mixtures: DWSIM's Rackett mixture density misses the reference by up to 8 % below 110 K (nitrogen-argon 50/50: -7.8 %) and up to 13 % nearer the critical point (120 K, 2000 kPa(a))",
+                "gas density: within 2.2 % of the reference up to 2000 kPa(a) except at isolated states where DWSIM 9.0.5 returns a wrong vapour density while its enthalpy agrees (air at 260 K, 200 kPa(a): -3.6 %; nitrogen-oxygen 50/50 at 250 K, 700 kPa(a): -32 %; crude oxygen at 190 K, 300 kPa(a): -20 %); up to 5 % at 170 K and 6000 kPa(a); at 170 K and 10000 kPa(a) DWSIM labels supercritical oxygen and argon liquid and its Rackett density is wrong by orders of magnitude",
+                "transport properties, solids (argon freezes at 83.8 K), other components"
+              ],
+              "tolerances": {
+                "saturation_temperature_abs_K": 0.3,
+                "equilibrium_mole_fraction_abs": 0.005,
+                "enthalpy_difference_abs_kJ_per_kmol": 200.0,
+                "liquid_density_rel_pure": 0.02
+              },
+              "benchmark": "tests/test_process_simulate_property_package.py"
+            },
+            "states_checked": 0,
+            "feeds_checked": 0
+          }
+        },
+        {
+          "id": "predictive.stream-properties",
+          "title": "every stream with calculated properties lies inside the benchmarked claim of the process's property package",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-predictive-stream-properties",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "package": "air-pr-chemsep",
+            "reason": "property_method configured before packages: the release-1 one",
+            "benchmark": {
+              "test": "tests/test_process_props.py",
+              "reference": "NIST WebBook reference equations of state (Span 2000 N2, Schmidt-Wagner 1985 O2, Lemmon 2000 air and N2/O2/Ar mixture), values in tests/data/process_props_references.yaml",
+              "tolerances": {
+                "air_density_rel": 0.005,
+                "gas_density_rel": 0.01,
+                "saturation_temperature_abs_K": 0.3,
+                "liquid_density_rel": 0.015,
+                "two_phase_temperature_abs_K": 0.3,
+                "vapor_fraction_abs": 0.03
+              }
+            },
+            "streams_with_calculated_properties": [
+              "S10 (design)",
+              "S11 (design)",
+              "S12B (design)",
+              "S12C (design)",
+              "S13 (design)",
+              "S14 (design)",
+              "S15 (design)",
+              "S16 (design)",
+              "S17 (design)",
+              "S18 (design)",
+              "S4 (design)",
+              "S4A (design)",
+              "S4B (design)",
+              "S4D (design)",
+              "S5 (design)",
+              "S5B (design)",
+              "S6 (design)",
+              "S7 (design)",
+              "S8 (design)",
+              "S9 (design)",
+              "S9B (design)"
+            ],
+            "coverage": {
+              "design": [
+                {
+                  "id": "S1",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-unsupported",
+                  "reason": "component H2O (7732-18-5) is outside the supported mixture (argon, nitrogen, oxygen); no package covers it; the nearest is this process's air-pr-chemsep"
+                },
+                {
+                  "id": "S2",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-unsupported",
+                  "reason": "component H2O (7732-18-5) is outside the supported mixture (argon, nitrogen, oxygen); no package covers it; the nearest is this process's air-pr-chemsep"
+                },
+                {
+                  "id": "S3",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-unsupported",
+                  "reason": "component H2O (7732-18-5) is outside the supported mixture (argon, nitrogen, oxygen); no package covers it; the nearest is this process's air-pr-chemsep"
+                },
+                {
+                  "id": "S1C",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-unsupported",
+                  "reason": "component H2O (7732-18-5) is outside the supported mixture (argon, nitrogen, oxygen); no package covers it; the nearest is this process's air-pr-chemsep"
+                },
+                {
+                  "id": "S3C",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-unsupported",
+                  "reason": "component H2O (7732-18-5) is outside the supported mixture (argon, nitrogen, oxygen); no package covers it; the nearest is this process's air-pr-chemsep"
+                },
+                {
+                  "id": "S4",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S4A",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S4B",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S4C",
+                  "package": null,
+                  "status": "not-covered",
+                  "rule": "cheme.process-property-out-of-range",
+                  "reason": "temperature 333.08 K outside the claimed 77 to 315 K"
+                },
+                {
+                  "id": "S4D",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S5",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S5B",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S6",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S13",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S18",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S14",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S15",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S16",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S17",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S7",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S8",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S9",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S9B",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S10",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S11",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S12A",
+                  "package": null,
+                  "status": "not-calculable",
+                  "reason": "missing temperature"
+                },
+                {
+                  "id": "S12H",
+                  "package": null,
+                  "status": "not-calculable",
+                  "reason": "missing pressure"
+                },
+                {
+                  "id": "S12B",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S12C",
+                  "package": "air-pr-chemsep",
+                  "status": "covered",
+                  "reason": "components and state inside the claim (phase: by the flash)"
+                },
+                {
+                  "id": "S12D",
+                  "package": null,
+                  "status": "not-calculable",
+                  "reason": "missing temperature, pressure"
+                },
+                {
+                  "id": "S12E",
+                  "package": null,
+                  "status": "not-calculable",
+                  "reason": "missing temperature, pressure"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "predictive.energy-closure",
+          "title": "the simulated plant's enthalpy flows close with its heat and work within tolerance",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-energy-closure",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded",
+          "hint": "run cheme process simulate --fill (it records the energy audit)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.exchangers",
+          "title": "no exchanger temperature cross or approach below its minimum, every utility level can serve its duty",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-exchangers",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no run recorded",
+          "hint": "run cheme process simulate --fill (it records the energy audit)",
+          "evidence": {}
+        },
+        {
+          "id": "predictive.formation-data",
+          "title": "the simulated reaction heat agrees with the formation enthalpies declared in process/materials.yaml",
+          "status": "missing",
+          "required": true,
+          "rule": "cheme.maturity-predictive-formation-data",
+          "file": "process/simulation-run.json",
+          "line": null,
+          "detail": "no energy audit recorded",
+          "hint": "run cheme process simulate --fill (it records the energy audit)",
+          "evidence": {}
+        }
+      ]
+    },
+    {
+      "id": "engineering",
+      "title": "Preliminary/basic engineering package",
+      "library_maturity": "basic-engineering",
+      "status": "pass",
+      "reached": false,
+      "requirements": [
+        {
+          "id": "engineering.equipment-list",
+          "title": "an equipment list",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-engineering-equipment-list",
+          "file": "equipment/equipment-list.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "engineering.datasheets",
+          "title": "a valid, final datasheet for every equipment item",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-engineering-datasheets",
+          "file": "equipment/datasheets/",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "engineering.pid",
+          "title": "P&IDs without errors",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-engineering-pid",
+          "file": "pid/",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {
+            "sheets": [
+              "pid/P-01.xml",
+              "pid/P-02.xml",
+              "pid/P-03.xml",
+              "pid/P-04.xml"
+            ],
+            "not_drawn": []
+          }
+        },
+        {
+          "id": "engineering.process-links",
+          "title": "every flowsheet link resolves against the lists and the sheets",
+          "status": "pass",
+          "required": true,
+          "rule": "cheme.maturity-engineering-process-links",
+          "file": "process/flowsheet.yaml",
+          "line": null,
+          "detail": "",
+          "hint": "",
+          "evidence": {}
+        },
+        {
+          "id": "engineering.consistency",
+          "title": "datasheet duties and sizes cross-checked against the current simulation",
+          "status": "unsupported",
+          "required": false,
+          "rule": "cheme.maturity-engineering-consistency",
+          "file": "equipment/datasheets/",
+          "line": null,
+          "detail": "not cross-checked by this command",
+          "hint": "",
+          "evidence": {}
+        }
+      ]
+    }
+  ],
+  "model_basis": [
+    {
+      "id": "V2101",
+      "role": "separator",
+      "basis": "stream-values",
+      "predictive": false,
+      "sourced": false,
+      "simulated": false,
+      "file": "process/flowsheet.yaml",
+      "line": 130,
+      "detail": "outlet values as written in the flowsheet (specified, no model); assumed or without a source: S4 flow (design), S4 composition (design), S12D flow (design), S12D composition (design)",
+      "sources": [],
+      "assumptions": [],
+      "limitations": [],
+      "evidence": []
+    },
+    {
+      "id": "C3101",
+      "role": "separator",
+      "basis": "equilibrium-stage",
+      "predictive": true,
+      "sourced": true,
+      "simulated": true,
+      "file": "process/simulation.yaml",
+      "line": null,
+      "detail": "distillation_column with dwsim Peng-Robinson (PR)",
+      "sources": [
+        "dwsim Peng-Robinson (PR)"
+      ],
+      "assumptions": [
+        "equilibrium stages (no efficiency or rate-based model)"
+      ],
+      "limitations": [],
+      "evidence": []
+    },
+    {
+      "id": "C3102",
+      "role": "separator",
+      "basis": "equilibrium-stage",
+      "predictive": true,
+      "sourced": true,
+      "simulated": true,
+      "file": "process/simulation.yaml",
+      "line": null,
+      "detail": "distillation_column with dwsim Peng-Robinson (PR)",
+      "sources": [
+        "dwsim Peng-Robinson (PR)"
+      ],
+      "assumptions": [
+        "equilibrium stages (no efficiency or rate-based model)"
+      ],
+      "limitations": [],
+      "evidence": []
+    }
+  ],
+  "cases": [
+    {
+      "id": "design",
+      "description": "Design case: 30 C ambient, 94 % O2 recovery (ASSUMED)",
+      "default": true,
+      "balanced": true,
+      "simulated": true
+    }
+  ],
+  "assumptions": {
+    "design_basis": [
+      "ASSUMED O2 recovery 94 % (no argon column, 99.5 % purity, 15 % Lachmann air).",
+      "ASSUMED MAC discharge 5.8 bara, HP column top 5.4 bara, LP column top 1.3 bara.",
+      "ASSUMED refrigeration by booster-braked expander, Lachmann air to the LP column, ~11,500 Nm3/h, ~250 kW refrigeration.",
+      "ASSUMED regeneration gas ~13,000 Nm3/h waste N2, heated electrically to 200 C.",
+      "ASSUMED DCAC air outlet 12 C via chilled water from an N2 evaporative cooler; no mechanical chiller.",
+      "ASSUMED GAN taken as pressurized N2 from the HP column top (~5.2 bara) and compressed to 9 bara.",
+      "ASSUMED all flows, pressures, duties and DNs are concept estimates, accuracy about +/-30 %."
+    ],
+    "assumed_values": {
+      "process/flowsheet.yaml": 74,
+      "process/simulation.yaml": 24
+    },
+    "models": {
+      "C3101": [
+        "equilibrium stages (no efficiency or rate-based model)"
+      ],
+      "C3102": [
+        "equilibrium stages (no efficiency or rate-based model)"
+      ]
+    }
+  },
+  "unresolved": [
+    {
+      "requirement": "sourced.boundary",
+      "status": "fail",
+      "file": "process/flowsheet.yaml",
+      "detail": "not given with a source: S1 flow (design), S1 composition (design)"
+    },
+    {
+      "requirement": "balanced.model-basis",
+      "status": "fail",
+      "file": "process/flowsheet.yaml",
+      "detail": "V2101: stream-values, outlet values as written in the flowsheet (specified, no model); assumed or without a source: S4 flow (design), S4 composition (design), S12D flow (design), S12D composition (design)"
+    },
+    {
+      "requirement": "predictive.run-record",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded in process/simulation-run.json"
+    },
+    {
+      "requirement": "predictive.current",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded in process/simulation-run.json"
+    },
+    {
+      "requirement": "predictive.converged",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded in process/simulation-run.json"
+    },
+    {
+      "requirement": "predictive.solver",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded in process/simulation-run.json"
+    },
+    {
+      "requirement": "predictive.coverage",
+      "status": "fail",
+      "file": "process/simulation.yaml",
+      "detail": "excluded: C1102, E2101, E3101, KT3101, PUR, V2101 and 1 more"
+    },
+    {
+      "requirement": "predictive.model-basis",
+      "status": "fail",
+      "file": "process/flowsheet.yaml",
+      "detail": "specified: V2101 (stream-values)"
+    },
+    {
+      "requirement": "predictive.property-package",
+      "status": "missing",
+      "file": "process/simulation.yaml",
+      "detail": "no method_selection recorded for property package 'Peng-Robinson (PR)'"
+    },
+    {
+      "requirement": "predictive.property-regime",
+      "status": "missing",
+      "file": "process/simulation.yaml",
+      "detail": "no run recorded in process/simulation-run.json"
+    },
+    {
+      "requirement": "predictive.energy-closure",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded"
+    },
+    {
+      "requirement": "predictive.exchangers",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no run recorded"
+    },
+    {
+      "requirement": "predictive.formation-data",
+      "status": "missing",
+      "file": "process/simulation-run.json",
+      "detail": "no energy audit recorded"
+    }
+  ],
+  "limitations": [
+    {
+      "subject": "engineering.consistency",
+      "file": "equipment/datasheets/",
+      "line": null,
+      "limitation": "not cross-checked by this command"
+    },
+    {
+      "subject": "engineering",
+      "file": "",
+      "line": null,
+      "limitation": "mechanical design to a code (wall thickness, nozzle loads) is not checked"
+    },
+    {
+      "subject": "engineering",
+      "file": "",
+      "line": null,
+      "limitation": "materials and corrosion selection is not checked"
+    },
+    {
+      "subject": "engineering",
+      "file": "",
+      "line": null,
+      "limitation": "relief and blowdown sizing is not checked"
+    },
+    {
+      "subject": "engineering",
+      "file": "",
+      "line": null,
+      "limitation": "control and dynamic behaviour is not checked"
+    },
+    {
+      "subject": "simulation-route",
+      "file": "process/simulation.yaml",
+      "line": null,
+      "limitation": "no electrolytes: the worker exposes no electrolyte property package"
+    },
+    {
+      "subject": "simulation-route",
+      "file": "process/simulation.yaml",
+      "line": null,
+      "limitation": "no pseudocomponents: every compound must be in DWSIM's database (by CAS number or the name in simulation.yaml); no assay characterisation"
+    },
+    {
+      "subject": "simulation-route",
+      "file": "process/simulation.yaml",
+      "line": null,
+      "limitation": "no solid phase: simulation.yaml has no solid compounds or solid-phase input, and none is tested"
+    },
+    {
+      "subject": "simulation-route",
+      "file": "process/simulation.yaml",
+      "line": null,
+      "limitation": "binary interaction parameters: DWSIM's own database (not inspected by cheme-as-code) unless simulation.yaml interaction_parameters set them (equation-of-state packages only)"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 29,
+      "limitation": "product GOXP (GOX to pipeline) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 30,
+      "limitation": "product GANP (GAN to battery limit) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 31,
+      "limitation": "product LOX (LOX to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 32,
+      "limitation": "product LIN (LIN to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 33,
+      "limitation": "product VENT (Vent to atmosphere) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 36,
+      "limitation": "product COND (Condensate (MAC cooler drains; DCAC condensate into its circulating water)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 39,
+      "limitation": "product CW (Cooling water return (heat rejected)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 124,
+      "limitation": "step C1102 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 157,
+      "limitation": "step K3101 (Compressing) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 164,
+      "limitation": "step E3104 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 192,
+      "limitation": "step C3101 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory"
+    },
+    {
+      "subject": "boundary",
+      "file": "process/flowsheet.yaml",
+      "line": 203,
+      "limitation": "step C3102 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory"
+    }
+  ],
+  "artifacts": {
+    "note": "artifact completeness never establishes calculation maturity",
+    "sheets": [
+      {
+        "id": "P-01",
+        "kind": "pid",
+        "file": "pid/P-01.xml",
+        "exists": true,
+        "generated": false,
+        "fingerprint": "sha256:97e8fcc2c5f37b02f56e3a860819d937313c590eab8b26df74c1c53d5f7bc06e"
+      },
+      {
+        "id": "P-02",
+        "kind": "pid",
+        "file": "pid/P-02.xml",
+        "exists": true,
+        "generated": false,
+        "fingerprint": "sha256:610bf298d1a3446e0965f424574afeef245be28f7167ede3862094cd0db1a7f0"
+      },
+      {
+        "id": "P-03",
+        "kind": "pid",
+        "file": "pid/P-03.xml",
+        "exists": true,
+        "generated": false,
+        "fingerprint": "sha256:a39bed749971864776c37ee2b7c8dc396fabfb80c9d24744e4867272c5e01b8d"
+      },
+      {
+        "id": "P-04",
+        "kind": "pid",
+        "file": "pid/P-04.xml",
+        "exists": true,
+        "generated": false,
+        "fingerprint": "sha256:c06f81101caad81404d0694aa8ba27aad670b2bdfd5e884f0d3f39c1dc66efe5"
+      },
+      {
+        "id": "BFD",
+        "kind": "bfd",
+        "file": "process/BFD.xml",
+        "exists": true,
+        "generated": true,
+        "fingerprint": "sha256:95398bb53bcebfe451c2ed4efe47fa382a3c8e403208a6647b8b769db9db6214"
+      },
+      {
+        "id": "PFD",
+        "kind": "pfd",
+        "file": "process/PFD.xml",
+        "exists": true,
+        "generated": true,
+        "fingerprint": "sha256:f7d9c024c7fc681fb727599f7864819233b01b6225d0d84f82da0ba2ee96e422"
+      }
+    ],
+    "files": {
+      "design_basis": [
+        "process/design-basis.yaml"
+      ],
+      "equipment_list": [
+        "equipment/equipment-list.yaml"
+      ],
+      "datasheets": [
+        "equipment/datasheets/C-1101.yaml",
+        "equipment/datasheets/C-1102.yaml",
+        "equipment/datasheets/C-3101.yaml",
+        "equipment/datasheets/C-3102.yaml",
+        "equipment/datasheets/E-1101.yaml",
+        "equipment/datasheets/E-1102.yaml",
+        "equipment/datasheets/E-1103.yaml",
+        "equipment/datasheets/E-2101.yaml",
+        "equipment/datasheets/E-3101.yaml",
+        "equipment/datasheets/E-3102.yaml",
+        "equipment/datasheets/E-3103.yaml",
+        "equipment/datasheets/E-3104.yaml",
+        "equipment/datasheets/E-4101.yaml",
+        "equipment/datasheets/E-4102.yaml",
+        "equipment/datasheets/E-4103.yaml",
+        "equipment/datasheets/E-4105A.yaml",
+        "equipment/datasheets/E-4105B.yaml",
+        "equipment/datasheets/E-4106A.yaml",
+        "equipment/datasheets/E-4106B.yaml",
+        "equipment/datasheets/F-1101.yaml",
+        "equipment/datasheets/F-2101.yaml",
+        "equipment/datasheets/K-1101.yaml",
+        "equipment/datasheets/K-3101.yaml",
+        "equipment/datasheets/K-4101.yaml",
+        "equipment/datasheets/K-4102.yaml",
+        "equipment/datasheets/KT-3101.yaml",
+        "equipment/datasheets/P-1101A.yaml",
+        "equipment/datasheets/P-1101B.yaml",
+        "equipment/datasheets/P-1102A.yaml",
+        "equipment/datasheets/P-1102B.yaml",
+        "equipment/datasheets/P-4101A.yaml",
+        "equipment/datasheets/P-4101B.yaml",
+        "equipment/datasheets/P-4102A.yaml",
+        "equipment/datasheets/P-4102B.yaml",
+        "equipment/datasheets/T-4101.yaml",
+        "equipment/datasheets/T-4102.yaml",
+        "equipment/datasheets/V-2101A.yaml",
+        "equipment/datasheets/V-2101B.yaml",
+        "equipment/datasheets/V-3101.yaml"
+      ],
+      "line_list": [
+        "piping/line-list.yaml"
+      ],
+      "instrument_list": [
+        "control/instrument-list.yaml"
+      ],
+      "layout": [
+        "layout/building.yaml",
+        "layout/equipment-placement.yaml",
+        "layout/hvac.yaml",
+        "layout/plant-model.yaml",
+        "layout/site-plan.yaml",
+        "layout/structures.yaml",
+        "layout/zones.yaml"
+      ],
+      "estimate": [
+        "estimate/cost-basis.yaml",
+        "estimate/rates.yaml",
+        "estimate/tea.yaml"
+      ],
+      "lca": [
+        "lca/dataset.yaml",
+        "lca/factors.yaml",
+        "lca/inventory.csv",
+        "lca/lca.yaml",
+        "lca/results.csv",
+        "lca/uncertainty.csv"
+      ],
+      "simulation_record": []
+    },
+    "boundary": {
+      "complete": false,
+      "categories": {
+        "unclassified": [
+          "AIR",
+          "POWER",
+          "GOXP",
+          "GANP",
+          "LOX",
+          "LIN",
+          "VENT",
+          "COND",
+          "CW"
+        ]
+      },
+      "unassigned_duties": [
+        "C1102",
+        "K3101",
+        "E3104",
+        "C3101",
+        "C3102"
+      ],
+      "findings": [
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 17,
+          "level": "info",
+          "rule": "cheme.boundary-unclassified",
+          "message": "feed AIR (Ambient air) has no category: the TEA and LCA cannot tell a raw material from a utility",
+          "hint": "category: raw_material | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 20,
+          "level": "info",
+          "rule": "cheme.boundary-unclassified",
+          "message": "feed POWER (Electric power (6.6 kV grid supply)) has no category: the TEA and LCA cannot tell a raw material from a utility",
+          "hint": "category: raw_material | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 29,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product GOXP (GOX to pipeline) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 30,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product GANP (GAN to battery limit) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 31,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product LOX (LOX to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 32,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product LIN (LIN to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 33,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product VENT (Vent to atmosphere) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 36,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product COND (Condensate (MAC cooler drains; DCAC condensate into its circulating water)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 39,
+          "level": "warning",
+          "rule": "cheme.boundary-unclassified",
+          "message": "product CW (Cooling water return (heat rejected)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+          "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 124,
+          "level": "warning",
+          "rule": "cheme.boundary-utility-unassigned",
+          "message": "step C1102 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+          "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 157,
+          "level": "warning",
+          "rule": "cheme.boundary-utility-unassigned",
+          "message": "step K3101 (Compressing) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+          "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 164,
+          "level": "warning",
+          "rule": "cheme.boundary-utility-unassigned",
+          "message": "step E3104 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+          "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 192,
+          "level": "warning",
+          "rule": "cheme.boundary-utility-unassigned",
+          "message": "step C3101 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+          "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 203,
+          "level": "warning",
+          "rule": "cheme.boundary-utility-unassigned",
+          "message": "step C3102 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+          "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch"
+        }
+      ]
+    }
+  },
+  "review": {
+    "note": "set by people only: cheme maturity reads it and never writes it",
+    "manifest_status": "unreviewed",
+    "records": [
+      {
+        "path": "reviews/2026-10-18-basic-engineering.md",
+        "topic": null,
+        "reviewer_kind": null,
+        "reviewed_commit": null,
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-18-design-review-S4.md",
+        "topic": null,
+        "reviewer_kind": null,
+        "reviewed_commit": null,
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-18-o2-safety-review.md",
+        "topic": null,
+        "reviewer_kind": null,
+        "reviewed_commit": null,
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-19-process-bfd-pfd.md",
+        "topic": "process-bfd-pfd",
+        "reviewer_kind": "self",
+        "reviewed_commit": "acc8766",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-21-layout-rereview.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "f2a7582600d526daa29e75514995110c1196010f",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-21-layout.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "51f918d6d49802073c550d19f7096e0c92c5d49f",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-22-layout-review3.md",
+        "topic": "layout",
+        "reviewer_kind": "self",
+        "reviewed_commit": "f1c29ffed5b2141a00a121a70007a7a596399724",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-22-layout-review4.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "13e07b49c663004a56bf73008a69c0a1c1741728",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-22-layout-review5.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "0530ede8e3c4f0ec18109a55ba1d587180dcaa8b",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-22-layout-review6.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "521f5c2070cade0b61027a56a084f9f709fdcf28",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-23-layout-review10.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "99f70af9aee7c79188172c8195f8eb4c8e2b48e6",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-23-layout-review7.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "898c28040ca957bda37853f81c5481872669cd40",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-23-layout-review8.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "e2c43ea2fc1358b71b4ecc46568c1cd43a04a9cb",
+        "approved_by": null
+      },
+      {
+        "path": "reviews/2026-10-23-layout-review9.md",
+        "topic": "layout",
+        "reviewer_kind": "agent",
+        "reviewed_commit": "ba79cf7c8dd965f1d568a11fa5447d70b8f230eb",
+        "approved_by": null
+      }
+    ]
+  },
+  "manifest": {
+    "file": "process.yaml",
+    "supported_maturity": null,
+    "claimed_maturity": "basic-engineering",
+    "review_status": "unreviewed",
+    "claim_exceeds_evidence": true
+  },
+  "source": {
+    "commit": "b63c88d3c5c57890ad8f0398dce2cbdf92343b76",
+    "dirty": [],
+    "fingerprints": {
+      "equipment/equipment-list.yaml": "sha256:d8822a8797b08aafbf89e429450b45306e917e96d9179f4a2bbc454cdb3bf6c3",
+      "plant.yaml": "sha256:b1607d4e502814e97feee68367739376992e4c5e6b8d069e46e26bb044898f44",
+      "process.yaml": "sha256:329807369e26dc44521205c9acc6ff6eb922eaa10e3c46879341685e4ce0796b",
+      "process/design-basis.yaml": "sha256:874fae3230d2485c032146398de9f120ac8e651fbf5395dc628c41f7a18e26a2",
+      "process/flowsheet.yaml": "sha256:9d11a840774450d068e5f7f9cf416caaa2d61744dcfce29c34922d0d0789ce3e",
+      "process/materials.yaml": "sha256:dfc7b8a7effda54264d98c4961f95828a5e8f1614615f371ace69139a429b404",
+      "process/simulation.yaml": "sha256:67fd22ada521ec6870dc4af9085aa3d570798d1cfe4d46be3e704eb668b5114e"
+    }
+  },
+  "findings": [
+    {
+      "file": "process/flowsheet.yaml",
+      "line": 247,
+      "level": "error",
+      "rule": "cheme.maturity-sourced-boundary",
+      "message": "fail: feeds and products declared; feed flows and compositions given with a source (not given with a source: S1 flow (design), S1 composition (design))",
+      "hint": "give the feed flows and compositions with provenance given and a source"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "line": 130,
+      "level": "error",
+      "rule": "cheme.maturity-balanced-model-basis",
+      "message": "fail: every reactor and separator rests on a sourced model or sourced specified values (V2101: stream-values, outlet values as written in the flowsheet (specified, no model); assumed or without a source: S4 flow (design), S4 composition (design), S12D flow (design), S12D composition (design))",
+      "hint": "give the specified values with provenance given and a source (a conversion: or observations of the decided model basis of process/reaction-evidence.yaml that cover it), or declare a reactor/separator model whose data are given"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "line": null,
+      "level": "info",
+      "rule": "cheme.maturity-balanced-energy-closure",
+      "message": "fail: energy balances of the blocks and steps (stream enthalpies against energy streams) (imbalance: PRD (design), K4101 (design), K4102 (design))",
+      "hint": "check the duties and the calculated enthalpies of those nodes"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-run-record",
+      "message": "missing: a run record for every case (no run recorded in process/simulation-run.json)",
+      "hint": "run cheme process simulate --fill (it records the run)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-current",
+      "message": "missing: every run record is current: simulated from the inputs as they are (fingerprints) (no run recorded in process/simulation-run.json)",
+      "hint": "run cheme process simulate --fill (it records the run)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-converged",
+      "message": "missing: every recorded run converged without errors (no run recorded in process/simulation-run.json)",
+      "hint": "run cheme process simulate --fill (it records the run)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-solver",
+      "message": "missing: simulator, simulator version, property package and core version recorded (no run recorded in process/simulation-run.json)",
+      "hint": "run cheme process simulate --fill (it records the run)"
+    },
+    {
+      "file": "process/simulation.yaml",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-coverage",
+      "message": "fail: every step simulated: none excluded and left at specified values (excluded: C1102, E2101, E3101, KT3101, PUR, V2101 and 1 more)",
+      "hint": "their streams stay specified; simulate them to claim predictive"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "line": 130,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-model-basis",
+      "message": "fail: every reactor and separator predicted by a model: specified splits, conversions and stream values cap the level at balanced (specified: V2101 (stream-values))",
+      "hint": "replace specified splits and conversions by predictive unit models"
+    },
+    {
+      "file": "process/simulation.yaml",
+      "line": 8,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-property-package",
+      "message": "missing: the property package is supported and recommended by a recorded method selection (or a recorded substitution) (no method_selection recorded for property package 'Peng-Robinson (PR)')",
+      "hint": "record method_selection.facts (thermodynamic-model-selection) so the package is checked against the recommendation"
+    },
+    {
+      "file": "process/simulation.yaml",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-property-regime",
+      "message": "missing: the property methods are used inside their declared regimes (no run recorded in process/simulation-run.json)",
+      "hint": "run cheme process simulate --fill (the regime is checked on its streams)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-energy-closure",
+      "message": "missing: the simulated plant's enthalpy flows close with its heat and work within tolerance (no run recorded)",
+      "hint": "run cheme process simulate --fill (it records the energy audit)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-exchangers",
+      "message": "missing: no exchanger temperature cross or approach below its minimum, every utility level can serve its duty (no run recorded)",
+      "hint": "run cheme process simulate --fill (it records the energy audit)"
+    },
+    {
+      "file": "process/simulation-run.json",
+      "line": null,
+      "level": "error",
+      "rule": "cheme.maturity-predictive-formation-data",
+      "message": "missing: the simulated reaction heat agrees with the formation enthalpies declared in process/materials.yaml (no energy audit recorded)",
+      "hint": "run cheme process simulate --fill (it records the energy audit)"
+    },
+    {
+      "file": "equipment/datasheets/",
+      "line": null,
+      "level": "info",
+      "rule": "cheme.maturity-engineering-consistency",
+      "message": "unsupported: datasheet duties and sizes cross-checked against the current simulation (not cross-checked by this command)",
+      "hint": "see docs/framework/maturity.md, requirement engineering.consistency"
+    },
+    {
+      "file": "process.yaml",
+      "line": 23,
+      "level": "warning",
+      "rule": "cheme.maturity-claim-exceeds",
+      "message": "maturity basic-engineering claimed; the checked evidence supports no level",
+      "hint": "lower the claim, or add the evidence the failing requirements name"
+    }
+  ]
+}

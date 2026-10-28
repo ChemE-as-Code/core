@@ -1,0 +1,9 @@
+schema: cheme/plant/v1
+name: safety-hazop
+description: Feed vessel V-101 and transfer pump P-101 to the battery limit, with an illustrative HAZOP study (cheme safety hazop)
+stage: concept
+stages:
+  - {id: concept, title: Concept and feasibility}
+  - {id: basic, title: Basic engineering}
+sheets:
+  - {id: P-01, file: pid/P-01.xml, title: Feed vessel and transfer pump}

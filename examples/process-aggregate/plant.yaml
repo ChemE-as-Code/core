@@ -1,0 +1,5 @@
+name: process-aggregate
+description: An air separation in blocks with parallel boundary streams aggregated on the BFD
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}

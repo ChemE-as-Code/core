@@ -1,0 +1,24 @@
+# Longest span between pipe supports by nominal diameter, m: a screening value for the rule
+# layout-free-span on the 3D model, not a stress or support design. Steel pipe, standard wall,
+# after the suggested spans of ASME B31.1 Table 121.5 ("liquid": water service, "gas": steam,
+# gas or air service); DN 15 and 20 extrapolated. Every value ASSUMED until the piping stress
+# and support design replaces it. A DN not in the table takes the next smaller row (the
+# smallest row below it).
+schema: cheme/pipe-spans/v1
+status: ASSUMED
+basis: "suggested maximum spans, ASME B31.1 Table 121.5 (standard wall steel pipe); DN 15 and 20 extrapolated (ASSUMED)"
+# a line's fluid counts as liquid when its name contains one of these words (any case)
+liquid_words: [liquid, water, condensate, oil, brine, glycol, amine, caustic, acid, slurry, lox, lin, lar, "rich liquid"]
+rows:
+  - {dn: 15, liquid: 1.5, gas: 1.8}
+  - {dn: 20, liquid: 1.8, gas: 2.1}
+  - {dn: 25, liquid: 2.1, gas: 2.7}
+  - {dn: 50, liquid: 3.0, gas: 4.0}
+  - {dn: 80, liquid: 3.7, gas: 4.6}
+  - {dn: 100, liquid: 4.3, gas: 5.2}
+  - {dn: 150, liquid: 5.2, gas: 6.4}
+  - {dn: 200, liquid: 5.8, gas: 7.3}
+  - {dn: 300, liquid: 7.0, gas: 9.1}
+  - {dn: 400, liquid: 8.2, gas: 10.7}
+  - {dn: 500, liquid: 9.1, gas: 11.9}
+  - {dn: 600, liquid: 9.8, gas: 12.8}

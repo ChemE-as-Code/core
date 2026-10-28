@@ -1,0 +1,82 @@
+# Operating sequences: startup, shutdown, abnormal modes. Schema: `cheme schema sequences`.
+# Trips are referred to by their C&E id, never repeated here. PROPOSED, not approved.
+schema: cheme/sequences/v1
+sequences:
+  - id: SEQ-START
+    title: Start up the feed section
+    mode: startup
+    section: FEED
+    cases: [design]
+    equipment: [D-101, E-101]
+    permissives:
+      - {interlock: I-01, state: reset}
+      - {tag: XV-107, state: open}
+      - {all: [{loop: FIC-101, state: in manual}, {loop: LIC-102, state: in manual}]}
+    interlocks: [I-01]
+    steps:
+      - id: S1
+        title: Admit feed
+        actions:
+          - {loop: FIC-101, action: setpoint, by: operator,
+             setpoint: {value: 1200, unit: kg/h, provenance: assumed, source: one third of the design rate}}
+          - {loop: FIC-101, action: auto, by: operator}
+        complete: {tag: LT-102, state: "> 30 %", delay: {value: 30, unit: s}}
+        timeout: {value: 30, unit: min}
+        on_timeout: abort
+      - id: S2
+        title: Level control in automatic
+        actions:
+          - {loop: LIC-102, action: auto}
+        complete: {loop: LIC-102, state: in auto}
+      - id: S3
+        title: Preheat
+        actions:
+          - {loop: FIC-105, action: auto, by: operator}
+          - {loop: TIC-103, action: auto, by: operator}
+          - {loop: FIC-105, action: cascade, by: operator}
+        complete: {tag: TT-103, state: within 5 K of the TIC-103 setpoint, delay: {value: 10, unit: min}}
+        operator: Raise the hot pentane flow slowly; watch the column pressure.
+      - id: S4
+        title: Raise to the design rate
+        actions:
+          - {loop: FIC-101, action: setpoint, by: operator,
+             setpoint: {value: 3600, unit: kg/h, provenance: given, source: basis of design,
+                        cases: [design], stream: S1, property: flow}}
+        complete: {loop: FIC-101, state: at setpoint, delay: {value: 15, unit: min}}
+        next: end
+    abort:
+      condition: {any: [{interlock: I-01, state: tripped}, {text: operator judges the column unstable}]}
+      actions:
+        - {loop: FIC-101, action: manual}
+        - {tag: FV-101, action: close}
+      then: SEQ-STOP
+    reset: {latching: true, manual: true, condition: {interlock: I-01, state: reset},
+            restart: {sequence: SEQ-STOP, state: complete}}
+  - id: SEQ-STOP
+    title: Normal shutdown of the feed section
+    mode: shutdown
+    section: FEED
+    equipment: [D-101, E-101]
+    interlocks: [I-01]
+    steps:
+      - id: S1
+        title: Stop the preheat
+        actions:
+          - {loop: FIC-105, action: manual}
+          - {tag: FV-105, action: close}
+        complete: {tag: FV-105, state: closed}
+      - id: S2
+        title: Stop the feed
+        actions:
+          - {loop: FIC-101, action: manual}
+          - {tag: FV-101, action: close}
+        complete: {tag: FV-101, state: closed}
+      - id: S3
+        title: Empty the flash drum to the preheater
+        actions:
+          - {loop: LIC-102, action: manual, by: operator}
+        complete: {tag: LT-102, state: "< 10 %"}
+        operator: Close LV-102 before the level is lost; I-01 closes XV-107 at low-low level.
+    abort:
+      notes: A trip during shutdown is handled by the C&E (I-01); the sequence stops where it is.
+    reset: {latching: false, manual: true}

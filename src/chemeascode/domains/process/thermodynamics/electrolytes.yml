@@ -1,0 +1,174 @@
+# The electrolyte contract (pre-release issue 364): the aqueous electrolyte systems the electrolyte route
+# (thermodynamics/electrolytes.py, `cheme process electrolyte`) executes. Per system: the
+# apparent components and the species they dissociate into, the composition, speciation and
+# activity basis, the model and its parameters with their source, the claimed range, the
+# properties claimed in it with their tolerances, the benchmark, and what is not claimed.
+#
+# Nothing outside a system's range is computed: another salt, acid or base, a second
+# electrolyte, a species the system does not list, a charge imbalance, a state outside the
+# temperature, pressure or molality range, or a state at which the solution boils is refused.
+# The phase and simulation routes (methods.yml) model no ions: they refuse charged species and,
+# together with water, the apparent electrolytes listed under `apparent_electrolytes`, instead
+# of computing them as neutral molecules.
+#
+# tests/test_electrolytes.py checks every claimed property against the reference data in
+# tests/data/electrolytes/nacl-h2o-reference.yaml (Hamer and Wu 1972; Pitzer, Peiper and Busey
+# 1984), on the solver version below.
+
+meta:
+  version: 1
+  description: >-
+    Aqueous electrolyte systems executed with Pitzer's equations through Cantera's
+    HMW-electrolyte phase, with the parameters' source, the claimed range and its benchmark.
+
+route:
+  title: "electrolytes.py: Pitzer's equations through Cantera's HMW-electrolyte phase"
+  solver: cantera
+  solver_version: "3.2.0"
+  extras: [cantera, props]
+  water_vapour_pressure: "IAPWS-95 saturation pressure of pure water (chemicals.iapws.iapws95_Psat, extra props)"
+  limitations:
+    - "one liquid phase only: no solid (salt or ice) and no vapour-liquid flash; a state at which the solution boils is refused"
+    - "only the systems below, each inside its application range; a mixture of electrolytes is refused"
+    - "excess and relative properties only: no absolute enthalpy, entropy, Gibbs energy, density or heat capacity of the solution"
+
+systems:
+  - id: NaCl-H2O
+    name: aqueous sodium chloride
+    # the methods.yml row whose liquid model this executes (the vapour here is pure water,
+    # not Redlich-Kwong-Soave)
+    method: PITZER-RKS
+    solvent: {species: H2O(L), cas: 7732-18-5, name: water}
+    apparent_components:
+      - id: NaCl
+        name: sodium chloride
+        cas: 7647-14-5
+        elements: {Na: 1, Cl: 1}
+        molar_mass_g_per_mol: 58.4428  # Pitzer, Peiper and Busey (1984), list of symbols
+        dissociation: {Na+: 1, Cl-: 1}
+    species:
+      - {id: H2O(L), charge: 0, elements: {H: 2, O: 1}}
+      - {id: Na+, charge: 1, elements: {Na: 1}}
+      - {id: Cl-, charge: -1, elements: {Cl: 1}}
+    speciation: >-
+      Complete dissociation, NaCl -> Na+ + Cl-: a strong 1:1 electrolyte. Ion association is
+      represented by Pitzer's virial coefficients, not as an ion-pair species. H+ and OH- from
+      the self-ionisation of water (about 1e-7 mol/kg) are not modelled.
+    basis:
+      composition: >-
+        Molality of NaCl, mol per kg of water. Also accepted: the mass fraction of NaCl in the
+        solution (converted with the molar mass above), or the species molalities of Na+ and
+        Cl-, which must balance in charge.
+      activity: >-
+        Solutes on the molality scale with the unsymmetric convention: the standard state is
+        the hypothetical ideal solution at 1 mol/kg, gamma -> 1 at infinite dilution. Only the
+        mean ionic activity coefficient gamma+- = (gamma_Na+ gamma_Cl-)^(1/2) is reported (a
+        single-ion activity coefficient is not measurable). Water on the mole-fraction scale,
+        the standard state is pure liquid water at the same temperature and pressure (Raoult).
+      osmotic_coefficient: "molal: phi = -ln(a_w) / (M_w * (m_Na+ + m_Cl-)), M_w the molar mass of water in kg/mol"
+      enthalpy: >-
+        The relative apparent molar enthalpy phi_L of NaCl, J per mol of NaCl: the enthalpy of
+        the solution minus that of its water and of its NaCl at infinite dilution, at the same
+        temperature and pressure. The enthalpy of diluting a solution from m1 to m2 is
+        phi_L(m2) - phi_L(m1) per mol of NaCl.
+      vapour: >-
+        The vapour over the solution is pure water (NaCl is not volatile), an ideal gas:
+        p_w = a_w * p_w_sat(T), with p_w_sat the IAPWS-95 saturation pressure of pure water.
+        Vapour non-ideality and the Poynting correction are neglected.
+    reference_conditions:
+      temperature_K: 298.15
+      pressure_kPa: 101.325
+      note: "the parameters are at 0.1 MPa and carry no pressure dependence"
+    model:
+      thermo: HMW-electrolyte
+      # f(T) = q0 + q1 (T - Tr) + q2 (T^2 - Tr^2) + q3 (1/T - 1/Tr) + q4 ln(T/Tr), Tr = 298.15 K
+      temperature_model: complex1
+      # computed by Cantera from the density and dielectric constant of water
+      A_Debye: variable
+      interactions:
+        - species: [Na+, Cl-]
+          beta0: [0.0765, 8.946e-03, -3.3158e-06, -777.03, -4.4706]
+          beta1: [0.2664, 6.1608e-05, 1.0715e-06, 0.0, 0.0]
+          beta2: [0.0, 0.0, 0.0, 0.0, 0.0]
+          Cphi: [1.27e-03, -4.655e-05, 0.0, 33.317, 0.09421]
+          alpha1: 2.0
+      parameter_source: >-
+        L. F. Silvester and K. S. Pitzer, Thermodynamics of electrolytes. 8. High-temperature
+        properties, including enthalpy and heat capacity, with application to sodium chloride,
+        J. Phys. Chem. 81 (1977) 1822-1828, doi:10.1021/j100534a007; the Na+/Cl- temperature
+        functions as Cantera's test input test/data/HMW_NaCl.yaml (Cantera v3.2.0, BSD-3-Clause)
+        encodes them. Not refitted by cheme-as-code.
+      water: "liquid-water-IAPWS95: Cantera's IAPWS-95 water for the solvent's density and the Debye-Hueckel slope"
+      standard_states: >-
+        Not used: every reported quantity is an excess or relative property, in which the
+        standard-state enthalpy, entropy and volume of the species cancel (the test changes them
+        and finds the same results). The input sets them to zero, so that no unverified value is
+        carried.
+    application_range:
+      temperature_K: [273.15, 373.15]
+      # the lower bound is the solution's own vapour pressure (below it the solution boils)
+      pressure_kPa: [null, 1000.0]
+      molality_mol_per_kg: [0.0, 6.0]
+      # the relative apparent molar enthalpy only
+      enthalpy_temperature_K: [313.15, 373.15]
+    properties:
+      - "mean ionic activity coefficient (molality scale) and osmotic coefficient, 273.15-373.15 K, up to 6 mol/kg and 1000 kPa(a)"
+      - "water activity and the water vapour pressure over the solution (from the osmotic coefficient, see basis.vapour)"
+      - "relative apparent molar enthalpy phi_L of NaCl (heats of dilution), 313.15-373.15 K only"
+      - "species and element closure: Na, Cl, H and O of the apparent components equal those of the species; zero net charge"
+    tolerances:
+      ln_mean_activity_coefficient_abs: 0.02
+      osmotic_coefficient_abs: 0.01
+      relative_apparent_molar_enthalpy_over_RT_abs: 0.03
+      closure_rel: 1.0e-9
+    tolerance_basis: >-
+      The reference evaluation's own uncertainty at 25 C (Pitzer, Peiper and Busey 1984, Table
+      6) is 0.002-0.004 in ln gamma+-, 0.002 in phi and 0.01-0.03 in phi_L/RT. The 1977
+      temperature functions depart from the 1984 evaluation most at 0 C, where "various
+      properties vary very rapidly" (ibid., section 6): ln gamma+- by up to 0.016 (4 mol/kg)
+      and phi by up to 0.006; from 10 C up by at most 0.0055 and 0.0032. The activity
+      tolerances (2 % in gamma+-, 0.01 in phi) cover 0 C; an error of 0.01 in phi is at most
+      0.0022 in ln a_w at 6 mol/kg (0.22 % in the vapour pressure). The enthalpy tolerance is the
+      reference's own uncertainty. The pressure range rests on the reference tables: from 1 to
+      200 bar gamma+- and phi change by at most 0.034 and 0.012 (0-100 C) and phi_L/RT by at
+      most 0.089 (40-100 C), so by at most 0.0016, 0.0006 and 0.004 from 1 to 10 bar.
+    not_claimed:
+      - "phi_L below 313.15 K: the 1977 temperature functions miss the 1984 evaluation by up to 0.09 RT at 298.15 K and 0.65 RT at 273.15 K (6 mol/kg), beyond its uncertainty"
+      - "above 6 mol/kg (the reference tables end there; halite saturates at 6.10-6.68 mol/kg between 0 and 100 C), solid NaCl and ice"
+      - "above 373.15 K or 1000 kPa(a); the boiling solution (no vapour-liquid flash)"
+      - "absolute enthalpy, heat capacity, density, entropy and Gibbs energy of the solution; transport properties"
+      - "the water vapour pressure against direct vapour-pressure measurements (it is checked through the osmotic coefficient only)"
+    benchmark:
+      test: tests/test_electrolytes.py
+      reference:
+        - "W. J. Hamer and Y.-C. Wu, Osmotic coefficients and mean activity coefficients of uni-univalent electrolytes in water at 25 C, J. Phys. Chem. Ref. Data 1 (1972) 1047, doi:10.1063/1.3253108, Table 16 (NaCl, 0.001-6 mol/kg)"
+        - "K. S. Pitzer, J. C. Peiper and R. H. Busey, Thermodynamic properties of aqueous sodium chloride solutions, J. Phys. Chem. Ref. Data 13 (1984) 1, doi:10.1063/1.555709, Tables A-8 (activity coefficient), A-9 (osmotic coefficient) and A-13 (excess enthalpy / RT), 0-100 C at 1 bar and 200 bar, 0.1-6 mol/kg; Table 6 (uncertainties)"
+      notes:
+        - "the 1977 parameters were fitted largely to data the 1984 evaluation also used: the comparison checks the transcription, the solver and the range, it is no independent validation of Pitzer's model"
+
+# Components that dissociate in water, refused by the phase and simulation routes when water is
+# present (they would be computed as neutral molecules). The NaCl-H2O system above runs NaCl.
+apparent_electrolytes:
+  - {cas: 7647-14-5, name: sodium chloride, system: NaCl-H2O}
+  - {cas: 7447-40-7, name: potassium chloride}
+  - {cas: 1310-73-2, name: sodium hydroxide}
+  - {cas: 1310-58-3, name: potassium hydroxide}
+  - {cas: 7647-01-0, name: hydrogen chloride}
+  - {cas: 7664-93-9, name: sulfuric acid}
+  - {cas: 7697-37-2, name: nitric acid}
+  - {cas: 7757-82-6, name: sodium sulfate}
+  - {cas: 497-19-8, name: sodium carbonate}
+  - {cas: 144-55-8, name: sodium bicarbonate}
+  - {cas: 12125-02-9, name: ammonium chloride}
+  - {cas: 10043-52-4, name: calcium chloride}
+  - {cas: 7632-00-0, name: sodium nitrite}
+  - {cas: 7664-38-2, name: phosphoric acid}
+  - {cas: 10035-10-6, name: hydrogen bromide}
+  - {cas: 7783-20-2, name: ammonium sulfate}
+  - {cas: 6484-52-2, name: ammonium nitrate}
+
+# Beyond the list: a component whose formula contains one of these elements (the alkali and
+# alkaline-earth metals) is a salt or base that dissociates in water (sodium aluminate, potassium
+# carbonate, lithium bromide, ...); with water it is refused the same way, by formula, wherever
+# the formula is known (thermo's for the phase route, materials.yaml's for the simulation).
+ionic_elements: [Li, Na, K, Rb, Cs, Mg, Ca, Sr, Ba]

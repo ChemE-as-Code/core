@@ -1,0 +1,5 @@
+name: process-blocks
+description: The process-recycle flowsheet before refinement (blocks only)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}

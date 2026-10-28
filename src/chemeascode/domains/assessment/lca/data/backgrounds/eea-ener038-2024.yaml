@@ -1,0 +1,324 @@
+# Packaged open background profile eea-ener038-2024: grid electricity of the EU-27 and its 27
+# member states in 2024, direct CO2e emissions per kWh of gross generation (EEA indicator ENER038,
+# CC BY under the EEA legal notice; acknowledge the EEA in each copy).
+# Use it from lca/factors.yaml with `include: [eea-ener038-2024]`; ids
+# eea-ener038-2024:electricity-<iso2> (electricity-de, electricity-nl, ...) and electricity-eu27.
+#
+# Generated from the indicator's two CSV files (EEA re-use policy, acknowledgement required);
+# each factor names its line. Scope: generation, direct emissions only: no T&D losses, no
+# upstream, biomass CO2 excluded. Compared with a baseline at the consumer with well-to-tank
+# (desnz-ghg-2026:electricity-gb), it understates: state it (proxy:). Core issue #268.
+schema: cheme/lca/v1
+kind: lca_factors
+sources:
+- id: eea-ener038-2024
+  title: Greenhouse gas emission intensity of electricity generation in Europe (indicator ENER038)
+  provider: European Environment Agency (EEA)
+  version: ENER038, data 1990-2024, published 2026-07-10
+  url: https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1
+  licence: 'CC BY (version not stated) under the EEA legal notice (https://www.eea.europa.eu/en/legal-notice):
+    re-use, including commercial, with the EEA acknowledged in each copy and the meaning not distorted'
+  attribution: 'Source: European Environment Agency (EEA), indicator ENER038 ''Greenhouse gas emission
+    intensity of electricity generation in Europe'' (2026), https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1,
+    CC BY; values converted from g to kg CO2e per kWh.'
+  publication: public
+  redistribution: true
+  geography: EU27
+  year: 2024
+  method: GWP100 of the UNFCCC inventories (IPCC AR5 for 2023+ submissions; not stated by the indicator)
+  checksum: sha256:7902614b4cbe71d06d813a8cd0edc7e154704a0fc44bfaa5e3f2336baf244774
+  notes: >-
+    Ratio of CO2e emissions from electricity production to gross electricity generation, nuclear and renewables
+    included at zero (indicator methodology). The numerator is inventory category 1A1a (public electricity
+    and heat), scaled up for autoproducers by their energy input, with heat split out pro rata. Biomass
+    combustion (as CO2e, not only CO2) and upstream emissions are not included. Per kWh of gross generation:
+    plants' own use, T&D losses and imports are not counted, so per kWh delivered the intensity would
+    be higher. Country values are published as integers (g). Underlying data: inventories reported to
+    UNFCCC, Eurostat nrg_bal_c. checksum is of the EU-27 file; country file sha256:0a2668e4d109ca83e62412b94e987df6f5dce967fcc3616d602979b57eb9866e.
+categories:
+- id: climate-change
+  title: Climate change
+  unit: kg CO2-eq
+  method: GWP100 of the UNFCCC inventories (AR5 inferred; EEA ENER038)
+factors:
+- id: electricity-eu27
+  title: Electricity, EU-27 average, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.18344
+  status: PUBLISHED
+  source: EEA ENER038 EU-27 file, Year 2024, 'Greenhouse gas (GHG) emission intensity (gCO2e/kWh)' = 183.44
+    g
+  source_id: eea-ener038-2024
+  year: 2024
+  location: EU27
+- id: electricity-at
+  title: Electricity, Austria, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.053
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 6 (Austria), column 2024 = 53 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: AT
+- id: electricity-be
+  title: Electricity, Belgium, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.155
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 15 (Belgium), column 2024 = 155 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: BE
+- id: electricity-bg
+  title: Electricity, Bulgaria, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.248
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 22 (Bulgaria), column 2024 = 248 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: BG
+- id: electricity-cy
+  title: Electricity, Cyprus, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.561
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 28 (Cyprus), column 2024 = 561 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: CY
+- id: electricity-cz
+  title: Electricity, Czechia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.338
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 26 (Czechia), column 2024 = 338 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: CZ
+- id: electricity-de
+  title: Electricity, Germany, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.291
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 23 (Germany), column 2024 = 291 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: DE
+- id: electricity-dk
+  title: Electricity, Denmark, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.064
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 9 (Denmark), column 2024 = 64 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: DK
+- id: electricity-ee
+  title: Electricity, Estonia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.384
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 27 (Estonia), column 2024 = 384 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: EE
+- id: electricity-es
+  title: Electricity, Spain, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.125
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 13 (Spain), column 2024 = 125 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: ES
+- id: electricity-fi
+  title: Electricity, Finland, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.027
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 3 (Finland), column 2024 = 27 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: FI
+- id: electricity-fr
+  title: Electricity, France, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.036
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 5 (France), column 2024 = 36 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: FR
+- id: electricity-gr
+  title: Electricity, Greece, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.304
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 24 (Greece), column 2024 = 304 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: GR
+- id: electricity-hr
+  title: Electricity, Croatia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.098
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 12 (Croatia), column 2024 = 98 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: HR
+- id: electricity-hu
+  title: Electricity, Hungary, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.127
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 14 (Hungary), column 2024 = 127 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: HU
+- id: electricity-ie
+  title: Electricity, Ireland, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.237
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 20 (Ireland), column 2024 = 237 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: IE
+- id: electricity-it
+  title: Electricity, Italy, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.206
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 19 (Italy), column 2024 = 206 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: IT
+- id: electricity-lt
+  title: Electricity, Lithuania, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.061
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 8 (Lithuania), column 2024 = 61 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: LT
+- id: electricity-lu
+  title: Electricity, Luxembourg, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.035
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 4 (Luxembourg), column 2024 = 35 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: LU
+- id: electricity-lv
+  title: Electricity, Latvia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.075
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 10 (Latvia), column 2024 = 75 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: LV
+- id: electricity-mt
+  title: Electricity, Malta, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.337
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 25 (Malta), column 2024 = 337 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: MT
+- id: electricity-nl
+  title: Electricity, Netherlands, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.245
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 21 (Netherlands), column 2024 = 245 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: NL
+- id: electricity-pl
+  title: Electricity, Poland, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.566
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 29 (Poland), column 2024 = 566 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: PL
+- id: electricity-pt
+  title: Electricity, Portugal, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.082
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 11 (Portugal), column 2024 = 82 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: PT
+- id: electricity-ro
+  title: Electricity, Romania, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.188
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 18 (Romania), column 2024 = 188 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: RO
+- id: electricity-se
+  title: Electricity, Sweden, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.006
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 2 (Sweden), column 2024 = 6 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: SE
+- id: electricity-si
+  title: Electricity, Slovenia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.175
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 16 (Slovenia), column 2024 = 175 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: SI
+- id: electricity-sk
+  title: Electricity, Slovakia, gross generation (direct emissions)
+  unit: kWh
+  values:
+    climate-change: 0.059
+  status: PUBLISHED
+  source: EEA ENER038 country file, line 7 (Slovakia), column 2024 = 59 g CO2e/kWh (integer)
+  source_id: eea-ener038-2024
+  year: 2024
+  location: SK

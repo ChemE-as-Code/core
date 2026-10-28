@@ -1,0 +1,3 @@
+# Line list. Schema: `cheme schema lines`.
+schema: cheme/lines/v1
+lines: []

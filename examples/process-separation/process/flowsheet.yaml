@@ -1,0 +1,174 @@
+# C3 to C5 cut: let down and flashed, the liquid preheated against hot pentane, propane taken
+# overhead in a column. The feeds are given; every other stream is left to
+# `cheme process simulate --fill` (specs in process/simulation.yaml).
+# Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Depropanizer
+units:
+  pressure: bar(a)
+  temperature: °C
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - id: FEED
+    title: C3 to C5 cut
+    ports: [{id: out, direction: out}]
+  - id: OIL
+    title: Hot pentane
+    ports: [{id: out, direction: out}]
+  - id: STEAM
+    title: LP steam
+    ports: [{id: q, direction: out, kind: energy}]
+products:
+  - id: GAS
+    title: Flash gas
+    ports: [{id: in, direction: in}]
+  - id: LPG
+    title: Propane
+    ports: [{id: in, direction: in}]
+  - id: C4C5
+    title: Butane and pentane
+    ports: [{id: in, direction: in}]
+  - id: OILRET
+    title: Pentane return
+    ports: [{id: in, direction: in}]
+  - id: CW
+    title: Cooling water
+    ports: [{id: q, direction: in, kind: energy}]
+
+blocks:
+  - id: FL
+    title: Feed flash
+    class: SeparatingByPhaseSeparation
+    ports:
+      - {id: in, direction: in}
+      - {id: vapour, direction: out}
+      - {id: liquid, direction: out}
+  - id: PH
+    title: Feed preheat
+    class: ExchangingThermalEnergy
+    ports:
+      - {id: cold_in, direction: in}
+      - {id: hot_in, direction: in}
+      - {id: cold_out, direction: out}
+      - {id: hot_out, direction: out}
+  - id: DC3
+    title: Depropanizer
+    class: Distilling
+    ports:
+      - {id: in, direction: in}
+      - {id: reboil, direction: in, kind: energy}
+      - {id: condense, direction: out, kind: energy}
+      - {id: top, direction: out}
+      - {id: bottom, direction: out}
+
+steps:
+  - id: V1
+    block: FL
+    title: Let-down valve
+    class: RegulatingFlow
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: out, direction: out}
+  - id: D1
+    block: FL
+    title: Flash drum
+    class: SeparatingByFlash
+    ports:
+      - {id: in, direction: in}
+      - {id: vapour, direction: out, delegates: vapour}
+      - {id: liquid, direction: out, delegates: liquid}
+  - id: E1
+    block: PH
+    title: Feed preheater
+    class: ExchangingThermalEnergy
+    ports:
+      - {id: cold_in, direction: in, delegates: cold_in}
+      - {id: hot_in, direction: in, delegates: hot_in}
+      - {id: cold_out, direction: out, delegates: cold_out}
+      - {id: hot_out, direction: out, delegates: hot_out}
+  - id: C1
+    block: DC3
+    title: Depropanizer column
+    class: Distilling
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: reboil, direction: in, kind: energy, delegates: reboil}
+      - {id: condense, direction: out, kind: energy, delegates: condense}
+      - {id: top, direction: out, delegates: top}
+      - {id: bottom, direction: out, delegates: bottom}
+
+streams:
+  - id: S1
+    title: Feed
+    from: FEED.out
+    to: V1.in
+    template: hc
+    state:
+      design:
+        pressure: {value: 12, provenance: given, source: battery limit}
+        temperature: {value: 45, provenance: given, source: battery limit}
+        flow: {value: 3600, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {C3: 0.4, NC4: 0.3, NC5: 0.3}, provenance: given, source: basis of design}
+  - id: S2
+    title: Let-down feed
+    from: V1.out
+    to: D1.in
+    template: hc
+  - id: S3
+    title: Flash gas
+    from: D1.vapour
+    to: GAS.in
+    template: hc
+  - id: S4
+    title: Flash liquid
+    from: D1.liquid
+    to: E1.cold_in
+    template: hc
+  - id: S5
+    title: Column feed
+    from: E1.cold_out
+    to: C1.in
+    template: hc
+  - id: S6
+    title: Propane
+    from: C1.top
+    to: LPG.in
+    template: hc
+  - id: S7
+    title: Butane and pentane
+    from: C1.bottom
+    to: C4C5.in
+    template: hc
+  - id: H1
+    title: Hot pentane
+    from: OIL.out
+    to: E1.hot_in
+    template: hc
+    state:
+      design:
+        pressure: {value: 5, provenance: given, source: hot oil system}
+        temperature: {value: 150, provenance: given, source: hot oil system}
+        flow: {value: 5000, provenance: assumed, source: hot oil circulation}
+        composition: {basis: mole_fraction, values: {C3: 0, NC4: 0, NC5: 1}, provenance: given, source: pentane}
+  - id: H2
+    title: Pentane return
+    from: E1.hot_out
+    to: OILRET.in
+    template: hc
+  - id: Q1
+    title: Reboiler duty
+    kind: energy
+    from: STEAM.q
+    to: C1.reboil
+  - id: Q2
+    title: Condenser duty
+    kind: energy
+    from: C1.condense
+    to: CW.q

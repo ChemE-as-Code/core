@@ -1,0 +1,4 @@
+[
+  {"pid": "hydrogen-1", "title": "Hydrogen by steam methane reforming", "issue": 1, "skill": "tech-refining-hydrogen-and-sulfur",
+   "notes": "Route: natural-gas SMR with pre-reforming optional, HT shift, PSA purification, PSA tail gas as reformer fuel, steam export; CO2 emissions in the LCI (process and combustion kept apart)."}
+]

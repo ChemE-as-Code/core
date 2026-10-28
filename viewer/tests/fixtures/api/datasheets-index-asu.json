@@ -1,0 +1,1050 @@
+{
+  "rev": null,
+  "directory": "equipment/datasheets",
+  "datasheets": [
+    {
+      "tag": "C-1101",
+      "file": "equipment/datasheets/C-1101.yaml",
+      "valid": true,
+      "type": "ProcessColumn",
+      "service": "Direct contact aftercooler (DCAC)",
+      "draft": false,
+      "counts": {
+        "assumed": 13,
+        "tbd": 0,
+        "supplier": 3,
+        "not_applicable": 4
+      },
+      "nozzles": 8,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/C-1101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "C-1102",
+      "file": "equipment/datasheets/C-1102.yaml",
+      "valid": true,
+      "type": "ProcessColumn",
+      "service": "Evaporative cooler (chilled water)",
+      "draft": false,
+      "counts": {
+        "assumed": 10,
+        "tbd": 0,
+        "supplier": 3,
+        "not_applicable": 4
+      },
+      "nozzles": 5,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/C-1102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "C-3101",
+      "file": "equipment/datasheets/C-3101.yaml",
+      "valid": true,
+      "type": "ProcessColumn",
+      "service": "HP column",
+      "draft": true,
+      "counts": {
+        "assumed": 8,
+        "tbd": 2,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 10,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/C-3101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "C-3102",
+      "file": "equipment/datasheets/C-3102.yaml",
+      "valid": true,
+      "type": "ProcessColumn",
+      "service": "LP column",
+      "draft": true,
+      "counts": {
+        "assumed": 3,
+        "tbd": 3,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 9,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/C-3102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-1101",
+      "file": "equipment/datasheets/E-1101.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "MAC 1st intercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 12,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-1101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-1102",
+      "file": "equipment/datasheets/E-1102.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "MAC 2nd intercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 12,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-1102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-1103",
+      "file": "equipment/datasheets/E-1103.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "MAC aftercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 12,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-1103.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-2101",
+      "file": "equipment/datasheets/E-2101.yaml",
+      "valid": true,
+      "type": "ElectricHeater",
+      "service": "Regeneration gas heater",
+      "draft": false,
+      "counts": {
+        "assumed": 5,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 3,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-2101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-3101",
+      "file": "equipment/datasheets/E-3101.yaml",
+      "valid": true,
+      "type": "PlateHeatExchanger",
+      "service": "Main heat exchanger (brazed aluminium plate-fin)",
+      "draft": false,
+      "counts": {
+        "assumed": 3,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 1
+      },
+      "nozzles": 10,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-3101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-3102",
+      "file": "equipment/datasheets/E-3102.yaml",
+      "valid": true,
+      "type": "PlateHeatExchanger",
+      "service": "Subcooler (rich liquid / LN against waste N2 and GAN)",
+      "draft": true,
+      "counts": {
+        "assumed": 0,
+        "tbd": 4,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 6,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-3102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-3103",
+      "file": "equipment/datasheets/E-3103.yaml",
+      "valid": true,
+      "type": "PlateHeatExchanger",
+      "service": "Main condenser-reboiler (bath type)",
+      "draft": true,
+      "counts": {
+        "assumed": 0,
+        "tbd": 4,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": false,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/E-3103.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-3104",
+      "file": "equipment/datasheets/E-3104.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "Booster aftercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 15,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-3104.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4101",
+      "file": "equipment/datasheets/E-4101.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "GOX compressor intercoolers (package)",
+      "draft": false,
+      "counts": {
+        "assumed": 17,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4102",
+      "file": "equipment/datasheets/E-4102.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "GOX compressor aftercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 11,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4103",
+      "file": "equipment/datasheets/E-4103.yaml",
+      "valid": true,
+      "type": "TubularHeatExchanger",
+      "service": "GAN compressor aftercooler",
+      "draft": false,
+      "counts": {
+        "assumed": 11,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 4,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4103.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4105A",
+      "file": "equipment/datasheets/E-4105A.yaml",
+      "valid": true,
+      "type": "HeatExchanger",
+      "service": "LOX ambient-air vaporizer A",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 1
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4105A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4105B",
+      "file": "equipment/datasheets/E-4105B.yaml",
+      "valid": true,
+      "type": "HeatExchanger",
+      "service": "LOX ambient-air vaporizer B",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 1
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4105B.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4106A",
+      "file": "equipment/datasheets/E-4106A.yaml",
+      "valid": true,
+      "type": "HeatExchanger",
+      "service": "LIN ambient-air vaporizer A",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 1
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4106A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "E-4106B",
+      "file": "equipment/datasheets/E-4106B.yaml",
+      "valid": true,
+      "type": "HeatExchanger",
+      "service": "LIN ambient-air vaporizer B",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 1
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/E-4106B.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "F-1101",
+      "file": "equipment/datasheets/F-1101.yaml",
+      "valid": true,
+      "type": "GasFilter",
+      "service": "MAC inlet air filter",
+      "draft": false,
+      "counts": {
+        "assumed": 2,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/F-1101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "F-2101",
+      "file": "equipment/datasheets/F-2101.yaml",
+      "valid": true,
+      "type": "GasFilter",
+      "service": "Adsorber outlet dust filter",
+      "draft": false,
+      "counts": {
+        "assumed": 5,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 3,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/F-2101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "K-1101",
+      "file": "equipment/datasheets/K-1101.yaml",
+      "valid": true,
+      "type": "CentrifugalCompressor",
+      "service": "Main air compressor (MAC)",
+      "draft": false,
+      "counts": {
+        "assumed": 17,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 8,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/K-1101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "K-3101",
+      "file": "equipment/datasheets/K-3101.yaml",
+      "valid": true,
+      "type": "CentrifugalCompressor",
+      "service": "Expander-braked air booster",
+      "draft": false,
+      "counts": {
+        "assumed": 14,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/K-3101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "K-4101",
+      "file": "equipment/datasheets/K-4101.yaml",
+      "valid": true,
+      "type": "CentrifugalCompressor",
+      "service": "GOX compressor",
+      "draft": false,
+      "counts": {
+        "assumed": 15,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 6,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/K-4101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "K-4102",
+      "file": "equipment/datasheets/K-4102.yaml",
+      "valid": true,
+      "type": "CentrifugalCompressor",
+      "service": "GAN compressor",
+      "draft": false,
+      "counts": {
+        "assumed": 12,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 3,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/K-4102.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "KT-3101",
+      "file": "equipment/datasheets/KT-3101.yaml",
+      "valid": true,
+      "type": "Turbine",
+      "service": "Air expansion turbine (Lachmann)",
+      "draft": false,
+      "counts": {
+        "assumed": 11,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 5,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/KT-3101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-1101A",
+      "file": "equipment/datasheets/P-1101A.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "DCAC cooling water pump",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-1101A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-1101B",
+      "file": "equipment/datasheets/P-1101B.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "DCAC cooling water pump (spare)",
+      "draft": false,
+      "counts": {
+        "assumed": 6,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-1101B.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-1102A",
+      "file": "equipment/datasheets/P-1102A.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "Chilled water pump",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-1102A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-1102B",
+      "file": "equipment/datasheets/P-1102B.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "Chilled water pump (spare)",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-1102B.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-4101A",
+      "file": "equipment/datasheets/P-4101A.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "LOX backup pump",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-4101A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-4101B",
+      "file": "equipment/datasheets/P-4101B.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "LOX backup pump (spare)",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-4101B.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "P-4102A",
+      "file": "equipment/datasheets/P-4102A.yaml",
+      "valid": true,
+      "type": "CentrifugalPump",
+      "service": "LIN backup pump",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/P-4102A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "T-4101",
+      "file": "equipment/datasheets/T-4101.yaml",
+      "valid": true,
+      "type": "Tank",
+      "service": "LOX storage tank",
+      "draft": false,
+      "counts": {
+        "assumed": 5,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 9,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/T-4101.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "T-4102",
+      "file": "equipment/datasheets/T-4102.yaml",
+      "valid": true,
+      "type": "Tank",
+      "service": "LIN storage tank",
+      "draft": false,
+      "counts": {
+        "assumed": 5,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 8,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/T-4102.svg",
+      "has_drawing": false,
+      "drawing_current": false,
+      "findings": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    },
+    {
+      "tag": "V-2101A",
+      "file": "equipment/datasheets/V-2101A.yaml",
+      "valid": true,
+      "type": "PressureVessel",
+      "service": "Molecular sieve adsorber A",
+      "draft": false,
+      "counts": {
+        "assumed": 7,
+        "tbd": 0,
+        "supplier": 1,
+        "not_applicable": 0
+      },
+      "nozzles": 7,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/V-2101A.svg",
+      "has_drawing": true,
+      "drawing_current": true,
+      "findings": {
+        "error": 0,
+        "warning": 2,
+        "info": 0
+      }
+    },
+    {
+      "tag": "V-2101B",
+      "file": "equipment/datasheets/V-2101B.yaml",
+      "valid": true,
+      "type": "PressureVessel",
+      "service": "Molecular sieve adsorber B",
+      "draft": false,
+      "counts": {
+        "assumed": 3,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 7,
+      "has_dimensions": true,
+      "has_weights": false,
+      "drawing": "equipment/datasheets/V-2101B.svg",
+      "has_drawing": true,
+      "drawing_current": false,
+      "findings": {
+        "error": 0,
+        "warning": 1,
+        "info": 0
+      }
+    },
+    {
+      "tag": "V-3101",
+      "file": "equipment/datasheets/V-3101.yaml",
+      "valid": true,
+      "type": "Tank",
+      "service": "Cold liquid drain vaporizer (dump)",
+      "draft": false,
+      "counts": {
+        "assumed": 2,
+        "tbd": 0,
+        "supplier": 0,
+        "not_applicable": 0
+      },
+      "nozzles": 2,
+      "has_dimensions": true,
+      "has_weights": true,
+      "drawing": "equipment/datasheets/V-3101.svg",
+      "has_drawing": true,
+      "drawing_current": false,
+      "findings": {
+        "error": 0,
+        "warning": 3,
+        "info": 0
+      }
+    }
+  ],
+  "missing": [
+    "P-4102B"
+  ],
+  "source": {
+    "commit": "a41cd58e9f9f543421ed4d65221dc9b30087f276",
+    "dirty": [],
+    "fingerprints": {
+      "equipment/datasheets/C-1101.svg": "sha256:0a9f19e0b1330a7652fd506dfb62367f3297d633e1f785ed13e9e67a3c74a4a7",
+      "equipment/datasheets/C-1101.yaml": "sha256:99c5c3b36b0b26feade8ff2bc6cf017e8a31e543427605b494c409774ac5e1aa",
+      "equipment/datasheets/C-1102.svg": "sha256:a61f1ac0c9acd82445dd5a87323da48ec6153e742b6f3474d14ee46dda0b18d0",
+      "equipment/datasheets/C-1102.yaml": "sha256:65df3fd7398adab1d9d938f1c753936f67a347cf35052b9746a7a97cfda22d4f",
+      "equipment/datasheets/C-3101.svg": "sha256:9ebdf1c1d89601b116175fabf58ab7d5ec790f3f377ecde562d396a6ecf32084",
+      "equipment/datasheets/C-3101.yaml": "sha256:9e66228ae9b9c8993cb0efe58bc0adb20c551f9c8452c2cdde102e4f7ee68536",
+      "equipment/datasheets/C-3102.svg": "sha256:7829a27b7941e2b3679fbbd8b1f97bb31e3680aeb03e949f8f4ba24d840afccf",
+      "equipment/datasheets/C-3102.yaml": "sha256:e7d95b0b1b1f345599ce5b89019e195bc9c8db316e031b34ce81e15b04e4eac5",
+      "equipment/datasheets/E-1101.svg": "sha256:ddf30f1cc121c993bb10ab1bba56645eb5aeb5ce603d5b8b409ae741071bef54",
+      "equipment/datasheets/E-1101.yaml": "sha256:ccf5b2bbeea81eadc8b5e2327566f14a22fedef13c05ce27673239cd03e83d8d",
+      "equipment/datasheets/E-1102.svg": "sha256:e16c4308914fa040832e313b6a7c2cd69117f4068f071e6809137537b3fb6794",
+      "equipment/datasheets/E-1102.yaml": "sha256:2a82776c8478628b102842a5a80e961cc5b8dc39bd5ad63d61c8d45609397249",
+      "equipment/datasheets/E-1103.svg": "sha256:34e91e43df2ab4e42b2198eaa921833a0ad249e1f6632af68fae000f7a6ae8bc",
+      "equipment/datasheets/E-1103.yaml": "sha256:fdb9d9e4067a10caf0697eaa2180485862638a58aadec48c78fb01cbc74e1075",
+      "equipment/datasheets/E-2101.svg": "sha256:f621ce6daec3ca9827888559510ae59eb28dd6102499860f532b4507adc1deb6",
+      "equipment/datasheets/E-2101.yaml": "sha256:664456f1df10b1f8e395f4248a56996b4104cf6f722f6ed92b02d73c75c76dbc",
+      "equipment/datasheets/E-3101.svg": "sha256:104b0a75eb0b4e7492ae2c9cdd5ab434eeb7de5c9b44520612dec3e5628646b9",
+      "equipment/datasheets/E-3101.yaml": "sha256:b74de9c80ffc2b140f4f37f69305ac34b00dc1f23abdaff2aca541d86621a401",
+      "equipment/datasheets/E-3102.svg": "sha256:53ed92a6721d2d01327e30f806357735e6b5adb0d846307ff3ff030a97e14cc7",
+      "equipment/datasheets/E-3102.yaml": "sha256:42e897b28703f1296e3fe7a9db940fd08d65c2812bafe2f95b04427930d64d75",
+      "equipment/datasheets/E-3103.svg": "sha256:1710502a88c79635037f371074d4c152a02c51a7e835586242dcad33c36d4dc0",
+      "equipment/datasheets/E-3103.yaml": "sha256:1af55402eea77cbc608dd8ea1f7d935d757d55ea9eed2a5d6bc038d17837e50e",
+      "equipment/datasheets/E-3104.svg": "sha256:8afed1c2c247a3f745178f170eb6e08327682d7872fe508214cf21007ffab22c",
+      "equipment/datasheets/E-3104.yaml": "sha256:9bb0ffab642232c03287ed2baba6680179c0646e6e52d43b89b09c72ced6f12e",
+      "equipment/datasheets/E-4101.svg": "sha256:ecd90e1d6a9bf97e4b8f33c8fed2e8699b75de33e392c3f3defadc474d971478",
+      "equipment/datasheets/E-4101.yaml": "sha256:e9ecf2c2fb75cbba5de325c05a65d87bdee07dd2276155785182b8a35b13a7b1",
+      "equipment/datasheets/E-4102.svg": "sha256:f8bf66f4b1a21edd13b8aa6c94985216235d09b4a0b5e347beba4a38c627006f",
+      "equipment/datasheets/E-4102.yaml": "sha256:71e24e210616ffb0f16daabca9561aa592ca7c955a552932e15450ba8edd240b",
+      "equipment/datasheets/E-4103.svg": "sha256:c4b22caedcbe410633339798ddff77111a674f2ec63112368f6bafa8a038b9f6",
+      "equipment/datasheets/E-4103.yaml": "sha256:84c5e510cb7e65f34bbcc94ae54d307d1b4655c6d96c7a61c0e02e2c615b9e8f",
+      "equipment/datasheets/E-4105A.svg": "sha256:d94e70e38ac31cd17d50059cd3d532d252333af6523f1c43a83853c4fc828370",
+      "equipment/datasheets/E-4105A.yaml": "sha256:2a50582758b8a7eee5af15d4c72cb5d450d6237b786969d6fd4756ebd6e60637",
+      "equipment/datasheets/E-4105B.svg": "sha256:7194ef2ef42cf71b733ec1fba39c3f6fb494469b36c1fef0eea7f19a2b25a90f",
+      "equipment/datasheets/E-4105B.yaml": "sha256:b1be06e03cde26ec9b86b6d7c4543ce5454129fc04a8b062b896407083cad67d",
+      "equipment/datasheets/E-4106A.svg": "sha256:0c1c8e6e0a57d4d71190e910f76207c27a44e4810f9df79861c975ea4f4097bd",
+      "equipment/datasheets/E-4106A.yaml": "sha256:bd4d3d1db000c3a2b803ed151ba18aebc98c46ba8dfc4d158cda17e80070d0ed",
+      "equipment/datasheets/E-4106B.svg": "sha256:c4e38ac83b26797df351cd5e89dc4f167e0683e6cda6527e0dcf2dd823467952",
+      "equipment/datasheets/E-4106B.yaml": "sha256:8062755428b21aa84c65ce1551099f66c3e4135c04b2c22bea2df6094b29c891",
+      "equipment/datasheets/F-1101.svg": "sha256:3db8c24b118908902d0829874d5c151f8e184dbe10fff4394a4d7094080cc321",
+      "equipment/datasheets/F-1101.yaml": "sha256:0a8c2b2f841e212e6c298210076609d386c226e735a6045d9820a97ccd4b5f04",
+      "equipment/datasheets/F-2101.svg": "sha256:5b59f24e9e85f3c60f7e60e80b34bbe5749f38d1dd9059e9b1fcdd3333f43b48",
+      "equipment/datasheets/F-2101.yaml": "sha256:44d5b2839a00a6e287592e1425951817ebe21afbafa911589646cfe85ef8790f",
+      "equipment/datasheets/K-1101.svg": "sha256:abb12bb63677eef693d050dbf615de58f44754f33c73c0b0be3f5294e93b2cbf",
+      "equipment/datasheets/K-1101.yaml": "sha256:73f0dfc0374ed44ccd562220de675228e7f40005f15c03aa01cf383ddedd1e27",
+      "equipment/datasheets/K-3101.svg": "sha256:608776287f0c5d5717f2f3a69905da1fc10938c11f5a59413503f976ca07324a",
+      "equipment/datasheets/K-3101.yaml": "sha256:cabcdfd94b929aeb3ec6ab1d56f06bc1f56dde657b08c7b8501ce550e681f47b",
+      "equipment/datasheets/K-4101.svg": "sha256:5f1c2c093c6f23921cb6961443d0f407fe8a8395ec3d848b5784c9adc6246d59",
+      "equipment/datasheets/K-4101.yaml": "sha256:9e021c78a9e287bd8e4848180fc0c26af730db15d4242b4aa8ddac838f1c6c56",
+      "equipment/datasheets/K-4102.svg": "sha256:eeb79125923abbf7988d0365a19e918a8a604c6e4b4d9fe5655683239194efaf",
+      "equipment/datasheets/K-4102.yaml": "sha256:0ae93c6ea8b94cc12be601d0f84e4b2877f85047430d35626dd0b87ea04dd7c0",
+      "equipment/datasheets/KT-3101.svg": "sha256:d3ae04a29bc211b484fe704c6a9f403120278495598c912438f4f3e15361d2b5",
+      "equipment/datasheets/KT-3101.yaml": "sha256:324139736f5c344d00c90d8439a55badc4d65d7c074761616b60726874682924",
+      "equipment/datasheets/P-1101A.svg": "sha256:4591d8a9e4da8bbc7a95a129b5d1f41bf00782c158b7146c1166545c2fa2a806",
+      "equipment/datasheets/P-1101A.yaml": "sha256:7685386cfacb1a3512013db3ad1782a927745f66c959884e7a0ea0bc06fe61b9",
+      "equipment/datasheets/P-1101B.svg": "sha256:b7fdf9b6e84fd7e109ed665f0f4acb9fe18b6fbf9ea7af2bec07c8c93fd5eb34",
+      "equipment/datasheets/P-1101B.yaml": "sha256:4526c8811ddbed8f9cfa2813cb62fbb123ff47d7d8f5592004dd2677e35c41fe",
+      "equipment/datasheets/P-1102A.svg": "sha256:22f249accb5389113a0ec1aa98aa06bfce094fa596ca272d92c7d300c04c8a92",
+      "equipment/datasheets/P-1102A.yaml": "sha256:a5ca8bfd2d3a0fbe8124502609ca8d39a8bc8a009e6f88c82dd29576a247f1f4",
+      "equipment/datasheets/P-1102B.svg": "sha256:fb9bb39ecdb4bdcd3d739c8066803ee57b968bbd91631e10b23cf2d6a32b5101",
+      "equipment/datasheets/P-1102B.yaml": "sha256:0694cb7ba10200091163141f14559c0fcb96bd3e1c9f643c1944635bf948cf14",
+      "equipment/datasheets/P-4101A.svg": "sha256:565cc2177c87555a0fe58acf1e64edd1918aec2abd59ed78318b324460ae780b",
+      "equipment/datasheets/P-4101A.yaml": "sha256:99da8d33b261d38b73a3b5715b90ac710b89e3a27f628a6caa1385fc19150af1",
+      "equipment/datasheets/P-4101B.svg": "sha256:21ba8dcadce3261c33ce7a90c13c2f328577f2a1a457d1e24c50184541e78f12",
+      "equipment/datasheets/P-4101B.yaml": "sha256:d21d5f6529c5baee0d2ef3a3ebc5e58f882c82c2c6221f7cfcb2f05d393f8898",
+      "equipment/datasheets/P-4102A.svg": "sha256:781318dfcbee9b88cd77b1461bb340f6ece155147e7dad9a68b4eb12ef4e2a5f",
+      "equipment/datasheets/P-4102A.yaml": "sha256:5364b14e4d0ccad901a39683ffde7353344d6bfc885e9dc1fa7f73bb458b33ea",
+      "equipment/datasheets/T-4101.svg": "sha256:70280b621bcfcd63db23b76889b191f86681a7cb686ecc786d1fab4745a13fbc",
+      "equipment/datasheets/T-4101.yaml": "sha256:51b74617b5fb1d2678a06f66b795e5b0e2b4790c009c93fe7567ad3dad85de0c",
+      "equipment/datasheets/T-4102.yaml": "sha256:c6dfddc3a8cde4657f9493a3f41b3a714c756d7610ace02fce070983dc6bc201",
+      "equipment/datasheets/V-2101A.svg": "sha256:98f01a10938b173dac71f849ec6549d9bd88c765da216a9ddb88de26883b4d9a",
+      "equipment/datasheets/V-2101A.yaml": "sha256:834bc1eba17e973899988c0d26c788c79d0a405fb2c3719fcb8897682a7e28e0",
+      "equipment/datasheets/V-2101B.svg": "sha256:aa2db2bbf46b13784859a636f3fff76089f419f0c7722491131038e005aaf411",
+      "equipment/datasheets/V-2101B.yaml": "sha256:821b2a327af5f5930357ec96c4d77863ea92ac698fc3f404ce076fd8e1bb9016",
+      "equipment/datasheets/V-3101.svg": "sha256:b0143bba305052759b09ca69803309839ba8cde7142a5456ddd2484750dbb162",
+      "equipment/datasheets/V-3101.yaml": "sha256:0cc66d152e982f3003852ecf3bba1f8b91fcfc619ed08c79434e69bead53b0aa",
+      "equipment/equipment-list.yaml": "sha256:a567503f6c67137cba95d59b84016a1ebc1b5559799ee594def6587ce91d4b44",
+      "layout/plant-model.yaml": "sha256:bc8e6b5add5e32a03819c895b3555304f07ba9b66cb413fbadde34f71b6dbcbb",
+      "pid/P-01.xml": "sha256:62c82c156cdac2a704113b9d10ca4709d63a900b6e0db82f95a35d56b21dfd64",
+      "pid/P-02.xml": "sha256:610bf298d1a3446e0965f424574afeef245be28f7167ede3862094cd0db1a7f0",
+      "pid/P-03.xml": "sha256:a39bed749971864776c37ee2b7c8dc396fabfb80c9d24744e4867272c5e01b8d",
+      "pid/P-04.xml": "sha256:c06f81101caad81404d0694aa8ba27aad670b2bdfd5e884f0d3f39c1dc66efe5",
+      "piping/line-list.yaml": "sha256:8fae400b0697ef2e9cc84f15852f84db049e517d32d7811ddefaef410a07a815",
+      "plant.yaml": "sha256:b1607d4e502814e97feee68367739376992e4c5e6b8d069e46e26bb044898f44",
+      "process/BFD.xml": "sha256:ae6bb76c7f95af0e62d87b2fa977903d233ad1dc45de714ab039973c282772b9",
+      "process/PFD.xml": "sha256:92455a7dfc2e6f7208e596605552e6c58d206f871ee8a3f838cc8d1a6578e36f"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+# Packaged emission factor set emep-eea-guidebook: PLACEHOLDER (core#176). It holds no values. A
+# factor of lca/lca.yaml that names it (set: emep-eea-guidebook) refuses to run until the set is
+# verified; give the factor in lca/lca.yaml with its value, unit and source meanwhile.
+schema: cheme/lca/v1
+kind: emission_factors
+id: emep-eea-guidebook
+title: EMEP/EEA air pollutant emission inventory guidebook (Tier 1 and Tier 2 factors)
+provider: European Environment Agency (EEA)
+status: placeholder
+todo: >-
+  TODO: read the combustion and fugitive factors (NOx, CO, NMVOC, SOx, PM, CH4, N2O by fuel and
+  technology) from the guidebook chapters themselves, and record the guidebook edition, chapter
+  version, URL, checksum and table of every factor. The download host (eea.europa.eu) was not
+  reachable when the mechanism was built, so nothing was read and no value is packaged.
+licence_note: >-
+  TODO (owner): the reuse terms of the EEA and of the guidebook's chapters have not been checked;
+  check whether they allow redistributing the factors under CC BY 4.0 / MIT and what attribution
+  they ask for, before setting status verified and redistribution true.

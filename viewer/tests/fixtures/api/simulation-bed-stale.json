@@ -1,0 +1,356 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "dwsim",
+    "property_package": "Peng-Robinson (PR)",
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [],
+    "guesses": {},
+    "specs": {}
+  },
+  "run": {
+    "case": "design",
+    "run_at": "2026-10-27T14:37:45Z",
+    "tool": "cheme-as-code 0.7.0",
+    "simulator": {
+      "name": "dwsim",
+      "version": "9.0.5.0",
+      "method": "Peng-Robinson (PR)"
+    },
+    "property_package": "Peng-Robinson (PR)",
+    "model_fingerprint": "8f212e987b6a3822",
+    "inputs": {
+      "commit": "f0a5902dbd99f66814918f1c81dbe6d12d5e010b",
+      "dirty": [
+        "process/flowsheet.yaml"
+      ],
+      "fingerprints": {
+        "process/catalysts.yaml": "sha256:be7369416e4bf254bf608723ad69ae3025eab84e13899b22f674d6a2c5733898",
+        "process/flowsheet.yaml": "sha256:8bbb9be09154b66e3f989d0c64fa452d9b120d68b6108cda7a0321810cdbaa9b",
+        "process/materials.yaml": "sha256:3aa0947754b6ac678ccec1909dbb075f0c9baa51aa6f8e107ad4eb40e054cd11",
+        "process/reactions.yaml": "sha256:537ac17d0f532a1091f61306888a4123eae7d3f574b7bbf7b4a97200109d47fa",
+        "process/simulation.yaml": "sha256:a60b956384d675853cd4405164e6140391e77276965914a057a055bbaad8d7dd"
+      }
+    },
+    "converged": true,
+    "status": "converged",
+    "iterations": 1,
+    "messages": [],
+    "units": [
+      {
+        "id": "R1",
+        "unit": "kinetic_pfr",
+        "status": "simulated",
+        "basis": "predictive",
+        "converged": true,
+        "results": {
+          "duty_kW": 0.0,
+          "extents_kmol_h": {
+            "SYN": 7.189663544823725
+          },
+          "hot_spot_K": 728.0219037520731,
+          "pressure_drop_kPa": 0.0
+        },
+        "messages": [],
+        "warnings": [],
+        "coupling": "external-unit",
+        "outer_loop": {
+          "coupling": "external-unit",
+          "model": "cheme fixed bed (1D pseudo-homogeneous plug flow, ideal gas)",
+          "dwsim_unit": "conversion_reactor",
+          "tolerance": 0.0001,
+          "temperature_tolerance": 0.05,
+          "max_iterations": 30,
+          "iterations": 1,
+          "converged": true,
+          "residuals": [
+            {
+              "iteration": 1,
+              "flow": 1.2756010283266967e-16,
+              "pressure": 0.0,
+              "temperature_K": 0.0
+            }
+          ],
+          "bed": {
+            "heat": "adiabatic",
+            "inlet_temperature_K": 673.15,
+            "inlet_pressure_kPa": 10000.0,
+            "outlet_temperature_K": 728.0219037520731,
+            "outlet_pressure_kPa": 10000.0,
+            "pressure_drop_kPa": 0.0,
+            "hot_spot_K": 728.0219037520731,
+            "catalyst_mass_kg": 2000.0,
+            "extents_kmol_h": {
+              "SYN": 7.189663544823725
+            },
+            "outlet_kmol_h": {
+              "N2": 102.81013645517625,
+              "H2": 308.43040936552876,
+              "NH3": 24.37972708964746,
+              "AR": 10.000399999999999
+            },
+            "inlet_kmol_h": {
+              "N2": 109.9998,
+              "H2": 329.9993999999999,
+              "NH3": 10.000399999999999,
+              "AR": 10.000399999999999
+            },
+            "notes": [
+              "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
+            ],
+            "reaction_heat_kW": 207.61029192090044,
+            "energy_residual_kW": 0.0
+          }
+        }
+      }
+    ],
+    "streams": [
+      {
+        "id": "S2",
+        "values": {
+          "temperature": {
+            "value": 728.022,
+            "unit": "K"
+          },
+          "pressure": {
+            "value": 10000.0,
+            "unit": "kPa(a)"
+          },
+          "flow": {
+            "value": 4316.63,
+            "unit": "kg/h"
+          },
+          "composition": {
+            "basis": "mole_fraction",
+            "values": {
+              "N2": 0.230712,
+              "H2": 0.692137,
+              "NH3": 0.0547096,
+              "AR": 0.0224415
+            }
+          }
+        },
+        "filled": [
+          "temperature",
+          "pressure",
+          "flow",
+          "composition"
+        ],
+        "kept": {}
+      }
+    ],
+    "findings": [
+      {
+        "file": "process/simulation.yaml",
+        "line": 1,
+        "level": "info",
+        "rule": "cheme.process-sim-coupling",
+        "message": "R1: kinetic reactor coupled as an external unit, converged in 1 DWSIM solve(s) (bed outlet against DWSIM's: flow 1.3e-16, pressure 0 relative, temperature 0 K): the reactor model is solved by cheme-as-code at the inlet DWSIM gives, DWSIM sees a conversion reactor",
+        "ids": [
+          "R1"
+        ],
+        "hint": "specs.R1.coupling sets the tolerance and the iterations; no native DWSIM kinetic reactor is used",
+        "id": "process/simulation.yaml#process-sim-coupling:R1"
+      },
+      {
+        "file": "process/simulation.yaml",
+        "line": null,
+        "level": "info",
+        "rule": "cheme.process-sim-energy-not-evaluable",
+        "message": "energy closure not evaluated: the simulator returned no stream enthalpies",
+        "ids": [],
+        "hint": "run cheme process simulate again (the worker reports mass enthalpies)",
+        "id": "process/simulation.yaml#process-sim-energy-not-evaluable:"
+      }
+    ],
+    "energy": {
+      "reference": {
+        "source": "simulator (DWSIM mass enthalpy, kJ/kg, its own reference state)",
+        "formation_enthalpy_included": false,
+        "comparable_with": "values of the same run only",
+        "formation_basis": "reacting units, and the plant with a reactor: plus sum n_i dHf_i (ideal gas, 298.15 K, DWSIM's database) of the reacting components whose flow changes (energy.formation)"
+      },
+      "tolerance": {
+        "abs_kW": 0.1,
+        "rel_duty": 0.01,
+        "rel_enthalpy": 0.0001
+      },
+      "closure": {
+        "units": [
+          {
+            "id": "R1",
+            "unit": "kinetic_pfr",
+            "heat_in_kW": 0.0,
+            "work_in_kW": 0.0,
+            "status": "not-evaluable"
+          }
+        ],
+        "plant": {
+          "feeds": [
+            "S1"
+          ],
+          "products": [
+            "S2"
+          ],
+          "heat_in_kW": 0.0,
+          "work_in_kW": 0.0,
+          "basis": "formation",
+          "reasons": [
+            "the simulator returned no enthalpies"
+          ],
+          "status": "not-evaluable"
+        }
+      },
+      "formation": {
+        "property_package": "Peng-Robinson (PR)",
+        "reference_verified": true,
+        "reference": "each component's ideal gas at 298.15 K = 0, without formation enthalpies (verified live for DWSIM 9.0.5: Peng-Robinson (PR), Peng-Robinson 1978 (PR78), Soave-Redlich-Kwong (SRK))",
+        "closure_basis": "DWSIM's formation enthalpies (simulator_dHf_298_kJ_kmol)",
+        "components": {
+          "N2": {
+            "dHf_298_kJ_kmol": 0.0,
+            "source": "declared in process/materials.yaml (given)",
+            "origin": "declared",
+            "molar_mass": 28.014,
+            "simulator_dHf_298_kJ_kmol": null,
+            "simulator_database": null
+          },
+          "H2": {
+            "dHf_298_kJ_kmol": 0.0,
+            "source": "declared in process/materials.yaml (given)",
+            "origin": "declared",
+            "molar_mass": 2.016,
+            "simulator_dHf_298_kJ_kmol": null,
+            "simulator_database": null
+          },
+          "NH3": {
+            "dHf_298_kJ_kmol": -45558.0,
+            "source": "declared in process/materials.yaml (given)",
+            "origin": "declared",
+            "molar_mass": 17.031,
+            "simulator_dHf_298_kJ_kmol": null,
+            "simulator_database": null
+          },
+          "AR": {
+            "dHf_298_kJ_kmol": 0.0,
+            "source": "declared in process/materials.yaml (given)",
+            "origin": "declared",
+            "molar_mass": 39.948,
+            "simulator_dHf_298_kJ_kmol": null,
+            "simulator_database": null
+          }
+        }
+      },
+      "exchangers": [],
+      "utility_levels": [],
+      "utilities": {
+        "totals_kW": {
+          "hot_utility": 0.0,
+          "cold_utility": 0.0,
+          "power_in": 0.0,
+          "power_out": 0.0,
+          "recovered": 0.0
+        },
+        "duties": []
+      }
+    }
+  },
+  "stale": true,
+  "staleness": {
+    "model_fingerprint": "8f212e987b6a3822",
+    "current_fingerprint": "8aaaf02a63c7c18c",
+    "changed_files": [
+      "process/flowsheet.yaml"
+    ]
+  },
+  "units": [
+    {
+      "id": "R1",
+      "unit": "kinetic_pfr",
+      "status": "simulated",
+      "basis": "predictive",
+      "reason": "",
+      "spec": null,
+      "run": {
+        "id": "R1",
+        "unit": "kinetic_pfr",
+        "status": "simulated",
+        "basis": "predictive",
+        "converged": true,
+        "results": {
+          "duty_kW": 0.0,
+          "extents_kmol_h": {
+            "SYN": 7.189663544823725
+          },
+          "hot_spot_K": 728.0219037520731,
+          "pressure_drop_kPa": 0.0
+        },
+        "messages": [],
+        "warnings": [],
+        "coupling": "external-unit",
+        "outer_loop": {
+          "coupling": "external-unit",
+          "model": "cheme fixed bed (1D pseudo-homogeneous plug flow, ideal gas)",
+          "dwsim_unit": "conversion_reactor",
+          "tolerance": 0.0001,
+          "temperature_tolerance": 0.05,
+          "max_iterations": 30,
+          "iterations": 1,
+          "converged": true,
+          "residuals": [
+            {
+              "iteration": 1,
+              "flow": 1.2756010283266967e-16,
+              "pressure": 0.0,
+              "temperature_K": 0.0
+            }
+          ],
+          "bed": {
+            "heat": "adiabatic",
+            "inlet_temperature_K": 673.15,
+            "inlet_pressure_kPa": 10000.0,
+            "outlet_temperature_K": 728.0219037520731,
+            "outlet_pressure_kPa": 10000.0,
+            "pressure_drop_kPa": 0.0,
+            "hot_spot_K": 728.0219037520731,
+            "catalyst_mass_kg": 2000.0,
+            "extents_kmol_h": {
+              "SYN": 7.189663544823725
+            },
+            "outlet_kmol_h": {
+              "N2": 102.81013645517625,
+              "H2": 308.43040936552876,
+              "NH3": 24.37972708964746,
+              "AR": 10.000399999999999
+            },
+            "inlet_kmol_h": {
+              "N2": 109.9998,
+              "H2": 329.9993999999999,
+              "NH3": 10.000399999999999,
+              "AR": 10.000399999999999
+            },
+            "notes": [
+              "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
+            ],
+            "reaction_heat_kW": 207.61029192090044,
+            "energy_residual_kW": 0.0
+          }
+        }
+      }
+    }
+  ],
+  "problem": null,
+  "findings": []
+}

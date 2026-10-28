@@ -1,0 +1,39 @@
+{
+  "stages": [
+    {
+      "id": "S1",
+      "target": "concept",
+      "budget_usd": 3,
+      "review_budget_usd": 2,
+      "task": "Concept: write process/design-basis.yaml (ASSUMED values marked), DESIGN.md (process description, block flow, main-stream balance, key decisions, tag convention, sheet split), plant.yaml (stage concept, the sheets declared), the equipment, line and instrument lists with sheet assignments, control/cause-effect.yaml for the trips known so far, and plant-specific gates in checks/checks.yaml (kind on-sheet for drawing content), and a first plot plan (layout/site-plan.yaml with areas, roads, racks and separations; every equipment-list item placed; skill layout-yaml). No P&ID XML yet."
+    },
+    {
+      "id": "S2",
+      "target": "basic",
+      "budget_usd": 7,
+      "review_budget_usd": 2,
+      "task": "Draw the next sheet (see 'Next sheet to draw'), one large sheet in this stage; update the lists; render and look at it."
+    },
+    {
+      "id": "S3",
+      "target": "basic",
+      "budget_usd": 7,
+      "review_budget_usd": 2,
+      "task": "Draw the next sheet (see 'Next sheet to draw'); update the lists; render and look at it."
+    },
+    {
+      "id": "S4",
+      "target": "basic",
+      "budget_usd": 6,
+      "review_budget_usd": 2,
+      "task": "Layout: site plan, buildings, structures and equipment placement (skills layout-yaml, structures-access), separations for the spacing criteria in DESIGN.md, racks for every line between areas, zones (skill area-classification), then cheme layout build and the routes (skill pipe-routing): render the plan and two sections and look at them."
+    },
+    {
+      "id": "S5",
+      "target": "basic",
+      "budget_usd": 5,
+      "review_budget_usd": 3,
+      "task": "Close-out: fix every open finding, bring validate to 0 warnings and the basic gates to ok. Do not sign off: the reviewer and a human do that."
+    }
+  ]
+}

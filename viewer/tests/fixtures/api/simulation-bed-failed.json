@@ -1,0 +1,255 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "dwsim",
+    "property_package": "Peng-Robinson (PR)",
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [],
+    "guesses": {},
+    "specs": {
+      "R1": {
+        "coupling": {
+          "max_iterations": 3
+        }
+      }
+    }
+  },
+  "run": {
+    "case": "design",
+    "run_at": "2026-10-27T14:37:49Z",
+    "tool": "cheme-as-code 0.7.0",
+    "simulator": {
+      "name": "dwsim",
+      "version": "9.0.5.0",
+      "method": "Peng-Robinson (PR)"
+    },
+    "property_package": "Peng-Robinson (PR)",
+    "model_fingerprint": "2c09ae5672951572",
+    "inputs": {
+      "commit": "0f1d98bc6d24e7c2d05bd81672a7844b4b0464b3",
+      "dirty": [],
+      "fingerprints": {
+        "process/catalysts.yaml": "sha256:be7369416e4bf254bf608723ad69ae3025eab84e13899b22f674d6a2c5733898",
+        "process/flowsheet.yaml": "sha256:aec99ac5bc15f804bce398156adc6d5e3e557851786676ae3ebf875a852ca383",
+        "process/materials.yaml": "sha256:3aa0947754b6ac678ccec1909dbb075f0c9baa51aa6f8e107ad4eb40e054cd11",
+        "process/reactions.yaml": "sha256:537ac17d0f532a1091f61306888a4123eae7d3f574b7bbf7b4a97200109d47fa",
+        "process/simulation.yaml": "sha256:de0f8d185e0dad06e49e75c504be2c015a2bbdf4cec40ab0bb0de19a64e17b18"
+      }
+    },
+    "converged": false,
+    "status": "not-converged",
+    "iterations": 1,
+    "messages": [
+      "the kinetic reactor coupling did not converge in 3 DWSIM solves: R1 (flow residual 0.00774, temperature 13.8 K)"
+    ],
+    "units": [
+      {
+        "id": "R1",
+        "unit": "kinetic_pfr",
+        "status": "simulated",
+        "basis": "predictive",
+        "converged": null,
+        "results": {
+          "duty_kW": 0.0,
+          "extents_kmol_h": {}
+        },
+        "messages": [],
+        "warnings": [],
+        "coupling": "external-unit",
+        "outer_loop": {
+          "coupling": "external-unit",
+          "model": "cheme fixed bed (1D pseudo-homogeneous plug flow, ideal gas)",
+          "dwsim_unit": "conversion_reactor",
+          "tolerance": 0.0001,
+          "temperature_tolerance": 0.05,
+          "max_iterations": 3,
+          "iterations": 3,
+          "converged": false,
+          "residuals": [
+            {
+              "iteration": 1,
+              "flow": 0.00780688665443758,
+              "pressure": 0.0,
+              "temperature_K": 13.91620658174611
+            },
+            {
+              "iteration": 2,
+              "flow": 0.008375154857222667,
+              "pressure": 0.0,
+              "temperature_K": 14.535343003475077
+            },
+            {
+              "iteration": 3,
+              "flow": 0.007744771662546451,
+              "pressure": 0.0,
+              "temperature_K": 13.79491764565671
+            }
+          ],
+          "bed": {
+            "heat": "adiabatic",
+            "inlet_temperature_K": 688.15,
+            "inlet_pressure_kPa": 10000.0,
+            "outlet_temperature_K": 770.268370982951,
+            "outlet_pressure_kPa": 10000.0,
+            "pressure_drop_kPa": 0.0,
+            "hot_spot_K": 770.268370982951,
+            "catalyst_mass_kg": 2000.0,
+            "extents_kmol_h": {
+              "SYN": 10.706283647105716
+            },
+            "outlet_kmol_h": {
+              "N2": 99.29351635289427,
+              "H2": 297.8805490586828,
+              "NH3": 31.41296729421144,
+              "AR": 10.000399999999999
+            },
+            "inlet_kmol_h": {
+              "N2": 109.9998,
+              "H2": 329.9993999999999,
+              "NH3": 10.000399999999999,
+              "AR": 10.000399999999999
+            },
+            "notes": [
+              "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
+            ],
+            "reaction_heat_kW": 310.18772273507307,
+            "energy_residual_kW": 0.0
+          }
+        }
+      }
+    ],
+    "streams": [],
+    "findings": [
+      {
+        "file": "process/simulation.yaml",
+        "line": 6,
+        "level": "info",
+        "rule": "cheme.process-sim-coupling",
+        "message": "R1: kinetic reactor coupled as an external unit, not converged after 3 DWSIM solve(s) (bed outlet against DWSIM's: flow 0.0077, pressure 0 relative, temperature 14 K): the reactor model is solved by cheme-as-code at the inlet DWSIM gives, DWSIM sees a conversion reactor",
+        "ids": [
+          "R1"
+        ],
+        "hint": "specs.R1.coupling sets the tolerance and the iterations; no native DWSIM kinetic reactor is used",
+        "id": "process/simulation.yaml#process-sim-coupling:R1"
+      },
+      {
+        "file": "process/flowsheet.yaml",
+        "line": 1,
+        "level": "warning",
+        "rule": "cheme.process-sim-not-converged",
+        "message": "case design: the simulation did not converge: the kinetic reactor coupling did not converge in 3 DWSIM solves: R1 (flow residual 0.00774, temperature 13.8 K)",
+        "ids": [],
+        "hint": "check the specs and the feeds; no stream value is written",
+        "id": "process/flowsheet.yaml#process-sim-not-converged:1"
+      }
+    ]
+  },
+  "stale": false,
+  "staleness": {
+    "model_fingerprint": "2c09ae5672951572",
+    "current_fingerprint": "2c09ae5672951572",
+    "changed_files": []
+  },
+  "units": [
+    {
+      "id": "R1",
+      "unit": "kinetic_pfr",
+      "status": "simulated",
+      "basis": "predictive",
+      "reason": "",
+      "spec": {
+        "coupling": {
+          "max_iterations": 3
+        }
+      },
+      "run": {
+        "id": "R1",
+        "unit": "kinetic_pfr",
+        "status": "simulated",
+        "basis": "predictive",
+        "converged": null,
+        "results": {
+          "duty_kW": 0.0,
+          "extents_kmol_h": {}
+        },
+        "messages": [],
+        "warnings": [],
+        "coupling": "external-unit",
+        "outer_loop": {
+          "coupling": "external-unit",
+          "model": "cheme fixed bed (1D pseudo-homogeneous plug flow, ideal gas)",
+          "dwsim_unit": "conversion_reactor",
+          "tolerance": 0.0001,
+          "temperature_tolerance": 0.05,
+          "max_iterations": 3,
+          "iterations": 3,
+          "converged": false,
+          "residuals": [
+            {
+              "iteration": 1,
+              "flow": 0.00780688665443758,
+              "pressure": 0.0,
+              "temperature_K": 13.91620658174611
+            },
+            {
+              "iteration": 2,
+              "flow": 0.008375154857222667,
+              "pressure": 0.0,
+              "temperature_K": 14.535343003475077
+            },
+            {
+              "iteration": 3,
+              "flow": 0.007744771662546451,
+              "pressure": 0.0,
+              "temperature_K": 13.79491764565671
+            }
+          ],
+          "bed": {
+            "heat": "adiabatic",
+            "inlet_temperature_K": 688.15,
+            "inlet_pressure_kPa": 10000.0,
+            "outlet_temperature_K": 770.268370982951,
+            "outlet_pressure_kPa": 10000.0,
+            "pressure_drop_kPa": 0.0,
+            "hot_spot_K": 770.268370982951,
+            "catalyst_mass_kg": 2000.0,
+            "extents_kmol_h": {
+              "SYN": 10.706283647105716
+            },
+            "outlet_kmol_h": {
+              "N2": 99.29351635289427,
+              "H2": 297.8805490586828,
+              "NH3": 31.41296729421144,
+              "AR": 10.000399999999999
+            },
+            "inlet_kmol_h": {
+              "N2": 109.9998,
+              "H2": 329.9993999999999,
+              "NH3": 10.000399999999999,
+              "AR": 10.000399999999999
+            },
+            "notes": [
+              "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
+            ],
+            "reaction_heat_kW": 310.18772273507307,
+            "energy_residual_kW": 0.0
+          }
+        }
+      }
+    }
+  ],
+  "problem": null,
+  "findings": []
+}

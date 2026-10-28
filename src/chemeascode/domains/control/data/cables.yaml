@@ -1,0 +1,60 @@
+# Cable sizes for the cable list and the tray fill (chemeascode.domains.control.electrical).
+# Every row is ASSUMED: typical catalogue values of copper XLPE armoured cables, to size the
+# trays at basic engineering. They are no cable sizing: the electrical design (load flow,
+# voltage drop, short circuit, protection, derating for grouping and ambient) picks the cables.
+#
+# A motor's full-load current is P / (sqrt(3) x U x power_factor x efficiency) (a feeder's is
+# P / (sqrt(3) x U x its own power factor, default 1.0), with no efficiency); the smallest
+# size whose current rating times `derating` carries it is taken, else parallel cables of the
+# largest size.
+power_factor: 0.85
+efficiency: 0.92
+derating: 0.8          # grouping on a tray and ambient, ASSUMED
+lv:
+  basis: "0.6/1 kV 4-core Cu XLPE/SWA/PVC (e.g. BS 5467), in free air on a perforated tray, 90 C conductor; current ratings and overall diameters typical of catalogues (ASSUMED)"
+  max_voltage_v: 1000
+  sizes:               # [conductor mm2, current rating A, overall diameter mm]
+    - [2.5, 29, 15.0]
+    - [4, 39, 16.6]
+    - [6, 50, 18.0]
+    - [10, 69, 21.0]
+    - [16, 94, 23.5]
+    - [25, 119, 27.5]
+    - [35, 146, 30.0]
+    - [50, 180, 34.0]
+    - [70, 232, 38.5]
+    - [95, 282, 43.5]
+    - [120, 328, 47.5]
+    - [150, 379, 52.5]
+    - [185, 434, 58.0]
+    - [240, 514, 65.0]
+    - [300, 593, 71.0]
+  cores: 4
+mv:
+  basis: "6/10 kV 3-core Cu XLPE/SWA/PVC (e.g. IEC 60502-2), in free air on a ladder tray; current ratings and overall diameters typical of catalogues (ASSUMED)"
+  max_voltage_v: 12000
+  sizes:
+    - [35, 160, 48.0]
+    - [50, 190, 51.0]
+    - [70, 235, 55.0]
+    - [95, 285, 59.0]
+    - [120, 325, 63.0]
+    - [150, 365, 66.0]
+    - [185, 415, 70.0]
+    - [240, 480, 76.0]
+    - [300, 545, 82.0]
+  cores: 3
+instrument:
+  basis: "screened armoured instrument cable, 1.5 mm2 field pairs, 0.5 mm2 multipair home runs (e.g. EN 50288-7); overall diameters typical of catalogues (ASSUMED)"
+  field:               # a transmitter or a positioner: one pair; an on/off valve: three
+    transmitter: {pairs: 1, od_mm: 12.0}
+    control_valve: {pairs: 1, od_mm: 12.0}
+    on_off_valve: {pairs: 3, od_mm: 16.0}
+  multipair:           # [pairs, overall diameter mm]: the smallest that holds the pairs and spares
+    - [2, 14.0]
+    - [5, 18.0]
+    - [10, 23.0]
+    - [20, 30.0]
+    - [24, 32.0]
+    - [36, 37.0]
+    - [48, 42.0]
