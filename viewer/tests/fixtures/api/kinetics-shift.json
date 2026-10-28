@@ -6,7 +6,7 @@
       "file": "experiments/kinetics/broken.yaml",
       "data": null,
       "fit": null,
-      "problem": "experiments/kinetics/broken.yaml: kind: Input should be 'kinetic-data' (and 4 more)"
+      "problem": "experiments/kinetics/broken.yaml: kind: Input should be 'kinetic-data' (and 3 more)"
     },
     {
       "file": "experiments/kinetics/wgs.yaml",

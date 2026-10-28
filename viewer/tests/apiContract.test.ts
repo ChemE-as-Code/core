@@ -151,8 +151,8 @@ const layout = layoutJson as unknown as Layout;
 const diff = diffJson as unknown as SheetDiff;
 const asu = asuJson as unknown as Layout;
 
-const REPO_KEYS: (keyof RepoInfo)[] = ["name", "root_name", "branch", "head", "stage", "stages", "sheets", "dirty", "has_layout", "has_lca", "has_equipment_estimate", "has_simulation", "has_reactions"];
-const REPO_ISSUES_KEYS: (keyof RepoInfo)[] = [...REPO_KEYS, "has_tea", "has_datasheets", "has_kinetic_data", "has_control", "has_issues"];
+const REPO_KEYS: (keyof RepoInfo)[] = ["name", "root_name", "branch", "head", "stage", "stages", "sheets", "dirty", "has_layout", "has_lca", "has_equipment_estimate", "has_simulation", "has_reactions", "has_tea", "has_datasheets", "has_kinetic_data", "has_control", "has_issues"];
+const REPO_ISSUES_KEYS: (keyof RepoInfo)[] = REPO_KEYS;
 const ISSUES_KEYS: (keyof IssuesReport)[] = ["repository", "label", "web", "new", "stage", "stages", "open_by_gate", "blocking", "issues"];
 const ISSUE_KEYS: (keyof Issue)[] = [
   "number", "title", "state", "status", "type", "gate", "gates", "disciplines", "source", "waiting", "url", "created", "updated", "closed",
@@ -191,7 +191,7 @@ const STREAM_KEYS: (keyof ProcessStream)[] = [
   "imbalance",
   "links",
 ];
-const COMPOSITION_KEYS: (keyof NonNullable<ProcessStream["composition"]>)[] = ["basis", "values", "provenance", "source", "fingerprint"];
+const COMPOSITION_KEYS: (keyof NonNullable<ProcessStream["composition"]>)[] = ["basis", "values", "provenance", "source", "fingerprint", "uncertainty", "origin", "stale"];
 const BALANCE_KEYS: (keyof ProcessBalance)[] = [
   "node",
   "kind",
@@ -507,6 +507,7 @@ const DIFF_KEYS: (keyof SheetDiff)[] = [
   "new_highlight",
   "projection_diff",
   "status",
+  "error",
   "old_owner",
   "new_owner",
   "items",
@@ -895,7 +896,7 @@ describe("the end-to-end mocks look like the real responses", () => {
 
 const SIMULATION_KEYS: (keyof SimulationView)[] = ["rev", "file", "run_file", "case", "cases", "spec", "run", "stale", "staleness", "units", "problem", "findings"];
 const SIM_SPEC_KEYS: (keyof SimulationView["spec"])[] = ["simulator", "property_package", "components", "tolerance", "tear_streams", "exclude", "guesses", "specs"];
-const SIM_UNIT_KEYS: (keyof SimulationUnit)[] = ["id", "unit", "status", "reason", "spec", "run"];
+const SIM_UNIT_KEYS: (keyof SimulationUnit)[] = ["id", "unit", "status", "reason", "spec", "run", "basis"];
 const SIM_RUN_KEYS: (keyof SimulationRun)[] = [
   "case",
   "run_at",
@@ -905,13 +906,15 @@ const SIM_RUN_KEYS: (keyof SimulationRun)[] = [
   "model_fingerprint",
   "inputs",
   "converged",
+  "status",
   "iterations",
   "messages",
   "units",
   "streams",
   "findings",
+  "energy",
 ];
-const SIM_RUN_UNIT_KEYS: (keyof SimRunUnit)[] = ["id", "unit", "status", "converged", "results", "messages", "warnings", "reason"];
+const SIM_RUN_UNIT_KEYS: (keyof SimRunUnit)[] = ["id", "unit", "status", "converged", "results", "messages", "warnings", "reason", "basis", "coupling"];
 const SIM_RUN_STREAM_KEYS: (keyof SimRunStream)[] = ["id", "values", "filled", "kept"];
 
 describe("real /api/simulation", () => {
@@ -931,7 +934,7 @@ describe("real /api/simulation", () => {
     expectKnown(runs.flatMap((r) => r.units), SIM_RUN_UNIT_KEYS, "run unit");
     expectKnown(current.run!.streams, SIM_RUN_STREAM_KEYS, "run stream");
     expectKnown(runs.map((r) => r.inputs), ["commit", "dirty", "fingerprints"], "run inputs");
-    expectKnown(runs.map((r) => r.simulator), ["name", "version"], "run simulator");
+    expectKnown(runs.map((r) => r.simulator), ["name", "version", "method"], "run simulator");
     expectKnown([...asu.findings, ...failed.run!.findings], FINDING_KEYS, "finding");
   });
 
@@ -949,8 +952,8 @@ describe("real /api/simulation", () => {
   it("a recorded run: current, then stale, and one that did not converge", () => {
     expect(current.stale).toBe(false);
     expect(current.run?.converged).toBe(true);
-    expect(current.run?.iterations).toBeNull();
-    expect(current.run?.simulator).toEqual({ name: "dwsim", version: "9.0.5.0" });
+    expect(current.run?.iterations).toBe(1); // the stand-in solver reports one
+    expect(current.run?.simulator).toMatchObject({ name: "dwsim", version: "9.0.5.0" });
     expect(stale.stale).toBe(true);
     expect(stale.staleness.changed_files).toEqual(["process/simulation.yaml"]);
     expect(failed.run?.converged).toBe(false);
@@ -975,6 +978,7 @@ const REACTION_KEYS: (keyof Reaction)[] = [
   "id",
   "title",
   "equation",
+  "reaction_smiles",
   "stoichiometry",
   "phase",
   "reversible",
@@ -1008,6 +1012,9 @@ const REACTOR_KEYS: (keyof ReactorRow)[] = [
   "fugacity",
   "reactions",
   "duty_kW",
+  "duty_assumptions",
+  "duty_basis",
+  "tank",
   "missing",
 ];
 
@@ -1062,7 +1069,7 @@ const CATALYST_KEYS: (keyof CatalystEntry)[] = [
   "reactions",
   "units",
 ];
-const BED_KEYS: (keyof ReactorBed)[] = ["catalyst_mass_kg", "catalyst_volume_m3", "outlet_temperature_K", "outlet_pressure_kPa", "pressure_drop_kPa", "hot_spot_K", "profile", "notes"];
+const BED_KEYS: (keyof ReactorBed)[] = ["catalyst_mass_kg", "catalyst_volume_m3", "outlet_temperature_K", "outlet_pressure_kPa", "pressure_drop_kPa", "hot_spot_K", "profile", "notes", "transport"];
 
 describe("real /api/reactions of core's shift example (rate law, catalyst, fixed bed)", () => {
   const view = reactionsShiftJson as unknown as ReactionsView;
@@ -1086,7 +1093,7 @@ describe("real /api/reactions of core's shift example (rate law, catalyst, fixed
     const cat = view.kinetics!.catalysts[0]!;
     expectKnown([cat.physical!], ["form", "particle_diameter", "sphericity", "particle_density", "bulk_density", "bed_voidage", "surface_area", "provenance", "source"], "physical");
     expectKnown([cat.window!], ["temperature", "pressure", "provenance", "source"], "window");
-    expectKnown([cat.space_velocity!], ["basis", "range", "provenance", "source"], "space velocity");
+    expectKnown([cat.space_velocity!], ["basis", "range", "gas", "provenance", "source"], "space velocity");
     expectKnown([cat.deactivation!], ["lifetime", "mechanisms", "regeneration", "provenance", "source"], "deactivation");
     expectKnown([cat.price!], ["value", "unit", "year", "provenance", "source"], "price");
   });

@@ -36,7 +36,7 @@ test.describe("catalysis", () => {
     await expect(wgs.locator('[data-parameter="Ea"]')).toContainText("111000 kJ/kmol");
     await wgs.locator(".sources summary").click();
     await expect(wgs.locator("tr[data-point]")).toHaveCount(12);
-    await expect(page.locator('[data-kinetic-file="experiments/kinetics/broken.yaml"] [data-kinetic-problem]')).toHaveText("experiments/kinetics/broken.yaml: kind: Input should be 'kinetic-data' (and 4 more)");
+    await expect(page.locator('[data-kinetic-file="experiments/kinetics/broken.yaml"] [data-kinetic-problem]')).toHaveText("experiments/kinetics/broken.yaml: kind: Input should be 'kinetic-data' (and 3 more)");
   });
 
   test("the library: marks, filter, and the link from the reactions page", async ({ page }) => {

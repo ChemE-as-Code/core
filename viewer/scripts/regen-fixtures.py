@@ -127,7 +127,14 @@ GIT_ENV = {
 }
 
 
+#: The time a recorded run says it ran: fixed, so the fixtures do not change with every run of this
+#: script (the viewer only shows it).
+RUN_AT = "2026-10-28T12:00:00Z"
+
+
 def write(path: Path, data: object) -> None:
+    if isinstance(data, dict) and isinstance(data.get("run"), dict) and "run_at" in data["run"]:
+        data = {**data, "run": {**data["run"], "run_at": RUN_AT}}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {path.relative_to(VIEWER)}")

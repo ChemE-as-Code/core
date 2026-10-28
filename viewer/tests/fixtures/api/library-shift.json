@@ -93,6 +93,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -216,6 +220,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -318,6 +326,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -396,6 +408,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -471,6 +487,10 @@
         }
       ],
       "catalysts": [],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -549,6 +569,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -654,6 +678,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -786,6 +814,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -912,6 +944,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1004,6 +1040,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1098,6 +1138,10 @@
           "differs": true
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
       ]
@@ -1187,6 +1231,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1282,6 +1330,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
       ]
@@ -1382,6 +1434,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1496,6 +1552,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
       ]
@@ -1629,6 +1689,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1707,6 +1771,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1837,6 +1905,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -1922,6 +1994,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -2038,6 +2114,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product",
         "Twigg (ed.), Catalyst Handbook, 2nd ed., Manson (1989)"
@@ -2121,6 +2201,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -2209,6 +2293,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "equilibrium",
+        "note": "ideal-gas equilibrium limit from the components' formation data, without fugacity corrections or a rate law: how closely a reactor approaches it is not given"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]
@@ -2335,6 +2423,10 @@
           "differs": false
         }
       ],
+      "model_basis": {
+        "kind": "stoichiometry_only",
+        "note": "no conversion, selectivity, equilibrium basis or rate law: source and choose the reactor model separately"
+      },
       "sources": [
         "Ullmann's Encyclopedia of Industrial Chemistry (Wiley-VCH), article on the product"
       ]

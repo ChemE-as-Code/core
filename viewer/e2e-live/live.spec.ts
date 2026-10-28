@@ -4,9 +4,9 @@ import { expect, test } from "@playwright/test";
 // the same commit. The plant is examples/safety-hazop as a git repository.
 
 test("the API answers the viewer's first requests", async ({ request }) => {
-  for (const path of ["/api/repo", "/api/tree", "/api/branches", "/api/log"]) {
+  for (const path of ["/api/repo", "/api/tree", "/api/branches", "/api/log", "/api/pid.svg?path=pid%2FP-01.xml"]) {
     const response = await request.get(path);
-    expect(response.ok(), path).toBeTruthy();
+    expect(response.ok(), `${path}: ${response.status()} ${response.ok() ? "" : await response.text()}`).toBeTruthy();
   }
 });
 

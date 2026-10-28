@@ -1,7 +1,7 @@
 {
   "rev": null,
   "model": "layout/plant-model.yaml",
-  "model_sha256": "a290bba12e0ffa78f1940a029396febe0478bd68273875b1466771f1a8e15001",
+  "model_sha256": "6c0870c5c1494525ae753c18a9c56ede0a8c18c220f1557663dc9f15b25dbdb7",
   "columns": [
     "category",
     "item",
@@ -192,7 +192,7 @@
       "spec": "",
       "group": "platform",
       "count": 3,
-      "quantity": 5.027,
+      "quantity": 8.802,
       "unit": "m2",
       "length_m": null,
       "class": "",
@@ -247,7 +247,7 @@
       "t": 8.533
     },
     "grating": {
-      "m2": 5.027
+      "m2": 8.802
     },
     "concrete": {
       "m3": 1.15
@@ -258,13 +258,13 @@
     "currency": "XXX",
     "cost_year": 2026,
     "example": true,
-    "model_sha256": "a290bba12e0ffa78f1940a029396febe0478bd68273875b1466771f1a8e15001",
+    "model_sha256": "6c0870c5c1494525ae753c18a9c56ede0a8c18c220f1557663dc9f15b25dbdb7",
     "totals": {
-      "materials": 157.62,
-      "direct": 309.49,
-      "indirect": 30.95,
-      "contingency": 34.04,
-      "total": 374.48,
+      "materials": 161.39,
+      "direct": 317.03,
+      "indirect": 31.7,
+      "contingency": 34.87,
+      "total": 383.6,
       "unpriced_rows": 0
     },
     "lines": [
@@ -428,11 +428,11 @@
         "section": "material",
         "id": "grating platform",
         "description": "grating",
-        "quantity": 5.027,
+        "quantity": 8.802,
         "unit": "m2",
         "rate": 1.0,
         "basis": "grating",
-        "cost": 5.03,
+        "cost": 8.8,
         "status": "ASSUMED",
         "source": "EXAMPLE placeholder, not a price",
         "year": 2026
@@ -480,11 +480,11 @@
         "section": "direct",
         "id": "steel-erection",
         "description": "Steel and grating erection on steel, grating",
-        "quantity": 90.36,
+        "quantity": 94.13,
         "unit": "XXX",
         "rate": 1.0,
         "basis": "steel-erection",
-        "cost": 90.36,
+        "cost": 94.13,
         "status": "ASSUMED",
         "source": "EXAMPLE placeholder, not a factor",
         "year": 2026
@@ -493,11 +493,11 @@
         "section": "indirect",
         "id": "indirects",
         "description": "Engineering and construction management",
-        "quantity": 309.49,
+        "quantity": 317.03,
         "unit": "XXX",
         "rate": 0.1,
         "basis": "indirects",
-        "cost": 30.95,
+        "cost": 31.7,
         "status": "ASSUMED",
         "source": "EXAMPLE placeholder, not a factor",
         "year": 2026
@@ -506,11 +506,11 @@
         "section": "contingency",
         "id": "contingency",
         "description": "Contingency",
-        "quantity": 340.44,
+        "quantity": 348.73,
         "unit": "XXX",
         "rate": 0.1,
         "basis": "contingency",
-        "cost": 34.04,
+        "cost": 34.87,
         "status": "ASSUMED",
         "source": "EXAMPLE placeholder, not a factor",
         "year": 2026

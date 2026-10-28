@@ -2,7 +2,7 @@
   "name": "process-nested",
   "root_name": "process-nested",
   "branch": "main",
-  "head": "e66535e359fd73946ed3eadb60de2db9015addbd",
+  "head": "c2ce1d94a6d9b078631217cab376027a8ad318d0",
   "stage": "concept",
   "stages": [
     {
@@ -38,5 +38,13 @@
   ],
   "dirty": true,
   "has_layout": false,
-  "has_lca": false
+  "has_lca": false,
+  "has_tea": false,
+  "has_equipment_estimate": false,
+  "has_simulation": false,
+  "has_reactions": false,
+  "has_datasheets": false,
+  "has_kinetic_data": false,
+  "has_control": false,
+  "has_issues": false
 }

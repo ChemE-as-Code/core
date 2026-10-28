@@ -102,6 +102,7 @@
       "catalyst": "",
       "sources": [],
       "key_component": "CO",
+      "reaction_smiles": null,
       "type": "conversion",
       "units": [
         {
@@ -257,6 +258,7 @@
       "catalyst": "",
       "sources": [],
       "key_component": null,
+      "reaction_smiles": null,
       "type": null,
       "units": [],
       "rate_law": null,
@@ -276,6 +278,7 @@
       "node": "R",
       "kind": "block",
       "bed": null,
+      "tank": null,
       "model": "conversion",
       "balance": "ok",
       "streams_in": [
@@ -300,6 +303,8 @@
         }
       ],
       "duty_kW": null,
+      "duty_assumptions": [],
+      "duty_basis": "ideal gas",
       "missing": [
         "reaction COOX: no equilibrium_constant and no ideal_gas data for CO, O2, CO2",
         "ideal_gas data for CO, CO2, N2, O2"

@@ -56,7 +56,7 @@ test.describe("maturity", () => {
     await page.goto("/maturity?rev=v0.1");
     await expect(page.getByTestId("maturity-badge")).toHaveText("Verified maturity: outdated report");
     await expect(page.getByTestId("maturity-stale")).toContainText("process/flowsheet.yaml");
-    await expect(page.getByText("as recorded, not current")).toBeVisible();
+    await expect(page.getByText("as recorded, not current", { exact: true })).toBeVisible();
     await expect(page.locator(".levels .badge.pass")).toHaveCount(0);
   });
 

@@ -22,8 +22,8 @@
   },
   "run": {
     "case": "design",
-    "run_at": "2026-10-27T14:37:45Z",
-    "tool": "cheme-as-code 0.7.0",
+    "run_at": "2026-10-28T12:00:00Z",
+    "tool": "cheme-as-code 0.8.0",
     "simulator": {
       "name": "dwsim",
       "version": "9.0.5.0",
@@ -216,7 +216,7 @@
       "formation": {
         "property_package": "Peng-Robinson (PR)",
         "reference_verified": true,
-        "reference": "each component's ideal gas at 298.15 K = 0, without formation enthalpies (verified live for DWSIM 9.0.5: Peng-Robinson (PR), Peng-Robinson 1978 (PR78), Soave-Redlich-Kwong (SRK))",
+        "reference": "each component's ideal gas at 298.15 K = 0, without formation enthalpies, a liquid below it by its departure function (verified live for DWSIM 9.0.5: Peng-Robinson (PR), Peng-Robinson 1978 (PR78), Soave-Redlich-Kwong (SRK))",
         "closure_basis": "DWSIM's formation enthalpies (simulator_dHf_298_kJ_kmol)",
         "components": {
           "N2": {
