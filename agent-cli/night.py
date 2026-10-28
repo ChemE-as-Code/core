@@ -5,7 +5,7 @@
 Each case gets its own worktree and branch (case/<pid>); every agent session goes through
 agent.py (spending cap, guards, run record committed in processes/<pid>/runs/). This script
 does the outward steps itself (push, PR, merge), never the agents. The ledger counts every
-runs.jsonl entry since LEDGER_SINCE plus the caps of sessions still running.
+runs.jsonl entry since --since (default: the start) plus the caps of sessions still running.
 
 The cases are a JSON list (see jobs/examples/cases.json); the process-library checkout and the
 worktree folder default to siblings of this repository (CHEME_LIBRARY, CHEME_WORKTREES).
@@ -20,7 +20,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import procs
@@ -29,8 +29,8 @@ HERE = Path(__file__).resolve().parent
 WORKSPACE = HERE.parent.parent  # the folder holding this repository and process-library
 LIB = Path(os.environ.get("CHEME_LIBRARY") or WORKSPACE / "process-library")
 WT = Path(os.environ.get("CHEME_WORKTREES") or WORKSPACE / "wt")
-LEDGER_SINCE = "2026-10-27T21:00"  # the $100 budget: core run records onwards
-CAPS = {"design": 14.0, "review": 3.0, "fix": 5.0, "ci-fix": 0.0}  # CI fails on shared lci/mappings.yaml: fixed centrally
+LEDGER_SINCE = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")  # --since; default: this start
+CAPS = {"design": 14.0, "review": 3.0, "fix": 5.0, "ci-fix": 3.0}
 MIN = {"design": 8.0, "review": 1.5, "fix": 2.0, "ci-fix": 1.5}
 
 lock = threading.Lock()
@@ -220,9 +220,12 @@ def main():
     p.add_argument("--total", type=float, default=100.0)
     p.add_argument("--lanes", type=int, default=3)
     p.add_argument("--only", nargs="*")
+    p.add_argument("--since", help="Ledger start (UTC, YYYY-MM-DDTHH:MM): count runs.jsonl from here; default: now.")
     a = p.parse_args()
     all_cases = json.loads(Path(a.cases).read_text(encoding="utf-8"))
     cases = [c for c in all_cases if not a.only or c["pid"] in a.only]
+    global LEDGER_SINCE
+    LEDGER_SINCE = a.since or LEDGER_SINCE
     log(f"start: {len(cases)} cases, {a.lanes} lanes, ${a.total} total, ${spent():.2f} already spent")
     with ThreadPoolExecutor(a.lanes) as pool:
         for c in cases:

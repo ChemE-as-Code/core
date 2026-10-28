@@ -13,7 +13,7 @@ design files. Follow this folder's AGENTS.md, the skill `review` and `reviews/RE
   general engineering knowledge and the cited sources' facts); every key value is sourced or
   marked ASSUMED; no third-party tables, figures or passages copied (library CLAUDE.md); the
   LCI is per functional unit, consistent with the flowsheet (mass in = mass out within
-  tolerance), has no zero-filled or licensed background values, and every gap is described;
+  tolerance), has no zero-filled or licensed background values, every unmapped background is listed as a gap with a description, per-process overrides are in the folder's `lca/mappings.yaml`, and facts cite a source with a locator;
   process.yaml is honest about maturity; nothing outside `processes/{pid}/` changed.
 
 ## Output

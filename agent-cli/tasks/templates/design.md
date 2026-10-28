@@ -31,7 +31,10 @@ third-party tables/figures/text, facts with sources, estimates marked ASSUMED).
    fuel), co-products, emissions to air/water and wastes, each with amount per functional unit,
    unit and provenance (flowsheet stream id or ASSUMED with reason). Leave background datasets
    **unmapped** (gaps, never 0 and never values from licensed databases); give for each a short
-   description of the background activity it should connect to later. Write the inventory
+   description of the background activity it should connect to later: an unmapped exchange of
+   an internal process is a reported gap, not a build error (library ADR on LCI gaps). Overrides
+   for this process's exchanges go in `lca/mappings.yaml` in this folder, never in the shared
+   `lci/mappings.yaml`. Write the inventory
    (`cheme assess lca --inventory --write` and `--coverage`) and check its mass balance against
    the flowsheet.
 5. DESIGN.md, PROGRESS.md and the equipment/line lists as far as the PFD requires.
@@ -39,6 +42,13 @@ third-party tables/figures/text, facts with sources, estimates marked ASSUMED).
 Out of scope: P&IDs (leave the template's DEXPI reference sheet alone or remove it), layout,
 HAZOP, TEA, datasheets. Do not edit anything outside `processes/{pid}/` (shared files such as
 `chemicals/chemicals.yaml` are changed later in one consolidated PR: list what is missing there).
+
+## Sources: research online
+Use web search and fetch to find open sources for the route, operating conditions, yields,
+utilities and emissions. Record each fact in our own words with its source (URL or DOI and the
+exact table/section/page) in DESIGN.md or the `source:`/`provenance:` fields; never copy text,
+tables or figures (library CLAUDE.md). Prefer primary literature, BREF documents and open
+reports; mark a value ASSUMED when no source supports it.
 
 ## Working rules
 - Run `cheme status`, `cheme check`, `cheme maturity`, `cheme process streams` and fix what you
