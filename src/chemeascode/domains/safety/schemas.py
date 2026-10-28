@@ -1,5 +1,6 @@
-"""Schemas of the safety files: the risk matrix (``cheme/risk-matrix/v1``) and the HAZOP study
-(``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``).
+"""Schemas of the safety files: the risk matrix (``cheme/risk-matrix/v1``), the HAZOP study
+(``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``) and the failure-mode library
+scenario propagation walks with (``cheme/failure-modes/v1``, ``safety/failure-modes.yaml``).
 
 A study is one nested file in worksheet order: nodes, their deviations (guide word and
 parameter) and the scenarios of each deviation (a cause leading to a consequence), with the
@@ -37,6 +38,7 @@ from chemeascode.foundation.schemas.reviews import Basis
 
 MATRIX_SCHEMA = "cheme/risk-matrix/v1"
 STUDY_SCHEMA = "cheme/hazop-study/v1"
+FAILURE_MODES_SCHEMA = "cheme/failure-modes/v1"
 
 
 def _stable_id(value: Any) -> Any:
@@ -409,3 +411,104 @@ class HazopStudy(Strict):
     def scenarios(self) -> list[tuple[Node, Deviation, Scenario]]:
         """Every scenario with its node and deviation, in worksheet order."""
         return [(n, d, s) for n in self.nodes for d in n.deviations for s in d.scenarios]
+
+
+# ---------------------------------------------------------------------------
+# Failure-mode library (scenario propagation)
+# ---------------------------------------------------------------------------
+
+#: Which way a deviation travels along the piping from where it arises; ``none``: it stays at
+#: the object (a level, a temperature inside), and the object's own responses to it apply.
+Towards = Literal["downstream", "upstream", "both", "none"]
+#: What an object does with a deviation reaching it: turns it into another (``responds``), lets
+#: it through (``passes``, ``no-effect``: not recorded as a step), takes it up (``absorbs``) or
+#: ends the chain at a top event (``stops``).
+ResponseEffect = Literal["responds", "passes", "no-effect", "absorbs", "stops"]
+#: The events that end a chain: a loss of primary containment or a fire or explosion inside.
+TopEvent = Literal["loss-of-containment", "overpressure", "overfill", "internal-fire-explosion"]
+
+
+class DeviationSpec(Strict):
+    """A deviation: a guide word applied to a parameter, and which way it travels."""
+
+    parameter: str = Field(min_length=1, description="flow, pressure, temperature, level, ...")
+    guide_word: GuideWord
+    towards: Towards = Field(
+        default="downstream", description="Which way it travels along the piping from here."
+    )
+
+
+class FailureMode(Strict):
+    """A way an object of the class can fail, and the deviation it gives at the object."""
+
+    id: StableId
+    gives: DeviationSpec
+    mechanism: str = ""
+    needs: Literal["power", "actuation", "operator"] | None = Field(
+        default=None,
+        description="actuation: only an object operated by an actuating system can fail so.",
+    )
+    fail: Literal["open", "closed", "last", "stop", "off"] | None = Field(
+        default=None,
+        description="Only where the object's fail position (control/loops.yaml) is this one; an "
+        "unrecorded fail position keeps the mode, with a question.",
+    )
+    at: Literal["self", "final-element"] = Field(
+        default="self",
+        description="final-element: an instrument function's failure, felt at the valve it "
+        "actuates.",
+    )
+
+
+class Response(Strict):
+    """What an object of the class does with an incoming deviation."""
+
+    incoming: DeviationSpec
+    via: Literal["inlet", "outlet", "any"] = Field(
+        default="any",
+        description="inlet: the deviation arrives travelling downstream; outlet: upstream.",
+    )
+    effect: ResponseEffect
+    gives: DeviationSpec | None = Field(default=None, description="The deviation it turns into.")
+    top_event: TopEvent | None = None
+    note: str = ""
+
+    @model_validator(mode="after")
+    def _complete(self) -> Response:
+        if self.effect == "responds" and self.gives is None:
+            raise ValueError("effect responds needs gives: the deviation it turns into")
+        if self.effect == "stops" and self.top_event is None:
+            raise ValueError("effect stops needs top_event")
+        return self
+
+
+class ClassEntry(Strict):
+    """The failure modes and responses of one DEXPI class (and its subclasses)."""
+
+    modes: list[FailureMode] = Field(default_factory=list)
+    responses: list[Response] = Field(default_factory=list)
+
+
+class FailureModeLibrary(Strict):
+    """The project's failure modes and responses by DEXPI class: the data
+    ``cheme safety hazop propagate`` walks the P&IDs with. Project data, written by the team."""
+
+    schema_: str = Field(alias="schema", description=f"Always {FAILURE_MODES_SCHEMA}.")
+    kind: Literal["failure-modes"]
+    example: bool = Field(default=False, description="True: illustrative data, not a library.")
+    status: Judgement = "proposed"
+    source: str = Field(
+        default="", description="Who wrote it and from what: the basis and licence of the content."
+    )
+    classes: dict[str, ClassEntry] = Field(
+        default_factory=dict,
+        description="By DEXPI class name (CentrifugalPump, Valve, ...): an object takes the "
+        "entry of its most specific class that has one.",
+    )
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _version(self) -> FailureModeLibrary:
+        if self.schema_ != FAILURE_MODES_SCHEMA:
+            raise ValueError(unsupported_schema(self.schema_, FAILURE_MODES_SCHEMA))
+        return self

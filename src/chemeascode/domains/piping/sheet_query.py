@@ -49,7 +49,8 @@ def class_matches(item: DrawnItem, wanted: str) -> bool:
 _STOP = {"ConceptualObject", "PyDexpiBaseModel", "BaseModel", "ABC", "object"}
 
 
-def _classes(obj: Any) -> tuple[str, ...]:
+def dexpi_classes(obj: Any) -> tuple[str, ...]:
+    """The DEXPI class of *obj* and its superclasses, most specific first."""
     found = []
     for klass in type(obj).__mro__:
         if klass.__name__ in _STOP:
@@ -151,7 +152,7 @@ def sheet_items(model: Any, sheet: str) -> list[DrawnItem]:
             DrawnItem(
                 tag=tag.strip(),
                 cls=type(obj).__name__,
-                classes=_classes(obj),
+                classes=dexpi_classes(obj),
                 id=getattr(obj, "id", "") or "",
                 kind=kind,
                 connected=connected,
@@ -166,7 +167,7 @@ def sheet_items(model: Any, sheet: str) -> list[DrawnItem]:
                 DrawnItem(
                     tag=number,
                     cls=type(system).__name__,
-                    classes=_classes(system),
+                    classes=dexpi_classes(system),
                     id=system.id or "",
                     kind="line",
                     connected=id(system) in piped_lines,

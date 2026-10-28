@@ -33,6 +33,7 @@ from chemeascode.domains.safety.hazop import (
     study_state,
     workspace_studies,
 )
+from chemeascode.domains.safety.propagation import Context, Deviation, Propagation, propagate
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.workspace import Workspace
 
@@ -184,3 +185,133 @@ def review_draft(workspace: Workspace, summary: StudySummary) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+#: The project's failure-mode library ``cheme safety hazop propagate`` walks with.
+LIBRARY_FILE = "safety/failure-modes.yaml"
+
+
+@dataclass
+class NodePropagation:
+    """``cheme safety hazop propagate`` for one node: its candidates and what limits them."""
+
+    study: str
+    node: str
+    library: str
+    sheets: list[str]
+    deviation: Deviation | None
+    result: Propagation
+    findings: list[Finding]
+
+
+def _deviation(node: Any, wanted: str) -> Deviation:
+    """A deviation of *node* by its id (``N1-NF``), or one given as ``<guide word> <parameter>``."""
+    for deviation in node.deviations:
+        if deviation.id == wanted:
+            return Deviation(deviation.parameter, deviation.guide_word)
+    guide_word, _, parameter = wanted.strip().partition(" ")
+    if not parameter.strip():
+        raise ValueError(
+            f"--deviation {wanted!r}: no deviation of {node.id} has that id; give its id or "
+            "'<guide word> <parameter>' (no flow, more pressure)"
+        )
+    return Deviation(parameter.strip(), guide_word)
+
+
+def node_propagation(
+    workspace: Workspace,
+    study_id: str,
+    node_id: str,
+    deviation: str | None = None,
+    library_file: str = LIBRARY_FILE,
+) -> NodePropagation:
+    """Walk the study's analysed P&IDs from the members of node *node_id* with the failure-mode
+    library. Reads only; raises ValueError for a missing study, node, library or P&ID."""
+    from pydantic import ValidationError
+
+    from chemeascode.domains.piping.sheet_query import load_sheets, sheet_id_of
+    from chemeascode.domains.safety.hazop import load_study
+    from chemeascode.domains.safety.schemas import FailureModeLibrary
+
+    path = study_path(study_id)
+    if not (workspace.root / path).is_file():
+        raise ValueError(f"no study {path}")
+    loaded = load_study(workspace.root, path)
+    if loaded.model is None:
+        raise ValueError(f"{path} does not load: cheme safety hazop check {study_id}")
+    node = next((n for n in loaded.model.nodes if n.id == node_id), None)
+    if node is None:
+        raise ValueError(f"{path}: no node {node_id}")
+    wanted = _deviation(node, deviation) if deviation else None
+
+    library_path = workspace.root / library_file
+    if not library_path.is_file():
+        raise ValueError(
+            f"no failure-mode library {library_file}: the team writes it "
+            "(cheme schema failure-modes; skill hazop-scenario-propagation)"
+        )
+    try:
+        library = FailureModeLibrary.model_validate(
+            yaml.safe_load(library_path.read_text(encoding="utf-8")) or {}
+        )
+    except (yaml.YAMLError, ValidationError) as failure:
+        raise ValueError(f"{library_file} does not load: {failure}") from failure
+
+    analysed = {basis.path for basis in loaded.model.analysed}
+    models = []
+    for sheet in load_sheets(workspace):
+        if sheet.name not in analysed:
+            continue
+        if sheet.model is None:
+            raise ValueError(f"{sheet.name} does not load: {sheet.error}")
+        models.append((sheet_id_of(workspace, sheet.name), sheet.model))
+    if not models:
+        raise ValueError(
+            f"{path} analyses no P&ID: cheme safety hazop stamp {study_id} --input pid/<sheet>.xml"
+        )
+
+    context = Context()
+    parsed = workspace.parsed_lists(("interlocks", "loops"))
+    if "interlocks" in parsed:
+        for interlock in parsed["interlocks"].interlocks:
+            context.interlocks.setdefault(str(interlock.cause.tag), []).append(str(interlock.id))
+    if "loops" in parsed:
+        for loop in parsed["loops"].loops:
+            for element in loop.final_elements:
+                if element.fail:
+                    context.fail[str(element.tag)] = element.fail
+
+    result = propagate(models, library, node.members, context, wanted)
+    findings = []
+    if result.unresolved:
+        findings.append(
+            Finding(
+                path,
+                "warning",
+                "cheme.hazop-propagation-member",
+                f"{node_id}: not on the analysed P&IDs: {', '.join(result.unresolved)}",
+                key=node_id,
+                hint="fix the member, or stamp the sheet it is on (cheme safety hazop stamp)",
+            )
+        )
+    if result.uncovered:
+        findings.append(
+            Finding(
+                library_file,
+                "info",
+                "cheme.hazop-class-uncovered",
+                f"{node_id}: no library entry for {', '.join(result.uncovered)}: no cause or "
+                "response of theirs is walked",
+                key=node_id,
+                hint="add the class (or a superclass) to the library under classes:",
+            )
+        )
+    return NodePropagation(
+        loaded.model.id,
+        node_id,
+        library_file,
+        [sheet for sheet, _ in models],
+        wanted,
+        result,
+        findings,
+    )
