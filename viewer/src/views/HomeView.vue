@@ -78,6 +78,7 @@ const groups = computed(() => groupSheets(repo.value?.sheets ?? []));
         <li><RouterLink :to="{ name: 'validate' }">Validation of the working tree</RouterLink></li>
         <li><RouterLink :to="{ name: 'reviews', query: withRev() }">Reviews: open findings and sign-offs</RouterLink></li>
         <li v-if="store.hasInterlocks"><RouterLink :to="{ name: 'cause-effect', query: withRev() }">Cause &amp; effect matrix</RouterLink></li>
+        <li v-if="store.hasHazop"><RouterLink :to="{ name: 'hazop', query: withRev() }">HAZOP studies</RouterLink></li>
         <li v-if="store.repo?.has_issues"><RouterLink :to="{ name: 'issues', query: withRev() }">Issues: action items, holds, technical queries and design changes</RouterLink></li>
         <li v-if="store.repo?.has_control"><RouterLink :to="{ name: 'control', query: withRev() }">Control: loops, sequences, narrative and philosophy</RouterLink></li>
         <li v-if="store.repo?.has_simulation"><RouterLink :to="{ name: 'streams', query: withRev({ tab: 'simulation' }) }">Simulation: the recorded run</RouterLink></li>

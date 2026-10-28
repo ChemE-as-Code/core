@@ -2,6 +2,7 @@ import { computed, reactive, watchEffect, type ComputedRef } from "vue";
 import { api, ApiError, type Branch, type IssuesReport, type PlantStatus, type RepoInfo } from "@/api";
 import { hasInterlocks } from "@/lib/causeEffect";
 import { datasheetPaths } from "@/lib/studies";
+import { hazopPaths } from "@/lib/hazop";
 import { MATURITY_FILE, checkInputs, evaluatedState, recordedState, type MaturityState } from "@/lib/maturity";
 import type { SnapshotManifest } from "@/dataSource";
 
@@ -18,6 +19,8 @@ export interface Store {
   hasInterlocks: boolean;
   /** The working tree has `equipment/datasheets/<TAG>.yaml` (from the same `/api/tree`): the datasheet pages have something to show. */
   hasDatasheets: boolean;
+  /** The working tree has `safety/hazop/<id>/study.yaml` (from the same `/api/tree`): the HAZOP page has something to show. */
+  hasHazop: boolean;
   /** Set when the viewer shows a static snapshot (`?data=`) instead of a server. */
   snapshot: SnapshotInfo | null;
   /** Why the snapshot asked for with `?data=` could not be opened. */
@@ -40,6 +43,7 @@ export const store = reactive<Store>({
   loading: false,
   hasInterlocks: false,
   hasDatasheets: false,
+  hasHazop: false,
   snapshot: null,
   snapshotError: null,
   embed: false,
@@ -228,6 +232,7 @@ export async function loadRepo(): Promise<void> {
       .then((tree) => {
         store.hasInterlocks = hasInterlocks(tree);
         store.hasDatasheets = Boolean(repo.has_datasheets) || datasheetPaths(tree).size > 0;
+        store.hasHazop = hazopPaths(tree).size > 0;
       })
       .catch(() => {
         store.hasInterlocks = false;
