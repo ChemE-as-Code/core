@@ -48,7 +48,7 @@
   },
   "run": {
     "case": "design",
-    "run_at": "2026-10-28T12:57:07Z",
+    "run_at": "2026-10-28T12:00:00Z",
     "tool": "cheme-as-code 0.8.0",
     "simulator": {
       "name": "dwsim",
