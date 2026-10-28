@@ -168,6 +168,12 @@ def check_runner(plant: Path, tmp: Path) -> None:
     # package's cheme (this checkout's environment) goes first on PATH.
     bin_dir = Path(sys.executable).parent
     env = {**env, "CLAUDE_CONFIG_DIR": str(home), "PATH": f"{bin_dir}{os.pathsep}{env['PATH']}"}
+    # `cheme runs record --commit` commits in the plant: CI has no git identity of its own
+    env |= {
+        f"GIT_{who}_{what}": value
+        for who in ("AUTHOR", "COMMITTER")
+        for what, value in (("NAME", "smoke"), ("EMAIL", "smoke@example.invalid"))
+    }
     start = git(plant, "rev-parse", "HEAD")
     code = (
         "import sys, types, agent\n"
@@ -183,6 +189,8 @@ def check_runner(plant: Path, tmp: Path) -> None:
     records = sorted((plant / "runs").glob("*/run.yaml"))
     if not records:
         sys.exit("no run record written")
+    if "run record" not in git(plant, "log", "-1", "--format=%s"):
+        sys.exit("the run record was written but not committed")
     tools = yaml.safe_load(records[-1].read_text(encoding="utf-8"))["tools"]
     print("tools:", json.dumps(tools, indent=1))
 
