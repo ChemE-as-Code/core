@@ -86,4 +86,5 @@ make a scenario safe.
 
 - `safety/README.md`; `cheme schema hazop-study`, `cheme schema risk-matrix`.
 - IEC 61882:2016; ISO 31000 (risk criteria); the company's risk matrix procedure.
-- Skills `hazop-study` (drafting), `hazop-review` (review and revisions).
+- Skills `hazop-study` (drafting), `hazop-risk-classification` (suggesting codes from the
+  matrix), `hazop-review` (review and revisions).

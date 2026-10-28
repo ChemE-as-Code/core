@@ -72,17 +72,17 @@ actions:
    modes, the team and the assessment basis. `analysed:` records the revision of every P&ID and
    control file the study analyses.
 2. **Nodes and design intent.** Split the plant into nodes; give each its members and design
-   intent. Skill `hazop-study`.
+   intent. Skills `hazop-study`, `hazop-node-breakdown`.
 3. **Deviations.** For each node, the guide words that make sense with each parameter of its
    intent (flow, pressure, temperature, level, composition, ...).
 4. **Causes and consequences.** One scenario per credible cause and consequence; a deviation
-   without a credible cause says so in `notes:`.
+   without a credible cause says so in `notes:`. Skill `hazop-scenario-propagation`.
 5. **Safeguards.** The ones the P&IDs and the cause and effect actually have, by tag or
    interlock id.
 6. **Assessment and recommendations.** The team rates severity and likelihood per category,
    initial and, where it credits safeguards, residual, each with its basis; `cheme safety hazop
    rate H-01 --write` looks the bands up; a band whose matrix policy requires an action asks for
-   one. Skill `hazop-assessment`.
+   one. Skills `hazop-risk-classification` (suggested codes), `hazop-assessment`.
 7. **Human review.** `cheme safety hazop check H-01`, `cheme safety hazop report H-01`, then a
    review record (`cheme safety hazop review H-01` prepares it; skill `hazop-review`).
 8. **Revisions.** When a P&ID or the C&E changes, `cheme validate` reports

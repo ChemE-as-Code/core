@@ -47,7 +47,8 @@ or during a session. You draft; the team decides. Everything you write is a prop
    `N3`, its place in the list is only the display order), a `title`, its `members` (tags as
    printed; `{tag: X, sheet: P-02}` where a tag is on several sheets with different meaning;
    `{sheet: P-01, object: Nozzle-7}` for an untagged DEXPI object), the `design_intent`
-   (what it is meant to do, with the ranges), and `status: proposed`, `by: agent`.
+   (what it is meant to do, with the ranges), and `status: proposed`, `by: agent`. Skill
+   `hazop-node-breakdown` places every item by named boundary rules.
 3. **Deviations.** For each parameter of the intent (flow, pressure, temperature, level,
    composition, phase, reaction, ...) the guide words that give a meaningful deviation:
    `no`, `more`, `less`, `as-well-as`, `part-of`, `reverse`, `other-than`, and for
@@ -56,7 +57,9 @@ or during a session. You draft; the team decides. Everything you write is a prop
 4. **Scenarios.** One per credible cause and consequence: `id` (`S1`, ... unique in the
    study, never reused), `cause` (what fails, by tag), `consequence` (the outcome assuming
    the safeguards fail), `refs` (the tags of cause and consequence), `modes` when it applies
-   only to some. Several consequences of one cause are several scenarios.
+   only to some. Several consequences of one cause are several scenarios. Skill
+   `hazop-scenario-propagation` finds causes in the node and follows each deviation over the
+   P&ID to its consequence.
 5. **Candidate safeguards** (`safeguards:` register, referenced by id from the scenarios):
    only what the plant has: an instrument with an alarm, a control loop, an interlock of
    `control/cause-effect.yaml` (`kind: interlock, interlock: I-01`), a relief device of
@@ -104,6 +107,8 @@ plant behaves.
 
 - `safety/README.md` (file format, workflow, commands); `cheme schema hazop-study`.
 - IEC 61882:2016, Hazard and operability studies (HAZOP studies) - Application guide.
-- Skills `hazop-assessment` (ratings and bands), `hazop-review` (review and revisions),
+- Skills `hazop-node-breakdown` (nodes), `hazop-scenario-propagation` (scenarios),
+  `hazop-risk-classification` (suggested codes), `hazop-assessment` (ratings and bands),
+  `hazop-review` (review and revisions),
   `review` (review records), `hazop-equipment-causes` (deviations by equipment),
   `safeguard-crediting` (what may be credited), `relief-scenarios`, `process-safety` (hub).

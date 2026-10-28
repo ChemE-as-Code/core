@@ -46,6 +46,10 @@ def history(paths: list[str]) -> list[str]:
 
 
 def main() -> None:
+    out = ROOT / "src/chemeascode/templates" / MANIFEST_FILE
+    # The 0.8.0 history was squashed, so git no longer holds the earlier versions: keep the
+    # hashes the manifest already lists after those git still knows.
+    known = json.loads(out.read_text(encoding="utf-8"))["skills"] if out.is_file() else {}
     skills: dict[str, dict[str, list[str]]] = {}
     for name, files in bundled_files().items():
         entry = skills.setdefault(name, {})
@@ -54,9 +58,12 @@ def main() -> None:
             paths = [source.resolve().relative_to(ROOT).as_posix()]
             paths.append(paths[0].replace(*OLD_PACKAGE, 1))
             paths += [p.format(name=name, file=relative) for p in EARLIER]
-            entry[relative] = [current] + [h for h in history(paths) if h != current]
+            hashes = [current]
+            for digest in history(paths) + known.get(name, {}).get(relative, []):
+                if digest not in hashes:
+                    hashes.append(digest)
+            entry[relative] = hashes
     manifest = {"schema": MANIFEST_SCHEMA, "skills": skills}
-    out = ROOT / "src/chemeascode/templates" / MANIFEST_FILE
     out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(f"{out.relative_to(ROOT)}: {sum(len(f) for f in skills.values())} files")
 

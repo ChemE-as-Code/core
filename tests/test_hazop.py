@@ -187,7 +187,14 @@ def test_a_fresh_project_documents_the_study_location(tmp_path):
     matrix = load_matrix(root, "safety/risk-matrix.yaml")
     assert matrix.usable and matrix.model.example  # the template's matrix says it is an example
     assert not (root / "safety" / "hazop").exists()  # no empty study to mistake for one
-    for skill in ("hazop-study", "hazop-assessment", "hazop-review"):
+    for skill in (
+        "hazop-study",
+        "hazop-node-breakdown",
+        "hazop-scenario-propagation",
+        "hazop-risk-classification",
+        "hazop-assessment",
+        "hazop-review",
+    ):
         assert (root / ".claude" / "skills" / skill / "SKILL.md").is_file()
     assert not [f for f in validate_workspace(Workspace(root)).findings if "hazop" in f.rule]
 
