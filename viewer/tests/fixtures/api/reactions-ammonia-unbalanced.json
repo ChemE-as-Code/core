@@ -33,6 +33,7 @@
         "Appl, Ammonia, Ullmann's Encyclopedia of Industrial Chemistry, doi:10.1002/14356007.a02_143.pub3"
       ],
       "key_component": null,
+      "reaction_smiles": null,
       "type": "equilibrium",
       "units": [
         {
@@ -60,6 +61,7 @@
       "node": "LOOP",
       "kind": "block",
       "bed": null,
+      "tank": null,
       "model": null,
       "balance": "imbalance",
       "streams_in": [
@@ -85,6 +87,8 @@
         }
       ],
       "duty_kW": null,
+      "duty_assumptions": [],
+      "duty_basis": "ideal gas",
       "missing": [
         "one outlet with a temperature",
         "the temperature of every stream"
@@ -94,6 +98,7 @@
       "node": "R1",
       "kind": "step",
       "bed": null,
+      "tank": null,
       "model": "equilibrium",
       "balance": "imbalance",
       "streams_in": [
@@ -118,6 +123,8 @@
         }
       ],
       "duty_kW": -4798.052680310904,
+      "duty_assumptions": [],
+      "duty_basis": "ideal gas",
       "missing": []
     }
   ],

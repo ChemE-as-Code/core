@@ -142,6 +142,6 @@ test.describe("simulation", () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Simulation: the recorded run" }).click();
     await expect(page).toHaveURL(/\/streams\?tab=simulation/);
-    await expect(page.getByRole("region", { name: "Simulation" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Simulation", exact: true })).toBeVisible();
   });
 });

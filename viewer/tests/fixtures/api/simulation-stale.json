@@ -48,59 +48,67 @@
   },
   "run": {
     "case": "design",
-    "run_at": "2026-10-23T13:08:58Z",
-    "tool": "cheme-as-code 0.7.0",
+    "run_at": "2026-10-28T12:57:06Z",
+    "tool": "cheme-as-code 0.8.0",
     "simulator": {
       "name": "dwsim",
-      "version": "9.0.5.0"
+      "version": "9.0.5.0",
+      "method": "Peng-Robinson (PR)"
     },
     "property_package": "Peng-Robinson (PR)",
     "model_fingerprint": "aa92c1c90ad4962a",
     "inputs": {
-      "commit": "c62be914b1eea33a48fcc27bf034db6539d62158",
+      "commit": "0bb0c2e2c4fc159305d2e403887d569915bb736d",
       "dirty": [
         "process/flowsheet.yaml"
       ],
       "fingerprints": {
-        "process/flowsheet.yaml": "sha256:ed12bd83734eee6bf01a15d3a262002ac021cfceba91609eea2ee91f37822542",
+        "process/flowsheet.yaml": "sha256:b5f3245f30d5e98a11127ca9a3e97a52741df7a81301e3e17727d50ed7185ebe",
         "process/materials.yaml": "sha256:5194b43824ad48e1fbf1c7243217f9b5cbe6fc10862fdbfeaa9eb740dc1910b7",
-        "process/simulation.yaml": "sha256:ee50c5bf0012871f395fb0928a1b146632058dbf6ef67929f9cf986f99d5b95e"
+        "process/simulation.yaml": "sha256:071481e2e218c4bd52084c88f4c199ac8b5a2e6223fffdd7bf8d2b2a77eb858f"
       }
     },
     "converged": true,
-    "iterations": null,
+    "status": "converged",
+    "iterations": 1,
     "messages": [],
     "units": [
       {
         "id": "K1",
         "unit": "compressor",
         "status": "simulated",
+        "basis": "predictive",
         "converged": true,
         "results": {
           "duty_kW": 84.2
         },
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       },
       {
         "id": "E1",
         "unit": "cooler",
         "status": "simulated",
+        "basis": "predictive",
         "converged": true,
         "results": {
           "duty_kW": -81.0
         },
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       },
       {
         "id": "X1",
         "unit": "splitter",
         "status": "simulated",
+        "basis": "specified",
         "converged": true,
         "results": {},
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       }
     ],
     "streams": [
@@ -246,7 +254,100 @@
         "kept": {}
       }
     ],
-    "findings": []
+    "findings": [
+      {
+        "file": "process/simulation.yaml",
+        "line": null,
+        "level": "info",
+        "rule": "cheme.process-sim-energy-not-evaluable",
+        "message": "energy closure not evaluated: the simulator returned no stream enthalpies",
+        "ids": [],
+        "hint": "run cheme process simulate again (the worker reports mass enthalpies)",
+        "id": "process/simulation.yaml#process-sim-energy-not-evaluable:"
+      }
+    ],
+    "energy": {
+      "reference": {
+        "source": "simulator (DWSIM mass enthalpy, kJ/kg, its own reference state)",
+        "formation_enthalpy_included": false,
+        "comparable_with": "values of the same run only",
+        "formation_basis": "reacting units, and the plant with a reactor: plus sum n_i dHf_i (ideal gas, 298.15 K, DWSIM's database) of the reacting components whose flow changes (energy.formation)"
+      },
+      "tolerance": {
+        "abs_kW": 0.1,
+        "rel_duty": 0.01,
+        "rel_enthalpy": 0.0001
+      },
+      "closure": {
+        "units": [
+          {
+            "id": "K1",
+            "unit": "compressor",
+            "heat_in_kW": -0.0,
+            "work_in_kW": 84.2,
+            "status": "not-evaluable"
+          },
+          {
+            "id": "E1",
+            "unit": "cooler",
+            "heat_in_kW": -81.0,
+            "work_in_kW": 0.0,
+            "status": "not-evaluable"
+          },
+          {
+            "id": "X1",
+            "unit": "splitter",
+            "heat_in_kW": 0.0,
+            "work_in_kW": 0.0,
+            "status": "not-evaluable"
+          }
+        ],
+        "plant": {
+          "feeds": [
+            "S1"
+          ],
+          "products": [
+            "S4",
+            "S5"
+          ],
+          "heat_in_kW": -81.0,
+          "work_in_kW": 84.2,
+          "basis": "simulator",
+          "reasons": [
+            "the simulator returned no enthalpies"
+          ],
+          "status": "not-evaluable"
+        }
+      },
+      "formation": null,
+      "exchangers": [],
+      "utility_levels": [],
+      "utilities": {
+        "totals_kW": {
+          "hot_utility": 0.0,
+          "cold_utility": 81.0,
+          "power_in": 84.2,
+          "power_out": 0.0,
+          "recovered": 0.0
+        },
+        "duties": [
+          {
+            "id": "K1",
+            "role": "power",
+            "class": "power_in",
+            "kW": 84.2,
+            "terminal": "POWER"
+          },
+          {
+            "id": "E1",
+            "role": "heat",
+            "class": "cold_utility",
+            "kW": 81.0,
+            "terminal": null
+          }
+        ]
+      }
+    }
   },
   "stale": true,
   "staleness": {
@@ -261,6 +362,7 @@
       "id": "K1",
       "unit": "compressor",
       "status": "simulated",
+      "basis": "predictive",
       "reason": "",
       "spec": {
         "outlet_pressure": {
@@ -278,18 +380,21 @@
         "id": "K1",
         "unit": "compressor",
         "status": "simulated",
+        "basis": "predictive",
         "converged": true,
         "results": {
           "duty_kW": 84.2
         },
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       }
     },
     {
       "id": "E1",
       "unit": "cooler",
       "status": "simulated",
+      "basis": "predictive",
       "reason": "",
       "spec": {
         "pressure_drop": {
@@ -308,28 +413,33 @@
         "id": "E1",
         "unit": "cooler",
         "status": "simulated",
+        "basis": "predictive",
         "converged": true,
         "results": {
           "duty_kW": -81.0
         },
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       }
     },
     {
       "id": "X1",
       "unit": "splitter",
       "status": "simulated",
+      "basis": "specified",
       "reason": "",
       "spec": null,
       "run": {
         "id": "X1",
         "unit": "splitter",
         "status": "simulated",
+        "basis": "specified",
         "converged": true,
         "results": {},
         "messages": [],
-        "warnings": []
+        "warnings": [],
+        "coupling": "native"
       }
     }
   ],

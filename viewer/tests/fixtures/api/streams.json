@@ -5,7 +5,11 @@
     {
       "id": "design",
       "description": "Design case",
-      "default": true
+      "default": true,
+      "capacity": null,
+      "provenance": null,
+      "applicability": null,
+      "source": null
     }
   ],
   "default_case": "design",
@@ -67,7 +71,10 @@
         },
         "provenance": "given",
         "source": "basis of design",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -107,7 +114,10 @@
         },
         "provenance": "assumed",
         "source": "",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -147,7 +157,10 @@
         },
         "provenance": "given",
         "source": "product specification",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -187,7 +200,10 @@
         },
         "provenance": "assumed",
         "source": "",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -227,7 +243,10 @@
         },
         "provenance": "assumed",
         "source": "",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -267,7 +286,10 @@
         },
         "provenance": "assumed",
         "source": "",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": {
         "value": "vapor",
@@ -314,7 +336,10 @@
         },
         "provenance": "assumed",
         "source": "",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},

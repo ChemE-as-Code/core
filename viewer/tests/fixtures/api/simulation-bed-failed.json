@@ -28,8 +28,8 @@
   },
   "run": {
     "case": "design",
-    "run_at": "2026-10-27T14:37:49Z",
-    "tool": "cheme-as-code 0.7.0",
+    "run_at": "2026-10-28T12:57:09Z",
+    "tool": "cheme-as-code 0.8.0",
     "simulator": {
       "name": "dwsim",
       "version": "9.0.5.0",
@@ -88,13 +88,13 @@
               "iteration": 2,
               "flow": 0.008375154857222667,
               "pressure": 0.0,
-              "temperature_K": 14.535343003475077
+              "temperature_K": 14.535343003474964
             },
             {
               "iteration": 3,
               "flow": 0.007744771662546451,
               "pressure": 0.0,
-              "temperature_K": 13.79491764565671
+              "temperature_K": 13.794917645656824
             }
           ],
           "bed": {
@@ -207,13 +207,13 @@
               "iteration": 2,
               "flow": 0.008375154857222667,
               "pressure": 0.0,
-              "temperature_K": 14.535343003475077
+              "temperature_K": 14.535343003474964
             },
             {
               "iteration": 3,
               "flow": 0.007744771662546451,
               "pressure": 0.0,
-              "temperature_K": 13.79491764565671
+              "temperature_K": 13.794917645656824
             }
           ],
           "bed": {

@@ -265,7 +265,7 @@
     "provenance": {
       "generator": "cheme layout build",
       "generator_version": "2",
-      "generator_sha256": "dacdbf12dbf0129d29296db8fd195ff72d9ea9dc0193e485fedad8653f5a802b",
+      "generator_sha256": "19d031ad9261fac1af5f0ad26fe969e502dcd2c6bb9e7cdd3838f11f773b1e51",
       "sources": {
         "control/instrument-list.yaml": "sha256:b9cdb56012ee7243a1435945ca4794430b43afa08045501de5e5b8bd04adc408",
         "electrical/electrical-list.yaml": "sha256:fb64e97d71ee025320d56ecd84b2b682f77e27b8138bd5292dc9a84b3abbde18",
@@ -277,7 +277,7 @@
         "pid/P-01.xml": "sha256:f4280cae0c127d85f4f83cfdd2b0e520f6d7d5bed1f3cd3ae51e20b6dd637ca2",
         "piping/line-list.yaml": "sha256:985fc86c7ba974f6dd8825cc2ccb13d0ca43dba67b996b4b05a9b5775cb5d915"
       },
-      "output_sha256": "a290bba12e0ffa78f1940a029396febe0478bd68273875b1466771f1a8e15001"
+      "output_sha256": "6c0870c5c1494525ae753c18a9c56ede0a8c18c220f1557663dc9f15b25dbdb7"
     },
     "units": "m",
     "site": {
@@ -794,12 +794,12 @@
                 "material": "steel",
                 "start": [
                   4.4,
-                  14.125,
+                  13.675,
                   0.0
                 ],
                 "end": [
                   4.4,
-                  14.125,
+                  13.675,
                   6.1
                 ],
                 "profile": [
@@ -818,12 +818,12 @@
                 "material": "steel",
                 "start": [
                   4.4,
-                  13.675,
+                  14.125,
                   0.0
                 ],
                 "end": [
                   4.4,
-                  13.675,
+                  14.125,
                   6.1
                 ],
                 "profile": [
@@ -887,12 +887,12 @@
                 "material": "steel",
                 "start": [
                   35.6,
-                  15.875,
+                  16.325,
                   0.0
                 ],
                 "end": [
                   35.6,
-                  15.875,
+                  16.325,
                   6.1
                 ],
                 "profile": [
@@ -911,12 +911,12 @@
                 "material": "steel",
                 "start": [
                   35.6,
-                  16.325,
+                  15.875,
                   0.0
                 ],
                 "end": [
                   35.6,
-                  16.325,
+                  15.875,
                   6.1
                 ],
                 "profile": [
@@ -4359,7 +4359,7 @@
             "lod": 2
           },
           {
-            "id": "VP-FV-104/P1/handrail-3",
+            "id": "VP-FV-104/P1/handrail-3-0",
             "refs": {
               "file": "layout/structures.yaml"
             },
@@ -4373,7 +4373,7 @@
             ],
             "end": [
               12.83,
-              8.75,
+              10.175,
               2.4
             ],
             "profile": [
@@ -4383,7 +4383,7 @@
             "section": "RHS50x50"
           },
           {
-            "id": "VP-FV-104/P1/handrail-3-mid",
+            "id": "VP-FV-104/P1/handrail-3-0-mid",
             "refs": {
               "file": "layout/structures.yaml"
             },
@@ -4397,7 +4397,7 @@
             ],
             "end": [
               12.83,
-              8.75,
+              10.175,
               1.85
             ],
             "profile": [
@@ -4408,7 +4408,7 @@
             "lod": 2
           },
           {
-            "id": "VP-FV-104/P1/handrail-3-toe",
+            "id": "VP-FV-104/P1/handrail-3-0-toe",
             "refs": {
               "file": "layout/structures.yaml"
             },
@@ -4422,7 +4422,7 @@
             ],
             "end": [
               12.83,
-              8.75,
+              10.175,
               1.35
             ],
             "profile": [
@@ -4433,7 +4433,7 @@
             "lod": 2
           },
           {
-            "id": "VP-FV-104/P1/handrail-3-post-0",
+            "id": "VP-FV-104/P1/handrail-3-0-post-0",
             "refs": {
               "file": "layout/structures.yaml"
             },
@@ -4458,7 +4458,131 @@
             "lod": 2
           },
           {
-            "id": "VP-FV-104/P1/handrail-3-post-1",
+            "id": "VP-FV-104/P1/handrail-3-0-post-1",
+            "refs": {
+              "file": "layout/structures.yaml"
+            },
+            "source": "generated",
+            "kind": "member",
+            "material": "handrail",
+            "start": [
+              12.83,
+              10.175,
+              1.3
+            ],
+            "end": [
+              12.83,
+              10.175,
+              2.4
+            ],
+            "profile": [
+              0.04,
+              0.04
+            ],
+            "section": "RHS40x40",
+            "lod": 2
+          },
+          {
+            "id": "VP-FV-104/P1/handrail-3-1",
+            "refs": {
+              "file": "layout/structures.yaml"
+            },
+            "source": "generated",
+            "kind": "member",
+            "material": "handrail",
+            "start": [
+              12.83,
+              9.525,
+              2.4
+            ],
+            "end": [
+              12.83,
+              8.75,
+              2.4
+            ],
+            "profile": [
+              0.05,
+              0.05
+            ],
+            "section": "RHS50x50"
+          },
+          {
+            "id": "VP-FV-104/P1/handrail-3-1-mid",
+            "refs": {
+              "file": "layout/structures.yaml"
+            },
+            "source": "generated",
+            "kind": "member",
+            "material": "handrail",
+            "start": [
+              12.83,
+              9.525,
+              1.85
+            ],
+            "end": [
+              12.83,
+              8.75,
+              1.85
+            ],
+            "profile": [
+              0.008,
+              0.04
+            ],
+            "section": "FL40x8",
+            "lod": 2
+          },
+          {
+            "id": "VP-FV-104/P1/handrail-3-1-toe",
+            "refs": {
+              "file": "layout/structures.yaml"
+            },
+            "source": "generated",
+            "kind": "member",
+            "material": "steel",
+            "start": [
+              12.83,
+              9.525,
+              1.35
+            ],
+            "end": [
+              12.83,
+              8.75,
+              1.35
+            ],
+            "profile": [
+              0.005,
+              0.1
+            ],
+            "section": "FL100x5",
+            "lod": 2
+          },
+          {
+            "id": "VP-FV-104/P1/handrail-3-1-post-0",
+            "refs": {
+              "file": "layout/structures.yaml"
+            },
+            "source": "generated",
+            "kind": "member",
+            "material": "handrail",
+            "start": [
+              12.83,
+              9.525,
+              1.3
+            ],
+            "end": [
+              12.83,
+              9.525,
+              2.4
+            ],
+            "profile": [
+              0.04,
+              0.04
+            ],
+            "section": "RHS40x40",
+            "lod": 2
+          },
+          {
+            "id": "VP-FV-104/P1/handrail-3-1-post-1",
             "refs": {
               "file": "layout/structures.yaml"
             },
@@ -4689,7 +4813,7 @@
         "item_elevation": 2.191,
         "width": 1.0,
         "arc_deg": [
-          330.0,
+          262.4,
           30.0
         ],
         "review_needed": true,
@@ -4714,7 +4838,7 @@
             ],
             "depth": 0.03,
             "arc_deg": [
-              330.0,
+              262.4,
               30.0
             ]
           },
@@ -4735,7 +4859,7 @@
             ],
             "depth": 0.05,
             "arc_deg": [
-              330.0,
+              262.4,
               30.0
             ]
           },
@@ -4756,7 +4880,7 @@
             ],
             "depth": 0.04,
             "arc_deg": [
-              330.0,
+              262.4,
               30.0
             ],
             "lod": 2
@@ -4778,7 +4902,7 @@
             ],
             "depth": 0.1,
             "arc_deg": [
-              330.0,
+              262.4,
               30.0
             ],
             "lod": 2
@@ -4792,13 +4916,13 @@
             "kind": "cylinder",
             "material": "handrail",
             "start": [
-              11.797,
-              8.962,
+              9.726,
+              7.943,
               2.191
             ],
             "end": [
-              11.797,
-              8.962,
+              9.726,
+              7.943,
               3.291
             ],
             "radius": 0.02,
@@ -4813,13 +4937,13 @@
             "kind": "cylinder",
             "material": "handrail",
             "start": [
-              12.075,
-              10.0,
+              11.188,
+              8.299,
               2.191
             ],
             "end": [
-              12.075,
-              10.0,
+              11.188,
+              8.299,
               3.291
             ],
             "radius": 0.02,
@@ -4827,6 +4951,27 @@
           },
           {
             "id": "V-101/platform-1/post-2",
+            "refs": {
+              "tag": "V-101"
+            },
+            "source": "generated",
+            "kind": "cylinder",
+            "material": "handrail",
+            "start": [
+              12.026,
+              9.55,
+              2.191
+            ],
+            "end": [
+              12.026,
+              9.55,
+              3.291
+            ],
+            "radius": 0.02,
+            "lod": 2
+          },
+          {
+            "id": "V-101/platform-1/post-3",
             "refs": {
               "tag": "V-101"
             },
@@ -4854,13 +4999,13 @@
           },
           "source": "generated",
           "base": [
-            12.13,
-            9.007,
+            9.893,
+            7.652,
             0.0
           ],
           "top": [
-            12.13,
-            9.007,
+            9.893,
+            7.652,
             2.191
           ],
           "cage": false,
@@ -4874,13 +5019,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.035,
-                8.803,
+                9.669,
+                7.663,
                 0.0
               ],
               "end": [
-                12.035,
-                8.803,
+                9.669,
+                7.663,
                 3.291
               ],
               "profile": [
@@ -4898,13 +5043,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.225,
-                9.211,
+                10.118,
+                7.642,
                 0.0
               ],
               "end": [
-                12.225,
-                9.211,
+                10.118,
+                7.642,
                 3.291
               ],
               "profile": [
@@ -4930,7 +5075,7 @@
         "width": 1.0,
         "arc_deg": [
           330.0,
-          30.0
+          97.6
         ],
         "review_needed": true,
         "serves": [
@@ -4955,7 +5100,7 @@
             "depth": 0.03,
             "arc_deg": [
               330.0,
-              30.0
+              97.6
             ]
           },
           {
@@ -4976,7 +5121,7 @@
             "depth": 0.05,
             "arc_deg": [
               330.0,
-              30.0
+              97.6
             ]
           },
           {
@@ -4997,7 +5142,7 @@
             "depth": 0.04,
             "arc_deg": [
               330.0,
-              30.0
+              97.6
             ],
             "lod": 2
           },
@@ -5019,7 +5164,7 @@
             "depth": 0.1,
             "arc_deg": [
               330.0,
-              30.0
+              97.6
             ],
             "lod": 2
           },
@@ -5053,13 +5198,13 @@
             "kind": "cylinder",
             "material": "handrail",
             "start": [
-              12.075,
-              10.0,
+              12.026,
+              10.45,
               4.809
             ],
             "end": [
-              12.075,
-              10.0,
+              12.026,
+              10.45,
               5.909
             ],
             "radius": 0.02,
@@ -5074,13 +5219,34 @@
             "kind": "cylinder",
             "material": "handrail",
             "start": [
-              11.797,
-              11.037,
+              11.188,
+              11.701,
               4.809
             ],
             "end": [
-              11.797,
-              11.037,
+              11.188,
+              11.701,
+              5.909
+            ],
+            "radius": 0.02,
+            "lod": 2
+          },
+          {
+            "id": "V-101/platform-2/post-3",
+            "refs": {
+              "tag": "V-101"
+            },
+            "source": "generated",
+            "kind": "cylinder",
+            "material": "handrail",
+            "start": [
+              9.726,
+              12.057,
+              4.809
+            ],
+            "end": [
+              9.726,
+              12.057,
               5.909
             ],
             "radius": 0.02,
@@ -5094,13 +5260,13 @@
           },
           "source": "generated",
           "base": [
-            12.13,
-            9.007,
+            11.054,
+            8.796,
             2.191
           ],
           "top": [
-            12.13,
-            9.007,
+            11.054,
+            8.796,
             4.809
           ],
           "cage": false,
@@ -5114,13 +5280,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.035,
-                8.803,
+                10.885,
+                8.648,
                 2.191
               ],
               "end": [
-                12.035,
-                8.803,
+                10.885,
+                8.648,
                 5.909
               ],
               "profile": [
@@ -5138,13 +5304,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.225,
-                9.211,
+                11.223,
+                8.944,
                 2.191
               ],
               "end": [
-                12.225,
-                9.211,
+                11.223,
+                8.944,
                 5.909
               ],
               "profile": [
@@ -5334,13 +5500,13 @@
           },
           "source": "generated",
           "base": [
-            12.13,
-            9.007,
+            11.054,
+            11.204,
             4.809
           ],
           "top": [
-            12.13,
-            9.007,
+            11.054,
+            11.204,
             7.207
           ],
           "cage": false,
@@ -5354,13 +5520,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.035,
-                8.803,
+                10.885,
+                11.352,
                 4.809
               ],
               "end": [
-                12.035,
-                8.803,
+                10.885,
+                11.352,
                 8.307
               ],
               "profile": [
@@ -5378,13 +5544,13 @@
               "kind": "member",
               "material": "steel",
               "start": [
-                12.225,
-                9.211,
+                11.223,
+                11.056,
                 4.809
               ],
               "end": [
-                12.225,
-                9.211,
+                11.223,
+                11.056,
                 8.307
               ],
               "profile": [

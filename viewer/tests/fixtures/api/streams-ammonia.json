@@ -5,7 +5,11 @@
     {
       "id": "design",
       "description": "Design case",
-      "default": true
+      "default": true,
+      "capacity": null,
+      "provenance": null,
+      "applicability": null,
+      "source": null
     }
   ],
   "default_case": "design",
@@ -69,7 +73,10 @@
         },
         "provenance": "given",
         "source": "basis of design",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -125,7 +132,10 @@
         },
         "provenance": "calculated",
         "source": "cheme process propagate: mixer M1 from S1 S8",
-        "fingerprint": "c4c1cf41178b7fbe"
+        "fingerprint": "af8ec8bdca880bcf",
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -181,7 +191,10 @@
         },
         "provenance": "calculated",
         "source": "cheme process propagate: reactor R1 from S2",
-        "fingerprint": "d56039267d06ea0e"
+        "fingerprint": "d56039267d06ea0e",
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -230,7 +243,10 @@
         },
         "provenance": "calculated",
         "source": "cheme process propagate: pass-through E1 from S3",
-        "fingerprint": "c2460d39930a77f4"
+        "fingerprint": "c2460d39930a77f4",
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -272,7 +288,10 @@
         },
         "provenance": "assumed",
         "source": "loop balance; all NH3 condensed",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -314,7 +333,10 @@
         },
         "provenance": "assumed",
         "source": "loop balance; all NH3 condensed",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -356,7 +378,10 @@
         },
         "provenance": "calculated",
         "source": "cheme process propagate: splitter SP1 from S5",
-        "fingerprint": "6e3883418ea3839c"
+        "fingerprint": "6e3883418ea3839c",
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},
@@ -398,7 +423,10 @@
         },
         "provenance": "assumed",
         "source": "loop balance",
-        "fingerprint": null
+        "fingerprint": null,
+        "uncertainty": null,
+        "origin": null,
+        "stale": false
       },
       "phase": null,
       "calculated": {},

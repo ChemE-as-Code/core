@@ -29,6 +29,20 @@ export interface Sheet {
 
 export type Provenance = "given" | "assumed" | "calculated";
 
+/** Where a value comes from, refining its provenance (core `foundation.schema_base.Origin`). */
+export type ValueOrigin = "measured" | "vendor" | "literature" | "design-rule" | "estimate" | "simulated" | "correlation";
+
+/** A value's uncertainty (core `foundation.uncertainty.Uncertainty`): gsd2 from a pedigree, or a cv or range. */
+export interface ValueUncertainty {
+  distribution: "lognormal" | "normal" | "triangular" | "uniform";
+  pedigree: number[] | null;
+  basic: number;
+  cv: number | null;
+  low: number | null;
+  high: number | null;
+  source: string;
+}
+
 export interface ProcessValue {
   value: number;
   unit: string;
@@ -66,6 +80,10 @@ export interface ProcessStream {
     source?: string;
     /** Input fingerprint of a calculated composition (null when given). */
     fingerprint?: string | null;
+    uncertainty?: ValueUncertainty | null;
+    origin?: ValueOrigin | null;
+    /** The composition is calculated and its inputs changed since. Older servers leave it out. */
+    stale?: boolean;
   } | null;
   phase: {
     value: string;
@@ -209,6 +227,8 @@ export interface SheetDiff {
   projection_diff: string;
   /** `added` / `removed` when the sheet exists on one side only, else `""`. */
   status?: "added" | "removed" | "";
+  /** Why a side could not be drawn or compared (`""` when both could). Older servers leave it out. */
+  error?: string;
   /** Each changed object id mapped to the SVG `<g id>` drawing it, per side. */
   old_owner?: Record<string, string>;
   new_owner?: Record<string, string>;
@@ -535,6 +555,8 @@ export interface SimRunUnit {
   warnings?: string[];
   /** Why an excluded unit is left out. */
   reason?: string;
+  /** How the unit's outlet follows from its inlets. Older servers leave it out. */
+  basis?: "predictive" | "shortcut" | "specified";
   /** A kinetic reactor coupled as an external unit (pre-release PR 151): `external-unit`. */
   coupling?: string;
   /** Its outer loop around the DWSIM solves. */
@@ -548,20 +570,26 @@ export interface SimulationRun {
   run_at: string;
   /** `cheme-as-code <version>`. */
   tool: string;
-  simulator: { name: string; version: string | null };
+  /** `method`: the property method the simulator ran with (older servers leave it out). */
+  simulator: { name: string; version: string | null; method?: string };
   property_package: string;
   /** The fingerprint every simulated stream value carries. */
   model_fingerprint: string;
   /** The inputs as they were after the run: HEAD, the files changed against it, each input file's fingerprint. */
   inputs: { commit: string | null; dirty: string[]; fingerprints: Record<string, string> };
   converged: boolean;
-  /** Null where the simulator does not report it (DWSIM's worker, for now). */
+  /** `converged` / `not-converged`. Older servers leave it out. */
+  status?: "converged" | "not-converged";
+  /** Null where the simulator does not report it. */
   iterations: number | null;
   messages: string[];
   units: SimRunUnit[];
   /** Empty when the run did not converge (no stream value is written). */
   streams: SimRunStream[];
   findings: Finding[];
+  /** The run's energy closure (reference state, tolerance, per unit and for the plant); null when it
+   * did not converge. Not shown by the viewer yet. Older servers leave it out. */
+  energy?: Record<string, unknown> | null;
 }
 
 export type SimUnitStatus = "simulated" | "excluded" | "refused" | "not-simulated" | "unknown";
@@ -575,6 +603,8 @@ export interface SimulationUnit {
   reason: string;
   spec: SimUnitSpec | null;
   run: SimRunUnit | null;
+  /** How the unit's outlet follows from its inlets. Older servers leave it out. */
+  basis?: "predictive" | "shortcut" | "specified";
 }
 
 /** `GET /api/simulation?case=&rev=`: 404 without `process/simulation.yaml`, 422 when it does not load or the case is unknown. */
@@ -720,6 +750,8 @@ export interface Reaction {
   id: string;
   title: string;
   equation: string;
+  /** The reaction SMILES derived from the components' SMILES (null when one is missing). Older servers leave it out. */
+  reaction_smiles?: string | null;
   stoichiometry: Record<string, number>;
   phase: "vapor" | "liquid" | "mixed" | null;
   reversible: boolean;
@@ -815,6 +847,12 @@ export interface ReactorRow {
     rate_unit: string | null;
   }[];
   duty_kW: number | null;
+  /** The assumptions behind `duty_kW`, and its basis (`ideal gas`, ...). Older servers leave them out. */
+  duty_assumptions?: string[];
+  duty_basis?: string;
+  /** The solved stirred tank of a batch or CSTR reactor; null for the other models. Not shown by
+   * the viewer yet. Older servers leave it out. */
+  tank?: Record<string, unknown> | null;
   /** What it lacks to give a duty or an approach. */
   missing: string[];
 }
@@ -860,7 +898,7 @@ export interface Catalyst {
     | null;
   /** K and kPa(a), min and max. */
   window: (CatalystProvenanced & { temperature: [number, number] | null; pressure: [number, number] | null }) | null;
-  space_velocity: (CatalystProvenanced & { basis: "GHSV" | "WHSV" | "LHSV"; range: [number, number] }) | null;
+  space_velocity: (CatalystProvenanced & { basis: "GHSV" | "WHSV" | "LHSV"; range: [number, number]; gas?: "wet" | "dry" }) | null;
   poisons: string[];
   deactivation: (CatalystProvenanced & { lifetime: number | null; mechanisms: string[]; regeneration: string }) | null;
   price: (CatalystProvenanced & { value: number; unit: string; year: number }) | null;
@@ -948,6 +986,12 @@ export interface LibraryEntry {
   title: string;
   /** K and kPa(a). */
   window: { temperature: [number, number] | null; pressure: [number, number] | null };
+  /** Which reactor model the entry's own data supports. Older servers leave it out. */
+  model_basis?: {
+    kind: "stoichiometry_only" | "conversion_selectivity" | "equilibrium" | "kinetic";
+    provenance?: "given" | "assumed" | null;
+    note: string;
+  };
   /** `in_plant`: the plant's id of the component with this CAS number, else null. */
   components: { id: string; name: string; cas: string; formula: string; in_plant: string | null }[];
   /** `in_plant`: the plant has this id with the same stoichiometry. */

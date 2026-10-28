@@ -69,7 +69,7 @@ describe("the contract of the catalysis responses", () => {
     expect(unknownKeys(fitted.map((f) => f.data!), ["schema", "kind", "reaction", "catalyst", "basis", "points", "provenance", "source"])).toEqual([]);
   });
   it("library entries: the fields the type knows", () => {
-    const known: (keyof LibraryEntry)[] = ["id", "title", "window", "components", "reactions", "catalysts", "sources"];
+    const known: (keyof LibraryEntry)[] = ["id", "title", "window", "components", "reactions", "catalysts", "model_basis", "sources"];
     expect(unknownKeys(library.entries, known)).toEqual([]);
     expect(unknownKeys(library.entries.flatMap((e) => e.components), ["id", "name", "cas", "formula", "in_plant"])).toEqual([]);
     expect(unknownKeys(library.entries.flatMap((e) => e.reactions), ["id", "equation", "reversible", "phase", "catalyst", "heat_of_reaction", "in_plant"])).toEqual([]);

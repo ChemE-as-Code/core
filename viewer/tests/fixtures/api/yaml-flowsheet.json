@@ -442,6 +442,268 @@
   "kind": "flowsheet",
   "schema": {
     "$defs": {
+      "Batch": {
+        "additionalProperties": false,
+        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).",
+        "properties": {
+          "time": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "s of reaction",
+            "title": "Time"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/BatchTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "heat": {
+            "default": "isothermal",
+            "enum": [
+              "isothermal",
+              "adiabatic"
+            ],
+            "title": "Heat",
+            "type": "string"
+          },
+          "catalyst_loading": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg of catalyst per m3: rate laws per kg of catalyst.",
+            "title": "Catalyst Loading"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "Batch",
+        "type": "object"
+      },
+      "BatchTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "The component whose conversion ends the batch.",
+            "title": "Key",
+            "type": "string"
+          },
+          "conversion": {
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Conversion",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "conversion"
+        ],
+        "title": "BatchTarget",
+        "type": "object"
+      },
+      "Bed": {
+        "additionalProperties": false,
+        "description": "A packed catalyst bed (``reactor: pfr``; the model: :mod:`.fixed_bed`). Its size is the\ncatalyst mass, else the bed volume, else ``tubes`` tubes of ``diameter`` and ``length``;\nthe catalyst (``catalyst:``) gives the bulk density, particle and voidage.",
+        "properties": {
+          "catalyst_mass": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg",
+            "title": "Catalyst Mass"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m3 of bed",
+            "title": "Volume"
+          },
+          "diameter": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m, of a tube (or the vessel): pressure drop, cooling",
+            "title": "Diameter"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m",
+            "title": "Length"
+          },
+          "tubes": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Tubes",
+            "type": "integer"
+          },
+          "heat": {
+            "default": "adiabatic",
+            "enum": [
+              "adiabatic",
+              "isothermal",
+              "cooled"
+            ],
+            "title": "Heat",
+            "type": "string"
+          },
+          "coolant_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K, cooled beds",
+            "title": "Coolant Temperature"
+          },
+          "heat_transfer_coefficient": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "W/(m2 K), overall, bed to coolant (cooled beds)",
+            "title": "Heat Transfer Coefficient"
+          },
+          "viscosity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pa s, of the gas (Ergun pressure drop)",
+            "title": "Viscosity"
+          },
+          "diffusivity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2/s: the key reactants' diffusivity in the gas (effectiveness factor, Weisz-Prater, Mears)",
+            "title": "Diffusivity"
+          },
+          "time_on_stream": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "h: the catalyst's age the bed is solved at (its deactivation law); the end of run sizes the bed. None: fresh.",
+            "title": "Time On Stream"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "Bed",
+        "type": "object"
+      },
       "BfdView": {
         "additionalProperties": false,
         "description": "How the BFD draws the boundary streams.",
@@ -479,6 +741,156 @@
       "Block": {
         "additionalProperties": false,
         "properties": {
+          "crystallizer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Crystallizer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A crystallizer (with its filter and recycle)."
+          },
+          "solid_separation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SolidSeparation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A filter or centrifuge on its own."
+          },
+          "reactions": {
+            "description": "Reaction ids of process/reactions.yaml that take place here: the balance is reactive (elements and extents instead of components).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "conversion": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Reaction id -> conversion of its key component here, instead of the reaction's own conversion (cheme process propagate).",
+            "title": "Conversion",
+            "type": "object"
+          },
+          "reactor": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conversion",
+                  "equilibrium",
+                  "gibbs",
+                  "pfr",
+                  "cstr",
+                  "batch"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet) or batch (the rate laws over the batch time); none: conversion when every reaction has one.",
+            "title": "Reactor"
+          },
+          "bed": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Bed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: pfr: the catalyst bed."
+          },
+          "tank": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Tank"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: cstr: the tank(s)."
+          },
+          "hazard": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReactionHazard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "TD24 and MTT for the thermal screening of the reactor."
+          },
+          "selectivity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Selectivity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A conversion reactor by the key's conversion and the selectivities to its products (instead of a conversion per reaction)."
+          },
+          "batch": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Batch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: batch: the batch."
+          },
+          "catalyst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The catalyst its bed holds: an id of process/catalysts.yaml.",
+            "title": "Catalyst"
+          },
+          "fugacity": {
+            "default": "ideal",
+            "description": "Equilibrium and Gibbs reactors: the gas as ideal, or with Peng-Robinson fugacity coefficients (the components' critical constants) for high pressures.",
+            "enum": [
+              "ideal",
+              "peng_robinson"
+            ],
+            "title": "Fugacity",
+            "type": "string"
+          },
+          "approach": {
+            "default": 0.0,
+            "description": "Equilibrium and Gibbs reactors: K is taken at the outlet temperature plus this approach, K (positive: less conversion of an exothermic reaction).",
+            "title": "Approach",
+            "type": "number"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -570,6 +982,32 @@
         "title": "Block",
         "type": "object"
       },
+      "CakeLiquid": {
+        "additionalProperties": false,
+        "description": "The liquid (mother liquor) held in a filter or centrifuge cake.",
+        "properties": {
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "basis": {
+            "description": "mass_fraction: liquid over the wet cake's mass (below 1); per_kg_solid: kg of liquid per kg of dry solid.",
+            "enum": [
+              "mass_fraction",
+              "per_kg_solid"
+            ],
+            "title": "Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "basis"
+        ],
+        "title": "CakeLiquid",
+        "type": "object"
+      },
       "Case": {
         "additionalProperties": false,
         "properties": {
@@ -586,12 +1024,97 @@
             "type": "boolean",
             "default": false,
             "title": "Default"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The declared capacity of this case, e.g. 500 t/d GOX.",
+            "title": "Capacity"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "given",
+                  "calculated",
+                  "assumed",
+                  "extrapolated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How the case's operating point is known (given, calculated, assumed, extrapolated).",
+            "title": "Provenance"
+          },
+          "applicability": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CaseApplicability"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What the case's operating point rests on.",
+            "title": "Source"
           }
         },
         "required": [
           "id"
         ],
         "title": "Case",
+        "type": "object"
+      },
+      "CaseApplicability": {
+        "additionalProperties": false,
+        "description": "Where a case's flows and duties hold: an envelope with its source, not a scaling law.",
+        "properties": {
+          "range": {
+            "description": "e.g. 350-550 t/d GOX, 70-105 % load.",
+            "minLength": 1,
+            "title": "Range",
+            "type": "string"
+          },
+          "source": {
+            "description": "What supports the envelope.",
+            "minLength": 3,
+            "title": "Source",
+            "type": "string"
+          },
+          "limitations": {
+            "default": "",
+            "title": "Limitations",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "source"
+        ],
+        "title": "CaseApplicability",
         "type": "object"
       },
       "CompositionValue": {
@@ -639,6 +1162,40 @@
             "default": null,
             "description": "Calculated compositions: the inputs they were derived from (cheme process propagate); a mismatch is cheme.process-calculated-stale.",
             "title": "Fingerprint"
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Uncertainty"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Of every fraction, relative to it (as on a quantity)."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "enum": [
+                  "measured",
+                  "vendor",
+                  "literature",
+                  "design-rule",
+                  "estimate",
+                  "simulated",
+                  "correlation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of figure it is (as on a quantity).",
+            "title": "Origin"
           }
         },
         "required": [
@@ -647,6 +1204,205 @@
           "provenance"
         ],
         "title": "CompositionValue",
+        "type": "object"
+      },
+      "Crystallizer": {
+        "additionalProperties": false,
+        "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed.",
+        "properties": {
+          "solute": {
+            "description": "The dissolved component that crystallizes.",
+            "title": "Solute",
+            "type": "string"
+          },
+          "solvent": {
+            "title": "Solvent",
+            "type": "string"
+          },
+          "crystal": {
+            "description": "The solid component formed (phase: solid).",
+            "title": "Crystal",
+            "type": "string"
+          },
+          "basis": {
+            "enum": [
+              "solubility",
+              "yield"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K, the crystallizer's (the mother liquor's)",
+            "title": "Temperature"
+          },
+          "solubility": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Solubility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "yield": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ImposedYield"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "evaporation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Evaporation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "separation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SolidSeparation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "recycle": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/MotherLiquorRecycle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CrystallizerEnergy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "outlets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Role -> the step's outlet port.",
+            "propertyNames": {
+              "enum": [
+                "slurry",
+                "cake",
+                "mother_liquor",
+                "vapour"
+              ]
+            },
+            "title": "Outlets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "solute",
+          "solvent",
+          "crystal",
+          "basis",
+          "outlets"
+        ],
+        "title": "Crystallizer",
+        "type": "object"
+      },
+      "CrystallizerEnergy": {
+        "additionalProperties": false,
+        "description": "Data of the crystallizer's lumped energy balance, from the feed's temperature to the\ncrystallizer's (every outlet leaves at it).",
+        "properties": {
+          "heat_capacity": {
+            "description": "kJ/(kg K) of the feed solution, constant",
+            "exclusiveMinimum": 0,
+            "title": "Heat Capacity",
+            "type": "number"
+          },
+          "heat_of_crystallization": {
+            "description": "kJ per kg of crystal formed, at the crystallizer's temperature: the enthalpy change, negative when crystallization releases heat.",
+            "title": "Heat Of Crystallization",
+            "type": "number"
+          },
+          "latent_heat": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kJ per kg of solvent evaporated (with evaporation)",
+            "title": "Latent Heat"
+          },
+          "feed_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K; default: the inlet stream's temperature",
+            "title": "Feed Temperature"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "heat_capacity",
+          "heat_of_crystallization",
+          "provenance"
+        ],
+        "title": "CrystallizerEnergy",
         "type": "object"
       },
       "EnthalpyReference": {
@@ -683,6 +1439,119 @@
           "temperature"
         ],
         "title": "EnthalpyReference",
+        "type": "object"
+      },
+      "Evaporation": {
+        "additionalProperties": false,
+        "description": "Solvent removed as vapour before or in the crystallizer, one of: ``flow`` (kg/h),\n``feed_fraction`` (of the crystallizer feed's total mass), ``solvent_fraction`` (of the\nfeed's solvent) or ``concentration`` (the solute's mass fraction in the liquid after\nevaporation, crystals not yet formed).",
+        "properties": {
+          "flow": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg/h of solvent",
+            "title": "Flow"
+          },
+          "feed_fraction": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Feed Fraction"
+          },
+          "solvent_fraction": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Solvent Fraction"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1,
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Concentration"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "Evaporation",
+        "type": "object"
+      },
+      "ImposedYield": {
+        "additionalProperties": false,
+        "description": "The fraction of the anhydrous solute entering the crystallizer that crystallizes,\nspecified (an empirical or vendor yield), not predicted.",
+        "properties": {
+          "value": {
+            "exclusiveMaximum": 1,
+            "minimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "title": "ImposedYield",
         "type": "object"
       },
       "Layout": {
@@ -747,6 +1616,38 @@
           "ref"
         ],
         "title": "Link",
+        "type": "object"
+      },
+      "MotherLiquorRecycle": {
+        "additionalProperties": false,
+        "description": "The fraction of the filtrate returned to the crystallizer's feed (before evaporation);\nthe rest leaves as the purge.",
+        "properties": {
+          "fraction": {
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Fraction",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fraction",
+          "provenance"
+        ],
+        "title": "MotherLiquorRecycle",
         "type": "object"
       },
       "NormalConditions": {
@@ -946,6 +1847,40 @@
             "default": null,
             "description": "Calculated values: the inputs (T, P, composition, method) they were calculated from; a mismatch is cheme.process-calculated-stale.",
             "title": "Fingerprint"
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Uncertainty"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Relative to the value, e.g. {gsd2: 1.2} or {distribution: triangular, low: 0.9, high: 1.1}; cheme assess lca samples a feed's or product's flow with it instead of the default for its provenance. No calculated value's fingerprint includes it."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "enum": [
+                  "measured",
+                  "vendor",
+                  "literature",
+                  "design-rule",
+                  "estimate",
+                  "simulated",
+                  "correlation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What kind of figure it is, refining the provenance: given measured, vendor or literature; assumed design-rule, estimate or literature; calculated simulated (cheme process simulate) or correlation (cheme process props). Another pairing is cheme.provenance-origin. No calculated value's fingerprint includes it.",
+            "title": "Origin"
           }
         },
         "required": [
@@ -953,6 +1888,264 @@
           "provenance"
         ],
         "title": "Quantity",
+        "type": "object"
+      },
+      "ReactionHazard": {
+        "additionalProperties": false,
+        "description": "What the thermal screening of a reactor (``cheme process reactor-hazards``) needs beyond\nthe reactions: the decomposition and the technical limit, from calorimetry and the design.",
+        "properties": {
+          "td24": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K: the temperature at which the decomposition's adiabatic time to maximum rate is 24 h (DSC, ARC; never estimated here).",
+            "title": "Td24"
+          },
+          "mtt": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest normal boiling point of the liquid's components at about atmospheric pressure.",
+            "title": "Mtt"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "ReactionHazard",
+        "type": "object"
+      },
+      "Selectivity": {
+        "additionalProperties": false,
+        "description": "A conversion reactor given as reported: the per-pass ``conversion`` of the ``key``\ncomponent and the molar selectivity to each product, ``F_p formed / F_key converted``. The\nextents of the reactions follow (series and parallel side reactions in one step).",
+        "properties": {
+          "key": {
+            "description": "The component converted (a reactant of the reactions).",
+            "title": "Key",
+            "type": "string"
+          },
+          "conversion": {
+            "description": "Per pass, of the key's inlet flow.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Conversion",
+            "type": "number"
+          },
+          "products": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Product id -> kmol formed per kmol of the key converted.",
+            "minProperties": 1,
+            "title": "Products",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SelectivityUncertainty"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Of the conversion and the selectivities, e.g. {conversion: {gsd2: 1.1}, products: {B: {distribution: triangular, low: 0.9, high: 1.1}}}: sampled by cheme process reactor-uncertainty."
+          }
+        },
+        "required": [
+          "key",
+          "conversion",
+          "products",
+          "provenance"
+        ],
+        "title": "Selectivity",
+        "type": "object"
+      },
+      "SelectivityUncertainty": {
+        "additionalProperties": false,
+        "description": "The uncertainty of a ``selectivity:``'s figures, each relative to its value: sampled by\ncheme process reactor-uncertainty, never part of an outlet's fingerprint.",
+        "properties": {
+          "conversion": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Uncertainty"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Of the key's conversion."
+          },
+          "products": {
+            "additionalProperties": {
+              "$ref": "#/$defs/Uncertainty"
+            },
+            "description": "Product id -> the uncertainty of its selectivity.",
+            "title": "Products",
+            "type": "object"
+          }
+        },
+        "title": "SelectivityUncertainty",
+        "type": "object"
+      },
+      "SolidSeparation": {
+        "additionalProperties": false,
+        "description": "A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid\nthe cake holds, specified (no filtration or centrifuge model); the liquid divides with the\nsame composition between cake and filtrate. ``outlets`` maps ``cake`` and ``filtrate`` to\nthe step's outlet ports (inside a ``crystallizer:``, the crystallizer's own outlets).",
+        "properties": {
+          "solid_recovery": {
+            "description": "Fraction of the solid to the cake.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Solid Recovery",
+            "type": "number"
+          },
+          "cake_liquid": {
+            "$ref": "#/$defs/CakeLiquid"
+          },
+          "outlets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "cake",
+                "filtrate"
+              ]
+            },
+            "title": "Outlets",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "solid_recovery",
+          "cake_liquid",
+          "provenance"
+        ],
+        "title": "SolidSeparation",
+        "type": "object"
+      },
+      "Solubility": {
+        "additionalProperties": false,
+        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).",
+        "properties": {
+          "unit": {
+            "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the solute's mass fraction in the saturated solution.",
+            "enum": [
+              "kg/kg_solvent",
+              "mass_fraction"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "points": {
+            "description": "(K, value) pairs, increasing in temperature.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "provenance"
+        ],
+        "title": "Solubility",
         "type": "object"
       },
       "State": {
@@ -1039,6 +2232,156 @@
       "Step": {
         "additionalProperties": false,
         "properties": {
+          "crystallizer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Crystallizer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A crystallizer (with its filter and recycle)."
+          },
+          "solid_separation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SolidSeparation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A filter or centrifuge on its own."
+          },
+          "reactions": {
+            "description": "Reaction ids of process/reactions.yaml that take place here: the balance is reactive (elements and extents instead of components).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "conversion": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Reaction id -> conversion of its key component here, instead of the reaction's own conversion (cheme process propagate).",
+            "title": "Conversion",
+            "type": "object"
+          },
+          "reactor": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conversion",
+                  "equilibrium",
+                  "gibbs",
+                  "pfr",
+                  "cstr",
+                  "batch"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet) or batch (the rate laws over the batch time); none: conversion when every reaction has one.",
+            "title": "Reactor"
+          },
+          "bed": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Bed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: pfr: the catalyst bed."
+          },
+          "tank": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Tank"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: cstr: the tank(s)."
+          },
+          "hazard": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReactionHazard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "TD24 and MTT for the thermal screening of the reactor."
+          },
+          "selectivity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Selectivity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A conversion reactor by the key's conversion and the selectivities to its products (instead of a conversion per reaction)."
+          },
+          "batch": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Batch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reactor: batch: the batch."
+          },
+          "catalyst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The catalyst its bed holds: an id of process/catalysts.yaml.",
+            "title": "Catalyst"
+          },
+          "fugacity": {
+            "default": "ideal",
+            "description": "Equilibrium and Gibbs reactors: the gas as ideal, or with Peng-Robinson fugacity coefficients (the components' critical constants) for high pressures.",
+            "enum": [
+              "ideal",
+              "peng_robinson"
+            ],
+            "title": "Fugacity",
+            "type": "string"
+          },
+          "approach": {
+            "default": 0.0,
+            "description": "Equilibrium and Gibbs reactors: K is taken at the outlet temperature plus this approach, K (positive: less conversion of an exothermic reaction).",
+            "title": "Approach",
+            "type": "number"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1169,6 +2512,103 @@
         "title": "StreamDef",
         "type": "object"
       },
+      "Tank": {
+        "additionalProperties": false,
+        "description": "A continuous stirred tank (``reactor: cstr``; the model: :mod:`.stirred_tank`): its\nvolume, or the space time V / Q0 on the inlet's volumetric flow, of each of ``count`` equal\ntanks in series; isothermal (at the outlet's temperature, else the inlet's) or adiabatic.",
+        "properties": {
+          "volume": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m3 of liquid or gas, per tank",
+            "title": "Volume"
+          },
+          "residence_time": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "s, V / Q0 per tank (instead of volume)",
+            "title": "Residence Time"
+          },
+          "count": {
+            "default": 1,
+            "description": "Equal tanks in series.",
+            "minimum": 1,
+            "title": "Count",
+            "type": "integer"
+          },
+          "heat": {
+            "default": "isothermal",
+            "enum": [
+              "isothermal",
+              "adiabatic"
+            ],
+            "title": "Heat",
+            "type": "string"
+          },
+          "catalyst_loading": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg of catalyst per m3 of reactor: for rate laws per kg of catalyst.",
+            "title": "Catalyst Loading"
+          },
+          "time_on_stream": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "h: the age of the step's catalyst (catalyst:, its deactivation law) the tank is solved at. None: fresh.",
+            "title": "Time On Stream"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "Tank",
+        "type": "object"
+      },
       "Terminal": {
         "additionalProperties": false,
         "description": "An external feed (DEXPI Source) or product (DEXPI Sink).",
@@ -1195,6 +2635,41 @@
             },
             "title": "Links",
             "type": "array"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "raw_material",
+                  "product",
+                  "by_product",
+                  "utility",
+                  "wastewater",
+                  "off_gas",
+                  "solid_waste",
+                  "emission"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What crosses the boundary here; not given: unclassified (a gap the boundary-completeness check reports).",
+            "title": "Category"
+          },
+          "utility": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/UtilityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "category utility: the utility and its temperature levels."
           }
         },
         "required": [
@@ -1221,6 +2696,106 @@
           }
         },
         "title": "Tolerance",
+        "type": "object"
+      },
+      "Uncertainty": {
+        "additionalProperties": false,
+        "description": "The uncertainty of a value, relative to it (see :mod:`.uncertainty`).\n\n``lognormal`` with ``gsd2`` (95 % within value / gsd2 .. value x gsd2) or ``pedigree``\nscores (five, 1 to 5: reliability, completeness, temporal, geographical, technological)\non a ``basic`` gsd2; ``normal`` with ``cv``; ``triangular`` or ``uniform`` with ``low`` and\n``high`` multipliers (e.g. 0.8 and 1.2).",
+        "properties": {
+          "distribution": {
+            "default": "lognormal",
+            "enum": [
+              "lognormal",
+              "normal",
+              "triangular",
+              "uniform"
+            ],
+            "title": "Distribution",
+            "type": "string"
+          },
+          "gsd2": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gsd2"
+          },
+          "pedigree": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 5,
+                "minItems": 5,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pedigree"
+          },
+          "basic": {
+            "default": 1.05,
+            "description": "Basic gsd2 under the pedigree.",
+            "minimum": 1,
+            "title": "Basic",
+            "type": "number"
+          },
+          "cv": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cv"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "High"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "Uncertainty",
         "type": "object"
       },
       "Units": {
@@ -1278,6 +2853,86 @@
           }
         },
         "title": "Units",
+        "type": "object"
+      },
+      "UtilityLevel": {
+        "additionalProperties": false,
+        "description": "What a utility terminal supplies: its kind and, for heat, its temperature levels, which\n``cheme process simulate`` checks against the temperatures of the duty it serves, and, for\nsteam, its pressure. ``cheme assess lca`` gives the energy exchange's carrier the level,\nthe supply temperature and the steam pressure (core#313).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "steam",
+              "hot_oil",
+              "fired_heat",
+              "cooling_water",
+              "air_cooling",
+              "refrigerant",
+              "electricity",
+              "fuel",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "level": {
+            "default": "",
+            "description": "The utility level's name in the design basis, e.g. LP, MP or HP steam, a hot-oil circuit or a refrigeration level.",
+            "title": "Level",
+            "type": "string"
+          },
+          "pressure": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Steam: its supply pressure (flowsheet units; a gauge pressure is read against 101.325 kPa). It does not set the temperature: give supply_temperature (saturated steam: the saturation temperature at this pressure)."
+          },
+          "supply_temperature": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Where the utility enters the exchanger (flowsheet units)."
+          },
+          "return_temperature": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Where it leaves; not given: the same as the supply (condensing steam, a boiling refrigerant)."
+          },
+          "min_approach": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Least temperature difference to the process side, K."
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "UtilityLevel",
         "type": "object"
       },
       "ViewItem": {
