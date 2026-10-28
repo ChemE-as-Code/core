@@ -199,6 +199,7 @@
   },
   "hazop-assessment": {
    "SKILL.md": [
+    "f89293d1b7839829b3bb3f92f42ea44452be5a1a384ce236bf01de1ecee25422",
     "12cc0783c0a03e7e86c7932bd845677b0cf83b63770ebbc2e11896ae66ebda60"
    ]
   },
@@ -207,14 +208,30 @@
     "ee62d07aff399d88982af65c0f3f9c8eb4e6fd64f0db252af7382818f30306b1"
    ]
   },
+  "hazop-node-breakdown": {
+   "SKILL.md": [
+    "c196775e34772236f78fe828160ff6310e4c036e6f9cf9ed769500ccc09a41b1"
+   ]
+  },
   "hazop-review": {
    "SKILL.md": [
     "d779d298ece32016846565eb9b469d8305c1d904fbf7ce4003140e8f3e6ac7a7",
     "0d4bc385e18f1d8fad2d1990e13d13771c87f6e7dfacbb09d9633d53ff65947d"
    ]
   },
+  "hazop-risk-classification": {
+   "SKILL.md": [
+    "ff7f1dca3d722d56fbfa0a35f0858e9545bc2000bdfe1cdbf720b9e093833f7d"
+   ]
+  },
+  "hazop-scenario-propagation": {
+   "SKILL.md": [
+    "c0cc63812111061f4cfebc28193bede9e67dd24085b576cf7c25305727791aea"
+   ]
+  },
   "hazop-study": {
    "SKILL.md": [
+    "ff40ba0f64a9c20f42753dd0c7dabee97098e0b3750afbd568db34fde6101065",
     "96f49a3c1a594f9c5c4f47e6f9bdac50c499ca1d5dead203d3c1e48e427b735b",
     "e827e867b6d01fb23cbeb825d331a2afe9e5f123beb0c6cd44711bacac2dae66",
     "c5f76dc55b2af64570711298c479d213ef42344c116b6a88a212395e0e37a9f7"
@@ -549,6 +566,7 @@
   },
   "process-safety": {
    "SKILL.md": [
+    "4e4289fbd979c8512ee834e236707a181e34406d701e3afb41bb0b5c6f8ddb07",
     "53c51f4c1d7a1a1107b2c3f04df14979fda3d31a70d039e5d1c78eb1dde55132"
    ]
   },

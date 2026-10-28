@@ -1341,7 +1341,9 @@ cheme safety hazop review H-01 [--write] # a review record (reviews/) for the re
   `kind: hazop` gates (`require: [assessed, reviewed, inputs-current, actions-closed,
   no-example]`) and `kind: review, topic: hazop` gates ask for completion and review per stage.
 - `examples/safety-hazop/` is a small plant with an illustrative study; the skills
-  `hazop-study`, `hazop-assessment` and `hazop-review` describe the workflow.
+  `hazop-study`, `hazop-assessment` and `hazop-review` describe the workflow, and
+  `hazop-node-breakdown`, `hazop-scenario-propagation` and `hazop-risk-classification` the
+  nodes, the scenarios traced over the P&ID and the suggested ratings.
 
 ### check
 

@@ -23,7 +23,8 @@ lookup. `hazop.py`: loading, the `cheme.hazop-*` rules against the study, the pl
 the lists and sheets, interlocks of `control/cause-effect.yaml`) and the matrix, staleness of
 bands and analysed inputs, the targeted band write, the study's state and review.
 `hazop_report.py`: the report. `data/risk-matrix-example.yaml`: the illustrative matrix that
-`cheme init` writes. Skills `hazop-study`, `hazop-assessment`, `hazop-review`. Review records
+`cheme init` writes. Skills `hazop-study`, `hazop-node-breakdown`, `hazop-scenario-propagation`,
+`hazop-risk-classification`, `hazop-assessment`, `hazop-review`. Review records
 (`reviews/*.md`, `chemeascode.foundation.reviews`) tie the review to its scope and
 `reviewed_commit`; interlocks and the cause-and-effect matrix belong to `control`, and a study
 refers to them by id.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Safety: three HAZOP skills, guidance only (no new command): `hazop-node-breakdown` (nodes
+  by named boundary rules, with members and design intent), `hazop-scenario-propagation`
+  (causes inside the node, consequences followed object by object over the P&ID to a top
+  event, then the fluid's outcome) and `hazop-risk-classification` (severity and likelihood
+  codes suggested from the project's risk matrix, with their basis). Everything they write
+  is `status: proposed`.
+
 ## 0.8.0 (2026-10-28): initial public release
 
 The first public version of cheme-as-code: the `cheme` toolkit, the viewer and the agent runner
