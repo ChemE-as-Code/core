@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0 (2026-10-29)
+
+First stable release: from here on cheme-as-code follows semantic versioning (ADR 0032). The
+public interface (commands, plant-repository file formats and schemas, run records, the
+`cheme serve` API and the documented Python API) changes incompatibly only in a new major
+version. No breaking change since 0.8.0.
+
+### Fixed
+
+- Viewer fixtures carry a fixed `run_at`; the live API test names the failing answer (#48).
+- Smoke test: CI gets a git identity for the run record's commit and checks it is committed (#49).
+- `agent-cli/run.sh` is executable again (the repository's first commit dropped the bit) (#50).
+
+### Changed
+
+- Agent runner (`agent-cli/`): CI-fix runs are back, `night.py --since` sets the ledger start,
+  design prompts research sources online with locators and keep per-process LCI overrides in the
+  process folder (#52).
+- Versioning: semantic versioning from 1.0.0 (ADR 0032); the contributing guide's "Moving a
+  module" no longer relies on being pre-1.0.
+
 ## 0.8.0 (2026-10-28): initial public release
 
 The first public version of cheme-as-code: the `cheme` toolkit, the viewer and the agent runner

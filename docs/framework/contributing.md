@@ -129,7 +129,9 @@ directory, call the function with that directory, return the result with its `so
 
 ## Moving a module
 
-There is no compatibility layer (pre-1.0): a move changes the import path.
+There is no compatibility layer for internal modules: a move changes the import path. Moving a
+module on the documented Python API (ADR 0032) is a breaking change and needs a new major
+version, or the new path first and the removal in the next major.
 
 1. `git mv` the file, so `git log --follow` keeps its history. Change only import lines.
 2. Update every reference to the old path: `src/`, tests, skills (`SKILL.md`, scripts),
@@ -140,6 +142,14 @@ There is no compatibility layer (pre-1.0): a move changes the import path.
 4. Anything under `domains/process/*.py` changes `generator_fingerprint()`. Rebuild the examples
    (`uv run --directory examples/<example> cheme process build`) and commit the sheets;
    only `generator_sha256` changes.
+
+## Releases and versions
+
+cheme-as-code follows semantic versioning from 1.0.0 (ADR 0032). A release sets `version` in
+`pyproject.toml` (then `uv lock`), adds a dated CHANGELOG section (with "Breaking" first when
+there is one, and its migration), and is tagged on `main` after the merge with an annotated
+`vX.Y.Z` tag and a GitHub release whose notes are that CHANGELOG section. A breaking change to
+the public interface the ADR lists needs a new major version.
 
 ## Architecture decisions
 

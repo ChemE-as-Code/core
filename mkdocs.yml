@@ -155,4 +155,5 @@ nav:
       - "0029 Run records per run": adr/0029-run-records-per-run.md
       - "0030 Conversion reactors checked against the declared conversion": adr/0030-conversion-reactors-checked-against-the-declared-conversion.md
       - "0031 One glossary and qualified maturity": adr/0031-one-glossary-and-qualified-maturity.md
+      - "0032 Semantic versioning from 1.0.0": adr/0032-semantic-versioning-from-1-0-0.md
       - Template: adr/template.md
