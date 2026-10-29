@@ -510,3 +510,14 @@ def test_streams_cli_formats(recycle, monkeypatch):
     for flag, needle in (("--md", "| S1 |"), ("--csv", "S1,Feed"), ("--json", '"balances"')):
         result = runner.invoke(app, ["process", "streams", flag])
         assert result.exit_code == 0 and needle in result.output, result.output
+
+
+def test_an_optional_step_method_is_looked_up_in_its_enum():
+    import pydexpi.pydexpi_classes.pydexpi_classes as C
+
+    from chemeascode.domains.process.build import step_method
+
+    pumping = C.Pumping.model_fields["method"].annotation  # PumpingMethod | Undefined | None
+    assert step_method(pumping, None) is C.PumpingMethod.UNSPECIFIED
+    assert step_method(pumping, "centrifugalmotion") is C.PumpingMethod.CENTRIFUGALMOTION
+    assert step_method(int | None, None) is None

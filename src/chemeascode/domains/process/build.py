@@ -29,7 +29,8 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, cast
+from enum import Enum
+from typing import Any, cast, get_args
 
 import pydexpi.pydexpi_classes.pydexpi_classes as C
 
@@ -78,7 +79,12 @@ def step_class(name: str) -> type | None:
 
 def step_method(enum: Any, wanted: str | None) -> Any:
     """The member of a step class's ``method`` enum *wanted* names (name or value, any case);
-    without one, ``Unspecified`` or ``Generic``."""
+    without one, ``Unspecified`` or ``Generic``. An optional method (``PumpingMethod |
+    Undefined | None`` in pyDEXPI 2.1) is looked up in its enum."""
+    if not (inspect.isclass(enum) and issubclass(enum, Enum)):
+        enum = next((a for a in get_args(enum) if inspect.isclass(a) and issubclass(a, Enum)), None)
+        if enum is None:
+            return None
     members = list(enum)
     for member in members:
         if wanted and wanted.lower() in (member.name.lower(), str(member.value).lower()):

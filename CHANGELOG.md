@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: `cheme process simulate` leaves a feed with no flow in the case (an idle return or
+  recycle into a mixer) out of the DWSIM model, with info `sim-feed-idle`.
+- Fix: `cheme process build` failed on any `Pumping` step: pyDEXPI 2.1 declares its method
+  optional (`PumpingMethod | Undefined | None`); the method is now looked up in its enum. The
+  example sheets are regenerated (generator code stamp only).
 - Fix: `cheme safety hazop propagate` lost the pipe between two items of different segments
   when the second segment came later in the file (the walk ended in `no-connection`); items
   are now indexed before pipes.
