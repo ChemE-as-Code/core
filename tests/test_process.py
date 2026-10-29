@@ -140,6 +140,28 @@ def test_pumping_step_builds_with_its_method(recycle):
 
 
 @pytest.mark.parametrize(
+    ("cls", "method", "message"),
+    [
+        ("Pumping", "Typo", "Typo is not a PumpingMethod of Pumping"),
+        ("Cooling", "Typo", "Typo is not a HeatExchangeMethod of Cooling"),
+        ("Mixing", "Static", "Mixing has no DEXPI method"),
+    ],
+)
+def test_unknown_step_method_is_a_finding(recycle, cls, method, message):
+    """A ``method:`` the class does not have is refused by the rules instead of being dropped
+    (optional-method classes such as ``Pumping``) or crashing the build (issue #59)."""
+
+    def set_method(data):
+        e1 = next(s for s in data["steps"] if s["id"] == "E1")
+        e1.update({"class": cls, "method": method})
+
+    _edit(recycle, set_method)
+    found = [f for f in _rules(recycle) if f.rule == "cheme.process-class"]
+    assert len(found) == 1 and found[0].level == "error", [f.format() for f in found]
+    assert message in found[0].message and found[0].hint, found[0].format()
+
+
+@pytest.mark.parametrize(
     "cls",
     [
         c
