@@ -648,6 +648,39 @@ def test_worker_reports_failures_as_json_on_stdout():
     assert done.returncode == 1 and result["ok"] is False and "model" in result["error"]
 
 
+def test_tear_acceleration_follows_a_slow_loop_torn_three_times():
+    """One loop torn at three streams in series, 0.995 of the gap left per circuit (a small
+    purge): each copy is fed by the tear before it, so the slow mode has complex eigenvalues.
+    Plain substitution needs about 12,000 passes to 1e-9; the acceleration a handful."""
+    from chemeascode.integrations import dwsim_worker as worker
+
+    c = 0.995 ** (1 / 3)
+
+    def g(x):
+        return [c * x[2] + 1.0, c * x[0] + 1.0, c * x[1] + 1.0]
+
+    x, xs, gs, passes = [0.0, 0.0, 0.0], [], [], 0
+    while passes < 30:
+        passes += 1
+        gx = g(x)
+        if max(abs(a - b) for a, b in zip(gx, x, strict=True)) < 1e-9:
+            break
+        xs, gs = [*xs, x][-worker.ANDERSON_DEPTH - 1 :], [*gs, gx][-worker.ANDERSON_DEPTH - 1 :]
+        x = worker._anderson(xs, gs) if len(xs) > 1 else gx
+    assert passes < 10
+    assert x == pytest.approx([1 / (1 - c)] * 3, rel=1e-9)
+
+
+def test_tear_tolerance_is_absolute_for_small_streams_and_relative_for_large():
+    from chemeascode.integrations import dwsim_worker as worker
+
+    # temperature, pressure, then the compounds' mass flows (kg/s)
+    assert worker._tolerance([300.0, 1e5, 0.001, 0.002]) == (1e-7, 1e-4, 1e-2)
+    mass, _, _ = worker._tolerance([300.0, 1.47e7, 60.0, 25.0])
+    assert mass == pytest.approx(85.0 * worker.TEAR_RELATIVE)
+    assert worker._tear_errors([300.0, 1e5, 1.0, 2.0], [300.5, 1e5, 1.5, 1.5]) == (1.0, 0.5, 0.0)
+
+
 @dwsim_tests
 def test_dwsim_solves_the_example(plant, tmp_path):
     process, _ = load_process(plant.root)
@@ -776,6 +809,90 @@ def test_dwsim_solves_a_recycle(plant):
     process, _ = load_process(plant.root)
     check = run(plant, process, "design", write=False)
     assert not [f for f in check.findings if f.level != "info"], check.findings
+
+
+def _two_recycles(ws: Workspace) -> None:
+    """Two recycles with one small purge (core#57): the anti-surge loop takes 99.2 % of the
+    cooled air back through V2 to M1, and a second loop 50 % of the instrument air (X2) back
+    through V3 to M2 ahead of the compressor. 1000 kg/h leave as 0.6 % + 0.2 % of the
+    compressed air, half of the 0.6 % through X2: 1000 / 0.005 = 200,000 kg/h compressed. Each
+    pass of plain substitution (DWSIM's Recycle) closes only 0.5 % of the gap."""
+
+    def edit(d):
+        _anti_surge(d)
+        d["steps"][2]["split"] = {"a": 0.006, "b": 0.002}
+        d["steps"][2]["ports"][1].pop("delegates", None)
+        d["steps"] += [
+            {
+                "id": "M2",
+                "block": "COMP",
+                "class": "MixingSimple",
+                "ports": [
+                    {"id": "in", "direction": "in"},
+                    {"id": "recycle", "direction": "in"},
+                    {"id": "out", "direction": "out"},
+                ],
+            },
+            {
+                "id": "X2",
+                "block": "DIST",
+                "class": "SplittingMaterial",
+                "split": {"a": 0.5},
+                "ports": [
+                    {"id": "in", "direction": "in"},
+                    {"id": "a", "direction": "out", "delegates": "a"},
+                    {"id": "b", "direction": "out"},
+                ],
+            },
+            {
+                "id": "V3",
+                "block": "DIST",
+                "class": "RegulatingFlow",
+                "ports": [{"id": "in", "direction": "in"}, {"id": "out", "direction": "out"}],
+            },
+        ]
+        streams = {s["id"]: s for s in d["streams"]}
+        streams["S0"]["to"] = "M2.in"
+        streams["S4"]["to"] = "X2.in"
+        d["streams"] += [
+            {"id": "S10", "from": "M2.out", "to": "K1.in", "template": "air"},
+            {"id": "S11", "from": "X2.b", "to": "V3.in", "template": "air"},
+            {"id": "S12", "from": "V3.out", "to": "M2.recycle", "template": "air"},
+            {"id": "S13", "from": "X2.a", "to": "HP.in", "template": "air"},
+        ]
+
+    def specs(d):
+        let_down = {"outlet_pressure": {"value": 101.325, "provenance": "given"}}
+        d["specs"].update(V2=let_down, V3=dict(let_down))
+        d["tear_streams"] = ["S9", "S12"]
+
+    _edit(ws, "process/flowsheet.yaml", edit)
+    _edit(ws, "process/simulation.yaml", specs)
+
+
+def test_two_recycles_are_torn_as_given(plant):
+    _two_recycles(plant)
+    found = _model(plant)
+    assert found.model is not None, found.findings
+    assert [r["stream"] for r in found.model["recycles"]] == ["S9", "S12"]
+
+
+@dwsim_tests
+def test_dwsim_converges_two_recycles_with_a_small_purge(plant):
+    _two_recycles(plant)
+    process, _ = load_process(plant.root)
+    result = run(plant, process, "design", write=True)
+    assert not [f for f in result.findings if f.level in ("error", "warning")], result.findings
+    flow = {k: _state(plant, k)["flow"]["value"] for k in ("S10", "S8", "S9", "S11", "S12")}
+    flow.update({k: _state(plant, k)["flow"]["value"] for k in ("S5", "S13")})
+    # each copy within 1e-5 of its tear's flow (TEAR_RELATIVE), the products exact
+    assert flow["S10"] == pytest.approx(200_000.0, rel=2e-5)
+    assert flow["S9"] == pytest.approx(0.992 * flow["S10"], rel=2e-5)
+    assert flow["S12"] == pytest.approx(0.003 * flow["S10"], rel=2e-5)
+    assert flow["S5"] + flow["S13"] == pytest.approx(1000.0, rel=1e-4)
+    entry = json.loads((plant.root / "process/simulation-run.json").read_text())["cases"]["design"]
+    # plain substitution would need thousands of passes (0.995 per pass)
+    assert entry["status"] == "converged" and 1 < entry["iterations"] < 100
 
 
 @dwsim_tests

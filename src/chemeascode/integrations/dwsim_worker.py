@@ -138,23 +138,184 @@ def _connect_column(sim: Any, unit: Any, u: dict[str, Any], objects: dict, torn:
         sim.ConnectObjects(unit.GraphicObject, stream.GraphicObject, 2 + k, 0)
 
 
+#: A tear has converged when its copy differs from it by at most this much: mass flow (kg/s,
+#: summed over the compounds, as DWSIM's Recycle measures it), temperature (K), pressure (Pa).
+#: DWSIM's defaults (0.01 kg/s, 0.1 K) stop short of the balance tolerance.
+TEAR_TOLERANCE = (1e-7, 1e-4, 1e-2)
+#: ... and the mass flow at most this fraction of the tear's flow where that is more than 1e-7
+#: kg/s: DWSIM's unit models (flashes, exchangers, equilibrium reactors) reproduce a loop's
+#: flows to about 1e-6 of them (an ammonia loop, 85 kg/s, stalls at 3e-5 to 6e-4 kg/s), so
+#: 1e-7 kg/s on a large stream is out of reach of any method. 1e-5 stays 500 times inside a
+#: flowsheet balance tolerance of 0.5 %.
+TEAR_RELATIVE = 1e-5
+#: Passes through the flowsheet one solve may take before its tears are reported.
+TEAR_PASSES = 500
+#: Earlier passes the tear iteration's acceleration (:func:`_anderson`) draws on.
+ANDERSON_DEPTH = 5
+
+
+def _tear_state(stream: Any) -> list[float]:
+    """Temperature (K), pressure (Pa) and the compounds' mass flows (kg/s) of *stream*."""
+    flows = [_num(c.MassFlow) or 0.0 for c in stream.Phases[0].Compounds.Values]
+    return [_num(stream.GetTemperature()) or 0.0, _num(stream.GetPressure()) or 0.0, *flows]
+
+
+def _tear_errors(tear: list[float], copy: list[float]) -> tuple[float, float, float]:
+    """How far a copy is from its tear: mass flow (summed over the compounds), T, P."""
+    mass = sum(abs(a - b) for a, b in zip(tear[2:], copy[2:], strict=True))
+    return mass, abs(tear[0] - copy[0]), abs(tear[1] - copy[1])
+
+
+def _tolerance(tear: list[float]) -> tuple[float, float, float]:
+    """The tolerances of a tear (:data:`TEAR_TOLERANCE`, :data:`TEAR_RELATIVE`) by its state."""
+    mass, kelvin, pascal = TEAR_TOLERANCE
+    return max(mass, TEAR_RELATIVE * sum(tear[2:])), kelvin, pascal
+
+
+def _anderson(xs: list[list[float]], gs: list[list[float]]) -> list[float]:
+    """The next iterate of the fixed point x = g(x) from the last iterates *xs* and their images
+    *gs* (oldest first): Anderson acceleration (Walker and Ni, SIAM J. Numer. Anal. 49 (2011)
+    1715), the image minus the combination of earlier image steps that best cancels the
+    residual f = g - x in the least-squares sense (modified Gram-Schmidt; a step that adds
+    nothing new is dropped). A loop's tears in series give its slow mode complex eigenvalues,
+    which a single dominant eigenvalue or a per-variable secant (Wegstein) cannot follow."""
+    fs = [[g - x for g, x in zip(gk, xk, strict=True)] for xk, gk in zip(xs, gs, strict=True)]
+    df = [[b - a for a, b in zip(fs[j], fs[j + 1], strict=True)] for j in range(len(fs) - 1)]
+    dg = [[b - a for a, b in zip(gs[j], gs[j + 1], strict=True)] for j in range(len(gs) - 1)]
+    q: list[list[float]] = []
+    r: list[list[float]] = []  # column j of R: its coefficients on q[0..]
+    kept: list[int] = []
+    for j, col in enumerate(df):
+        v, coef = list(col), []
+        for qi in q:
+            c = sum(a * b for a, b in zip(qi, v, strict=True))
+            coef.append(c)
+            v = [a - c * b for a, b in zip(v, qi, strict=True)]
+        norm = math.sqrt(sum(a * a for a in v))
+        if norm <= 1e-10 * math.sqrt(sum(a * a for a in col)) or norm == 0.0:
+            continue
+        q.append([a / norm for a in v])
+        r.append([*coef, norm])
+        kept.append(j)
+    if not kept:
+        return list(gs[-1])
+    rhs = [sum(a * b for a, b in zip(qi, fs[-1], strict=True)) for qi in q]
+    gamma = [0.0] * len(kept)
+    for i in reversed(range(len(kept))):  # back substitution, R upper triangular
+        s = rhs[i] - sum(r[k][i] * gamma[k] for k in range(i + 1, len(kept)))
+        gamma[i] = s / r[i][i]
+    out = list(gs[-1])
+    for g, j in zip(gamma, kept, strict=True):
+        out = [o - g * d for o, d in zip(out, dg[j], strict=True)]
+    return out
+
+
 class _Flowsheet:
-    """Solves the flowsheet (``CalculateFlowsheet4``) and counts the passes DWSIM's sequential
-    solver makes through it: one per solve without a recycle, else the iterations of the
-    recycle that took the most (``Recycle.IterationsTaken``; DWSIM converges all recycles in one
-    loop). DWSIM's flowsheet solver reports no iteration count of its own."""
+    """Solves the flowsheet and counts the passes DWSIM's sequential solver makes through it.
 
-    def __init__(self, automation: Any, sim: Any) -> None:
+    Without tears one ``CalculateFlowsheet4`` is one pass. With tears the worker iterates
+    itself: each pass solves the flowsheet with the copies ("<id>-R") as given streams, then
+    sets every copy at once from its tear, accelerated over all tears together
+    (:func:`_anderson`), until every tear meets :data:`TEAR_TOLERANCE` or
+    :data:`TEAR_PASSES` are spent. DWSIM's Recycle (9.0.5) only copies the tear (its
+    GlobalBroyden leaves the composition unaccelerated), and a loop with a small purge relaxes
+    by about the purge fraction per circuit: thousands of passes. Its Recycle blocks are
+    connected afterwards (:meth:`close`) and run their own test on the converged flowsheet."""
+
+    def __init__(self, automation: Any, sim: Any, tears: dict[str, tuple[Any, Any]]) -> None:
         self.automation, self.sim = automation, sim
-        self.recycles: list[Any] = []
+        self.tears = tears  # tear id -> (tear stream, its copy)
+        self.recycles: list[Any] = []  # DWSIM's Recycle blocks, once connected
         self.passes = 0
+        self.unconverged: dict[str, tuple[float, float, float]] = {}
 
-    def solve(self) -> list[str]:
-        """The solve's error messages (none: it converged)."""
+    def _pass(self) -> list[str]:
         errors = self.automation.CalculateFlowsheet4(self.sim) or []
         taken = [int(_num(r.IterationsTaken) or 0) for r in self.recycles]
         self.passes += max([1, *taken])
         return [str(getattr(e, "Message", e)) for e in errors]
+
+    def solve(self) -> list[str]:
+        """The solve's error messages (none: it converged)."""
+        if not self.tears or self.recycles:
+            return self._pass()
+        ids = list(self.tears)
+        scale = [TEAR_TOLERANCE[1], TEAR_TOLERANCE[2]]  # residuals in tolerances
+        xs: list[list[float]] = []
+        gs: list[list[float]] = []
+        accelerated = False
+        for _ in range(TEAR_PASSES):
+            errors = self._pass()
+            if errors and accelerated and gs:
+                # the accelerated copies failed a unit: back to the last tears, copied plainly
+                self._set(ids, gs[-1], scale)
+                xs, gs, accelerated = [], [], False
+                continue
+            if errors:
+                return errors
+            states = {t: [_tear_state(s) for s in self.tears[t]] for t in ids}
+            self.unconverged = {}
+            for t in ids:
+                found = _tear_errors(*states[t])
+                if any(e > tol for e, tol in zip(found, _tolerance(states[t][0]), strict=True)):
+                    self.unconverged[t] = found
+            if not self.unconverged:
+                return []
+            unit = scale + [TEAR_TOLERANCE[0]] * (len(states[ids[0]][0]) - 2)
+            xs.append([v / u for t in ids for v, u in zip(states[t][1], unit, strict=True)])
+            gs.append([v / u for t in ids for v, u in zip(states[t][0], unit, strict=True)])
+            xs, gs = xs[-ANDERSON_DEPTH - 1 :], gs[-ANDERSON_DEPTH - 1 :]
+            accelerated = len(xs) > 1
+            self._set(ids, _anderson(xs, gs) if accelerated else gs[-1], unit)
+        return [
+            f"recycle at {t}: not converged in {TEAR_PASSES} passes (copy off by {m:.3g} kg/s, "
+            f"{dt:.3g} K, {dp:.3g} Pa; tolerance {tol[0]:.3g} kg/s, {tol[1]:g} K, {tol[2]:g} Pa)"
+            for t, (m, dt, dp) in self.unconverged.items()
+            for tol in [_tolerance(_tear_state(self.tears[t][0]))]
+        ]
+
+    def _set(self, ids: list[str], x: list[float], unit: list[float]) -> None:
+        """Set the copies from the scaled iterate *x* (the tears' variables in order)."""
+        from System import Array, Double
+
+        n = len(unit)
+        for k, t in enumerate(ids):
+            v = [a * u for a, u in zip(x[k * n : (k + 1) * n], unit, strict=True)]
+            copy = self.tears[t][1]
+            flows = [max(w, 0.0) for w in v[2:]]
+            weights = [c.ConstantProperties.Molar_Weight for c in copy.Phases[0].Compounds.Values]
+            moles = [w / mw for w, mw in zip(flows, weights, strict=True)]
+            copy.SetTemperature(v[0] if v[0] > 0 else self.tears[t][0].GetTemperature())
+            copy.SetPressure(v[1] if v[1] > 0 else self.tears[t][0].GetPressure())
+            copy.SetMassFlow(sum(flows))
+            if sum(moles) > 0:
+                copy.SetOverallComposition(Array[Double]([m / sum(moles) for m in moles]))
+
+    def close(self, sim: Any, kind: Any, converged: bool) -> list[str]:
+        """Connect DWSIM's Recycle blocks between the tears and their copies (as the saved
+        flowsheet shows them) and, when the tear iteration converged, let DWSIM run its own
+        recycle test on it, which then passes in its first pass; why not where not."""
+        messages = []
+        for k, (t, (tear, copy)) in enumerate(self.tears.items()):
+            recycle = _concrete(sim.AddObject(kind, 100 + 150 * k, 500, f"RC-{t}"))
+            sim.ConnectObjects(tear.GraphicObject, recycle.GraphicObject, -1, 0)
+            sim.ConnectObjects(recycle.GraphicObject, copy.GraphicObject, 0, -1)
+            limits = recycle.ConvergenceParameters
+            limits.VazaoMassica, limits.Temperatura, limits.Pressao = _tolerance(_tear_state(tear))
+            recycle.MaximumIterations = TEAR_PASSES
+            self.recycles.append(recycle)
+        if not converged or not self.recycles:
+            return messages
+        messages += self._pass()
+        for t, recycle in zip(self.tears, self.recycles, strict=True):
+            if not recycle.Converged:
+                h = recycle.ConvergenceHistory
+                messages.append(
+                    f"recycle at {t}: not converged in DWSIM's recycle test (copy off by "
+                    f"{abs(_num(h.VazaoMassicaE) or 0):.3g} kg/s, "
+                    f"{abs(_num(h.TemperaturaE) or 0):.3g} K, {abs(_num(h.PressaoE) or 0):.3g} Pa)"
+                )
+        return messages
 
 
 def _columns(flowsheet: _Flowsheet, objects: dict, model: dict) -> list[str]:
@@ -617,11 +778,8 @@ def solve(request: dict[str, Any]) -> dict[str, Any]:
     # a tear stream leaves its unit as itself and enters the next one as its copy "<id>-R",
     # with a DWSIM Recycle between the two
     torn = {r["stream"]: f"{r['stream']}-R" for r in model.get("recycles", [])}
-    for k, (sid, copy) in enumerate(torn.items()):
+    for copy in torn.values():
         objects[copy] = _concrete(sim.AddObject(ObjectType.MaterialStream, 100, 550, copy))
-        objects[f"RC-{sid}"] = _concrete(
-            sim.AddObject(ObjectType.OT_Recycle, 100 + 150 * k, 500, f"RC-{sid}")
-        )
     for u in model["units"]:
         unit = objects[u["id"]]
         if u["type"] == "distillation_column":
@@ -680,15 +838,6 @@ def solve(request: dict[str, Any]) -> dict[str, Any]:
     first = next((s["feed"] for s in model["streams"] if s.get("feed")), None)
     for r in model.get("recycles", []):
         sid = r["stream"]
-        recycle = objects[f"RC-{sid}"]
-        sim.ConnectObjects(objects[sid].GraphicObject, recycle.GraphicObject, -1, 0)
-        sim.ConnectObjects(recycle.GraphicObject, objects[torn[sid]].GraphicObject, 0, -1)
-        # DWSIM's defaults (0.01 kg/s, 0.1 K) stop short of the balance tolerance
-        limits = recycle.ConvergenceParameters
-        limits.VazaoMassica = 1e-7
-        limits.Temperatura = 1e-4
-        limits.Pressao = 1e-2
-        recycle.MaximumIterations = 500
         guess = {**(first or {}), **(r.get("guess") or {})}
         copy = objects[torn[sid]]
         copy.SetTemperature(float(guess.get("temperature_K", 298.15)))
@@ -700,8 +849,7 @@ def solve(request: dict[str, Any]) -> dict[str, Any]:
         )
 
     Settings.SolverMode = 0
-    flowsheet = _Flowsheet(automation, sim)
-    flowsheet.recycles = [objects[f"RC-{sid}"] for sid in torn]
+    flowsheet = _Flowsheet(automation, sim, {t: (objects[t], objects[c]) for t, c in torn.items()})
     messages = flowsheet.solve()
     for _ in range(10 if trains else 0):
         # a first pass that failed on a starting ratio is redone from the solved inlet pressure
@@ -716,9 +864,7 @@ def solve(request: dict[str, Any]) -> dict[str, Any]:
         messages = _columns(flowsheet, objects, model)
     if groups and not messages:
         messages += _balance(flowsheet, objects, groups, model)
-    for sid in torn:
-        if not objects[f"RC-{sid}"].Converged:
-            messages.append(f"recycle at {sid}: not converged")
+    messages += flowsheet.close(sim, ObjectType.OT_Recycle, not messages)
     for key, obj in objects.items():
         if hasattr(obj, "Calculated") and not obj.Calculated:
             text = str(getattr(obj, "ErrorMessage", "") or "")
