@@ -27,7 +27,9 @@ the SHA-256 of the canonical generated XML (see :mod:`.provenance`).
 
 from __future__ import annotations
 
+import enum
 import inspect
+import typing
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -76,10 +78,22 @@ def step_class(name: str) -> type | None:
     return None
 
 
-def step_method(enum: Any, wanted: str | None) -> Any:
+def method_enum(annotation: Any) -> type[enum.Enum] | None:
+    """The enum of a step class's ``method`` field: the annotation itself, or the enum in a
+    union such as ``Pumping``'s ``PumpingMethod | Undefined | None``."""
+    for candidate in (annotation, *typing.get_args(annotation)):
+        if inspect.isclass(candidate) and issubclass(candidate, enum.Enum):
+            return candidate
+    return None
+
+
+def step_method(annotation: Any, wanted: str | None) -> Any:
     """The member of a step class's ``method`` enum *wanted* names (name or value, any case);
-    without one, ``Unspecified`` or ``Generic``."""
-    members = list(enum)
+    without one, ``Unspecified`` or ``Generic``; None where the field has no enum."""
+    methods = method_enum(annotation)
+    if methods is None:
+        return None
+    members = list(methods)
     for member in members:
         if wanted and wanted.lower() in (member.name.lower(), str(member.value).lower()):
             return member
