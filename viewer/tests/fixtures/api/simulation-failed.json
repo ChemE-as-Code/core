@@ -49,7 +49,7 @@
   "run": {
     "case": "design",
     "run_at": "2026-10-28T12:00:00Z",
-    "tool": "cheme-as-code 1.0.0",
+    "tool": "cheme-as-code 1.0.1",
     "simulator": {
       "name": "dwsim",
       "version": "9.0.5.0",
@@ -58,7 +58,7 @@
     "property_package": "Peng-Robinson (PR)",
     "model_fingerprint": "aa92c1c90ad4962a",
     "inputs": {
-      "commit": "0bb0c2e2c4fc159305d2e403887d569915bb736d",
+      "commit": "3407fcfe0760509e0aa0edcbbea9bc5efb38591c",
       "dirty": [],
       "fingerprints": {
         "process/flowsheet.yaml": "sha256:185c5eb3e96191fbfc7773cff107d52dbf4c65664c78eaba5e9db0d8b46da482",
