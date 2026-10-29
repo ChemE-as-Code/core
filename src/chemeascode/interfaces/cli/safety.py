@@ -204,6 +204,101 @@ def rate(
         raise typer.Exit(1)
 
 
+@hazop_app.command("propagate")
+def propagate(
+    study: STUDY,
+    node: Annotated[str, typer.Option(help="The node id whose scenarios are walked.")],
+    deviation: Annotated[
+        str | None,
+        typer.Option(
+            help="Only this deviation: its id in the study (N1-NF) or '<guide word> "
+            "<parameter>' (default: every deviation a cause brings to the node)."
+        ),
+    ] = None,
+    library: Annotated[
+        str, typer.Option(help="The failure-mode library (cheme schema failure-modes).")
+    ] = "safety/failure-modes.yaml",
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
+    over the study's analysed P&IDs, object by object, to a top event, a study limit or an
+    object that absorbs it, with the safeguards the plant has along the path and the questions
+    the files leave open. Read-only: proposals for the study, never written into it."""
+    from chemeascode.project.hazop import node_propagation
+
+    workspace = _workspace()
+    try:
+        found = node_propagation(workspace, study, node, deviation, library)
+    except ValueError as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    candidates = found.result.candidates
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "study": found.study,
+                    "node": found.node,
+                    "library": found.library,
+                    "sheets": found.sheets,
+                    "candidates": [
+                        {
+                            "deviation": {
+                                "guide_word": c.deviation.guide_word,
+                                "parameter": c.deviation.parameter,
+                            },
+                            "at": c.at,
+                            "cause": c.cause,
+                            "mode": c.mode,
+                            "mechanism": c.mechanism,
+                            "kind": c.kind,
+                            "end": c.end,
+                            "top_event": c.top_event,
+                            "fluid": c.fluid,
+                            "path": [
+                                {
+                                    "sheet": s.sheet,
+                                    "object": s.object,
+                                    "tag": s.tag,
+                                    "class": s.cls,
+                                    "deviation": s.deviation.text(),
+                                    "effect": s.effect,
+                                }
+                                for s in c.path
+                            ],
+                            "reached": c.reached,
+                            "safeguards": [asdict(g) for g in c.safeguards],
+                            "questions": c.questions,
+                        }
+                        for c in candidates
+                    ],
+                    "uncovered": found.result.uncovered,
+                    "unresolved": found.result.unresolved,
+                    "findings": [{**asdict(f), "id": f.id} for f in found.findings],
+                },
+                indent=2,
+            )
+        )
+        return
+    typer.echo(
+        f"{found.study} {found.node}: {len(candidates)} candidate(s) from {found.library} over "
+        f"{', '.join(found.sheets)} (proposals: the team decides)"
+    )
+    for c in candidates:
+        ending = c.top_event or c.end
+        typer.echo(
+            f"{c.deviation.text()} at {c.at}: {c.cause} {c.mode} [{c.kind}] -> {ending}"
+            + (f" ({c.fluid})" if c.fluid else "")
+        )
+        typer.echo(f"  path: {c.path_text()}")
+        for guard in c.safeguards:
+            typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
+        for question in c.questions:
+            typer.echo(f"  question: {question}")
+    for finding in found.findings:
+        typer.echo(finding.format())
+
+
 @hazop_app.command("report")
 def report(
     study: STUDY,

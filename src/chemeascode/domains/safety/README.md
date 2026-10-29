@@ -22,7 +22,11 @@ risk matrix (`cheme/risk-matrix/v1`). `risk_matrix.py`: the matrix rules and the
 lookup. `hazop.py`: loading, the `cheme.hazop-*` rules against the study, the plant (tags of
 the lists and sheets, interlocks of `control/cause-effect.yaml`) and the matrix, staleness of
 bands and analysed inputs, the targeted band write, the study's state and review.
-`hazop_report.py`: the report. `data/risk-matrix-example.yaml`: the illustrative matrix that
+`hazop_report.py`: the report. `propagation.py` (ADR 0032, `cheme safety hazop propagate`):
+the candidate scenarios of a node, each failure mode of its objects walked over the pyDEXPI
+objects of the analysed P&IDs to a top event or study limit, with the safeguards on the path and
+the open questions; the failure modes come from the project's `safety/failure-modes.yaml`
+(`cheme/failure-modes/v1`, none shipped). `data/risk-matrix-example.yaml`: the illustrative matrix that
 `cheme init` writes. Skills `hazop-study`, `hazop-node-breakdown`, `hazop-scenario-propagation`,
 `hazop-risk-classification`, `hazop-assessment`, `hazop-review`. Review records
 (`reviews/*.md`, `chemeascode.foundation.reviews`) tie the review to its scope and

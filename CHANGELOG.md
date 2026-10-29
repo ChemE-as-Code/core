@@ -8,6 +8,12 @@
   event, then the fluid's outcome) and `hazop-risk-classification` (severity and likelihood
   codes suggested from the project's risk matrix, with their basis). Everything they write
   is `status: proposed`.
+- Safety: `cheme safety hazop propagate STUDY --node N [--deviation D] [--json]` walks each
+  failure mode of a node's objects over the study's analysed P&IDs (pyDEXPI objects, no graph
+  library) to a top event, a study limit or an object that absorbs it, with the candidate
+  safeguards on the path and the questions the files leave open; read-only. The failure modes
+  are project data in `safety/failure-modes.yaml` (new kind `failure-modes`,
+  `cheme/failure-modes/v1`); none are shipped (ADR 0032).
 
 ## 0.8.0 (2026-10-28): initial public release
 
