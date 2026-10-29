@@ -190,6 +190,52 @@ def _anti_surge(d):
     ]
 
 
+def _idle_return(d):
+    """A mixer M1 before the splitter, its second inlet S9 a feed with no flow (an idle return)."""
+    d["feeds"].append(
+        {"id": "IDLE", "title": "Idle return", "ports": [{"id": "out", "direction": "out"}]}
+    )
+    x1 = next(s for s in d["steps"] if s["id"] == "X1")
+    x1["ports"][0].pop("delegates")
+    d["steps"].append(
+        {
+            "id": "M1",
+            "block": "DIST",
+            "title": "Header",
+            "class": "Mixing",
+            "ports": [
+                {"id": "a", "direction": "in", "delegates": "in"},
+                {"id": "b", "direction": "in"},
+                {"id": "out", "direction": "out"},
+            ],
+        }
+    )
+    next(s for s in d["streams"] if s["id"] == "S3")["to"] = "M1.a"
+    d["streams"].append({"id": "S8", "from": "M1.out", "to": "X1.in", "template": "air"})
+    state = {k: dict(v) for k, v in d["streams"][0]["state"]["design"].items()}
+    state["flow"] = {"value": 0, "provenance": "assumed", "source": "shut"}
+    d["streams"].append(
+        {
+            "id": "S9",
+            "from": "IDLE.out",
+            "to": "M1.b",
+            "template": "air",
+            "state": {"design": state},
+        }
+    )
+
+
+def test_an_idle_feed_is_left_out_of_the_simulation(plant):
+    _edit(plant, "process/flowsheet.yaml", _idle_return)
+    found = _model(plant)
+    assert found.model is not None, found.findings
+    m1 = next(u for u in found.model["units"] if u["id"] == "M1")
+    assert m1["inlets"] == ["S3"]
+    assert "S9" not in [s["id"] for s in found.model["streams"]]
+    idle = [f for f in found.findings if f.rule.endswith("sim-feed-idle")]
+    assert idle and idle[0].level == "info" and idle[0].ids == ["S9"]
+
+
 def _with_recycle(ws: Workspace) -> None:
     _edit(ws, "process/flowsheet.yaml", _anti_surge)
     _edit(

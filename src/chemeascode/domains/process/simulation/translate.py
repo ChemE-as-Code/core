@@ -649,6 +649,26 @@ def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Tra
         else:
             out.outlets.append(stream.id)
 
+    # A feed with no flow in this case (an idle branch: a recycle or a return that is shut)
+    # carries nothing, and DWSIM's mixer mixes a zero-flow inlet in wrongly (its energy); it is
+    # left out, with its place at the unit.
+    idle = sorted(
+        s.id
+        for s in feeds
+        if (total := stream_flows(process, s, case).total) is not None and total == 0
+    )
+    if idle:
+        feeds = [s for s in feeds if s.id not in idle]
+        for node_id in ins:
+            ins[node_id] = [x for x in ins[node_id] if x[2].id not in idle]
+        add(
+            "info",
+            "sim-feed-idle",
+            f"feed stream(s) {', '.join(idle)} ({case}) carry no flow: left out of the simulation",
+            (FLOWSHEET_FILE, ["streams", index[idle[0]]]),
+            idle,
+        )
+
     # -- unit operations ------------------------------------------------------------------------
     units: list[dict[str, Any]] = []
     for node_id, node in nodes.items():
