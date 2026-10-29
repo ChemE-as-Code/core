@@ -157,7 +157,50 @@ def set_command(
     )
 
 
+def crossings(
+    sheets: Annotated[
+        list[Path] | None,
+        typer.Argument(metavar="[SHEET...]", help="P&ID files (default: every P&ID)."),
+    ] = None,
+    gap: Annotated[float, typer.Option(help="Gap length in sheet mm.")] = 3.0,
+    check: Annotated[
+        bool, typer.Option("--check", help="Write nothing; exit 1 if a crossing is not shown.")
+    ] = False,
+    print_only: Annotated[bool, _PRINT] = False,
+    no_fmt: Annotated[bool, _NO_FMT] = False,
+) -> None:
+    """Show every crossing of two lines by a gap: pipes run through instrument lines, the
+    horizontal through the vertical of two lines of one kind; gaps drawn in the line that
+    should run through are joined."""
+    from chemeascode.domains.piping.authoring.crossings import apply_crossings
+    from chemeascode.domains.piping.authoring.edit import EditError
+    from chemeascode.interfaces.cli import _sheet_for, _workspace
+
+    if sheets:
+        targets = [_sheet_for("", s) for s in sheets]
+    else:
+        workspace = _workspace()
+        targets = [(p, workspace.relative(p)) for p in workspace.pid_files() if p.is_file()]
+    pending = False
+    for path, name in targets:
+        try:
+            result = apply_crossings(
+                path, gap=gap, write=not (print_only or check), name=name, fmt=not no_fmt
+            )
+        except (EditError, ValueError) as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(2) from failure
+        pending = pending or bool(result.diff)
+        if print_only:
+            typer.echo(result.diff, nl=False)
+        for line in result.report():
+            typer.echo(line, err=print_only)
+    if check and pending:
+        raise typer.Exit(1)
+
+
 def register(app: typer.Typer) -> None:
     app.command()(move)
     app.command()(rename)
     app.command("set")(set_command)
+    app.command()(crossings)

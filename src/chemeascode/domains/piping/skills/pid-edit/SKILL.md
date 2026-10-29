@@ -80,6 +80,9 @@ Read the `dexpi-xml` skill first if you have not in this session; its Convention
    that crop, fix the placement, and quote the `drawing <sheet>:` counts validate prints before
    you write "no overlaps" anywhere. A crossing you cannot avoid is accepted with a reason in
    `checks/checks.yaml` (`accept:`, by the finding's `[id ...]`), not left as a warning.
+   Two lines that cross without joining show it by a gap in one of them: after drawing or
+   rerouting lines run `cheme crossings pid/P-01.xml` (a pipe runs through an instrument line;
+   of two lines of one kind the horizontal runs through the vertical). Do not cut gaps by hand.
 6. **Review the change** before committing: `cheme diff HEAD --list` prints one line per
    changed plant item (`<kind> <class> <id> [tag]: N added, M removed, K modified`). Every line
    should be an item you meant to change. `--list --verbose` lists each change under its item,

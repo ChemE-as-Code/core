@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Piping: `cheme crossings [SHEET...] [--gap MM] [--check] [--print]` shows every crossing of
+  two drawn lines by a gap in one of them: a pipe runs through an instrument line, and of two
+  lines of one kind the horizontal runs through the vertical. Gaps drawn in the line that
+  should run through are joined, pieces filling a gap the rule asks for are removed, a line
+  under a bundle of lanes gets one gap; a gap already in the right line stays. Pure XML
+  transform like `cheme move`; skill `pid-edit` says when to run it.
 - Fix: `cheme process simulate` leaves a feed with no flow in the case (an idle return or
   recycle into a mixer) out of the DWSIM model, with info `sim-feed-idle`.
 - Fix: `cheme process build` failed on any `Pumping` step: pyDEXPI 2.1 declares its method
