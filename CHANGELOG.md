@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fix: `cheme safety hazop propagate` lost the pipe between two items of different segments
+  when the second segment came later in the file (the walk ended in `no-connection`); items
+  are now indexed before pipes.
 - Safety: three HAZOP skills, guidance only (no new command): `hazop-node-breakdown` (nodes
   by named boundary rules, with members and design intent), `hazop-scenario-propagation`
   (causes inside the node, consequences followed object by object over the P&ID to a top
