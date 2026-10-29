@@ -212,7 +212,8 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 add(sheet, obj, _text(get_tag(obj)))
                 for nozzle in getattr(obj, "nozzles", None) or ():
                     owner[id(nozzle)] = id(obj)
-        for system in getattr(conceptual, "pipingNetworkSystems", None) or ():
+        systems = getattr(conceptual, "pipingNetworkSystems", None) or ()
+        for system in systems:
             line = _text(getattr(system, "lineNumber", None))
             for segment in system.segments or ():
                 fluid = _text(getattr(segment, "fluidCode", None)) or _text(
@@ -221,6 +222,9 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 index.segments[id(segment)] = (sheet, line, fluid)
                 for item in segment.items or ():
                     add(sheet, item, _text(piping_tag(item)), fluid)
+        # Pipes second: a pipe may end at an item of a segment listed after its own.
+        for system in systems:
+            for segment in system.segments or ():
                 # A segment without pipes still joins its own ends.
                 for pipe in segment.connections or [segment]:
                     source = node(getattr(pipe, "sourceItem", None))

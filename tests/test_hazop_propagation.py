@@ -164,6 +164,20 @@ def test_a_local_cause_is_followed_downstream_to_the_study_limit(model):
     assert ("control", "FIC-104") in [(g.kind, g.ref) for g in candidate.safeguards]
 
 
+def test_a_pipe_may_end_at_an_item_of_a_later_segment():
+    from pydexpi.pydexpi_classes import pydexpi_classes as d
+
+    a, b = d.GateValve(id="A"), d.GateValve(id="B")
+    first = d.PipingNetworkSegment(
+        id="S1", items=[a], connections=[d.Pipe(sourceItem=a, targetItem=b)]
+    )
+    second = d.PipingNetworkSegment(id="S2", items=[b])
+    system = d.PipingNetworkSystem(id="L1", segments=[first, second])
+    model = d.EngineeringModel(conceptualModel=d.PlantModel(pipingNetworkSystems=[system]))
+    index = prop._index([("P-01", model)])
+    assert [(t, s) for t, s in index.down[id(a)]] == [(id(b), id(first))]
+
+
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
     context = Context(interlocks={"LT-102": ["I-01"]})
     result = run(model, ["P-101"], context, NO_FLOW)
