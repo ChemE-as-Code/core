@@ -1327,9 +1327,9 @@ def _id_rules(out: _Out) -> None:
                 hint="every step belongs to a block of blocks:",
             )
     for i, block in enumerate(fs.blocks):
-        _known_class(out, block.class_, ["blocks", i, "class"], block.id)
+        _known_class(out, block.class_, block.method, ["blocks", i], block.id)
     for i, step in enumerate(fs.steps):
-        _known_class(out, step.class_, ["steps", i, "class"], step.id)
+        _known_class(out, step.class_, step.method, ["steps", i], step.id)
     ids = [c.id for c in fs.cases]
     defaults = [c.id for c in fs.cases if c.default]
     if not fs.cases:
@@ -1343,17 +1343,41 @@ def _id_rules(out: _Out) -> None:
         )
 
 
-def _known_class(out: _Out, name: str, loc: list[Any], owner: str) -> None:
-    from chemeascode.domains.process.build import step_class
+def _known_class(out: _Out, name: str, method: str | None, loc: list[Any], owner: str) -> None:
+    from chemeascode.domains.process.build import method_enum, step_class, step_method
 
-    if step_class(name) is None:
+    cls = step_class(name)
+    if cls is None:
         out.add(
             "error",
             "class",
             f"{owner}: {name} is not a DEXPI 2.0.1 process step class",
-            loc,
+            [*loc, "class"],
             [owner],
             hint="e.g. ProcessStep, Compressing, Cooling, SeparatingByThermalProcess, Mixing",
+        )
+        return
+    if method is None:
+        return
+    field_info = cls.model_fields.get("method")
+    methods = method_enum(field_info.annotation) if field_info is not None else None
+    if methods is None:
+        out.add(
+            "error",
+            "class",
+            f"{owner}: {name} has no DEXPI method, but method: {method} is given",
+            [*loc, "method"],
+            [owner],
+            hint="drop method:, or choose a class that has one (e.g. Pumping, Cooling)",
+        )
+    elif step_method(field_info.annotation, method) is None:
+        out.add(
+            "error",
+            "class",
+            f"{owner}: {method} is not a {methods.__name__} of {name}",
+            [*loc, "method"],
+            [owner],
+            hint="method: one of " + ", ".join(str(m.value) for m in methods),
         )
 
 
