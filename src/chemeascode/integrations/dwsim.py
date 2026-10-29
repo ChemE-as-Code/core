@@ -93,8 +93,9 @@ def solve(model: dict[str, Any], save: Path | None = None, details: bool = False
     """Solve *model* in DWSIM; with *save*, also write the flowsheet there (``.dwxmz``).
 
     Returns the worker's result: ``version``, ``converged``, ``iterations`` (the flowsheet
-    passes DWSIM made over every solve: one per solve without a recycle, else the iterations of
-    its slowest recycle), ``messages``, ``streams`` (id ->
+    passes DWSIM made over every solve: one per solve without a recycle, else the passes of the
+    worker's tear iteration and of DWSIM's recycle test after it), ``messages`` (a tear that
+    does not converge is named with how far its copy is off), ``streams`` (id ->
     ``temperature_K``, ``pressure_Pa``, ``mass_flow_kg_s``, ``mole_fractions`` by compound id,
     ``vapor_fraction``), ``units`` (id -> ``duty_kW``), ``energies`` (id -> ``duty_kW``) and
     ``save_error`` when the flowsheet could not be saved.

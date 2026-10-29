@@ -247,7 +247,7 @@ findings: [...]
 
 | Adapter | Where | `solver` | `iterations` | Not converged |
 |---|---|---|---|---|
-| DWSIM | `simulate --fill`: each entry of `process/simulation-run.json` | `simulator` key: `dwsim`, version, `method` = property package | flowsheet passes: one per solve without a recycle, else the slowest recycle's `IterationsTaken`, summed over the re-solves (DWSIM's flowsheet solver has no count of its own) | the simulator's messages |
+| DWSIM | `simulate --fill`: each entry of `process/simulation-run.json` | `simulator` key: `dwsim`, version, `method` = property package | flowsheet passes: one per solve without a recycle, else the passes of the worker's accelerated tear iteration plus DWSIM's recycle test on its result, summed over the re-solves (DWSIM's flowsheet solver has no count of its own) | the simulator's messages |
 | Propagation | `cheme process propagate --json` | `cheme process propagate`, cheme-as-code version | sweeps through the nodes | the nodes not solved (also in `units`, `status: not-solved`) |
 | Properties | `cheme process props --json` | `thermo`, its version, the EOS | null (one flash per stream) | the streams refused or missing inputs |
 
