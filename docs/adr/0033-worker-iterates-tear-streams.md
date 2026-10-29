@@ -23,7 +23,14 @@ acceleration and a limit of 500 iterations. An ammonia synthesis loop with a 0.7
 - With acceleration (Anderson), the same loop stalls at 3e-5 to 6e-4 kg/s, which is 0.4 to
   8 × 10^-6 of its 85 kg/s. That is how far DWSIM's unit models (flashes, exchangers,
   equilibrium reactors) reproduce their outputs. Tightening the equilibrium reactor's tolerance
-  lowered the floor only to 3e-5 to 1.3e-4 kg/s. 1e-7 kg/s (1.2 × 10^-9 of the flow) is out of reach of any method.
+  lowered the floor only to 3e-5 to 1.3e-4 kg/s. A review reproduction with the criterion kept
+  at 1e-7 kg/s (same loop, tears S4, S9, S27, S44, S46, S48) located the floor: S46 and S48
+  reached 1e-12 kg/s, but S44, fed through the equilibrium converter R501, wandered between
+  1e-5 and 3e-4 kg/s. The first solve ended unconverged after 500 passes. The worker's re-solve
+  for the compressor trains met 1e-7 kg/s only when S44 dipped by chance, after 887 passes in
+  all. The test fixture (two loops, no reactor or flash) reaches 1e-16 kg/s in 4 passes under
+  either criterion. So 1e-7 kg/s on a large stream cannot be reached reliably once an
+  equilibrium reactor is inside the loop.
 
 ## Decision
 
@@ -45,9 +52,14 @@ acceleration and a limit of 500 iterations. An ammonia synthesis loop with a 0.7
 
 - Positive: multi-recycle loops with a small purge converge (ammonia-1 in 51 passes). Each pass
   computes every recycle, and the report says which tear failed and by how much.
-- Positive: the old guarantees hold. Streams below 0.01 kg/s keep the 1e-7 kg/s bound. A tear's
-  mismatch stays 500 times inside a 0.5 % flowsheet balance tolerance. DWSIM's own Recycle test
-  still passes on every converged result.
+- Kept from the old criterion: streams below 0.01 kg/s keep the 1e-7 kg/s bound. A tear's
+  mismatch (at most 1e-5 of its flow) stays 500 times inside the default flowsheet balance
+  tolerance (`rel` 0.005) and 10 times inside the energy closure's 1e-4 of the enthalpy flow.
+  DWSIM's own Recycle test runs on every converged result and must pass. It measures the
+  errors itself, but against the same `max(1e-7 kg/s, 1e-5 × flow)`, not 1e-7 kg/s.
+- Not kept: the absolute 1e-7 kg/s bound on streams above 0.01 kg/s. A flowsheet that sets its
+  balance `tolerance.rel` below 1e-5, with an `abs` smaller than 1e-5 of a tear's flow, can
+  see a tear's mismatch in its balance check.
 - Negative: on a large stream the mass criterion is looser than before (up to 1e-5 of the flow
   instead of 1e-7 kg/s). Copies of a loop torn several times can differ by a few 1e-5 of the
   flow.

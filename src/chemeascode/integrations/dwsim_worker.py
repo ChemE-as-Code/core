@@ -143,10 +143,10 @@ def _connect_column(sim: Any, unit: Any, u: dict[str, Any], objects: dict, torn:
 #: DWSIM's defaults (0.01 kg/s, 0.1 K) stop short of the balance tolerance.
 TEAR_TOLERANCE = (1e-7, 1e-4, 1e-2)
 #: ... and the mass flow at most this fraction of the tear's flow where that is more than 1e-7
-#: kg/s: DWSIM's unit models (flashes, exchangers, equilibrium reactors) reproduce a loop's
-#: flows to about 1e-6 of them (an ammonia loop, 85 kg/s, stalls at 3e-5 to 6e-4 kg/s), so
-#: 1e-7 kg/s on a large stream is out of reach of any method. 1e-5 stays 500 times inside a
-#: flowsheet balance tolerance of 0.5 %.
+#: kg/s: DWSIM's unit models (equilibrium reactors above all) reproduce a loop's flows to
+#: about 1e-6 of them (an ammonia loop, 85 kg/s, stalls at 3e-5 to 6e-4 kg/s at the converter
+#: outlet), so 1e-7 kg/s on a large stream is met only by chance. 1e-5 stays 500 times inside
+#: the default flowsheet balance tolerance of 0.5 % (ADR 0033).
 TEAR_RELATIVE = 1e-5
 #: Passes through the flowsheet one solve may take before its tears are reported.
 TEAR_PASSES = 500
@@ -243,12 +243,12 @@ class _Flowsheet:
         scale = [TEAR_TOLERANCE[1], TEAR_TOLERANCE[2]]  # residuals in tolerances
         xs: list[list[float]] = []
         gs: list[list[float]] = []
-        accelerated = False
+        accelerated, unit = False, scale
         for _ in range(TEAR_PASSES):
             errors = self._pass()
             if errors and accelerated and gs:
                 # the accelerated copies failed a unit: back to the last tears, copied plainly
-                self._set(ids, gs[-1], scale)
+                self._set(ids, gs[-1], unit)
                 xs, gs, accelerated = [], [], False
                 continue
             if errors:

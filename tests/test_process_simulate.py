@@ -671,6 +671,73 @@ def test_tear_acceleration_follows_a_slow_loop_torn_three_times():
     assert x == pytest.approx([1 / (1 - c)] * 3, rel=1e-9)
 
 
+def test_tear_iteration_falls_back_to_the_last_tears_after_a_failed_accelerated_pass(
+    monkeypatch,
+):
+    """Two tears around one slow loop; the first accelerated pass fails a unit. The next pass
+    starts from every copy set plainly to its tear of the last pass that solved."""
+    from types import SimpleNamespace as NS
+
+    from chemeascode.integrations import dwsim_worker as worker
+
+    class Array:  # System.Array[Double](values)
+        def __class_getitem__(cls, item):
+            return list
+
+    monkeypatch.setitem(sys.modules, "System", NS(Array=Array, Double=float))
+    weights = [2.0, 28.0]
+
+    class Stream:
+        def __init__(self, flows):
+            self.t, self.p, self.flows = 300.0, 1e5, list(flows)
+
+        @property
+        def Phases(self):  # DWSIM's names
+            values = [
+                NS(MassFlow=w, ConstantProperties=NS(Molar_Weight=mw))
+                for w, mw in zip(self.flows, weights, strict=True)
+            ]
+            return [NS(Compounds=NS(Values=values))]
+
+        def GetTemperature(self):
+            return self.t
+
+        def GetPressure(self):
+            return self.p
+
+        def SetTemperature(self, t):
+            self.t = t
+
+        def SetPressure(self, p):
+            self.p = p
+
+        def SetMassFlow(self, m):
+            self.total = m
+
+        def SetOverallComposition(self, x):
+            mass = [a * mw for a, mw in zip(x, weights, strict=True)]
+            self.flows = [self.total * m / sum(mass) for m in mass]
+
+    a, b = Stream([0.0, 0.0]), Stream([0.0, 0.0])
+    a_copy, b_copy = Stream([0.0, 0.0]), Stream([0.0, 0.0])
+    seen = []
+
+    class Automation:
+        def CalculateFlowsheet4(self, sim):
+            seen.append([*a_copy.flows, *b_copy.flows, a_copy.t, b_copy.t])
+            # A from B's copy, B from A's copy: 0.990 of the gap left per circuit
+            a.flows = [0.995 * f + 1.0 for f in b_copy.flows]
+            b.flows = [0.995 * f + 2.0 for f in a_copy.flows]
+            return ["unit failed"] if len(seen) == 3 else []
+
+    flowsheet = worker._Flowsheet(Automation(), None, {"A": (a, a_copy), "B": (b, b_copy)})
+    assert flowsheet.solve() == []
+    # pass 3 was the first accelerated one and failed: pass 4 starts from pass 2's tears
+    assert seen[3] == pytest.approx([2.99, 2.99, 2.995, 2.995, 300.0, 300.0])
+    assert a.flows[0] == pytest.approx(2.99 / (1 - 0.995**2), rel=1e-6)
+    assert len(seen) < 20
+
+
 def test_tear_tolerance_is_absolute_for_small_streams_and_relative_for_large():
     from chemeascode.integrations import dwsim_worker as worker
 

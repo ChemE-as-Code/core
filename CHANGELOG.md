@@ -13,8 +13,9 @@
   Recycle blocks, whose own test passes on the result. The ammonia-1 loop (tears S44, S46, S48)
   converges in 51 passes instead of failing after 500. A tear that does not converge is reported
   with how far its copy is off. The mass-flow criterion is now 1e-7 kg/s or 1e-5 of the tear's
-  flow, whichever is larger: DWSIM's unit models reproduce a loop's flows only to about 1e-6, so
-  1e-7 kg/s on a large stream was out of reach (ADR 0033).
+  flow, whichever is larger: DWSIM's unit models (the equilibrium converter above all) reproduce
+  a loop's flows only to about 1e-6, so 1e-7 kg/s on a large stream was met only by chance
+  (ADR 0033).
 
 ## 1.0.0 (2026-10-29)
 
