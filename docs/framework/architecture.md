@@ -3,7 +3,7 @@
 `cheme-as-code` is one installable package. This document sets out its internal modules, what each
 one owns, and which imports are allowed between them. The repository name (`core`), the package
 name, the CLI name, its commands and the `cheme serve` endpoints stay as they are. Modules
-that moved are importable only from their new path (pre-1.0, there is no compatibility layer);
+that moved are importable only from their new path (no compatibility layer for internal modules; ADR 0032 says what is public);
 see [migration-table.md](migration-table.md).
 
 ## Layout
