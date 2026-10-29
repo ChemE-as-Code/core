@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.1 (2026-10-29)
+
+Patch release: multi-recycle loops converge through DWSIM (#57, ADR 0033) and `cheme process build`
+builds Pumping steps (#59). No breaking change.
 
 ### Fixed
 
