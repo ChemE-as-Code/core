@@ -4,11 +4,12 @@ import copy
 import shutil
 from pathlib import Path
 
+import pydexpi.pydexpi_classes.pydexpi_classes as C
 import pytest
 import yaml
 
 from chemeascode.domains.process import GENERATOR_VERSION
-from chemeascode.domains.process.build import place
+from chemeascode.domains.process.build import place, step_method
 from chemeascode.domains.process.model import balances, load, rules
 from chemeascode.domains.process.sheets import build, check_sheet, edited, is_cycle_cut
 from chemeascode.foundation.workspace import Workspace
@@ -98,6 +99,83 @@ def test_pfd_nests_steps_and_delegates_ports_bfd_hides_internal(recycle):
     shown = {c.id for c in bfd.conceptualModel.processConnections}
     assert "S6" not in shown and {"S1", "S2", "S3", "S4", "S5", "Q1"} == shown
     assert "S6" in {c.id for c in pfd.conceptualModel.processConnections}
+
+
+def test_pumping_step_builds_with_its_method(recycle):
+    """A ``Pumping`` step (its ``method`` field is ``PumpingMethod | Undefined | None``) builds
+    like any other step: issue #59."""
+    from pydexpi.loaders.public import load_xml_with_report
+
+    def add_pump(data):
+        e1 = next(s for s in data["steps"] if s["id"] == "E1")
+        e1["ports"][1] = {"id": "out", "direction": "out"}
+        data["steps"].append(
+            {
+                "id": "P1",
+                "block": "SEP",
+                "title": "Distillate pump",
+                "class": "Pumping",
+                "method": "PositiveDisplacement",
+                "ports": [
+                    {"id": "in", "direction": "in"},
+                    {"id": "out", "direction": "out", "delegates": "top"},
+                ],
+            }
+        )
+        s3 = _stream(data, "S3")
+        data["streams"].append({**copy.deepcopy(s3), "id": "S7", "title": "Condensate"})
+        data["streams"][-1].update({"from": "E1.out", "to": "P1.in"})
+        s3["from"] = "P1.out"
+
+    _edit(recycle, add_pump)
+    assert not [f.format() for f in _rules(recycle) if f.level == "error"]
+    result = build(recycle, force=True)
+    assert not result.failed, result.lines
+    pfd = load_xml_with_report((recycle.root / "process/PFD.xml").read_bytes()).model
+    sep = next(s for s in pfd.conceptualModel.processSteps if s.id == "SEP")
+    pump = next(s for s in sep.subProcessSteps if s.id == "P1")
+    assert type(pump).__name__ == "Pumping" and pump.method.name == "POSITIVEDISPLACEMENT"
+    report = validate_workspace(recycle)
+    assert not [f.format() for f in report.findings if f.level == "error"]
+
+
+@pytest.mark.parametrize(
+    ("cls", "method", "message"),
+    [
+        ("Pumping", "Typo", "Typo is not a PumpingMethod of Pumping"),
+        ("Cooling", "Typo", "Typo is not a HeatExchangeMethod of Cooling"),
+        ("Mixing", "Static", "Mixing has no DEXPI method"),
+    ],
+)
+def test_unknown_step_method_is_a_finding(recycle, cls, method, message):
+    """A ``method:`` the class does not have is refused by the rules instead of being dropped
+    (optional-method classes such as ``Pumping``) or crashing the build (issue #59)."""
+
+    def set_method(data):
+        e1 = next(s for s in data["steps"] if s["id"] == "E1")
+        e1.update({"class": cls, "method": method})
+
+    _edit(recycle, set_method)
+    found = [f for f in _rules(recycle) if f.rule == "cheme.process-class"]
+    assert len(found) == 1 and found[0].level == "error", [f.format() for f in found]
+    assert message in found[0].message and found[0].hint, found[0].format()
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        c
+        for c in vars(C).values()
+        if isinstance(c, type) and issubclass(c, C.ProcessStep) and "method" in c.model_fields
+    ],
+    ids=lambda c: c.__name__,
+)
+def test_every_step_class_method_has_a_default(cls):
+    annotation = cls.model_fields["method"].annotation
+    default = step_method(annotation, None)
+    assert default is not None and default.name in ("UNSPECIFIED", "GENERIC")
+    named = step_method(annotation, list(type(default))[0].value)
+    assert named is list(type(default))[0]
 
 
 def test_refinement_keeps_stream_ids_and_balances(recycle, blocks):

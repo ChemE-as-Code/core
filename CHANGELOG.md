@@ -16,6 +16,14 @@
   flow, whichever is larger: DWSIM's unit models (the equilibrium converter above all) reproduce
   a loop's flows only to about 1e-6, so 1e-7 kg/s on a large stream was met only by chance
   (ADR 0033).
+- `cheme process build` builds a PFD step of DEXPI class `Pumping` (and the other step classes
+  whose `method` is optional: `Boiling`, `DrivingByEngine`, `DrivingByMotor`, `GeneratingSteam`,
+  `HeatingElectrical`, `HeatingInFurnace`, `SupplyingThermalEnergy`) instead of crashing on its
+  `method` field (#59). The committed example sheets are regenerated (generator code changed).
+- `cheme process rules` (`cheme.process-class`) refuses a step or block `method:` that is not a
+  member of its class's DEXPI method enum, or that is given on a class without a method, and lists
+  the valid methods. Before, the method was silently dropped (`Pumping`) or the build crashed
+  (`Compressing`, `Cooling`) (#59).
 
 ## 1.0.0 (2026-10-29)
 
