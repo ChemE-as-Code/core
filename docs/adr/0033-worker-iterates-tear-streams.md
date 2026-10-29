@@ -23,7 +23,7 @@ acceleration and a limit of 500 iterations. An ammonia synthesis loop with a 0.7
 - With acceleration (Anderson), the same loop stalls at 3e-5 to 6e-4 kg/s, which is 0.4 to
   8 × 10^-6 of its 85 kg/s. That is how far DWSIM's unit models (flashes, exchangers,
   equilibrium reactors) reproduce their outputs. Tightening the equilibrium reactor's tolerance
-  did not move the floor. 1e-7 kg/s (1.2 × 10^-9 of the flow) is out of reach of any method.
+  lowered the floor only to 3e-5 to 1.3e-4 kg/s. 1e-7 kg/s (1.2 × 10^-9 of the flow) is out of reach of any method.
 
 ## Decision
 
