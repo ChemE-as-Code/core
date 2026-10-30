@@ -413,15 +413,27 @@ function sectionAroundSelection(): void {
   state.section = { min: [box.min[0] - m, box.min[1] - m, Math.max(box.min[2] - m, sectionBounds.value?.min[2] ?? 0)], max: [box.max[0] + m, box.max[1] + m, box.max[2] + m] };
 }
 
-async function exportGlb(): Promise<void> {
+/** Print scales offered for the STL export (1:n; millimetres on the print). */
+const STL_SCALES = [100, 200, 500, 1000];
+const stlScale = ref(1000);
+const stlBase = ref(true);
+
+function exportGlb(): Promise<void> {
+  return exportFile((r) => r.exportGlb(), "model/gltf-binary", "glb");
+}
+function exportStl(): Promise<void> {
+  return exportFile((r) => r.exportStl({ scale: stlScale.value, base: stlBase.value }), "model/stl", `1-${stlScale.value}.stl`);
+}
+
+async function exportFile(write: (r: LayoutRenderer) => Promise<ArrayBuffer>, type: string, ext: string): Promise<void> {
   if (!renderer.value) return;
   exporting.value = true;
   try {
-    const data = await renderer.value.exportGlb();
-    const url = URL.createObjectURL(new Blob([data], { type: "model/gltf-binary" }));
+    const data = await write(renderer.value);
+    const url = URL.createObjectURL(new Blob([data], { type }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `layout-${rev.value ? shortRev(rev.value) : "working-tree"}.glb`;
+    a.download = `layout-${rev.value ? shortRev(rev.value) : "working-tree"}.${ext}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -647,6 +659,17 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
       <button type="button" class="btn" :class="{ active: tool === 'measure' }" :aria-pressed="tool === 'measure'" title="Click two points to measure their distance" @click="setTool('measure')">Measure</button>
       <button type="button" class="btn" :disabled="!state.select" title="Frame the selection" @click="focusSelected">Focus</button>
       <button type="button" class="btn" :disabled="exporting || !renderer" title="Download the visible model as binary glTF (.glb)" @click="exportGlb">Export .glb</button>
+      <label class="field" title="Print scale of the STL (millimetres on the print)">
+        STL
+        <select v-model.number="stlScale" aria-label="STL scale">
+          <option v-for="s in STL_SCALES" :key="s" :value="s">1:{{ s }}</option>
+        </select>
+      </label>
+      <label class="field" title="A slab under the model, its top at ground level, so the print is one piece">
+        <input v-model="stlBase" type="checkbox" aria-label="STL base" />
+        base
+      </label>
+      <button type="button" class="btn" :disabled="exporting || !renderer" title="Download the visible model as binary STL for 3D printing" @click="exportStl">Export .stl</button>
     </div>
 
     <div v-if="scene && state.tab === '3d' && state.section && sectionBounds" class="section-bar" aria-label="Section box">

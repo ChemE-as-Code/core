@@ -135,3 +135,46 @@ describe("glTF export of instanced detail", () => {
     expect([color.getX(half), color.getY(half), color.getZ(half)]).toEqual([0, 0, 1]);
   });
 });
+
+describe("STL export", () => {
+  const read = (data: ArrayBuffer) => {
+    const view = new DataView(data);
+    const count = view.getUint32(80, true);
+    const z: number[] = [];
+    const x: number[] = [];
+    for (let t = 0; t < count; t++)
+      for (let k = 0; k < 3; k++) {
+        x.push(view.getFloat32(84 + t * 50 + 12 + k * 12, true));
+        z.push(view.getFloat32(84 + t * 50 + 12 + k * 12 + 8, true));
+      }
+    return { count, bytes: data.byteLength, x, z };
+  };
+
+  it("writes the triangles in millimetres at the print scale, in the mesh's world frame", async () => {
+    const { stlBytes } = await import("@/lib/layoutThree");
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10));
+    mesh.position.set(5, 5, 5); // a 10 m cube standing on the ground at the origin
+    mesh.updateMatrixWorld(true);
+    const stl = read(stlBytes([mesh], { scale: 1000, base: false }));
+    expect(stl.count).toBe(12);
+    expect(stl.bytes).toBe(84 + 12 * 50);
+    expect(Math.min(...stl.x)).toBeCloseTo(0, 5);
+    expect(Math.max(...stl.x)).toBeCloseTo(10, 5); // 10 m at 1:1000 is 10 mm
+    expect(Math.max(...read(stlBytes([mesh], { scale: 100, base: false })).x)).toBeCloseTo(100, 4);
+  });
+
+  it("adds a base slab with its top at ground level under the lowest part", async () => {
+    const { stlBytes, STL_BASE_MM } = await import("@/lib/layoutThree");
+    const pit = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+    pit.position.set(0, 0, 0); // reaches 1 m below ground
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 20));
+    tower.position.set(10, 0, 12); // floats 2 m above ground: the slab top stays at 0
+    for (const m of [pit, tower]) m.updateMatrixWorld(true);
+    const stl = read(stlBytes([pit, tower], { scale: 1000, base: true }));
+    expect(stl.count).toBe(36);
+    const slab = stl.z.slice(24 * 3);
+    expect(Math.max(...slab)).toBeCloseTo(0, 5);
+    expect(Math.min(...slab)).toBeCloseTo(-1 - STL_BASE_MM, 5);
+    expect(read(stlBytes([], { scale: 1000, base: true })).count).toBe(0); // nothing visible, no slab
+  });
+});
