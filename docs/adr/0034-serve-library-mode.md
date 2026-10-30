@@ -55,4 +55,4 @@ per-plant state at once.
 
 - `src/chemeascode/interfaces/api/library.py`, `cheme serve` in `src/chemeascode/interfaces/cli/`.
 - `tests/test_serve_library.py`.
-- The viewer: `viewer/src/lib/plants.ts`, `viewer/src/views/PlantsView.vue`.
+- The viewer: `viewer/src/lib/plants.ts`, `viewer/src/PlantsApp.vue`, `viewer/e2e/library.spec.ts`.
