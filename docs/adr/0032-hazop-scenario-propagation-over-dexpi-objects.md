@@ -45,6 +45,14 @@ Two forces shape how:
   Safeguards are collected along the path and never stop it. What the files do not settle (a
   fail position not recorded, a response the library lacks, the fluid at a top event) is a
   question on the candidate, never a choice.
+- The walk is **breadth first and reports outcomes, not routes**: per cause it takes each object
+  with a given deviation and direction once, and keeps one candidate per outcome (deviation at
+  the node, end, top event, the object it ends at) on its shortest path. A valve whose DEXPI
+  `Role` is normally closed, locked closed or car sealed closed stops a walk (the line-up of
+  normal operation). The command prints one line per outcome with its causes; `--paths` and
+  `--json` give every candidate. On the pump-station case (14 nodes) enumerating every route
+  gave 126,643 candidates, 31 % of them cut off at the depth limit in loops through recycles
+  and closed valves; outcomes on shortest paths give 12,011, none cut off.
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 
@@ -60,8 +68,9 @@ Two forces shape how:
 - Negative: the index reimplements connectivity that `cheme show` also derives (from the XML).
 - Known limitations and open follow-ups: off-page connectors are not paired across sheets
   (P&IDs here carry no model link between them); writing candidates into the study
-  (`--write`, with fingerprints and staleness, ADR 0011) and the skill rewritten around the
-  command are the next step.
+  (`--write`, with fingerprints and staleness, ADR 0011) is the next step. The skill names the
+  command as an optional cross-check, not a required step: the trace by hand stays its method.
+  Other operating modes than normal (a switched standby, a start-up line-up) are not walked.
 
 ## Evidence
 

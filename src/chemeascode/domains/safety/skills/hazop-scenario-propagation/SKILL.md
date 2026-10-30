@@ -98,21 +98,24 @@ nobody followed far enough. You propose; the team decides what is credible.
 6. **Check**: `cheme safety hazop check H-01`.
 
 **Optional: the walk as a cross-check.** With a failure-mode library,
-`cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--json]` does steps 2
-and 3 mechanically: each failure mode of the node's objects is walked over the analysed P&IDs
-with the library's responses, and every walk that brings a deviation to the node is printed with
-its cause (local or driver), path, end, fluid, the safeguards on the path and its open
-questions. It is a tool, not a step: use it where it helps (a large or meshed node, a check
-after drafting for a cause or branch nobody followed, the instruments and interlocks along a
-long path) and skip it for a small node. Read its output as candidates, never as rows:
-- the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `visited`,
-  `unknown` (the library has no response there: a question, never a guessed response) or
-  `depth` (cut off after 40 objects: follow it by hand where it matters);
-- it lists every distinct path, so a meshed header gives thousands: group them by cause and top
-  event, and keep only what step 5 keeps;
-- it does not use valve positions (a walk passes through a normally closed drain valve) and
-  judges nothing: credibility and outcome are steps 4 and 5, and a safeguard on the path is a
-  candidate, not an effective one (skill `safeguard-crediting`).
+`cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--paths] [--json]` does
+steps 2 and 3 mechanically: each failure mode of the node's objects is walked over the analysed
+P&IDs with the library's responses, one candidate per outcome on its shortest path. It prints
+one line per outcome (deviation, top event or end, where, the causes that reach it) and the
+open questions once each; `--paths` gives every candidate with its path and the safeguards on
+it. It is a tool, not a step: use it where it helps (a large or meshed node, a check after
+drafting for a cause or branch nobody followed, the instruments and interlocks along a long
+path) and skip it for a small node. Read its output as candidates, never as rows:
+- the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `unknown`
+  (the library has no response there: a question, never a guessed response), `depth` (cut off
+  after 40 objects: follow it by hand), and, only counted, `closed`, `visited` and
+  `no-connection`;
+- a valve with a normally closed or locked closed role stops a walk: the line-up of normal
+  operation. A cause at that valve (opened in error, passing) still starts its own walk, but
+  another mode (a switched standby filter, a start-up line-up) is yours to follow by hand;
+- it judges nothing: credibility and outcome are steps 4 and 5, and a safeguard on the path is
+  a candidate, not an effective one (skill `safeguard-crediting`). Consequences inside a pump
+  or at a seal come from its own responses in the library, not from the walk.
 Say in a scenario's `notes:` when the walk found it.
 
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and

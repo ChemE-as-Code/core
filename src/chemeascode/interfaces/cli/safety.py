@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
@@ -218,12 +219,16 @@ def propagate(
     library: Annotated[
         str, typer.Option(help="The failure-mode library (cheme schema failure-modes).")
     ] = "safety/failure-modes.yaml",
+    paths: Annotated[
+        bool, typer.Option("--paths", help="Print each path with its candidate safeguards.")
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
-    over the study's analysed P&IDs, object by object, to a top event, a study limit or an
-    object that absorbs it, with the safeguards the plant has along the path and the questions
-    the files leave open. Read-only: proposals for the study, never written into it."""
+    over the study's analysed P&IDs, object by object, to a top event, a study limit, a closed
+    valve or an object that absorbs it, with the safeguards the plant has along the path and the
+    questions the files leave open. One candidate per outcome, on its shortest path. Read-only:
+    proposals for the study, never written into it."""
     from chemeascode.project.hazop import node_propagation
 
     workspace = _workspace()
@@ -280,21 +285,48 @@ def propagate(
             )
         )
         return
+    ends = Counter(c.end for c in candidates)
     typer.echo(
         f"{found.study} {found.node}: {len(candidates)} candidate(s) from {found.library} over "
-        f"{', '.join(found.sheets)} (proposals: the team decides)"
+        f"{', '.join(found.sheets)} (proposals: the team decides); "
+        + ", ".join(f"{n} {end}" for end, n in ends.most_common())
     )
-    for c in candidates:
-        ending = c.top_event or c.end
-        typer.echo(
-            f"{c.deviation.text()} at {c.at}: {c.cause} {c.mode} [{c.kind}] -> {ending}"
-            + (f" ({c.fluid})" if c.fluid else "")
-        )
-        typer.echo(f"  path: {c.path_text()}")
-        for guard in c.safeguards:
-            typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
-        for question in c.questions:
-            typer.echo(f"  question: {question}")
+    questions: Counter[str] = Counter(q for c in candidates for q in c.questions)
+    if paths:
+        for c in candidates:
+            typer.echo(
+                f"{c.deviation.text()} at {c.at}: {c.cause} {c.mode} [{c.kind}] -> "
+                f"{c.top_event or c.end} at {c.path[-1].label}"
+                + (f" ({c.fluid})" if c.fluid else "")
+            )
+            typer.echo(f"  path: {c.path_text()}")
+            for guard in c.safeguards:
+                typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
+    else:
+        # One line per outcome with its causes; ends that say nothing about a consequence
+        # (a closed valve, an object already walked, no connection) are only counted.
+        shown = ("top-event", "study-limit", "absorbed", "unknown", "depth")
+        outcomes: dict[tuple[str, str, str, str | None], list[str]] = {}
+        for c in sorted(candidates, key=lambda c: shown.index(c.end) if c.end in shown else 9):
+            if c.end in shown:
+                key = (c.deviation.text(), c.top_event or c.end, c.path[-1].label, c.fluid)
+                causes = outcomes.setdefault(key, [])
+                if c.cause not in causes:
+                    causes.append(c.cause)
+        for (deviation_text, ending, where, fluid), causes in outcomes.items():
+            typer.echo(
+                f"{deviation_text} -> {ending} at {where}"
+                + (f" ({fluid})" if fluid else "")
+                + f": {', '.join(causes)}"
+            )
+        hidden = sum(n for end, n in ends.items() if end not in shown)
+        if hidden:
+            typer.echo(
+                f"{hidden} candidate(s) end at a closed valve, an object already walked or no "
+                "connection: --paths lists every candidate with its path"
+            )
+    for question, n in questions.most_common():
+        typer.echo(f"question ({n} candidate(s)): {question}")
     for finding in found.findings:
         typer.echo(finding.format())
 

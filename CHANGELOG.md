@@ -5,6 +5,13 @@
 - Fix: `cheme safety hazop propagate` lost the pipe between two items of different segments
   when the second segment came later in the file (the walk ended in `no-connection`); items
   are now indexed before pipes.
+- Safety: `cheme safety hazop propagate` reports outcomes, not routes. The walk is breadth
+  first, takes each object with a deviation once per cause and keeps one candidate per outcome
+  on its shortest path, so a meshed header or a recycle no longer multiplies candidates or runs
+  into the depth limit; a valve with a normally closed, locked closed or car sealed closed DEXPI
+  `Role` stops it (end `closed`). The command prints one line per outcome with its causes and
+  each open question once; `--paths` prints every candidate with its path and safeguards.
+  On a 14-node pump station: 126,643 candidates to 12,011, none cut off at the depth limit.
 - Skills: `hazop-scenario-propagation` names `cheme safety hazop propagate` as an optional
   cross-check (with a failure-mode library; how to read its ends and limits), not a required
   step; the `process-safety` hub points to it.

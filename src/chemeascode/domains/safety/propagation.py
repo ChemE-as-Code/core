@@ -11,7 +11,10 @@ that object, a *driver* when it starts at another object of the node.
 
 The walk is deterministic and reads the pyDEXPI objects directly (no graph library): pipes give
 the flow direction (source to target), a nozzle stands for its equipment, an off-page connector
-is a study limit. Along the way it collects candidate safeguards that the plant has (an
+is a study limit, and a valve performing a normally closed or locked closed role stops the
+deviation. It goes breadth first and takes each object with a given deviation once per cause,
+so a meshed header or a recycle gives one candidate per outcome (on its shortest path), not one
+per route. Along the way it collects candidate safeguards that the plant has (an
 instrument measuring the deviated parameter on the path, its controller, the C&E interlocks it
 starts, a check valve against reverse flow, a relief device at a pressure deviation) without
 ever stopping the chain for them. What the files do not settle (a fail position not recorded, a
@@ -23,6 +26,7 @@ or whether a safeguard works.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -39,9 +43,18 @@ from chemeascode.domains.safety.schemas import (
 MAX_STEPS = 40
 #: The measured variable of an instrument function by its first letter (ISA 5.1 convention).
 MEASURED = {"F": "flow", "L": "level", "P": "pressure", "T": "temperature"}
+#: Role names or URIs (lower case, - and _ as spaces) of a valve closed in normal operation.
+CLOSED_ROLES = ("normally closed", "locked closed", "car sealed closed")
 
 End = Literal[
-    "top-event", "study-limit", "absorbed", "visited", "no-connection", "unknown", "depth"
+    "top-event",
+    "study-limit",
+    "absorbed",
+    "closed",
+    "visited",
+    "no-connection",
+    "unknown",
+    "depth",
 ]
 
 
@@ -63,7 +76,8 @@ class Step:
     tag: str | None
     cls: str
     deviation: Deviation
-    #: ``cause``, or the library's response: responds, passes, no-effect, absorbs, stops.
+    #: ``cause``, the library's response (responds, passes, no-effect, absorbs, stops),
+    #: ``closed`` (a valve closed in normal operation) or ``study-limit``.
     effect: str
     #: The object's key in the walk and the segment the deviation arrived by.
     key: int = field(compare=False, repr=False)
@@ -139,6 +153,7 @@ class _Object:
     fluid: str | None = None
     actuated: bool = False
     limit: bool = False
+    closed: bool = False
 
     @property
     def label(self) -> str:
@@ -175,6 +190,16 @@ def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _closed(obj: Any) -> bool:
+    """Whether *obj* performs a role of a valve closed in normal operation (DEXPI Role)."""
+    for role in getattr(obj, "performedRoles", None) or ():
+        names = (_text(getattr(role, "name", None)), _text(getattr(role, "uri_", None)))
+        text = " ".join(n for n in names if n).lower().replace("-", " ").replace("_", " ")
+        if any(closed in text for closed in CLOSED_ROLES):
+            return True
+    return False
+
+
 def _index(models: Iterable[tuple[str, Any]]) -> _Index:
     """The objects, pipes and instruments of the loaded *models* (``(sheet id, model)``)."""
     from pydexpi.pydexpi_classes.pydexpi_classes import TaggedPlantItem
@@ -198,6 +223,7 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 classes,
                 fluid,
                 limit="PipeOffPageConnector" in classes,
+                closed=_closed(obj),
             ),
         )
 
@@ -336,10 +362,20 @@ class _Walked:
 
 
 class _Walker:
+    """The walks of one cause, breadth first: each object is taken once with a given deviation
+    and direction, so the first walk to reach it is the shortest and later ones end there as
+    ``visited``."""
+
     def __init__(self, index: _Index, library: FailureModeLibrary) -> None:
         self.index = index
         self.library = library
         self.done: list[_Walked] = []
+        self.queue: deque[tuple[list[Step], int, int, Deviation, str, list[str]]] = deque()
+        self.seen: set[tuple[int, Deviation, str]] = set()
+
+    def run(self) -> None:
+        while self.queue:
+            self.arrive(*self.queue.popleft())
 
     def step(self, key: int, deviation: Deviation, effect: str, segment: int | None) -> Step:
         obj = self.index.objects[key]
@@ -362,7 +398,7 @@ class _Walker:
                 if following == back:
                     continue  # never straight back to where it came from
                 moved = True
-                self.arrive(path, following, segment, deviation, direction, questions)
+                self.queue.append((path, following, segment, deviation, direction, questions))
         if not moved:
             self.done.append(_Walked(path, "no-connection", None, questions))
 
@@ -379,12 +415,18 @@ class _Walker:
         if len(path) >= MAX_STEPS:
             self.done.append(_Walked(path, "depth", None, questions))
             return
-        if any(s.key == key and s.deviation == deviation for s in path):
+        state = (key, deviation, direction)
+        if state in self.seen or any(s.key == key and s.deviation == deviation for s in path):
             self.done.append(_Walked(path, "visited", None, questions))
             return
+        self.seen.add(state)
         if obj.limit:
             limit = self.step(key, deviation, "study-limit", segment)
             self.done.append(_Walked([*path, limit], "study-limit", None, questions))
+            return
+        if obj.closed:
+            closed = self.step(key, deviation, "closed", segment)
+            self.done.append(_Walked([*path, closed], "closed", None, questions))
             return
         via = "inlet" if direction == "downstream" else "outlet"
         self.react(path, key, segment, deviation, via, direction, questions)
@@ -510,6 +552,7 @@ def propagate(
                 first = Deviation(mode.gives.parameter, mode.gives.guide_word)
                 cause = walker.step(start, first, "cause", None)
                 walker.advance([cause], first, mode.gives.towards, [question] if question else [])
+                walker.run()
                 for walked in walker.done:
                     reached_here: set[Deviation] = set()
                     for i, step in enumerate(walked.path):
@@ -520,12 +563,16 @@ def propagate(
                         if step.deviation in reached_here:
                             continue
                         reached_here.add(step.deviation)
+                        # One candidate per outcome; the walk is breadth first, so the first
+                        # one kept has the shortest path.
                         signature = (
                             step.deviation,
-                            obj.label,
+                            step.key,
+                            start,
                             mode.id,
-                            tuple(s.key for s in walked.path),
                             walked.end,
+                            walked.top_event,
+                            walked.path[-1].key,
                         )
                         if signature in seen:
                             continue

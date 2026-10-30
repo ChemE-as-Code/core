@@ -178,6 +178,66 @@ def test_a_pipe_may_end_at_an_item_of_a_later_segment():
     assert [(t, s) for t, s in index.down[id(a)]] == [(id(b), id(first))]
 
 
+GATES = """
+schema: cheme/failure-modes/v1
+kind: failure-modes
+example: true
+source: synthetic test data
+classes:
+  GateValve:
+    modes:
+      - {id: M5, gives: {parameter: flow, guide_word: "no", towards: downstream}}
+    responses:
+      - {incoming: {parameter: flow, guide_word: "no"}, effect: passes}
+"""
+
+
+def gates(edges: list[tuple[str, str]], roles: dict[str, str] | None = None):
+    """A model of untagged gate valves joined by *edges*; *roles* gives a valve a role name."""
+    from pydexpi.pydexpi_classes import pydexpi_classes as d
+
+    names = sorted({n for edge in edges for n in edge})
+    valves = {n: d.GateValve(id=n) for n in names}
+    for name, role in (roles or {}).items():
+        valves[name].performedRoles = [d.Role(name=role)]
+    pipes = [d.Pipe(sourceItem=valves[a], targetItem=valves[b]) for a, b in edges]
+    segment = d.PipingNetworkSegment(id="S1", items=list(valves.values()), connections=pipes)
+    system = d.PipingNetworkSystem(id="L1", segments=[segment])
+    return d.EngineeringModel(conceptualModel=d.PlantModel(pipingNetworkSystems=[system]))
+
+
+def walk(model, members):
+    refs = [PlantRef(sheet="P-01", object=m) for m in members]
+    return propagate([("P-01", model)], library(GATES), refs).candidates
+
+
+def test_two_routes_to_the_same_outcome_give_one_candidate_on_the_shorter():
+    # A splits to B and C, which join again at D before E; C takes the long way round.
+    model = gates([("A", "B"), ("A", "C"), ("C", "X"), ("X", "D"), ("B", "D"), ("D", "E")])
+    ends = [c for c in walk(model, ["A"]) if c.end == "no-connection"]
+    assert len(ends) == 1  # one per route before
+    assert tags(ends[0]) == ["A", "B", "D", "E"]
+
+
+def test_a_recycle_is_walked_once():
+    model = gates([("A", "B"), ("B", "C"), ("C", "A"), ("B", "E")])
+    candidates = walk(model, ["A"])
+    assert {c.end for c in candidates} == {"visited", "no-connection"}
+    assert all(c.end != "depth" for c in candidates)
+
+
+@pytest.mark.parametrize(
+    "role", ["Normally closed", "urn:example:valve-position:locked-closed", "CAR_SEALED_CLOSED"]
+)
+def test_a_valve_closed_in_normal_operation_stops_the_walk(role):
+    model = gates([("A", "B"), ("B", "E")], roles={"B": role})
+    candidates = [c for c in walk(model, ["A", "E"]) if c.cause == "A"]
+    assert [(c.end, tags(c)) for c in candidates] == [("closed", ["A", "B"])]
+    assert candidates[0].path[-1].effect == "closed"
+    open_ = gates([("A", "B"), ("B", "E")], roles={"B": "Locked open"})
+    assert all(c.end != "closed" for c in walk(open_, ["A"]))
+
+
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
     context = Context(interlocks={"LT-102": ["I-01"]})
     result = run(model, ["P-101"], context, NO_FLOW)
@@ -336,7 +396,12 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     assert study.read_text(encoding="utf-8") == before
 
     text = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2"])
-    assert text.exit_code == 0 and "P-101 M1 [local]" in text.output
+    assert text.exit_code == 0 and "no flow -> overfill at V-101 (Water): P-101" in text.output
+    assert "path:" not in text.output
+    assert "question (" in text.output  # FV-104's fail position, once with its count
+    paths = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2", "--paths"])
+    assert paths.exit_code == 0 and "P-101 M1 [local]" in paths.output
+    assert "path: P-101 (no flow, cause)" in paths.output
 
     missing = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N9"])
     assert missing.exit_code == 2 and "no node N9" in missing.output
