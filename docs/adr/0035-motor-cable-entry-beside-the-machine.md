@@ -1,4 +1,4 @@
-# 0034. A motor's cable entry ends its tray beside the machine
+# 0035. A motor's cable entry ends its tray beside the machine
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

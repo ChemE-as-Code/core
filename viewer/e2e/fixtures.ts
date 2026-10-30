@@ -389,6 +389,8 @@ export async function mockApi(
     tea?: unknown;
     teaError?: string;
     files?: Record<string, string>;
+    /** `/api/plants` of a library server (none: 404, a server of one plant); every plant then answers the same fixtures under `/p/<id>/api/`. */
+    plants?: unknown;
     /** Entries added to `/api/tree` (a test's own files; no request leaves the browser). */
     extraTree?: { path: string; type: string; kind: string }[];
     status?: unknown;
@@ -438,7 +440,12 @@ export async function mockApi(
   const streamTable = (options.streams ?? streams) as Record<string, unknown>;
   await page.route("**/api/**", (route) => {
     const url = new URL(route.request().url());
-    const endpoint = url.pathname.replace(/^\/api\//, "");
+    // a plant of a library server answers under /p/<id>/api/ (core's ADR 0034); the library itself has only /api/plants
+    const endpoint = url.pathname.replace(/^(\/p\/[^/]+)?\/api\//, "");
+    if (endpoint === "plants")
+      return options.plants && url.pathname === "/api/plants"
+        ? json(route, options.plants)
+        : route.fulfill({ status: 404, contentType: "application/json", body: '{"error":"no endpoint /api/plants"}' });
     if (options.datasheets && (endpoint === "datasheets" || endpoint.startsWith("datasheets/"))) return datasheetRoute(route, url, endpoint);
     switch (endpoint) {
       case "repo":

@@ -2695,6 +2695,31 @@ export interface TeaBoundary {
   excluded_products: string[];
 }
 
+/** A plant of a library server (`GET /api/plants`, core's ADR 0034). */
+export interface PlantEntry {
+  id: string;
+  /** Its folder, relative to the library. */
+  path: string;
+  /** From `plant.yaml`; null when it does not validate (`error` says why). */
+  name: string | null;
+  stage: string | null;
+  sheets: number;
+  /** The level `checks/maturity.json` records (never evaluated live), and when. */
+  maturity: string | null;
+  maturity_checked: string | null;
+  /** From a `process.yaml` beside `plant.yaml` (process-library), when there is one. */
+  title: string | null;
+  summary: string | null;
+  families: string[];
+  error: string | null;
+}
+
+/** `GET /api/plants` of a library server: a 404 means a server of one plant. */
+export interface PlantsIndex {
+  root_name: string;
+  plants: PlantEntry[];
+}
+
 /** `GET /api/tea`: `cheme assess tea --json` of a revision, without the source. */
 export interface TeaReport {
   rev?: string | null;
@@ -3022,14 +3047,22 @@ export type Rev = string | null | undefined;
 
 export type Query = Record<string, QueryValue>;
 
-/** Base URL of the API; empty means same origin (the Vite proxy or `cheme serve --ui`). */
+/** Base URL of the server; empty means same origin (the Vite proxy or `cheme serve --ui`). */
 export const API_BASE: string = import.meta.env?.VITE_CHEME_API ?? "";
 
+// The plant's prefix on a library server (`/p/<id>`, core's ADR 0034), set once at startup.
+let plantPrefix = "";
+
+/** Talk to the plant under `/p/<id>/` of a library server (main.ts, from the page's path). */
+export function usePlant(id: string | null): void {
+  plantPrefix = id ? `/p/${encodeURIComponent(id)}` : "";
+}
+
 /**
- * `/api/<endpoint>?a=b`, leaving out parameters that are undefined, null or empty strings
- * (so an absent `rev` means the working tree). Keys are sorted for stable URLs.
+ * `/api/<endpoint>?a=b` of the plant shown, leaving out parameters that are undefined, null or
+ * empty strings (so an absent `rev` means the working tree). Keys are sorted for stable URLs.
  */
-export function apiUrl(endpoint: string, query: Query = {}, base: string = API_BASE): string {
+export function apiUrl(endpoint: string, query: Query = {}, base: string = API_BASE.replace(/\/+$/, "") + plantPrefix): string {
   const name = endpoint.replace(/^\/+/, "").replace(/^api\//, "");
   const params = new URLSearchParams();
   for (const key of Object.keys(query).sort()) {
@@ -3131,6 +3164,15 @@ async function readJson<E extends JsonEndpoint>(response: Response, _endpoint: E
 async function getJson<E extends JsonEndpoint>(endpoint: E, query?: Query, signal?: AbortSignal): Promise<JsonEndpoints[E]> {
   const response = await get(endpoint, query, signal);
   return readJson(response, endpoint);
+}
+
+/**
+ * The plants of a library server, from its root (never a plant's prefix, never a snapshot); a
+ * 404 (an ApiError) means the server serves one plant.
+ */
+export async function getPlants(signal?: AbortSignal): Promise<PlantsIndex> {
+  const response = await request(apiUrl("plants", {}, API_BASE), signal);
+  return (await response.json()) as PlantsIndex;
 }
 
 async function getText(endpoint: string, query?: Query, signal?: AbortSignal): Promise<string> {

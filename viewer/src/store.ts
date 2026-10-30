@@ -1,5 +1,5 @@
 import { computed, reactive, watchEffect, type ComputedRef } from "vue";
-import { api, ApiError, type Branch, type IssuesReport, type PlantStatus, type RepoInfo } from "@/api";
+import { api, ApiError, type Branch, type IssuesReport, type PlantsIndex, type PlantStatus, type RepoInfo } from "@/api";
 import { hasInterlocks } from "@/lib/causeEffect";
 import { datasheetPaths } from "@/lib/studies";
 import { MATURITY_FILE, checkInputs, evaluatedState, recordedState, type MaturityState } from "@/lib/maturity";
@@ -26,6 +26,12 @@ export interface Store {
   snapshotError: string | null;
   /** `?embed=1`: framed by another page (the Process Atlas), so no header and no file tree. */
   embed: boolean;
+  /** The plant's id on a library server (`/p/<id>/`, core's ADR 0034); null for a server of one plant. */
+  plant: string | null;
+  /** The library's plants, for the switcher in the header (loaded once, when there is a plant). */
+  plants: PlantsIndex | null;
+  /** `?back=`: the page this snapshot was opened from (the Process Atlas), to link back to. */
+  back: { href: string; label: string } | null;
   /** `GET /api/status` of the working tree, once loaded (see {@link loadStatus}). */
   status: PlantStatus | null;
   /** Why it is not there: a snapshot or an older server (404), or a failure. */
@@ -46,6 +52,9 @@ export const store = reactive<Store>({
   snapshot: null,
   snapshotError: null,
   embed: false,
+  plant: null,
+  plants: null,
+  back: null,
   status: null,
   statusError: null,
   statusLoading: false,

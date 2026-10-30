@@ -9,7 +9,7 @@
   tray beside the machine. The cable drops from there to the terminal box, and that drop counts
   in its length. A crane lane over the machine no longer counts the motor's tray. Any tray still
   inside the lane counts. An impossible entry is `cheme.electrical-cable-entry` (error). Model
-  trays gain an optional `drop_to` (#73, ADR 0034).
+  trays gain an optional `drop_to` (#73, ADR 0035).
 
 ## 1.0.1 (2026-10-29)
 
