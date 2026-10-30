@@ -14,6 +14,7 @@ classification) is a separate capability. It builds on this format and does not 
 |---|---|---|
 | `safety/hazop/<study-id>/study.yaml` | `cheme/hazop-study/v1` (`kind: hazop-study`) | `domains/safety/schemas.py` (`HazopStudy`) |
 | `safety/risk-matrix.yaml` (any path the study names) | `cheme/risk-matrix/v1` (`kind: risk-matrix`) | `domains/safety/schemas.py` (`RiskMatrix`) |
+| `safety/frequencies.yaml` (optional, the path the study's `frequencies:` names) | `cheme/frequencies/v1` (`kind: frequencies`), project data | `domains/safety/schemas.py` (`FrequencyLibrary`), `domains/safety/frequencies.py` |
 | `build/hazop/<study-id>.md`, `.html` | derived, never edited | `domains/safety/hazop_report.py` |
 | `reviews/<date>-hazop-<study-id>.md` | the review record (`cheme schema review`) | `foundation/reviews.py` |
 
@@ -21,11 +22,11 @@ One study is one directory, so material that belongs to it (session notes, atten
 signed copy) can sit next to `study.yaml`. The file is nested in worksheet order:
 
 ```
-study: scope, modes, analysed inputs, risk_matrix, assessment_basis, team
+study: scope, modes, analysed inputs, risk_matrix, frequencies, assessment_basis, team
   nodes[]: id, title, design_intent, members (plant refs), modes, status
     deviations[]: id, guide_word, parameter, notes
       scenarios[]: id, cause, consequence, refs, modes, safeguards (ids), actions (ids), status
-        risk.initial[] / risk.residual[]: category, severity, likelihood, basis, evidence, status, band
+        risk.initial[] / risk.residual[]: category, severity, likelihood, frequency, basis, evidence, status, band
   safeguards[]: id, title, kind, refs, interlock, status
   actions[]: id, text, owner, due, status, response
 ```
@@ -58,7 +59,7 @@ action closes several gaps.
 |---|---|---|
 | Proposal | `status: proposed` (the default) on nodes, scenarios, safeguards, ratings, actions and the risk matrix; `by:` names the proposer | an agent or one person |
 | Authored judgement | `status: accepted`; ratings' codes with `basis` and `evidence`; the matrix's `status: accepted` with `accepted_by` | the team |
-| Calculated value | a rating's `band: {value, provenance: calculated, source: 'cheme safety hazop rate: <matrix>', fingerprint}` | `cheme safety hazop rate --write` only |
+| Calculated value | a rating's `band: {value, provenance: calculated, source: 'cheme safety hazop rate: <matrix>', fingerprint}`; the `likelihood` of a rating with a `frequency:` link (its record's value in the matrix's `max_frequency` grades) | `cheme safety hazop rate --write` only |
 | Review decision | `reviews/*.md` with `topic: hazop`, the study directory in `scope`, the analysed inputs in `basis` | the reviewer |
 
 The default is `proposed`, so an entry nobody marked is never read as agreed. The state of a

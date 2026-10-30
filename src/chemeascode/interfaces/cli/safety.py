@@ -147,9 +147,11 @@ def rate(
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Look up the band of each rating (category, severity, likelihood) in the study's risk
-    matrix. Without --write nothing is written and the command exits 1 when a band is missing,
-    stale or edited, or a rating cannot be looked up. --write records the bands (with the
-    matrix and input fingerprint) and changes nothing else in the file."""
+    matrix; a rating linked to the frequency library (frequency:) first gets its likelihood
+    from the record and the matrix's max_frequency. Without --write nothing is written and the
+    command exits 1 when a band or a derived likelihood is missing, stale or edited, or a rating
+    cannot be looked up. --write records those likelihoods and the bands (with the matrix and
+    input fingerprint) and changes nothing else in the file."""
     from chemeascode.domains.safety.hazop import rate as rate_study
 
     workspace = _workspace()
@@ -182,6 +184,17 @@ def rate(
                         }
                         for r in result.rows
                     ],
+                    "likelihoods": [
+                        {
+                            "scenario": r.scenario,
+                            "which": r.which,
+                            "category": r.rating.category,
+                            "likelihood": r.rating.likelihood,
+                            "derived": r.derived.code,
+                            "record": r.derived.record.id if r.derived.record else None,
+                        }
+                        for r in result.likelihoods
+                    ],
                     "findings": [{**asdict(f), "id": f.id} for f in result.findings],
                 },
                 indent=2,
@@ -189,6 +202,15 @@ def rate(
         )
     else:
         typer.echo(f"matrix: {result.matrix or '(none)'} {result.matrix_id or ''}".rstrip())
+        for r in result.likelihoods:
+            record = r.derived.record
+            assert record is not None
+            typer.echo(
+                f"{r.scenario} {r.which:<8} {r.rating.category} likelihood "
+                f"{r.rating.likelihood or '?'} -> {r.derived.code} "
+                f"({record.id}, {record.value}/yr) "
+                + ("written" if result.written else "would write")
+            )
         for r in result.rows:
             codes = f"{r.rating.category} {r.rating.severity or '?'}/{r.rating.likelihood or '?'}"
             band = r.band or f"unresolved ({r.message})"
@@ -200,7 +222,8 @@ def rate(
             typer.echo(finding.format())
         if not result.rows:
             typer.echo("no ratings")
-    failed = bool(result.findings) or (result.changes and not result.written)
+    pending = (result.changes or result.likelihoods) and not result.written
+    failed = bool(result.findings) or pending
     if failed or any(r.state == "unresolved" for r in result.rows):
         raise typer.Exit(1)
 

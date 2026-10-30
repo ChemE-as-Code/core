@@ -23,6 +23,11 @@ Rules (``cheme.hazop-*``), each finding naming the file, line, rule and a hint:
   ``cheme.risk-matrix-*``); ``hazop-matrix-example`` (info): the matrix is example data;
 - ``hazop-unknown-code`` (error): a rating's category, severity or likelihood the matrix does
   not have; ``hazop-rating-duplicate`` (error): a category rated twice in one list;
+- ``hazop-frequency`` (error or info): a rating's ``frequency:`` link that gives no likelihood:
+  no or an invalid library, an unknown record or event type, a matrix without
+  ``max_frequency`` (error); an event type without a record per item or a record per a length
+  (info: the likelihood is given by hand); ``hazop-likelihood-derived`` (warning): a linked
+  rating whose likelihood is not the one its record gives (``rate --write`` sets it);
 - ``hazop-band-stale`` (warning): a calculated band whose rating or matrix changed since;
   ``hazop-band-edited`` (error): a calculated band that is not what the matrix gives for its
   inputs (edited by hand);
@@ -50,6 +55,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import ValidationError
 
+from chemeascode.domains.safety.frequencies import Derived, LoadedLibrary, derive, load_library
 from chemeascode.domains.safety.risk_matrix import (
     LoadedMatrix,
     band_rank,
@@ -101,6 +107,7 @@ class LoadedStudy:
     document: Any = None
     findings: list[Finding] = field(default_factory=list)
     matrix: LoadedMatrix | None = None
+    frequencies: LoadedLibrary | None = None
 
 
 def load_study(root: Path, path: str) -> LoadedStudy:
@@ -144,7 +151,8 @@ def load_study(root: Path, path: str) -> LoadedStudy:
             )
         return LoadedStudy(path, None, document, findings)
     matrix = load_matrix(root, study.risk_matrix) if study.risk_matrix else None
-    return LoadedStudy(path, study, document, findings, matrix)
+    library = load_library(root, study.frequencies) if study.frequencies else None
+    return LoadedStudy(path, study, document, findings, matrix, library)
 
 
 def dump_study(study: HazopStudy) -> str:
@@ -252,6 +260,49 @@ class RatingRow:
     @property
     def recorded(self) -> str | None:
         return self.rating.band.value if self.rating.band is not None else None
+
+
+@dataclass
+class LikelihoodRow:
+    """A rating linked to the frequency library, and the likelihood the library gives it."""
+
+    scenario: str
+    which: str
+    rating: Rating
+    loc: list[Any]
+    derived: Derived
+
+    @property
+    def changes(self) -> bool:
+        return self.derived.code is not None and self.derived.code != self.rating.likelihood
+
+
+def likelihood_rows(loaded: LoadedStudy) -> list[LikelihoodRow]:
+    """Every rating with a ``frequency:`` link, with the likelihood its record gives."""
+    study, matrix, library = loaded.model, loaded.matrix, loaded.frequencies
+    if study is None:
+        return []
+    rows = []
+    for ni, node in enumerate(study.nodes):
+        for di, dev in enumerate(node.deviations):
+            for si, scen in enumerate(dev.scenarios):
+                for which in ("initial", "residual"):
+                    for ri, rating in enumerate(getattr(scen.risk, which, None) or []):
+                        if rating.frequency is None:
+                            continue
+                        if library is None:
+                            derived = Derived(
+                                None, None, "the study names no frequencies:", "error"
+                            )
+                        elif library.model is None:
+                            derived = Derived(None, None, f"{library.path} does not load", "error")
+                        elif matrix is None or matrix.model is None or not matrix.usable:
+                            derived = Derived(None, None, "no usable risk matrix", "error")
+                        else:
+                            derived = derive(library.model, matrix.model, rating.frequency)
+                        loc = ["nodes", ni, "deviations", di, "scenarios", si, "risk", which, ri]
+                        rows.append(LikelihoodRow(scen.id, which, rating, loc, derived))
+    return rows
 
 
 def rating_rows(loaded: LoadedStudy) -> list[RatingRow]:
@@ -654,6 +705,37 @@ def study_findings(
             )
 
     findings += _risk_findings(loaded, add)
+    if loaded.frequencies is not None:
+        findings += loaded.frequencies.findings
+    for row in likelihood_rows(loaded):
+        owner = f"scenario {row.scenario} ({row.which}, {row.rating.category})"
+        key = f"{row.scenario}:{row.which}:{row.rating.category}"
+        if row.derived.problem:
+            add(
+                row.derived.level,
+                "frequency",
+                f"{owner}: no likelihood from the frequency library: {row.derived.problem}",
+                [*row.loc, "frequency"],
+                [row.scenario, row.rating.category],
+                "fix the link, or give the likelihood with its basis and drop frequency:"
+                if row.derived.level == "error"
+                else "give the likelihood by hand with its basis (or link another record)",
+                key=f"{key}:frequency",
+            )
+        elif row.changes:
+            record = row.derived.record
+            assert record is not None
+            add(
+                "warning",
+                "likelihood-derived",
+                f"{owner}: likelihood {row.rating.likelihood or 'none'}, but {record.id} "
+                f"({record.value}/yr) gives {row.derived.code}",
+                [*row.loc, "likelihood"],
+                [row.scenario, row.rating.category],
+                f"cheme safety hazop rate {study.id} --target {row.scenario} --write sets it "
+                "(a likelihood with a frequency link is derived, never typed)",
+                key=f"{key}:likelihood",
+            )
     findings += input_findings(workspace, loaded)
     findings += _unresolved(workspace, loaded)
     return findings
@@ -1145,6 +1227,8 @@ class RateResult:
     changes: list[RatingRow]
     findings: list[Finding]
     written: bool = False
+    #: Ratings whose likelihood the frequency library gives otherwise (set when written).
+    likelihoods: list[LikelihoodRow] = field(default_factory=list)
 
 
 def _target_scenarios(study: HazopStudy, target: str | None) -> set[str]:
@@ -1179,6 +1263,16 @@ def rate(
     if loaded.model is None:
         raise ValueError(f"{path} does not load; run cheme safety hazop check {study_id}")
     wanted = _target_scenarios(loaded.model, target)
+    # Likelihoods linked to the frequency library first: the bands are looked up from them.
+    likelihoods = [r for r in likelihood_rows(loaded) if r.scenario in wanted and r.changes]
+    if write and likelihoods:
+        file = workspace.root / path
+        derived = {tuple(r.loc): ("likelihood", r.derived.code) for r in likelihoods}
+        text = _read(file)
+        _write(file, write_keys(text, yaml.compose(text), derived))
+        loaded = load_study(workspace.root, path)
+        if loaded.model is None:
+            raise ValueError(f"{path} does not load after writing the likelihoods")
     rows = [r for r in rating_rows(loaded) if r.scenario in wanted]
     findings: list[Finding] = []
     matrix = loaded.matrix
@@ -1200,6 +1294,7 @@ def rate(
                 "cheme.hazop-unknown-code",
                 "cheme.hazop-rating-duplicate",
                 "cheme.hazop-band-edited",
+                "cheme.hazop-frequency",
             ) or (finding.rule == "cheme.hazop-unresolved" and ":codes" in finding.key)
             if relevant and (not finding.ids or finding.ids[0] in wanted):
                 findings.append(finding)
@@ -1221,7 +1316,9 @@ def rate(
         rows,
         changes,
         findings,
+        likelihoods=likelihoods,
     )
+    result.written = write and bool(likelihoods)
     if write and changes:
         assert matrix is not None and matrix.model is not None
         source = f"{RATE_SOURCE}: {matrix.model.id} ({matrix.path})"
@@ -1245,7 +1342,9 @@ def rate(
             )
             edits[tuple(row.loc)] = band
         file = workspace.root / path
-        _write(file, write_bands(_read(file), loaded.document, edits))
+        # Positions from the text as it is on disk: a CRLF file shifts the translated ones.
+        text = _read(file)
+        _write(file, write_bands(text, yaml.compose(text), edits))
         result.written = True
     return result
 
@@ -1299,15 +1398,22 @@ def write_bands(
     """*text* with the ``band:`` of each rating at a location of *edits* set (or removed for
     None). Only those entries change: every other line, comment and key order stays, and the
     file's line endings are kept."""
+    return write_keys(text, document, {loc: ("band", band) for loc, band in edits.items()})
+
+
+def write_keys(text: str, document: Any, edits: dict[tuple[Any, ...], tuple[str, Any]]) -> str:
+    """*text* with one key of each rating at a location of *edits* set to its value (a mapping
+    or a code; None removes the key), in place as :func:`write_bands` does."""
     eol = "\r\n" if "\r\n" in text else "\n"
     changes: list[tuple[int, int, str]] = []  # (start, end, replacement) as text indices
-    for loc, band in edits.items():
+    for loc, (name, band) in edits.items():
         rating = _node_at(document, loc)
         if not isinstance(rating, yaml.MappingNode) or not rating.value:
             raise ValueError(f"rating at {'.'.join(map(str, loc))} is not a mapping")
         keys = [k.value if isinstance(k, yaml.ScalarNode) else None for k, _ in rating.value]
-        at_band = keys.index("band") if "band" in keys else None
-        new = f"band: {_flow(band)}" if band is not None else ""
+        at_band = keys.index(name) if name in keys else None
+        value = _flow(band) if isinstance(band, dict) else _scalar(str(band or ""))
+        new = f"{name}: {value}" if band is not None else ""
         if rating.flow_style:
             if at_band is not None:
                 key, value = rating.value[at_band]
@@ -1488,7 +1594,7 @@ def stamp(
             for (p, old, relation), s in zip(entries, stamps, strict=True)
         ]
         block = f"analysed:{eol}" + "".join(lines) if lines else f"analysed: []{eol}"
-        _write(file, _replace_key(text, loaded.document, "analysed", block))
+        _write(file, _replace_key(text, yaml.compose(text), "analysed", block))
     return stamps
 
 

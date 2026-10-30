@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Safety: a HAZOP rating's likelihood can come from the project's frequency library (new kind
+  `frequencies`, `cheme/frequencies/v1`, named by the study's `frequencies:`; project data,
+  none shipped). A rating links `frequency: {event_type}` (its screening value: LOPA records
+  first, the highest) or `{record}`; with `max_frequency` on the matrix's likelihood grades,
+  `cheme safety hazop rate --write` derives the likelihood, then the band. New rules
+  `hazop-frequency` and `hazop-likelihood-derived`; the bounds are not part of the matrix
+  fingerprint, so recorded bands stay current (ADR 0033).
+- Fix: `cheme safety hazop rate --write` and `stamp --write` placed their edits by positions of
+  the text with its line endings translated, so a study with CRLF line endings was edited in
+  the wrong place; the positions now come from the text on disk.
 - Fix: `cheme safety hazop propagate` lost the pipe between two items of different segments
   when the second segment came later in the file (the walk ended in `no-connection`); items
   are now indexed before pipes.

@@ -4,6 +4,7 @@
 |---|---|
 | `safety/hazop/<study-id>/study.yaml` | one HAZOP study (`cheme schema hazop-study`): the one authoritative file, edited by the team and by agents |
 | `safety/risk-matrix.yaml` | the risk matrix the studies rate against (`cheme schema risk-matrix`). **The one `cheme init` writes is example data** (`example: true`): replace it with your company's matrix before anything is assessed. A matrix is `status: proposed` until the team accepts it (`status: accepted`, `accepted_by:`); a study rated against a proposed matrix stays a draft |
+| `safety/frequencies.yaml` (optional) | the project's initiating-event frequencies with their sources (`cheme schema frequencies`), named by a study's `frequencies:`; a rating links to a record or event type (`frequency:`) and `cheme safety hazop rate --write` derives its likelihood with the matrix's `max_frequency`. cheme-as-code ships none: the team writes or obtains it |
 | `build/hazop/<study-id>.md`, `.html` | the report, derived from the study (`cheme safety hazop report`); never edited |
 | `reviews/<date>-hazop-<study-id>.md` | the review record of the study (skill `review`, `cheme safety hazop review`) |
 
@@ -22,6 +23,7 @@ modes: [{id: normal, title: Normal operation}]
 analysed:                        # the files analysed, at the revision analysed (cheme safety hazop stamp)
   - {path: pid/P-01.xml, revision: 'sha256:...', relation: analyses}
 risk_matrix: safety/risk-matrix.yaml
+frequencies: safety/frequencies.yaml   # optional: the likelihood basis of linked ratings
 assessment_basis: how risk is ranked (initial before safeguards, residual with them)
 nodes:
   - id: N1                       # stable ids: never renumbered, never reused
@@ -99,7 +101,7 @@ actions:
 |---|---|
 | `cheme safety hazop init ID [--title T] [--input F]... [--matrix F]` | a draft study |
 | `cheme safety hazop check [ID] [--json]` | the study's findings and state: `invalid`, `draft`, `assessed` (complete, current, accepted), `reviewed` (and a current human review) |
-| `cheme safety hazop rate ID [--target NODE\|SCENARIO] [--write] [--json]` | the band of every rating from the matrix; `--write` records them, nothing else changes |
+| `cheme safety hazop rate ID [--target NODE\|SCENARIO] [--write] [--json]` | the band of every rating from the matrix, after the likelihood of each rating with a `frequency:` link from its record; `--write` records them, nothing else changes |
 | `cheme safety hazop report ID` | `build/hazop/ID.md` and `.html` |
 | `cheme safety hazop stamp ID [--input F]... [--write]` | the analysed inputs' recorded and current revisions (a file by its sha256, a committed directory by the commit); `--write` records the current ones |
 | `cheme safety hazop review ID [--write]` | a review record to complete, in the format of `reviews/` |

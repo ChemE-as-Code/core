@@ -72,10 +72,11 @@ def matrix_fingerprint(matrix: RiskMatrix) -> str:
     """The fingerprint of everything the matrix states (comments and layout are not part of
     it): any change to a band, a grade, a description or a cell changes it. Its acceptance
     (``status``, ``accepted_by``) is not part of it, so accepting the criteria changes no band
-    (and a matrix written before those fields keeps its fingerprint)."""
-    return value_fingerprint(
-        matrix.model_dump(mode="json", by_alias=True, exclude={"status", "accepted_by"})
-    )
+    (and a matrix written before those fields keeps its fingerprint). Nor are the grades'
+    ``max_frequency``: a band follows the codes; a likelihood derived from them is checked on
+    its own (``hazop-likelihood-derived``)."""
+    exclude = {"status": True, "accepted_by": True, "likelihood": {"__all__": {"max_frequency"}}}
+    return value_fingerprint(matrix.model_dump(mode="json", by_alias=True, exclude=exclude))
 
 
 def duplicate_keys(document: Any, file: str, rule: str) -> list[Finding]:
