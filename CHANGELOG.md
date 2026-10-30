@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer: the layout view exports the visible model as a binary STL for 3D printing ("Export
+  .stl"), in millimetres at 1:100, 1:200, 1:500 or 1:1000, with an optional base slab whose top
+  is at ground level, so everything standing on the ground prints as one piece. No thickening
+  or simplification: parts below the printer's resolution are left to the slicer.
 - Safety: three HAZOP skills, guidance only (no new command): `hazop-node-breakdown` (nodes
   by named boundary rules, with members and design intent), `hazop-scenario-propagation`
   (causes inside the node, consequences followed object by object over the P&ID to a top

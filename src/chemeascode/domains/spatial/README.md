@@ -50,8 +50,8 @@ them, or takes their results back as declared data:
   or structures.
 - **Dispersion and consequence modelling**: none. Zones come from an indicative radius table
   (safety domain) or as explicit volumes from a study done elsewhere.
-- **CAD export**: the model is YAML and JSON (`/api/layout`); the viewer exports glTF. No
-  other CAD or plant design system formats.
+- **CAD export**: the model is YAML and JSON (`/api/layout`); the viewer exports glTF, and STL
+  for 3D printing. No other CAD or plant design system formats.
 
 **Out of scope.** Deciding that a layout is good: the rules find intersections, missing access
 and unkept distances; spacing criteria, access philosophy, tier allocation, area
