@@ -3,7 +3,9 @@
 :func:`take_off` reads the model document (``layout/plant-model.yaml``, the contract in
 ``docs/framework/layout-model.md``) and counts the bulk materials in it:
 
-- **pipe**: length per DN, pipe class and insulation (``m``);
+- **pipe**: length per DN, pipe class and insulation (``m``); the length of a pipe declared
+  ``buried`` (``piping/routing.yaml``) that lies in the ground (its top at or below grade) is a
+  row of its own, group ``buried`` (for its coating and trench);
 - **elbow**: a change of direction inside a pipe's polyline, or where two pipes of one chain
   meet at an angle (``elbow 90``, ``elbow 45``, else ``bend <deg>``);
 - **tee**: a pipe end on another pipe's run, or three pipe ends at one point (``tee``, or
@@ -55,6 +57,8 @@ MTO_MD = "estimate/mto.md"
 SECTIONS_FILE = Path(__file__).parent / "data" / "steel-sections.yaml"
 #: Two points closer than this are one point, m.
 TOL = 0.002
+#: A buried pipe's top this little above grade still counts as in the ground, m.
+GRADE_TOL = 0.001
 #: A change of direction above this is a fitting, degrees.
 MIN_BEND_DEG = 1.0
 #: Valves (category ``valve``) by the model's inline ``kind``.
@@ -325,6 +329,21 @@ def _section_name(name: str) -> str:
     return re.sub(r"\s+", "", str(name)).upper()
 
 
+def _buried_length(pipe: dict[str, Any], points: list[Vec]) -> float:
+    """The length of a ``buried`` pipe in the ground: where its top (axis plus OD / 2 and
+    insulation) is at or below grade (z = 0), risers through grade counted to grade."""
+    r = float(pipe.get("od") or 0.0) / 2 + float(pipe.get("insulation_mm") or 0.0) / 1000.0
+    total = 0.0
+    for a, b in zip(points, points[1:], strict=False):
+        length = _norm(_sub(b, a))
+        top_a, top_b = a[2] + r, b[2] + r
+        if max(top_a, top_b) <= GRADE_TOL:
+            total += length
+        elif min(top_a, top_b) < 0.0:
+            total += length * -min(top_a, top_b) / abs(top_b - top_a)
+    return total
+
+
 def _pipe_spec(pipe: dict[str, Any]) -> str:
     thickness = float(pipe.get("insulation_mm") or 0.0)
     if thickness <= 0:
@@ -416,7 +435,13 @@ def take_off(model: dict[str, Any], model_file: str = LAYOUT_MODEL_FILE) -> Take
         points = _points(pipe)
         length = sum(_norm(_sub(b, a)) for a, b in zip(points, points[1:], strict=False))
         dn, cls, spec = float(pipe.get("dn") or 0.0), _class_code(pipe), _pipe_spec(pipe)
-        counter.add("pipe", "pipe", dn=dn, pipe_class=cls, spec=spec, quantity=length)
+        buried = _buried_length(pipe, points) if pipe.get("buried") is not None else 0.0
+        if length - buried > TOL or buried <= TOL:
+            counter.add("pipe", "pipe", dn=dn, pipe_class=cls, spec=spec, quantity=length - buried)
+        if buried > TOL:
+            counter.add(
+                "pipe", "pipe", dn=dn, pipe_class=cls, spec=spec, group="buried", quantity=buried
+            )
         thickness = float(pipe.get("insulation_mm") or 0.0) / 1000.0
         if thickness > 0:
             outer = float(pipe.get("od") or 0.0) + 2 * thickness

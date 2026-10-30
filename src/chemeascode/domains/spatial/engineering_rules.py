@@ -32,7 +32,8 @@ Rules (``cheme.layout-...``, level):
   span in the table (liquid or gas column by the fluid's name); ``support-missing`` (info): a
   level run longer than that span with no support in the model at all (a local pipe-way
   without steel). A span is measured between the supports and from the outer ones to the ends
-  of the level run (a bend, a nozzle, the pipe's end), along one pipe (one DEXPI segment);
+  of the level run (a bend, a nozzle, the pipe's end), along one pipe (one DEXPI segment); a
+  buried level run (``buried`` in ``piping/routing.yaml``, below grade) is left out;
 - ``operability`` (warning): a manual valve's handwheel or lever, or a transmitter head,
   without a walking level at most ``operator_max_height_m`` (``instrument_max_height_m``) below
   it within ``operator_reach_m`` in plan; an in-line item (valve, check valve, relief valve,
@@ -473,6 +474,8 @@ class EngineeringRules:
             worst = 0.0
             bare = 0.0
             for k, j in stretches:
+                if all((pipe["id"], m) in self.base.buried for m in range(k, j + 1)):
+                    continue  # buried: the soil carries it
                 s0, s1 = arcs[k][0], arcs[j][1]
                 found = support_arcs(points, arcs, k, j, on.get(pipe["id"], []))
                 if not found:

@@ -20,7 +20,7 @@ One row per category, item, DN (and second DN), pipe class, spec and group, summ
 
 | category | unit | item | counted from the model |
 |---|---|---|---|
-| `pipe` | m | `pipe` | each `pipes[]` polyline's length, by `dn`, `class.code` and insulation (`spec`: `bare` or `insulation <mm> mm <jacket>`); `count`: pipes |
+| `pipe` | m | `pipe` | each `pipes[]` polyline's length, by `dn`, `class.code` and insulation (`spec`: `bare` or `insulation <mm> mm <jacket>`); the length of a `buried` pipe in the ground (its top at or below grade, a riser to where it leaves the ground) in rows of its own, `group: buried` (coating, trench); `count`: pipes |
 | `elbow` | ea | `elbow 90`, `elbow 45`, `bend <deg>` | every change of direction above 1 degree inside a pipe's polyline, and where two pipe ends meet at an angle (at the larger DN) |
 | `tee` | ea | `tee`, `reducing tee` | a pipe end on another pipe's run (run: that pipe; `dn` the larger, `dn2` the smaller DN); three pipe ends at one point (run: the two largest); *n* > 3 ends: *n* - 2 tees |
 | `reducer` | ea | `reducer` | two pipe ends of different DN at one point (`dn` x `dn2`); a placed `inline` reducer elsewhere (`dn` of its pipe) |
