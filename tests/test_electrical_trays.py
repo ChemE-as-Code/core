@@ -576,3 +576,126 @@ def test_the_point_along_a_rack_skips_repeated_points_and_needs_a_length():
     assert _along([(0, 0), (0, 0), (10, 0), (10, 10)], 15.0) == (10.0, 5.0, 0.0, 1.0)
     assert _along([(0, 0), (10, 0)], 10.000001) == (10.0, 0.0, 1.0, 0.0)  # its end
     assert _along([(5, 5), (5, 5)], 0.0) is None  # no length: no direction (pre-release issue 236)
+
+
+# -- several power trays per rack (power_trays) ---------------------------------------------
+
+HEAVY = """\
+rooms:
+  - {id: MCC-1, kind: mcc, building: SUB-1}
+  - {id: SWG-1, kind: switchgear, building: SUB-1}
+  - {id: CR-1, kind: control, building: SUB-1}
+motors:
+  - {driven: P-101, power_kw: 15, source: vendor data}
+feeders:
+  - {tag: HV-1, item: P-101, power_kw: 3000, voltage_v: 6600, room: SWG-1}
+  - {tag: HV-2, item: P-101, power_kw: 3000, voltage_v: 6600, room: SWG-1}
+  - {tag: LV-1, item: P-101, power_kw: 250, voltage_v: 400, room: MCC-1}
+  - {tag: LV-2, item: P-101, power_kw: 250, voltage_v: 400, room: MCC-1}
+"""
+NARROW = "rules:\n  widths_mm: [100, 150, 200, 300]\n"
+
+
+def _power(document):
+    return {t["id"]: t for t in document["trays"] if t["system"] == "power"}
+
+
+def test_one_power_tray_overfills_and_the_hint_names_power_trays(cabled: Path):
+    (cabled / "electrical" / "electrical-list.yaml").write_text(HEAVY)
+    (cabled / "electrical" / "tray-rules.yaml").write_text(NARROW)
+    model = build_model(Workspace(cabled))
+    trays = _power(model.document)
+    assert trays["PT-PR-1-1"]["fill"] > 0.3 and "voltage" not in trays["PT-PR-1-1"]
+    assert "power_trays" not in model.document["cabling"]["rules"]
+    (fill,) = [f for f in model.findings if f.rule == "cheme.layout-tray-fill"]
+    assert fill.key == "PT-PR-1-1"
+    assert "declare 2 power trays on rack PR-1" in fill.hint
+    assert "power_trays: [{rack: PR-1, trays: 2}]" in fill.hint
+
+
+def test_several_power_trays_per_rack_by_voltage_class(cabled: Path):
+    (cabled / "electrical" / "electrical-list.yaml").write_text(HEAVY)
+    (cabled / "electrical" / "tray-rules.yaml").write_text(
+        NARROW + "  power_trays:\n    - {rack: PR-1, trays: [hv, lv]}\n"
+    )
+    workspace = Workspace(cabled)
+    model = build_model(workspace)
+    document = model.document
+    LayoutModelFile.model_validate(document)
+    trays = _power(document)
+    hv, lv = trays["PT-PR-1-A-1"], trays["PT-PR-1-B-1"]
+    assert "PT-PR-1-1" not in trays
+    assert (hv["voltage"], lv["voltage"]) == ("hv", "lv")
+    assert hv["cables"] == ["C-HV-1", "C-HV-2"]
+    assert lv["cables"] == ["C-LV-1", "C-LV-2", "C-M-P-101"]
+    # side by side, centred on the power lane (0.75 m left of the rack at y 15), the largest
+    # width (300 mm) and spacing_m (0.15 m) apart; both on the rack's tray tier
+    assert {p[1] for p in hv["points"]} == {15.525} and {p[1] for p in lv["points"]} == {15.975}
+    assert {p[2] for p in hv["points"]} == {6.5} == {p[2] for p in lv["points"]}
+    # the room legs follow the trays; the schedule names each cable's trays
+    cables = _by_id(document["cables"])
+    assert cables["C-HV-1"]["trays"] == ["PT-SWG-1-A", "PT-PR-1-A-1", "PT-HV-1"]
+    assert cables["C-M-P-101"]["trays"] == ["PT-MCC-1-B", "PT-PR-1-B-1", "PT-M-P-101"]
+    assert trays["PT-SWG-1-A"]["voltage"] == "hv" and "voltage" not in trays["PT-HV-1"]
+    rows = {r["tag"]: r for r in cable_schedule(document)}
+    assert rows["C-LV-1"]["trays"] == "PT-MCC-1-B PT-PR-1-B-1 PT-LV-1"
+    assert document["cabling"]["rules"]["power_trays"] == {"PR-1": ["hv", "lv"]}
+    rules = {f.rule for f in model.findings}
+    assert not rules & {
+        "cheme.layout-tray-fill",
+        "cheme.layout-tray-separation",
+        "cheme.layout-tray-voltage",
+        "cheme.layout-clash-tray",
+    }
+    assert build_model(workspace).text() == model.text()
+    write_model(workspace, model)
+    findings = validate_workspace(workspace).findings
+    assert layout_gate(workspace, ["cables", "trays"], findings) == []
+
+
+def test_power_trays_by_count_share_the_cables_out_by_fill(cabled: Path):
+    (cabled / "electrical" / "electrical-list.yaml").write_text(HEAVY)
+    (cabled / "electrical" / "tray-rules.yaml").write_text(
+        NARROW + "  power_trays:\n    - {rack: PR-1, trays: 2}\n"
+    )
+    trays = _power(build_model(Workspace(cabled)).document)
+    a, b = trays["PT-PR-1-A-1"], trays["PT-PR-1-B-1"]
+    # the larger first, each into the emptier tray: one HV cable in each, the LV ones after
+    assert "voltage" not in a and "voltage" not in b
+    assert {"C-HV-1", "C-HV-2"} & set(a["cables"]) and {"C-HV-1", "C-HV-2"} & set(b["cables"])
+    assert max(a["fill"], b["fill"]) <= 0.3
+
+
+def test_a_cable_without_a_tray_of_its_class_is_a_voltage_finding(cabled: Path):
+    (cabled / "electrical" / "electrical-list.yaml").write_text(HEAVY)
+    (cabled / "electrical" / "tray-rules.yaml").write_text(
+        NARROW + "  power_trays:\n    - {rack: PR-1, trays: [hv, hv]}\n"
+    )
+    model = build_model(Workspace(cabled))
+    voltage = [f for f in model.findings if f.rule == "cheme.layout-tray-voltage"]
+    assert voltage and all(f.hint and f.level == "warning" for f in voltage)
+    assert any("C-M-P-101" in f.message for f in voltage)
+
+
+def test_power_trays_are_validated_against_the_site_plan(cabled: Path):
+    (cabled / "electrical" / "tray-rules.yaml").write_text(
+        "rules:\n"
+        "  power_trays:\n"
+        "    - {rack: PR-9, trays: 2}\n"
+        "    - {rack: PR-1, trays: 3}\n"
+        "    - {rack: PR-1, trays: [hv]}\n"
+    )
+    found = {
+        (f.message, f.level, f.line)
+        for f in validate_workspace(Workspace(cabled)).findings
+        if f.rule == "cheme.layout-tray-rack"
+    }
+    messages = sorted(found)
+    assert any("rack PR-9, which the site plan" in m and lv == "error" for m, lv, _ in messages)
+    assert any("listed twice" in m and line == 5 for m, _, line in messages)
+    # three 900 mm trays do not fit on the power half of the 3 m rack
+    assert any("3 power trays on rack PR-1" in m and lv == "warning" for m, lv, _ in messages)
+    with pytest.raises(ValueError):
+        TrayRuleSet.model_validate({"power_trays": [{"rack": "PR-1", "trays": 0}]})
+    with pytest.raises(ValueError):
+        TrayRuleSet.model_validate({"power_trays": [{"rack": "PR-1", "trays": ["mv"]}]})

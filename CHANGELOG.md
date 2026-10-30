@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Several power trays per rack: `power_trays: [{rack, trays}]` in
+  `electrical/tray-rules.yaml` (a count, or one voltage class per tray: `hv`, `lv`, `any`;
+  `lv_max_v` 1000 V). The trays stand side by side on the rack's tray tier. The build shares
+  the cables out by voltage class, then by fill, and splits the room legs and links with
+  them. The cable schedule names each cable's tray. A `tray-fill` hint on a rack's power trunk
+  names the number of trays the rack needs. New rule `cheme.layout-tray-voltage`; model trays
+  gain an optional `voltage`. Without `power_trays` the model is unchanged (#71, ADR 0036).
+
 ## 1.1.0 (2026-10-30)
 
 Minor release: a motor's `cable_entry` ends its tray beside the machine, so crane lanes over

@@ -1406,6 +1406,36 @@ class TrayTier(LayoutModel):
     elevation: float = Field(description="Bottom of the trays (top of their steel), m.")
 
 
+#: The voltage class a power tray takes: ``lv`` cables up to ``lv_max_v``, ``hv`` above it.
+VoltageClass = Literal["any", "lv", "hv"]
+#: At most this many power trays side by side on one rack.
+POWER_TRAYS_MAX = 9
+
+
+class PowerTrays(LayoutModel):
+    """The power trays of a rack: side by side on its tray tier, centred on the power lane,
+    ``widths_mm[-1] + spacing_m`` apart (centre to centre). The build gives each cable on the
+    rack one of them: a tray of its voltage class, else an ``any`` tray (else another, finding
+    layout-tray-voltage), the one that keeps it under ``fill_max_power``, then the emptiest."""
+
+    rack: Id
+    trays: int | list[VoltageClass] = Field(
+        description="How many power trays (each takes any cable), or one voltage class per "
+        "tray: hv (above lv_max_v), lv (up to it) or any, e.g. [hv, hv, lv]."
+    )
+
+    @property
+    def classes(self) -> list[str]:
+        return ["any"] * self.trays if isinstance(self.trays, int) else list(self.trays)
+
+    @model_validator(mode="after")
+    def _check(self) -> "PowerTrays":
+        n = len(self.classes)
+        if not 1 <= n <= POWER_TRAYS_MAX:
+            raise ValueError(f"trays: 1 .. {POWER_TRAYS_MAX} power trays per rack, not {n}")
+        return self
+
+
 class TrayRuleSet(LayoutModel):
     """How the cable trays are sized and run (every default ASSUMED: check it against the
     project's electrical standard)."""
@@ -1435,6 +1465,16 @@ class TrayRuleSet(LayoutModel):
         "tier, on steel of their own, m.",
     )
     tiers: list[TrayTier] = Field(default_factory=list)
+    power_trays: list[PowerTrays] = Field(
+        default_factory=list,
+        description="Racks with more than one power tray (e.g. HV and LV apart); a rack not "
+        "listed has one.",
+    )
+    lv_max_v: float = Field(
+        default=1000.0,
+        description="A power cable up to this rated voltage is lv, above it hv (power_trays), "
+        "V (the low-voltage limit of IEC 60038).",
+    )
     lane_fraction: float = Field(
         default=0.25,
         description="Power trays run this fraction of the rack width to one side of its "
@@ -1493,6 +1533,7 @@ class TrayRuleSet(LayoutModel):
             "grid_m",
             "support_span_m",
             "support_reach_m",
+            "lv_max_v",
         ):
             _positive(name, getattr(self, name))
         for name in ("fill_max_power", "fill_max_instrument", "lane_fraction"):
@@ -2174,6 +2215,10 @@ class ModelTray(ModelObject):
     fill: float = Field(description="Cable cross-section over the tray's, fraction.")
     fill_max: float
     rack: str | None = None
+    voltage: Literal["lv", "hv"] | None = Field(
+        default=None,
+        description="The voltage class of a power tray of a rack with power_trays (none: any).",
+    )
     method: str | None = Field(default=None, description="How a leg was routed (astar, ...).")
     review_needed: bool | None = None
     parts: list[ModelPart] = Field(default_factory=list)

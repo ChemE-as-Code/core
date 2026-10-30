@@ -612,6 +612,53 @@ class _Rules:
                     [tier.rack],
                     f"racks: {', '.join(sorted(racks)) or 'none'}",
                 )
+        self.power_trays()
+
+    def power_trays(self) -> None:
+        """``power_trays`` naming a rack the site plan lacks or twice (error), or more trays
+        than fit on the power side of the rack (warning)."""
+        rules = self.layout.trays.rules  # type: ignore[union-attr]
+        racks = {r.id: r for r in self.layout.site_plan.racks} if self.layout.site_plan else {}
+        seen: set[str] = set()
+        for k, entry in enumerate(rules.power_trays):
+            loc = ("rules", "power_trays", k, "rack")
+            rack = racks.get(entry.rack)
+            if rack is None or entry.rack in seen:
+                twice = entry.rack in seen
+                self.add(
+                    "trays",
+                    loc,
+                    "error",
+                    "tray-rack",
+                    f"power trays on rack {entry.rack}, "
+                    + ("listed twice" if twice else "which the site plan does not declare"),
+                    [entry.rack],
+                    "one power_trays entry per rack"
+                    if twice
+                    else f"racks: {', '.join(sorted(racks)) or 'none'}",
+                )
+                seen.add(entry.rack)
+                continue
+            seen.add(entry.rack)
+            n = len(entry.classes)
+            widest = rules.widths_mm[-1] / 1000
+            pitch = widest + rules.spacing_m
+            lane = rules.lane_fraction * rack.width
+            inner = lane - (n - 1) / 2 * pitch - widest / 2
+            outer = lane + (n - 1) / 2 * pitch + widest / 2
+            if inner < -EPS or outer > rack.width / 2 + EPS:
+                self.add(
+                    "trays",
+                    ("rules", "power_trays", k, "trays"),
+                    "warning",
+                    "tray-rack",
+                    f"{n} power trays on rack {entry.rack} take {inner:.2f} .. {outer:.2f} m from "
+                    f"its centreline at the largest width ({widest * 1000:g} mm, {pitch:g} m "
+                    f"apart): beyond the power half of the {rack.width:g} m rack",
+                    [entry.rack],
+                    "fewer power trays, smaller widths_mm or another lane_fraction, or a wider "
+                    "rack in the site plan",
+                )
 
     # -- layout-hvac-ref ---------------------------------------------------------
 
