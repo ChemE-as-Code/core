@@ -14,7 +14,7 @@ test.describe("reactions", () => {
   test("the nav and home link it; reactions, reactors, balances", async ({ page }) => {
     await mockApi(page, { reactions: reactionsAmmonia, streams: streamsLinked });
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Reactions and reactors" })).toBeVisible();
+    await expect(page.getByTestId("home-pages").getByRole("link", { name: "Reactions" })).toBeVisible();
     await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Reactions" }).click();
     await expect(page).toHaveURL(/\/reactions/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Reactions");

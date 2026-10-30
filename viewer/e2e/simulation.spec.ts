@@ -140,7 +140,7 @@ test.describe("simulation", () => {
   test("home links the simulation when the repo has one", async ({ page }) => {
     await mockApi(page, { simulation: simulationRun, streams: streamsSimulation });
     await page.goto("/");
-    await page.getByRole("link", { name: "Simulation: the recorded run" }).click();
+    await page.getByTestId("home-pages").getByRole("link", { name: "Simulation" }).click();
     await expect(page).toHaveURL(/\/streams\?tab=simulation/);
     await expect(page.getByRole("region", { name: "Simulation", exact: true })).toBeVisible();
   });

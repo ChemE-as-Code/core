@@ -30,8 +30,8 @@ test.describe("embed", () => {
     await expect(page.locator(".pane[role='application'] svg").first()).toBeVisible();
     await expect(page.locator("header")).toHaveCount(0);
     await expect(page.getByTestId("snapshot-badge")).toHaveCount(0);
-    await expect(page.getByRole("complementary", { name: "Files" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Toggle file list" })).toHaveCount(0);
+    await expect(page.getByRole("complementary", { name: "Navigation" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Toggle navigation" })).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Pages" })).toHaveCount(0);
 
     const link = page.getByTestId("open-full-viewer");
@@ -58,7 +58,7 @@ test.describe("embed", () => {
     await expect(page.getByRole("heading", { name: /Engineering-step checks/ })).toBeVisible();
     await expect(page.locator("header")).toHaveCount(0);
     await expect(page.locator("#rev-select")).toHaveCount(0);
-    await expect(page.getByRole("complementary", { name: "Files" })).toHaveCount(0);
+    await expect(page.getByRole("complementary", { name: "Navigation" })).toHaveCount(0);
     await expect(page.getByTestId("open-full-viewer")).toHaveAttribute("href", `${baseURL}/checks`);
   });
 
@@ -77,7 +77,7 @@ test.describe("embed", () => {
     await serveSnapshot(page);
     await page.goto("/?data=/e2e-snapshot/#/");
     await expect(page.getByTestId("snapshot-badge")).toBeVisible();
-    await expect(page.getByRole("complementary", { name: "Files" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Navigation" })).toBeVisible();
     await expect(page.getByTestId("open-full-viewer")).toHaveCount(0);
   });
 });

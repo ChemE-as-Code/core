@@ -61,7 +61,7 @@ const fileLink = (sha: string) =>
 
 <template>
   <div class="page">
-    <h1>History <small>{{ path || "whole repository" }} &middot; {{ shortRev(rev) === "working tree" ? "HEAD" : shortRev(rev) }}</small></h1>
+    <h1>History <small>{{ path || "the whole plant" }} &middot; {{ shortRev(rev) === "working tree" ? "HEAD" : shortRev(rev) }}</small></h1>
     <div class="toolbar">
       <label>
         <span class="sr-only">File</span>

@@ -42,7 +42,7 @@ test.describe("catalysis", () => {
   test("the library: marks, filter, and the link from the reactions page", async ({ page }) => {
     await mockApi(page, { reactions: reactionsShift, library: libraryShift });
     await page.goto("/reactions");
-    await page.getByRole("link", { name: "Reaction library" }).click();
+    await page.locator("main").getByRole("link", { name: "Reaction library" }).click();
     await expect(page).toHaveURL(/\/library/);
     await expect(page.locator("[data-library-entry]")).toHaveCount(23);
     const shift = page.locator('[data-library-entry="ht_shift"]');

@@ -6,13 +6,19 @@ import { pathSegments } from "@/lib/format";
 import { KIND_BADGE, groupSheets } from "@/lib/process";
 import SignoffStrip from "@/components/SignoffStrip.vue";
 import { PHASE_NOTE, maturityBadge } from "@/lib/maturity";
+import { useNavGroups } from "@/lib/useNavGroups";
 
 const { rev, withRev } = useRev();
 // once per revision, shared with the header (which an embedding page hides)
 watch([rev, () => store.repo], ([value, loaded]) => loaded && void loadMaturity(value), { immediate: true });
+const nav = useNavGroups();
 const maturityState = computed(() => maturityBadge(maturity[rev.value ?? ""] ?? { kind: "loading" }));
 const repo = computed(() => store.repo);
 const groups = computed(() => groupSheets(repo.value?.sheets ?? []));
+// The pages and documents (the sheets have their cards above).
+const pages = computed(() =>
+  nav.value.map((g) => ({ ...g, items: g.items.filter((i) => i.to.name !== "pid") })).filter((g) => g.items.length),
+);
 </script>
 
 <template>
@@ -72,20 +78,17 @@ const groups = computed(() => groupSheets(repo.value?.sheets ?? []));
       </template>
       <p v-if="!repo.sheets.length" class="muted">No sheets in plant.yaml.</p>
 
-      <h2>Pages</h2>
-      <ul class="links">
-        <li><RouterLink :to="{ name: 'checks', query: withRev() }">Engineering-step checks</RouterLink></li>
-        <li><RouterLink :to="{ name: 'validate' }">Validation of the working tree</RouterLink></li>
-        <li><RouterLink :to="{ name: 'reviews', query: withRev() }">Reviews: open findings and sign-offs</RouterLink></li>
-        <li v-if="store.hasInterlocks"><RouterLink :to="{ name: 'cause-effect', query: withRev() }">Cause &amp; effect matrix</RouterLink></li>
-        <li v-if="store.repo?.has_issues"><RouterLink :to="{ name: 'issues', query: withRev() }">Issues: action items, holds, technical queries and design changes</RouterLink></li>
-        <li v-if="store.repo?.has_control"><RouterLink :to="{ name: 'control', query: withRev() }">Control: loops, sequences, narrative and philosophy</RouterLink></li>
-        <li v-if="store.repo?.has_simulation"><RouterLink :to="{ name: 'streams', query: withRev({ tab: 'simulation' }) }">Simulation: the recorded run</RouterLink></li>
-        <li v-if="store.repo?.has_reactions"><RouterLink :to="{ name: 'reactions', query: withRev() }">Reactions and reactors</RouterLink></li>
-        <li><RouterLink :to="{ name: 'library', query: withRev() }">Reaction library: industrial processes to start from</RouterLink></li>
-        <li v-if="store.hasDatasheets"><RouterLink :to="{ name: 'datasheets', query: withRev() }">Equipment datasheets</RouterLink></li>
-        <li v-if="!store.snapshot"><RouterLink :to="{ name: 'history', query: withRev() }">History</RouterLink></li>
-      </ul>
+      <h2>Pages and documents</h2>
+      <div class="page-groups" data-testid="home-pages">
+        <section v-for="g in pages" :key="g.id" :data-group="g.id">
+          <h3>{{ g.title }}</h3>
+          <ul>
+            <li v-for="item in g.items" :key="item.key">
+              <RouterLink :to="{ ...item.to, query: withRev(item.to.query) }" :title="item.title">{{ item.label }}</RouterLink>
+            </li>
+          </ul>
+        </section>
+      </div>
     </template>
     <p v-else-if="store.loading" class="muted">Loading&hellip;</p>
   </div>
@@ -176,7 +179,22 @@ h2 {
 .card.planned:hover {
   border-color: var(--border);
 }
-.links {
-  padding-left: var(--space-4);
+.page-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.page-groups h3 {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  margin: 0 0 var(--space-1);
+}
+.page-groups ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.page-groups li {
+  padding: 2px 0;
 }
 </style>

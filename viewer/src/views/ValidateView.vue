@@ -20,7 +20,8 @@ const impact = useAsync<ImpactReport | null>(async (signal) => {
   }
 });
 const levels: Level[] = ["error", "warning", "info"];
-const shown = ref(new Set<Level>(levels));
+// Info findings (notes, often hundreds on a large plant) are one click away, not in the way.
+const shown = ref(new Set<Level>(["error", "warning"]));
 const query = ref("");
 
 const counts = computed(() => countLevels(report.data.value?.findings ?? []));
@@ -98,7 +99,10 @@ function open(finding: Finding): void {
     <LoadState :loading="report.loading.value && !report.data.value" :error="report.error.value" @retry="report.reload" />
     <template v-if="report.data.value">
       <p class="muted summary">
-        {{ report.data.value.files.length }} files checked, {{ report.data.value.findings.length }} findings.
+        {{ report.data.value.files.length }} files checked, {{ report.data.value.findings.length }} findings<template
+          v-if="findings.length < report.data.value.findings.length"
+        >, {{ findings.length }} shown</template>.
+        <button v-if="!shown.has('info') && counts.info" type="button" class="link" data-testid="show-info" @click="toggle('info')">Show the {{ counts.info }} info findings</button>
       </p>
       <p v-if="!report.data.value.findings.length" class="notice">Everything validates.</p>
       <div v-else class="table-wrap">
@@ -146,6 +150,15 @@ function open(finding: Finding): void {
 }
 .file {
   white-space: nowrap;
+}
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: var(--space-1);
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
 }
 .hint {
   font-size: 12px;

@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch, watchEffect, onMounted } from "vue";
 import { START_LOCATION, useRoute, useRouter } from "vue-router";
 import AppHeader from "@/components/AppHeader.vue";
-import FileTree from "@/components/FileTree.vue";
+import SideNav from "@/components/SideNav.vue";
 import { loadRepo, store } from "@/store";
 import { fullViewerHref } from "@/lib/viewerOptions";
 import { pageTitle } from "@/router";
@@ -44,8 +44,8 @@ const fullViewer = computed(() => {
     <a class="skip-link" :href="inPage.href('main')" @click="inPage.go($event, 'main')">Skip to content</a>
     <template v-if="!store.embed">
       <AppHeader class="shell-header" :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-      <aside class="shell-sidebar" aria-label="Files">
-        <FileTree />
+      <aside class="shell-sidebar" aria-label="Navigation">
+        <SideNav />
       </aside>
       <div v-if="sidebarOpen" class="scrim" @click="sidebarOpen = false" />
     </template>

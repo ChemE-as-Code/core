@@ -14,7 +14,7 @@ test.describe("life cycle assessment", () => {
   test("totals, the contribution Sankey, coverage, sources, tables and the CSV cheme-as-code writes", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "LCA" }).click();
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Life cycle assessment" }).click();
     await expect(page).toHaveURL(/\/lca/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("per 1 t GOXP");
     // what the result is, before the numbers

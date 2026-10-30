@@ -18,6 +18,8 @@ export interface Store {
   hasInterlocks: boolean;
   /** The working tree has `equipment/datasheets/<TAG>.yaml` (from the same `/api/tree`): the datasheet pages have something to show. */
   hasDatasheets: boolean;
+  /** The file paths of the working tree (the same `/api/tree`), null until loaded: the navigation lists the documents in it. */
+  paths: Set<string> | null;
   /** Set when the viewer shows a static snapshot (`?data=`) instead of a server. */
   snapshot: SnapshotInfo | null;
   /** Why the snapshot asked for with `?data=` could not be opened. */
@@ -40,6 +42,7 @@ export const store = reactive<Store>({
   loading: false,
   hasInterlocks: false,
   hasDatasheets: false,
+  paths: null,
   snapshot: null,
   snapshotError: null,
   embed: false,
@@ -228,10 +231,12 @@ export async function loadRepo(): Promise<void> {
       .then((tree) => {
         store.hasInterlocks = hasInterlocks(tree);
         store.hasDatasheets = Boolean(repo.has_datasheets) || datasheetPaths(tree).size > 0;
+        store.paths = new Set(tree.filter((e) => e.type === "file").map((e) => e.path));
       })
       .catch(() => {
         store.hasInterlocks = false;
         store.hasDatasheets = Boolean(repo.has_datasheets);
+        store.paths = null;
       });
   } catch (e) {
     store.error = e instanceof Error ? e.message : String(e);

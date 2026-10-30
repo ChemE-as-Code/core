@@ -21,7 +21,7 @@ const changed = {
 async function openMatrix(page: Page, options: Parameters<typeof mockApi>[1] = {}) {
   await mockApi(page, { interlocks: onP01, ...options });
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "C&E" }).click();
+  await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Cause & effect" }).click();
   await expect(page).toHaveURL(/\/cause-effect/);
   return page.getByRole("table", { name: "Cause and effect matrix" });
 }
@@ -115,9 +115,9 @@ test.describe("cause and effect matrix", () => {
   test("without control/cause-effect.yaml: no nav link, and the page says so", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Engineering-step checks" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "C&E" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Cause & effect matrix" })).toHaveCount(0);
+    await expect(page.getByTestId("home-pages").getByRole("link", { name: "Checks" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Cause & effect" })).toHaveCount(0);
+    await expect(page.getByTestId("home-pages").getByRole("link", { name: "Cause & effect" })).toHaveCount(0);
     await page.goto("/cause-effect");
     await expect(page.locator("[data-ce-missing]")).toContainText("No interlocks");
   });
@@ -125,7 +125,7 @@ test.describe("cause and effect matrix", () => {
   test("the home page links the matrix", async ({ page }) => {
     await mockApi(page, { interlocks: onP01 });
     await page.goto("/");
-    await page.getByRole("link", { name: "Cause & effect matrix" }).click();
+    await page.getByTestId("home-pages").getByRole("link", { name: "Cause & effect" }).click();
     await expect(page.locator('[data-cell="I-02|P-4102A"]')).toHaveText("trip");
   });
 });
