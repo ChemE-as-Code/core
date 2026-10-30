@@ -8,6 +8,9 @@ copyright: Copyright (C) 2026 Artur Schweidtmann. cheme-as-code is licensed unde
 
 theme:
   name: material
+  # the ChemE-as-Code mark, as on cheme-as-code.org (style: assets/extra.css)
+  logo: assets/brand/mark.svg
+  favicon: assets/brand/favicon.svg
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
