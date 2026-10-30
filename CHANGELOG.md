@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `cheme layout build`: a branch starts exactly where its header's run is cut for the tee. The
+  run's end and the branch's start were computed apart and could fall on either side of a
+  millimetre when rounded (x 219.652 against 219.653 on a battery-limit header with a jog to
+  its lane), so the branch did not leave its header at the tee and was a 0.00 m
+  `cheme.layout-clash-pipe`. Each tee is now one point, the end of one piece, the start of the
+  next and of the branch (#95, a regression of #72).
+
 ## 1.2.0 (2026-10-30)
 
 Minor release: buried lines with a cover rule (#70, ADR 0036), several power trays per rack
