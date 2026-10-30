@@ -153,3 +153,8 @@ ASU tree entries, the penetration case, the review status and the ASU's simulati
 run and reaction fixtures always come from the core checkout's examples (they need core's `tests/`
 for the stand-in solver: `--core` must be a source checkout, not an installed package). Then run `npm test` and review the
 diff: a changed field usually needs a change in `src/api.ts` and the views that read it.
+- `api/tea-asu.json`: the real `/api/tea` of the ASU (its `estimate/tea.yaml`: an LCOP decision,
+  the main product unpriced, scenarios, a Monte Carlo); `api/tea-blocks.json`: the same of core's
+  `examples/process-blocks` with the premises `BLOCKS_TEA` of `scripts/regen-fixtures.py` (a cash
+  cost decision, `example: true`, a chemical, a catalyst replacement event, a priced emission,
+  working capital in days), so the TEA page is proven on more than the ASU.

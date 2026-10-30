@@ -61,6 +61,14 @@ is used).
   two gates, one with a mistyped gate `Basic`); and
   `issues-unavailable.json`, the 503 (status and body) of core's GitHub reader without a
   token; `repo-issues.json`, its `/api/repo` (`has_issues: true`). Core with `GET /api/issues` (pre-release issue 140 issues). `--only-issues` writes only these.
+- `tests/fixtures/api/tea-asu.json`: `/api/tea` of the ASU plant folder (`--asu`: its
+  `estimate/tea.yaml`, an LCOP decision with scenarios and a Monte Carlo), committed once in a
+  fresh git repository. `tea-blocks.json`: `/api/tea` of core's `examples/process-blocks` (one
+  feed, steam, a product and waste water) with `BLOCKS_TEA` (modelled on core's
+  `tests/test_assessment_tea.py` `premises()`: EUR, a cash cost decision, `example: true`,
+  labour, tax, a ramp-up, a chemical, a catalyst replacement, a priced emission, working capital
+  in days, scenarios and a Monte Carlo), so the page is not ASU-shaped. `--only-tea` (with
+  `--asu`) writes only these two.
 - `tests/fixtures/api/interlocks-asu.json`: `/api/interlocks` of the ASU plant folder (`--asu`:
   its `control/cause-effect.yaml`), committed once in a fresh git repository.
 - `tests/fixtures/api/simulation-asu.json`: `/api/simulation` of the ASU plant folder
@@ -366,6 +374,123 @@ def lca_fixture(asu: Path, tmp: Path) -> None:
     path = FIXTURES / "api" / "lca-asu.csv"
     path.write_text(out.stdout, encoding="utf-8")
     print(f"wrote {path.relative_to(VIEWER)}")
+
+
+# The TEA premises of core's examples/process-blocks (per hour 1000 kg feed and 350 kWh steam
+# in, 400 kg product and 600 kg waste water out): core's test premises, with a cash cost
+# decision, labour, tax, a ramp-up, a chemical per feed (variable_opex), a catalyst replacement
+# every 3 years (events), a priced emission on the waste water, working capital in days,
+# scenarios and a Monte Carlo. The numbers are an example (example: true).
+BLOCKS_TEA = {
+    "schema": "cheme/tea/v1",
+    "kind": "tea",
+    "example": True,
+    "currency": "EUR",
+    "cost_year": 2025,
+    "decision": {
+        "question": "Proceed to basic engineering with the blocks plant?",
+        "metric": "cash_cost",
+        "threshold": 600,
+        "confidence": 0.9,
+        "alternatives": ["toll manufacturing at a contract producer"],
+    },
+    "basis": {
+        "product": "PROD",
+        "specification": "95 wt% ethanol",
+        "boundary": "feed to product tank",
+        "scale": "3,200 t/a product",
+        "location": "NL",
+    },
+    "capex": {
+        "isbl": {"source": "given", "value": {"value": 5.0e6, "source": "fixture: a factored estimate", "year": 2025}, "estimate_class": 4},
+        "osbl": {"value": 0.3, "source": "fixture: offsites at 30 % of ISBL"},
+        "owners_cost": {"value": 0.1, "source": "fixture: owner's cost"},
+        "contingency": {"value": 0.2, "source": "fixture: process and project contingency"},
+    },
+    "operation": {"hours_per_year": 8000, "life_years": 20, "ramp_up": [0.5, 0.8], "source": "fixture"},
+    "prices": [
+        {"key": "feed:FEED", "value": 50, "unit": "t", "status": "QUOTED", "source": "fixture: supplier quote", "year": 2025},
+        {"key": "feed:STEAM", "value": 30, "unit": "MWh", "source": "fixture: site steam tariff", "year": 2025},
+        {"key": "product:PROD", "value": 900, "unit": "t", "source": "fixture: market price", "year": 2024},
+    ],
+    "free": [{"key": "product:WATER", "reason": "to the site's treatment"}],
+    "variable_opex": [
+        {
+            "id": "naoh",
+            "title": "Caustic soda for neutralisation",
+            "per": "feed:FEED",
+            "amount": {"value": 0.002, "source": "fixture: 2 kg NaOH per t of feed"},
+            "unit": "kg NaOH",
+            "value": 0.45,
+            "status": "QUOTED",
+            "source": "fixture: supplier quote",
+            "year": 2025,
+            "category": "chemical",
+        }
+    ],
+    "emissions": {
+        "price": {"value": 80, "source": "fixture: EU ETS allowance", "year": 2025},
+        "sources": [{"id": "wastewater", "key": "product:WATER", "factor": {"value": 0.05, "source": "fixture: t CO2-eq per t of waste water treated"}, "unit": "t"}],
+    },
+    "events": [
+        {
+            "id": "catalyst",
+            "title": "Catalyst replacement",
+            "kind": "replacement",
+            "cost": {"value": 150000, "source": "fixture: vendor quote for one charge", "year": 2025},
+            "every_years": 3,
+            "downtime_days": 5,
+            "source": "fixture: catalyst life 3 years",
+        }
+    ],
+    "fixed_opex": {
+        "maintenance": {"value": 0.03, "source": "fixture: 3 % of fixed capital"},
+        "labour": {
+            "operators": {"value": 5, "source": "fixture: one position, five crews"},
+            "cost_per_operator": {"value": 65000, "source": "fixture: NL operator, loaded", "year": 2025},
+            "supervision": {"value": 0.2, "source": "fixture"},
+        },
+    },
+    "finance": {
+        "discount_rate": {"value": 0.08, "source": "fixture: real hurdle rate"},
+        "tax_rate": {"value": 0.25, "source": "fixture: NL corporate tax"},
+        "depreciation_years": 10,
+        "construction": [0.4, 0.6],
+        "working_capital_days": {
+            "feed_inventory": {"value": 30, "source": "fixture"},
+            "receivables": {"value": 45, "source": "fixture"},
+            "payables": {"value": 30, "source": "fixture"},
+            "source": "fixture: days of the first full year's flows",
+        },
+    },
+    "uncertainty": {"iterations": 400, "seed": 7, "defaults": {"ASSUMED": {"gsd2": 1.2}}},
+    "scenarios": [
+        {"id": "dear-feed", "title": "Feed at twice the price", "prices": {"feed:FEED": 100}, "source": "fixture"},
+        {"id": "overrun", "title": "Capital overrun of 30 %", "scale": {"capex:isbl": 1.3}, "source": "fixture"},
+    ],
+}
+
+
+def tea_fixtures(core: Path, asu: Path, tmp: Path) -> None:
+    """`/api/tea` of the ASU's TEA, and of core's process-blocks with `BLOCKS_TEA`."""
+    import yaml
+
+    root = copy_plant(asu, tmp / "asu-tea")
+    git(root, "init", "-q", "-b", "main")
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "ASU TEA")
+    write(FIXTURES / "api" / "tea-asu.json", get(client_for(root), "/api/tea"))
+
+    blocks = copy_plant(core / "examples" / "process-blocks", tmp / "blocks-tea")
+    (blocks / "estimate").mkdir(exist_ok=True)
+    (blocks / "estimate" / "tea.yaml").write_text(yaml.safe_dump(BLOCKS_TEA, sort_keys=False), encoding="utf-8")
+    git(blocks, "init", "-q", "-b", "main")
+    git(blocks, "add", ".")
+    git(blocks, "commit", "-q", "-m", "Blocks TEA")
+    client = client_for(blocks)
+    if not get(client, "/api/repo").get("has_tea"):
+        raise SystemExit("process-blocks: /api/repo does not report has_tea; update this script")
+    write(FIXTURES / "api" / "tea-blocks.json", get(client, "/api/tea"))
 
 
 def reviews_fixture(asu: Path, tmp: Path) -> None:
@@ -844,6 +969,7 @@ def main() -> None:
     parser.add_argument("--only-beds", action="store_true", help="write only the fixed-bed fixtures (pre-release viewer issue 32)")
     parser.add_argument("--only-control", action="store_true", help="write only the control fixture (pre-release issue 140)")
     parser.add_argument("--only-issues", action="store_true", help="write only the issues fixtures (core with GET /api/issues)")
+    parser.add_argument("--only-tea", action="store_true", help="with --asu: write only the TEA fixtures (tea-asu.json, tea-blocks.json)")
     parser.add_argument("--only-datasheets", action="store_true", help="with --asu-datasheets: write only the datasheet endpoint fixtures")
     args = parser.parse_args()
     print(f"chemeascode from {Path(chemeascode.__file__).parent}")
@@ -865,6 +991,11 @@ def main() -> None:
             datasheet_fixtures(asu_plant(args.asu_datasheets), tmp)
             if args.only_datasheets:
                 return
+        if args.only_tea:
+            if not args.asu:
+                raise SystemExit("--only-tea needs --asu")
+            tea_fixtures(args.core.resolve(), asu_plant(args.asu), tmp)
+            return
         if args.demo:
             layout_fixtures(args.demo.resolve(), tmp)
         else:
@@ -878,8 +1009,9 @@ def main() -> None:
         if args.asu:
             lca_fixture(asu_plant(args.asu), tmp)
             interlocks_fixture(asu_plant(args.asu), tmp)
+            tea_fixtures(args.core.resolve(), asu_plant(args.asu), tmp)
         else:
-            print("no --asu: the LCA and interlocks fixtures left as they are")
+            print("no --asu: the LCA, interlocks and TEA fixtures left as they are")
         mep_fixtures(args.core.resolve(), tmp)
         process_fixtures(args.core.resolve(), tmp)
         simulation_run_fixtures(args.core.resolve(), tmp)

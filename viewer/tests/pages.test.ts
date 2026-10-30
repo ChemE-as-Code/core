@@ -15,6 +15,7 @@ const bare: NavInput = {
     has_layout: false,
     has_equipment_estimate: false,
     has_lca: false,
+    has_tea: false,
     has_control: false,
     has_issues: false,
   },
@@ -50,7 +51,7 @@ describe("navGroups", () => {
   it("lists a page only when the plant has something for it", () => {
     const all = labels({
       ...bare,
-      repo: { has_simulation: true, has_reactions: true, has_layout: true, has_equipment_estimate: true, has_lca: true, has_control: true, has_issues: true },
+      repo: { has_simulation: true, has_reactions: true, has_layout: true, has_equipment_estimate: true, has_lca: true, has_tea: true, has_control: true, has_issues: true },
       hasDatasheets: true,
       hasInterlocks: true,
       hasReviews: true,
@@ -59,7 +60,7 @@ describe("navGroups", () => {
     expect(all.equipment).toEqual(["Datasheets"]);
     expect(all.safety).toEqual(["Control", "Cause & effect"]);
     expect(all.layout).toEqual(["Layout 3D"]);
-    expect(all.cost).toEqual(["MTO and estimate", "Life cycle assessment"]);
+    expect(all.cost).toEqual(["MTO and estimate", "Techno-economics (TEA)", "Life cycle assessment"]);
     expect(all.quality).toEqual(["Checks", "Validation", "Maturity", "Reviews", "Issues"]);
   });
 
@@ -88,6 +89,13 @@ describe("navGroups", () => {
     expect(navFiles(groups)).toEqual(
       new Set(["process/design-basis.yaml", "piping/line-list.yaml", "safety/risk-matrix.yaml", "safety/hazop/H-02/study.yaml", "safety/hazop/H-10/study.yaml", "safety/hazop/SESSION.md", "estimate/tea.md", "README.md"]),
     );
+  });
+
+  it("lists the TEA page instead of its report when the plant has a TEA", () => {
+    const paths = new Set(["estimate/tea.md", "estimate/estimate.md"]);
+    const cost = (has_tea: boolean) => navGroups({ ...bare, repo: { ...bare.repo!, has_tea }, paths }).find((g) => g.id === "cost")!.items;
+    expect(cost(false).map((i) => [i.label, i.to.name])).toEqual([["Cost estimate", "file"], ["Techno-economics (TEA)", "file"]]);
+    expect(cost(true).map((i) => [i.label, i.to.name])).toEqual([["Techno-economics (TEA)", "tea"], ["Cost estimate", "file"]]);
   });
 
   it("has no documents before the tree is loaded and no history in a snapshot", () => {

@@ -42,6 +42,7 @@ export interface NavInput {
     | "has_layout"
     | "has_equipment_estimate"
     | "has_lca"
+    | "has_tea"
     | "has_control"
     | "has_issues"
   > | null;
@@ -176,7 +177,11 @@ export function navGroups(input: NavInput): NavGroup[] {
         ...(repo?.has_layout || repo?.has_equipment_estimate
           ? [page("mto", "MTO and estimate", repo?.has_layout ? "Material take-off and estimate of the 3D model, equipment estimate" : "Equipment estimate (cheme assess equipment)")]
           : []),
-        ...documents("cost", paths),
+        // the TEA page, else its report (estimate/tea.md) as a document
+        ...(repo?.has_tea
+          ? [page("tea", "Techno-economics (TEA)", "Techno-economic analysis (cheme assess tea)")]
+          : []),
+        ...documents("cost", paths).filter((d) => !(repo?.has_tea && d.file === "estimate/tea.md")),
         ...(repo?.has_lca ? [page("lca", "Life cycle assessment", "Life cycle assessment (cheme assess lca)")] : []),
       ],
     },
