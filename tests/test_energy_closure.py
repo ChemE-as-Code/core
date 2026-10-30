@@ -188,6 +188,184 @@ def test_condenser_reboiler_duty_is_recovered():
     assert found["totals_kW"]["hot_utility"] == found["totals_kW"]["cold_utility"] == 0.0
 
 
+# -- simulation audit: specified splits (component separators) ---------------------------------
+#
+# A component separator splits by given recoveries: nothing in it conserves energy. Its
+# imbalance is stated (enthalpy out minus in), never judged, and the plant closes with it
+# (ADR 0038). Bookkeeping numbers, not property data.
+
+
+def _specified_split(ws: Workspace) -> None:
+    """The depropanizer with D1 as a component separator (specified split) instead of a flash."""
+
+    def separator(d):
+        for step in d["steps"]:
+            if step["id"] == "D1":
+                step["class"] = "SeparatingByPhysicalProcess"
+
+    def recoveries(d):
+        d["specs"]["D1"] = {
+            "recoveries": {"C3": 0.9, "NC4": 0.05, "NC5": 0.01},
+            "recovery_outlet": "vapour",
+            "basis_source": "test bookkeeping",
+        }
+
+    _edit(ws, "process/flowsheet.yaml", separator)
+    _edit(ws, "process/simulation.yaml", recoveries)
+
+
+def test_specified_split_is_stated_and_the_plant_closes(tmp_path):
+    """D1 a specified split; S3 at 100 kJ/kg instead of 50: D1's outlets carry 0.2 x 100 + 0.8 x
+    -12.5 = 10 kW, its inlet S2 0 kW, so it states +10 kW (enthalpy out minus in). DWSIM's
+    EnergyImb given as -10 kW is the opposite sign (in minus out). Plant: 400 kW in (S1 0, H1
+    400), 430 out (S3 20, S6 30, S7 80, H2 300); C1's net heat 20 kW plus D1's stated 10 kW:
+    residual 0. Tolerance 0.1 + 0.01 x (20 + 10) + 1e-4 x 430 = 0.443 kW."""
+    ws = _copy(tmp_path, "process-separation")
+    _specified_split(ws)
+    process, sim, doc, model = _translate(ws)
+    assert {u["id"]: u["type"] for u in model["units"]}["D1"] == "component_separator"
+    out = separation_out(S3={"mass_enthalpy_kJ_kg": 100.0})
+    out["units"]["D1"] = {"duty_kW": -10.0}
+    findings, entry, lines = energy.audit(process, sim, doc, model, out)
+    units = {r["id"]: r for r in entry["closure"]["units"]}
+    d1 = units["D1"]
+    assert d1["status"] == "stated" and "residual_kW" not in d1
+    assert d1["imbalance_kW"] == pytest.approx(10.0) and d1["heat_in_kW"] == pytest.approx(10.0)
+    assert d1["sign_convention"] == energy.STATED_SIGN
+    assert d1["simulator_imbalance_kW"] == -10.0 and d1["simulator_convention"] == "in-minus-out"
+    plant = entry["closure"]["plant"]
+    assert plant["status"] == "ok"
+    assert plant["residual_kW"] == pytest.approx(0.0, abs=1e-9)
+    assert plant["heat_in_kW"] == pytest.approx(20.0)  # the units' heat, without D1
+    assert plant["stated_kW"] == pytest.approx(10.0)
+    assert plant["stated"] == pytest.approx({"D1": 10.0})
+    assert plant["tolerance_kW"] == pytest.approx(0.443)
+    stated = [f for f in findings if f.rule == "cheme.process-sim-energy-stated"]
+    assert [(f.level, f.ids) for f in stated] == [("info", ["D1"])]
+    assert "enthalpy out minus in 10 kW" in stated[0].message
+    assert not [f for f in findings if f.level == "warning"]
+    assert not [f for f in findings if f.rule == "cheme.process-sim-energy-unsupported"]
+    (plant_line,) = [x for x in lines if x.startswith("energy closure (plant)")]
+    assert plant_line.startswith("energy closure (plant): ok") and "(D1 10;" in plant_line
+    # the stated imbalance is no utility
+    assert not [d for d in entry["utilities"]["duties"] if d["id"] == "D1"]
+
+
+SPLIT = {
+    "units": [
+        {
+            "id": "X1",
+            "type": "component_separator",
+            "inlets": ["A"],
+            "outlets": ["B", "C"],
+            "energies": {},
+            "spec": {},
+        }
+    ]
+}
+
+
+def _split_out(b: float = 10.0, c: float | None = 10.0) -> dict:
+    """A 1 kg/s at 0 kJ/kg; B and C 0.5 kg/s each at *b* and *c* kJ/kg: imbalance 0.5 (b + c)."""
+    return {"streams": {"A": _s(300, 1.0, 0.0), "B": _s(300, 0.5, b), "C": _s(300, 0.5, c)}}
+
+
+@pytest.mark.parametrize(
+    ("simulator", "convention"),
+    [(10.0, "out-minus-in"), (-10.0, "in-minus-out"), (3.0, "differs"), (None, "not-reported")],
+)
+def test_the_simulators_sign_is_recorded_not_relied_on(simulator, convention):
+    """X1 states +10 kW (B and C 5 kW each, A 0) whatever DWSIM's EnergyImb says; the unit
+    tolerance is 0.1 + 1e-4 x 10 = 0.101 kW, which decides how EnergyImb is read."""
+    units = {"X1": {} if simulator is None else {"duty_kW": simulator}}
+    closure, findings = energy._closure(SPLIT, _split_out(), units, lambda *a: None)
+    (row,) = closure["units"]
+    assert row["imbalance_kW"] == pytest.approx(10.0)
+    assert row["tolerance_kW"] == pytest.approx(0.101)
+    assert row["simulator_convention"] == convention
+    assert closure["plant"]["status"] == "ok"
+    assert closure["plant"]["stated_kW"] == pytest.approx(10.0)
+    assert [f.rule for f in findings] == ["cheme.process-sim-energy-stated"]
+
+
+def test_a_negligible_imbalance_is_stated_without_a_finding():
+    closure, findings = energy._closure(
+        SPLIT, _split_out(0.0, 0.0), {"X1": {"duty_kW": 0.05}}, lambda *a: None
+    )
+    (row,) = closure["units"]
+    assert row["status"] == "stated" and row["simulator_convention"] == "negligible"
+    assert closure["plant"]["status"] == "ok" and not findings
+
+
+def test_a_split_without_enthalpies_leaves_the_plant_not_evaluable():
+    closure, findings = energy._closure(SPLIT, _split_out(c=None), {"X1": {}}, lambda *a: None)
+    (row,) = closure["units"]
+    assert row["status"] == "not-evaluable" and row["missing"] == ["C"]
+    plant = closure["plant"]
+    assert plant["status"] == "not-evaluable" and "residual_kW" not in plant
+    assert "X1" in plant["reasons"][0] and "no enthalpy for C" in plant["reasons"][0]
+    assert not findings
+
+
+def test_a_plant_imbalance_with_a_stated_split_names_it():
+    """A heater H1 before X1 claims 5 kW but A0 and A carry the same enthalpy: H1 and the plant
+    are 5 kW off (residual -5); X1's stated 10 kW is named and not part of the residual."""
+    model = copy.deepcopy(SPLIT)
+    model["units"].insert(
+        0,
+        {"id": "H1", "type": "heater", "inlets": ["A0"], "outlets": ["A"], "energies": {}},
+    )
+    out = _split_out()
+    out["streams"]["A0"] = _s(300, 1.0, 0.0)
+    units = {"H1": {"duty_kW": 5.0}, "X1": {"duty_kW": 10.0}}
+    closure, findings = energy._closure(model, out, units, lambda *a: None)
+    plant = closure["plant"]
+    assert plant["status"] == "imbalance" and plant["residual_kW"] == pytest.approx(-5.0)
+    unbalanced = [f for f in findings if f.rule == "cheme.process-sim-energy-unbalanced"]
+    (warned,) = [f for f in unbalanced if not f.ids]
+    assert "plus 10 kW stated by specified splits (X1)" in warned.message
+
+
+def _audit_of(plant: dict, units: list[dict]) -> dict:
+    return {
+        "reference": dict(energy.REFERENCE),
+        "closure": {"units": units, "plant": plant},
+        "exchangers": [],
+        "utility_levels": [],
+        "utilities": {
+            "totals_kW": dict.fromkeys(
+                ("hot_utility", "cold_utility", "power_in", "power_out", "recovered"), 0.0
+            )
+        },
+    }
+
+
+def test_energy_text_shows_stated_splits_and_old_records():
+    from chemeascode.domains.process.energy import (
+        SEPARATOR_SIGN_UNKNOWN,
+        EnergyReport,
+        energy_text,
+    )
+
+    closure, _ = energy._closure(SPLIT, _split_out(), {"X1": {"duty_kW": 10.0}}, lambda *a: None)
+    text = energy_text(EnergyReport("design", [], _audit_of(closure["plant"], closure["units"])))
+    assert "plant closure ok" in text and "10 kW stated by specified splits" in text
+    assert "X1: stated, imbalance 10 kW (enthalpy out minus in" in text
+    old = {"status": "unsupported", "reasons": [f"X1: {SEPARATOR_SIGN_UNKNOWN}"]}
+    row = {"id": "X1", "status": "unsupported", "reason": SEPARATOR_SIGN_UNKNOWN}
+    text = energy_text(EnergyReport("design", [], _audit_of(old, [row])))
+    assert "plant closure unsupported" in text and "simulate --fill again" in text
+
+
+def test_maturity_passes_a_closure_with_stated_splits():
+    from chemeascode.project.maturity import _energy_audit
+
+    closure, _ = energy._closure(SPLIT, _split_out(), {"X1": {}}, lambda *a: None)
+    data = {"cases": {"design": {"energy": _audit_of(closure["plant"], closure["units"])}}}
+    req, _ = _energy_audit(object(), data, ["design"])
+    assert req.status == "pass" and "stated" in req.detail and "X1" in req.detail
+
+
 # -- simulation audit: reacting units on a heat-of-formation basis ------------------------------
 #
 # N2 + 3 H2 = 2 NH3 at an extent of 1 mol/s: inlet A 10 mol/s (2.5 N2, 7.5 H2), outlet B 8 mol/s

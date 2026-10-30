@@ -48,6 +48,9 @@ from chemeascode.foundation.yamlsource import _yaml_line
 #: (kW); the enthalpy term allows for rounding of large absolute enthalpy flows, which depend on
 #: the reference state. Shared with the simulation's energy audit.
 ENERGY_TOLERANCE = {"abs_kW": 0.1, "rel_duty": 0.01, "rel_enthalpy": 1e-4}
+#: The reason a run recorded before ADR 0038 gives for a component separator (its plant
+#: closure was then unsupported); ``energy_text`` says to simulate again.
+SEPARATOR_SIGN_UNKNOWN = "the sign of the component separator's energy imbalance is not established"
 #: Source prefix of the enthalpies ``cheme process props`` writes (thermo).
 PROPS_SOURCE = "cheme process props"
 
@@ -369,14 +372,29 @@ def energy_text(report: EnergyReport) -> str:
             f"  plant closure {plant['status']}: residual {plant['residual_kW']:.4g} kW "
             f"(tolerance {plant['tolerance_kW']:.3g} kW)"
             + (", formation basis" if plant.get("basis") == "formation" else "")
+            + (
+                f"; {plant['stated_kW']:.4g} kW stated by specified splits"
+                if plant.get("stated")
+                else ""
+            )
         )
     else:
         lines.append(f"  plant closure {plant['status']}: {'; '.join(plant['reasons'])}")
+        if any(SEPARATOR_SIGN_UNKNOWN in r for r in plant["reasons"]):
+            lines.append(
+                "  (recorded before component separators' imbalances were stated, ADR 0038: "
+                "run cheme process simulate --fill again for the plant closure)"
+            )
     for row in audit["closure"]["units"]:
         if row["status"] in ("ok", "imbalance"):
             basis = " (formation basis)" if row.get("basis") == "formation" else ""
             lines.append(
                 f"  {row['id']}: {row['status']}, residual {row['residual_kW']:.4g} kW{basis}"
+            )
+        elif row["status"] == "stated":
+            lines.append(
+                f"  {row['id']}: stated, imbalance {row['imbalance_kW']:.4g} kW (enthalpy out "
+                "minus in; a specified split, not judged)"
             )
         else:
             reason = f": {row['reason']}" if row.get("reason") else ""
