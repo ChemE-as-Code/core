@@ -36,6 +36,7 @@ from chemeascode.domains.safety.schemas import (
     FailureMode,
     FailureModeLibrary,
     Node,
+    Outcome,
     PlantRef,
     Response,
 )
@@ -649,25 +650,29 @@ class Gap:
 
 @dataclass
 class Coverage:
+    #: The open gaps: top events with a cause no scenario covers and no decision handles.
     gaps: list[Gap]
-    #: Cause and top event pairs a scenario names, and those the node dismisses.
+    #: Cause and top event pairs a scenario names, and those decided in the triage.
     covered: int
     dismissed: int
+    questions: int
     #: Scenarios no walk reaches with their deviation from a cause they name: outside the library.
     unreached: list[str]
 
 
-def coverage(node: Node, candidates: list[Candidate]) -> Coverage:
+def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] = ()) -> Coverage:
     """Compare the node's scenarios with its candidates by tag: a scenario covers a top event
     when it has the deviation and its ``refs`` name the cause and the object the walk ends at.
-    A ``dismissed`` entry of the node takes a top event out, with its reason."""
+    A ``dismissed`` or ``question`` outcome of the triage (coverage.yaml) handles its causes."""
+    decided = [o for o in triage if o.node == node.id and o.status != "open"]
     rows = [
         ((d.guide_word, d.parameter), {str(r.tag or r.object) for r in s.refs}, s.id)
         for d in node.deviations
         for s in d.scenarios
     ]
     gaps: dict[tuple[Deviation, str | None, str], Gap] = {}
-    covered = dismissed = 0
+    covered = 0
+    handled = {"dismissed": 0, "question": 0}
     reached: set[str] = set()
     for c in candidates:
         deviation = (c.deviation.guide_word, c.deviation.parameter)
@@ -676,12 +681,17 @@ def coverage(node: Node, candidates: list[Candidate]) -> Coverage:
         if c.end != "top-event":
             continue
         at = c.path[-1].label
-        if any(
-            (x.guide_word, x.parameter, x.top_event, x.at) == (*deviation, c.top_event, at)
-            and (not x.causes or c.cause in x.causes)
-            for x in node.dismissed
-        ):
-            dismissed += 1
+        decision = next(
+            (
+                o
+                for o in decided
+                if (o.guide_word, o.parameter, o.top_event, o.at) == (*deviation, c.top_event, at)
+                and (not o.causes or c.cause in o.causes)
+            ),
+            None,
+        )
+        if decision is not None:
+            handled[decision.status] += 1
             continue
         if any(at in refs for refs, _ in naming):
             covered += 1
@@ -695,4 +705,42 @@ def coverage(node: Node, candidates: list[Candidate]) -> Coverage:
             causes.append(c.cause)
         gap.crosses.extend(n for n, _ in c.crosses if n not in gap.crosses)
     unreached = [sid for _, _, sid in rows if sid not in reached]
-    return Coverage(list(gaps.values()), covered, dismissed, unreached)
+    return Coverage(
+        list(gaps.values()), covered, handled["dismissed"], handled["question"], unreached
+    )
+
+
+def triage(
+    found: Iterable[tuple[str, Coverage]], outcomes: list[Outcome], by: str
+) -> list[Outcome]:
+    """*outcomes* brought up to date with the gaps *found* (node id, its coverage): decided
+    outcomes kept as they are, an ``open`` one per gap with the causes still open (new ones
+    appended, *by* naming the tool), ``open`` ones of the walked nodes no gap needs dropped."""
+    walked: dict[str, Coverage] = dict(found)
+    wanted: dict[tuple[str, Deviation, str, str], list[str]] = {}
+    for node_id, result in walked.items():
+        for gap in result.gaps:
+            key = (node_id, gap.deviation, gap.top_event, gap.at)
+            wanted[key] = [*gap.uncovered, *gap.cause_only]
+    kept: list[Outcome] = []
+    for o in outcomes:
+        key = (o.node, Deviation(o.parameter, o.guide_word), o.top_event, o.at)
+        if o.status != "open" or o.node not in walked:
+            kept.append(o)
+        elif key in wanted:
+            kept.append(o.model_copy(update={"causes": wanted.pop(key)}))
+    for (node_id, deviation, top_event, at), causes in wanted.items():
+        kept.append(
+            Outcome.model_validate(
+                {
+                    "node": node_id,
+                    "guide_word": deviation.guide_word,
+                    "parameter": deviation.parameter,
+                    "top_event": top_event,
+                    "at": at,
+                    "causes": causes,
+                    "by": by,
+                }
+            )
+        )
+    return kept

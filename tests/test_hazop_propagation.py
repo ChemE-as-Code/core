@@ -252,38 +252,70 @@ def test_a_candidate_names_the_other_nodes_its_path_enters(model):
     assert limit.crosses == [("N9", "CV-1")]
 
 
-def test_coverage_compares_the_scenarios_by_tag_and_takes_dismissals(model):
+OVERFILL = {"node": "N2", "guide_word": "no", "parameter": "flow", "top_event": "overfill"}
+
+
+def scenario_node(refs):
     from chemeascode.domains.safety.schemas import Node
 
+    scenario = {"id": "S1", "cause": "P-101 stops", "refs": refs}
+    return Node.model_validate(
+        {
+            "id": "N2",
+            "members": ["P-101"],
+            "deviations": [{"guide_word": "no", "parameter": "flow", "scenarios": [scenario]}],
+        }
+    )
+
+
+def outcome(**fields):
+    from chemeascode.domains.safety.schemas import Outcome
+
+    return Outcome.model_validate({**OVERFILL, "at": "V-101", **fields})
+
+
+def at_vessel(result):
+    return [g for g in result.gaps if g.at == "V-101"]
+
+
+def test_coverage_compares_the_scenarios_by_tag_and_takes_the_triage(model):
     candidates = run(model, ["P-101"]).candidates
-
-    def node(refs, dismissed=()):
-        scenario = {"id": "S1", "cause": "P-101 stops", "refs": refs}
-        return Node.model_validate(
-            {
-                "id": "N2",
-                "members": ["P-101"],
-                "deviations": [{"guide_word": "no", "parameter": "flow", "scenarios": [scenario]}],
-                "dismissed": list(dismissed),
-            }
-        )
-
-    def at_vessel(result):
-        return [g for g in result.gaps if g.at == "V-101"]
-
-    full = prop.coverage(node(["P-101", "V-101"]), candidates)
+    full = prop.coverage(scenario_node(["P-101", "V-101"]), candidates)
     assert not at_vessel(full) and full.covered and full.unreached == []
-    cause_only = at_vessel(prop.coverage(node(["P-101"]), candidates))
+    cause_only = at_vessel(prop.coverage(scenario_node(["P-101"]), candidates))
     assert [(g.top_event, g.cause_only, g.uncovered) for g in cause_only] == [
         ("overfill", ["P-101"], [])
     ]
-    elsewhere = prop.coverage(node(["X-1"]), candidates)
+    elsewhere = prop.coverage(scenario_node(["X-1"]), candidates)
     assert at_vessel(elsewhere)[0].uncovered == ["P-101"] and elsewhere.unreached == ["S1"]
-    reason = {"guide_word": "no", "parameter": "flow", "top_event": "overfill", "at": "V-101"}
-    gone = prop.coverage(node(["X-1"], [{**reason, "reason": "the team's call"}]), candidates)
+
+    gone = prop.coverage(
+        scenario_node(["X-1"]), candidates, [outcome(status="dismissed", reason="the team's")]
+    )
     assert not at_vessel(gone) and gone.dismissed == 1
-    other = prop.coverage(node(["X-1"], [{**reason, "causes": ["P-9"], "reason": "x"}]), candidates)
-    assert at_vessel(other) and other.dismissed == 0
+    asked = prop.coverage(
+        scenario_node(["X-1"]), candidates, [outcome(status="question", reason="which fluid?")]
+    )
+    assert not at_vessel(asked) and asked.questions == 1
+    for undecided in (outcome(), outcome(status="dismissed", reason="x", causes=["P-9"])):
+        result = prop.coverage(scenario_node(["X-1"]), candidates, [undecided])
+        assert at_vessel(result) and result.dismissed == 0
+    with pytest.raises(ValidationError, match="needs its reason"):
+        outcome(status="dismissed")
+
+
+def test_the_triage_lists_open_gaps_and_keeps_decisions(model):
+    candidates = run(model, ["P-101"]).candidates
+    gaps = prop.coverage(scenario_node(["X-1"]), candidates)
+    decided = outcome(at="X-9", status="dismissed", reason="kept")
+    stale_open = outcome(at="X-8")
+    elsewhere = outcome(node="N7", at="X-7")
+    listed = prop.triage([("N2", gaps)], [decided, stale_open, elsewhere], "tool")
+    assert decided in listed and elsewhere in listed and stale_open not in listed
+    vessel = [o for o in listed if o.at == "V-101"]
+    assert [(o.status, o.causes, o.by) for o in vessel] == [("open", ["P-101"], "tool")]
+    again = prop.triage([("N2", gaps)], listed, "tool")
+    assert again == listed  # a second write changes nothing
 
 
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
@@ -474,6 +506,26 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     assert nodes["N1"]["gaps"] == [] and nodes["N2"]["gaps"]
     both = ["safety", "hazop", "propagate", "H-01", "--coverage", "--deviation", "N2-NF"]
     assert runner.invoke(app, both).exit_code == 2
+    assert runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--write"]).exit_code == 2
+
+    # The triage file: written open, decided by hand, kept by the next write.
+    triage = plant / "safety" / "hazop" / "H-01" / "coverage.yaml"
+    written = runner.invoke(app, [*node_coverage, "--write"])
+    assert written.exit_code == 1 and "(written)" in written.output
+    data = yaml.safe_load(triage.read_text(encoding="utf-8"))
+    assert data["kind"] == "hazop-coverage" and data["walk"]["sheets"]
+    assert b"\r\n" not in triage.read_bytes()
+    for entry in data["outcomes"]:
+        entry.update(status="dismissed", reason="test: not credible here", by="agent")
+    triage.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    closed = runner.invoke(app, [*node_coverage, "--write"])
+    assert closed.exit_code == 0, closed.output
+    assert yaml.safe_load(triage.read_text(encoding="utf-8"))["outcomes"] == data["outcomes"]
+    assert study.read_text(encoding="utf-8") == before
+
+    pid = plant / "pid" / "P-01.xml"
+    pid.write_bytes(pid.read_bytes() + b"\n")
+    assert "changed since it was written" in runner.invoke(app, node_coverage).output
     assert study.read_text(encoding="utf-8") == before
 
     missing = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N9"])

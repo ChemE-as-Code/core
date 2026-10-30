@@ -17,8 +17,10 @@
   and groups the top events by consequence, with the nodes and causes reaching each.
 - Safety: `cheme safety hazop propagate STUDY [--node N] --coverage` compares the scenarios with
   the walk by tag: the top events no scenario covers (no scenario, or the cause with another
-  consequence) and the scenarios no walk reaches; exit 1 while a gap is open. A node's new
-  `dismissed:` list takes a top event out with its reason (`hazop-study` schema).
+  consequence) and the scenarios no walk reaches; exit 1 while a gap is open. `--write` keeps
+  the triage in `safety/hazop/<id>/coverage.yaml` (new kind `hazop-coverage`): each gap `open`
+  until a scenario covers it or it is `dismissed` or a `question`, with the reason; decisions
+  survive later writes, and a change of the library or an analysed sheet is reported.
 - Skills: `hazop-scenario-propagation` names `cheme safety hazop propagate` as an optional
   cross-check (with a failure-mode library; how to read its ends and limits), not a required
   step; the `process-safety` hub points to it.

@@ -62,9 +62,16 @@ Two forces shape how:
 - **The walk checks the study; it does not seed it.** `propagate --coverage` compares each
   node's scenarios with its top events by tag (the deviation, the cause and the object the walk
   ends at named in the scenario's `refs`; no text is compared, ADR 0010) and lists what no
-  scenario covers, and the scenarios no walk reaches. A gap is closed by a scenario or by a
-  `dismissed:` entry on the node with its reason, a proposal like every other. Seeding rows from
-  the walk was set aside: it anchors the draft on the library and hides what the library lacks.
+  scenario covers, and the scenarios no walk reaches. Seeding rows from the walk was set aside:
+  it anchors the draft on the library and hides what the library lacks.
+- **The triage lives beside the study, not in it.** Not every gap needs a row, but none may be
+  dropped silently: `--coverage --write` lists each in `safety/hazop/<id>/coverage.yaml`
+  (`cheme/hazop-coverage/v1`) as `open`, and an agent or the team marks it `dismissed` or
+  `question` with the reason (covered is derived from the scenarios, never written). A later
+  write keeps the decisions, adds new gaps and drops open ones no gap needs; the file records
+  the fingerprints of the library and the analysed sheets, and the command says when they
+  changed. The worksheet holds only its rows; the file is the record of what the walk raised
+  and what became of it.
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 

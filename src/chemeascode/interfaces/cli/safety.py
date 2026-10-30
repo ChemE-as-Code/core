@@ -6,7 +6,7 @@ import json
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -233,8 +233,16 @@ def propagate(
         typer.Option(
             "--coverage",
             help="Compare the node's (or every node's) scenarios with the top events the walk "
-            "brings to it: those no scenario covers or dismisses, and the scenarios no walk "
-            "reaches. Exits 1 while a top event is neither covered nor dismissed.",
+            "brings to it: those no scenario covers and no outcome of coverage.yaml decides, "
+            "and the scenarios no walk reaches. Exits 1 while one is open.",
+        ),
+    ] = False,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write",
+            help="With --coverage: bring safety/hazop/STUDY/coverage.yaml up to date (an open "
+            "outcome per gap; dismissed and question outcomes kept as they are).",
         ),
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
@@ -245,23 +253,22 @@ def propagate(
     questions the files leave open. One candidate per outcome, on its shortest path, with the
     other nodes it passes through. Without --node, every node, grouped by top event. Read-only:
     proposals for the study, never written into it."""
-    from chemeascode.project.hazop import node_propagation, study_propagation
+    from chemeascode.project.hazop import node_propagation, study_coverage, study_propagation
 
     workspace = _workspace()
+    if write and not coverage:
+        typer.echo("--write needs --coverage", err=True)
+        raise typer.Exit(2)
     if coverage:
         if deviation:
             typer.echo("--coverage compares every deviation: drop --deviation", err=True)
             raise typer.Exit(2)
         try:
-            found_all = (
-                study_propagation(workspace, study, library)
-                if node is None
-                else [node_propagation(workspace, study, node, None, library)]
-            )
+            report = study_coverage(workspace, study, node, library, write)
         except ValueError as failure:
             typer.echo(str(failure), err=True)
             raise typer.Exit(2) from failure
-        if _print_coverage(found_all, as_json):
+        if _print_coverage(report, as_json):
             raise typer.Exit(1)
         return
     if node is None:
@@ -379,8 +386,9 @@ def propagate(
         typer.echo(finding.format())
 
 
-def _print_coverage(found_all: list, as_json: bool) -> int:
-    """Each node's coverage; returns the number of gaps."""
+def _print_coverage(report: Any, as_json: bool) -> int:
+    """Each node's coverage; returns the number of open gaps."""
+    found_all = report.found
     gaps = sum(len(f.coverage.gaps) for f in found_all)
     if as_json:
         typer.echo(
@@ -388,11 +396,15 @@ def _print_coverage(found_all: list, as_json: bool) -> int:
                 {
                     "study": found_all[0].study if found_all else None,
                     "library": found_all[0].library if found_all else None,
+                    "triage": report.path,
+                    "stale": report.stale,
+                    "written": report.written,
                     "nodes": [
                         {
                             "node": f.node,
                             "covered": f.coverage.covered,
                             "dismissed": f.coverage.dismissed,
+                            "questions": f.coverage.questions,
                             "gaps": [
                                 {
                                     "deviation": {
@@ -419,13 +431,20 @@ def _print_coverage(found_all: list, as_json: bool) -> int:
         return gaps
     covered = sum(f.coverage.covered for f in found_all)
     dismissed = sum(f.coverage.dismissed for f in found_all)
+    questions = sum(f.coverage.questions for f in found_all)
     unreached = sum(len(f.coverage.unreached) for f in found_all)
     if found_all:
         typer.echo(
-            f"{found_all[0].study} coverage over {len(found_all)} node(s): {gaps} top event(s) "
-            f"no scenario covers, {covered} cause and top event pair(s) covered, {dismissed} "
-            f"dismissed; {unreached} scenario(s) no walk reaches (proposals: add a scenario or "
-            "dismiss each gap with its reason under the node's dismissed:)"
+            f"{found_all[0].study} coverage over {len(found_all)} node(s): {gaps} open top "
+            f"event(s); cause and top event pairs: {covered} covered, {dismissed} dismissed, "
+            f"{questions} question(s); {unreached} scenario(s) no walk reaches. Close each open "
+            f"one with a scenario, or as dismissed or question (with the reason) in {report.path}"
+            + (" (written)" if report.written else " (--write lists them there)")
+        )
+    if report.stale:
+        typer.echo(
+            f"{report.path}: the library or an analysed sheet changed since it was written: "
+            "check its decisions, then --write"
         )
     for f in found_all:
         for g in f.coverage.gaps:

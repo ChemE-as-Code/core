@@ -129,18 +129,27 @@ compares them with the walk by tag: a top event is covered when a scenario of th
 names the cause and the object the walk ends at in its `refs`. It lists each top event that is
 not (`no scenario`, or `cause only` where a row has the cause but another consequence), with
 the nodes the path crosses, and the scenarios no walk reaches (outside the library: seals,
-maintenance, operators; expected, not a fault). It exits 1 while a gap is open. Close each gap
-one of two ways, never by adding rows only to silence it:
-- a scenario (steps 4 and 5), its `refs` naming the cause and where the walk ends; or
-- a dismissal under the node, with the reason, as a proposal:
-  ```yaml
-  dismissed:
-    - {guide_word: more, parameter: pressure, top_event: overpressure, at: E-301,
-       causes: [MOV-411A], reason: "covered by S19 for the pump train", status: proposed, by: agent}
-  ```
-  `causes` left out dismisses the top event for every cause. Good reasons: a train covered by
-  one representative row, a library response the team does not accept, a consequence analysed
-  in the node it lies in. Never dismiss what you have not traced.
+maintenance, operators; expected, not a fault). It exits 1 while a gap is open.
+
+`--coverage --write` lists the open gaps in the triage file beside the study,
+`safety/hazop/H-01/coverage.yaml` (`cheme schema hazop-coverage`), one `status: open` outcome
+each; the study itself is not touched. Not every gap needs a row: decide each one, never add
+rows only to silence it, and never leave it silently:
+- **a scenario** (steps 4 and 5), its `refs` naming the cause and where the walk ends: the gap
+  is covered and the next `--write` drops its open outcome;
+- **dismissed**, with the reason (a train covered by one representative row, a library response
+  you do not accept, a consequence analysed in the node it lies in);
+- **question**, with what the files do not settle (the fluid, a design pressure, whether the
+  library's response is right): for the team.
+```yaml
+outcomes:
+  - {node: N4, guide_word: more, parameter: pressure, top_event: overpressure, at: E-301,
+     causes: [MOV-411A], status: dismissed, reason: "covered by S19 for the pump train", by: agent}
+```
+Edit only `status`, `reason`, `by` (and `causes` to split an outcome); `judgement: accepted` is
+the team's. A later `--write` keeps every dismissed and question outcome, adds the new gaps and
+drops open ones no gap needs; when the library or an analysed sheet changed since, the command
+says so: check the decisions. Never dismiss what you have not traced.
 
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and
 `notes`, keeping its id; a different cause or outcome is a new scenario with a new id.
