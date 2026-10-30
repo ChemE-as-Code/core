@@ -1674,6 +1674,8 @@ export interface ModelTray extends ModelObject {
   /** `trunk` (along a rack), `room` (from its room), `link` (across rack joints), `branch` (to a load). */
   kind: "trunk" | "room" | "link" | "branch" | string;
   points: XYZ[];
+  /** A branch ending at its motor's `cable_entry` beside the item: the terminal box its cable drops to (cable, not tray). */
+  drop_to?: XYZ | null;
   width: number;
   depth: number;
   length: number;

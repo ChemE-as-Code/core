@@ -17,7 +17,7 @@ boxes, trays, schedule, rules), `domains/spatial/schemas.py` (`TrayRules`, the m
 
 | file | kind | what |
 |---|---|---|
-| `electrical/electrical-list.yaml` | `electrical` (control) | `substations` (`id`, `building`, `incoming_kv`), `transformers` (`tag`, `substation`, `rating_kva`, `primary_kv`, `secondary_v`, `feeds`), `rooms` (`id`, `kind: mcc \| switchgear \| control \| rack_room`, `building` or `point`, `voltage_v`), `defaults` (`lv_room`, `mv_room`, `control_room`, `lv_voltage_v` 400, `mv_voltage_v` 6600, `mv_above_kw` 200, `jb_capacity` 24, `spare_pairs` 0.2), `motors` (`driven`, `tag`, `power_kw`, `voltage_v`, `room`, `assumed`, `source`, `skip`), `feeders` (`tag`, `item` or `point`, `power_kw`, ...), `junction_boxes` (`tag`, `point` or `area`, `instruments` patterns, `capacity`, `room`), `instruments` (`tag`, `jb`, `point`, `skip`) |
+| `electrical/electrical-list.yaml` | `electrical` (control) | `substations` (`id`, `building`, `incoming_kv`), `transformers` (`tag`, `substation`, `rating_kva`, `primary_kv`, `secondary_v`, `feeds`), `rooms` (`id`, `kind: mcc \| switchgear \| control \| rack_room`, `building` or `point`, `voltage_v`), `defaults` (`lv_room`, `mv_room`, `control_room`, `lv_voltage_v` 400, `mv_voltage_v` 6600, `mv_above_kw` 200, `jb_capacity` 24, `spare_pairs` 0.2), `motors` (`driven`, `tag`, `power_kw`, `voltage_v`, `room`, `assumed`, `source`, `skip`, `cable_entry`: see [Motor cable entry](#motor-cable-entry)), `feeders` (`tag`, `item` or `point`, `power_kw`, ...), `junction_boxes` (`tag`, `point` or `area`, `instruments` patterns, `capacity`, `room`), `instruments` (`tag`, `jb`, `point`, `skip`) |
 | `electrical/tray-rules.yaml` (optional) | `trays` (spatial) | `rules`: `widths_mm` (100 .. 900), `depth_mm` 100, `fill_max_power` 0.3, `fill_max_instrument` 0.4, `separation_m` 0.3, `spacing_m` 0.15, `tier_gap_m` 1.5, `tiers: [{rack, elevation}]`, `lane_fraction` 0.25, `entry_elevation_m` 3, `branch_elevation_m` 3, `rack_reach_m` 50, `jb_elevation_m` 1.2, `jb_reach_m` 30, `termination_m` 1.5, `slack` 0.05, `grid_m` 0.5, `avoid_zones` [oxygen_enriched, hazardous], `support_span_m` 6, `support_reach_m` 1. Every default ASSUMED |
 | `equipment/equipment-list.yaml`, `equipment/datasheets/<TAG>.yaml` | | the driven items; their power (`type_specific` or `operating`: `motor_kw`, `motor_power_kw`, `driver_kw`, `driver_power_kw`, `rated_power_kw`, `power_kw`) |
 | `control/instrument-list.yaml`, `pid/*.xml` | | the instruments; what each P&ID function measures (`SensingLocation`) and where it sits (`Location`: `Field` is a local gauge) |
@@ -83,14 +83,51 @@ Power cables (motors, feeders) and junction box home runs run in trays from thei
 - **Room** (`PT|IT-<room>`), **link** (`PT|IT-<rack>-<rack>`, from one rack's lane onto the
   next at their joint) and **branch** (`PT|IT-<load>`): A* legs of the pipe router, clear of
   items, steel, walls, pipes and the trays before them by `spacing_m`; a branch runs at least
-  `branch_elevation_m` high to above its load and drops onto it (0.6 m above the terminal box).
+  `branch_elevation_m` high to above its load and drops onto it (0.6 m above the terminal box);
+  a motor with a `cable_entry` ends its branch beside the item instead (below).
   Power trays and both trunks are routed first; instrument legs keep `separation_m` from every
   power tray. A leg the router cannot find is `method: direct`, `review_needed`.
 - **Width**: the smallest of `widths_mm` whose `width x depth x fill_max` holds the cables'
   cross-section; `fill` is cables' cross-section over the tray's.
 
-**Length** of a cable: along its trays plus the drop to its terminal (`route_length`), times
-`1 + slack`, plus `termination_m` at each end, rounded up to the metre.
+**Length** of a cable: along its trays plus the drop to its terminal (`route_length`; the drop
+is orthogonal, from the tray's end to the terminal box), times `1 + slack`, plus
+`termination_m` at each end, rounded up to the metre.
+
+## Motor cable entry
+
+Without it a motor's branch runs to above the terminal box and drops onto the machine, so the
+tray crosses the machine's footprint: a crane lane over the machine (`cheme layout lifting`)
+counts that tray as a blocker. A motor's `cable_entry` says where its cable leaves the tray
+beside the item; the branch ends there and the rest of the way to the terminal box is a cable
+drop (a conduit or a flexible cable, not tray), counted in the cable's length:
+
+```yaml
+motors:
+  - {driven: K-101, power_kw: 8567.9, cable_entry: {side: east, offset_m: 1.5}}
+  - {driven: K-102, power_kw: 260, cable_entry: {point: [131.0, 152.0], elevation_m: 4.0}}
+```
+
+| field | meaning |
+|---|---|
+| `side` | `north` (+y), `south` (-y), `east` (+x) or `west` (-x) side of the driven item's footprint in plan (the placed item's axis-aligned box in site axes) |
+| `offset_m` | along that side from its middle, m: toward +x on north and south, toward +y on east and west (default 0); at most half the side's length |
+| `clearance_m` | from the side out to the tray's centreline, m (default: the layout criteria's `lane_margin_m` + half the tray's width + `spacing_m`: just outside a crane lane that runs along that side or ends at it) |
+| `point` | instead of `side`: the tray's end [x, y], site m, outside the footprint |
+| `elevation_m` | the tray's end above grade, m (default 0.6 m above the terminal box); the branch runs at `branch_elevation_m` to above the entry and drops to it as tray |
+
+The branch's tray entry records the terminal box it drops to (`drop_to`); its last run is no
+longer the item's own drop, so the lifting lane and `clash-tray` count every run of it. Pick a
+side the lane runs along or the side away from the crane pad: an entry between the pad and the machine is
+still in the lane. A crane lane that runs diagonally to the footprint is wider than the
+footprint's sides: check with `cheme layout lifting`. The branch's way from the rack to the
+entry is the router's; it may still cross the lane higher up (the study names it).
+
+`cheme validate` and `cheme layout build`: `cheme.electrical-cable-entry` (error, on the entry's
+line) when the placed item makes it impossible (a `point` inside the footprint, an `offset_m`
+beyond the side); the build then gives that motor no cable (`cable-missing`) rather than end the
+tray over the machine. The schema refuses an entry with neither or both of `side` and `point`,
+or with `offset_m`/`clearance_m` beside a `point`.
 
 ## Rules (on the model)
 
@@ -98,14 +135,15 @@ Power cables (motors, feeders) and junction box home runs run in trays from thei
 |---|---|---|
 | `cheme.layout-tray-fill` | warning | a tray's fill over its `fill_max` (only at the largest width) |
 | `cheme.layout-tray-separation` | warning | a power and an instrument tray closer than `separation_m` (`cabling.rules`) |
-| `cheme.layout-clash-tray` | warning | a tray through an item part (not the branch's drop onto its own item), a pipe or a steel member |
+| `cheme.layout-clash-tray` | warning | a tray through an item part (not the branch's drop onto its own item, unless the branch ends at a `cable_entry`), a pipe or a steel member |
 | `cheme.layout-tray-zone` | warning | a tray inside a zone (`layout/zones.yaml`) of a kind in `avoid_zones` (`cabling.rules`; default oxygen-enriched and hazardous areas): move the lane, or record the cable sheath and glands for the zone and accept it |
 | `cheme.layout-tray-span` | warning | a tray off the racks (no `rack`) with a level run longer than `support_span_m` between points where steel (rack, tray tier and structure members, enclosure walls, building wall panels and roofs) comes within `support_reach_m` of it |
 | `cheme.layout-cable-missing` | warning | a motor, feeder, instrument or junction box without a cable (`cabling.missing`, with the reason) |
 | `cheme.layout-cable-unrouted` | warning | a cable with a `direct` tray |
 
 `cheme validate` on the list: `electrical-duplicate`, `-unknown-room`,
-`-unknown-substation`, `-unknown-tag` (a motor's `driven`), `-unknown-jb` (errors),
+`-unknown-substation`, `-unknown-tag` (a motor's `driven`), `-unknown-jb`, `-cable-entry` (with
+the committed model; errors),
 `-motor-power`, `-motor-room` (warnings); `layout-tray-rack` (error) for a tray tier on a rack
 the site plan lacks.
 

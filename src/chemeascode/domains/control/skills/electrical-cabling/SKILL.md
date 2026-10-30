@@ -42,6 +42,10 @@ detail stage (gate `electrical`).
    datasheet or under `motors: [{driven: P-101A, power_kw: 15, source: ...}]`; `voltage_v`,
    `room` and the motor `tag` only where the defaults (`defaults: {lv_room, mv_room,
    mv_above_kw, ...}`) do not fit. `skip: <reason>` for a motor cabled by its vendor package.
+   `cable_entry` where its cable leaves the tray beside the machine (the terminal box side):
+   `{side: north|south|east|west, offset_m, clearance_m}` of the item's plan footprint, or
+   `{point: [x, y]}`, with `elevation_m` optional; the tray ends there and the cable drops to
+   the terminal box (in its length). Give it for every heavy machine with a crane lane over it.
    Other consumers (an electric heater, a package panel) go under `feeders:`, with a
    `power_factor` for a package with motors (default 1.0, a resistive load, ASSUMED).
 3. **Instruments and junction boxes.** Without `junction_boxes` the build proposes one per area
@@ -71,7 +75,13 @@ detail stage (gate `electrical`).
    running more than `support_span_m` with no steel near it: run it along a rack or a
    structure, declare support steel, or bring the cable in at grade or in a trench). A tray
    over a heavy item blocks its crane lift (`layout-lifting`, skill `structures-access`):
-   feed a big motor from the side, not over the machine. Fix the cause and rebuild.
+   give its motor a `cable_entry` on a side the lane runs along or on the side away from the
+   crane pad (not between pad and machine), so the tray ends beside the machine; its default
+   clearance keeps it outside a lane running along that side or ending at it;
+   `electrical-cable-entry` (error) is an entry the placed item makes impossible (a point
+   inside its footprint, an offset beyond the side).
+   Rerun `cheme layout lifting`: a tray still in the lane is still named. Fix the cause and
+   rebuild.
 7. **Schedule.** `cheme layout cables --write` writes `electrical/cable-schedule.csv` and
    `.md`; commit them with the model.
 

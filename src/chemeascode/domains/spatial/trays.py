@@ -10,8 +10,12 @@ without it) and the site plan's racks.
 building that faces the nearest rack, 0.5 m outside, at ``entry_elevation_m`` (rooms of one
 building side by side, 1.5 m apart). A motor's cable ends at its item's terminal box (the
 ``<tag>/terminal-box`` part; else the motor, else the top of the item), a feeder's at its item
-or point. An instrument stands where it measures (the ``SensingLocation`` of its P&ID function:
-a nozzle's flange, the middle of a routed segment, an in-line item, an item), an actuated valve
+or point. A motor's ``cable_entry`` (a side of the item's plan footprint, or a point) ends its
+branch beside the item instead (:func:`entry_point`; the tray's ``drop_to`` the terminal box),
+the cable dropping from there to the terminal box; one the placed item makes impossible
+(:func:`entry_problem`) gives the motor no cable and :func:`cable_entry_findings` an error.
+An instrument stands where it measures (the ``SensingLocation`` of its P&ID function: a
+nozzle's flange, the middle of a routed segment, an in-line item, an item), an actuated valve
 (:func:`~chemeascode.domains.control.electrical.actuated_valve`) at its in-line item; an
 ``instruments`` entry of the electrical list may place it (``point``) or take it out (``skip``).
 A function located ``Field`` (a local gauge) or without a sensor needs no cable.
@@ -132,6 +136,7 @@ class Route:
     basis: str = ""
     trays: list[str] = field(default_factory=list)
     reason: str = ""
+    entry: bool = False  # the tray ends at the motor's cable_entry beside the item
 
 
 @dataclass
@@ -145,6 +150,7 @@ class Tray:
     method: str | None = None
     ends_at: str | None = None  # the item a branch ends at
     width: float = 0.0
+    drop_to: Vec | None = None  # a branch ending at a cable_entry: the terminal its cable drops to
 
 
 def _rules(trays: Any) -> TrayRuleSet:
@@ -173,6 +179,46 @@ def _terminal(item: dict[str, Any]) -> Vec:
         return ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, top)
     x0, y0, _, x1, y1, z1 = item["bbox"]
     return ((x0 + x1) / 2, (y0 + y1) / 2, z1)
+
+
+def entry_problem(entry: Any, bbox: list[float]) -> str:
+    """Why a motor's ``cable_entry`` cannot be beside an item of *bbox* (``[x0, y0, z0, x1, y1,
+    z1]``), with the hint's facts; '' when it can."""
+    x0, y0, _, x1, y1, _ = bbox
+    if entry.point is not None:
+        x, y = entry.point
+        if x0 + 1e-6 < x < x1 - 1e-6 and y0 + 1e-6 < y < y1 - 1e-6:
+            return (
+                f"its point [{x:g}, {y:g}] is inside the item's footprint "
+                f"[{x0:g}, {y0:g}, {x1:g}, {y1:g}]: the tray would end over the machine"
+            )
+        return ""
+    half = ((x1 - x0) if entry.side in ("north", "south") else (y1 - y0)) / 2
+    offset = entry.offset_m or 0.0
+    if abs(offset) > half + 1e-6:
+        return (
+            f"offset_m {offset:g} is beyond the {entry.side} side, which is {2 * half:g} m long "
+            f"(at most {half:g} m from its middle)"
+        )
+    return ""
+
+
+def entry_point(entry: Any, bbox: list[float], clearance: float) -> tuple[float, float]:
+    """The plan point where a tray ends for *entry* beside an item of *bbox*; *clearance* out
+    from the side when the entry gives none (see :class:`~chemeascode.domains.control.schemas.
+    CableEntry`)."""
+    if entry.point is not None:
+        return (float(entry.point[0]), float(entry.point[1]))
+    x0, y0, _, x1, y1, _ = bbox
+    c = clearance if entry.clearance_m is None else entry.clearance_m
+    offset = entry.offset_m or 0.0
+    xm, ym = (x0 + x1) / 2 + offset, (y0 + y1) / 2 + offset
+    return {
+        "north": (xm, y1 + c),
+        "south": (xm, y0 - c),
+        "east": (x1 + c, ym),
+        "west": (x0 - c, ym),
+    }[entry.side]
 
 
 def _manhattan(a: Vec, b: Vec) -> float:
@@ -280,6 +326,10 @@ class Cabling:
                 top = max(rack.levels) if rack.levels else 0.0
                 self.tiers[rack.id] = declared.get(rack.id, top + self.rules.tier_gap_m)
         self._router = None
+        from chemeascode.domains.spatial.criteria import criteria
+
+        #: A crane lane's margin beside its load: a cable_entry's default clearance takes it.
+        self.lane_margin = criteria(plan).lane_margin_m
 
     # -- the router of the legs ---------------------------------------------------------
 
@@ -802,7 +852,14 @@ class Cabling:
             )
         for route in routes:
             start, end, nodes = paths[route.tag]
-            tray = Tray(f"{prefix}-{route.to}", system, "branch", [route.tag], ends_at=route.owner)
+            tray = Tray(
+                f"{prefix}-{route.to}",
+                system,
+                "branch",
+                [route.tag],
+                ends_at=route.owner,
+                drop_to=route.terminal if route.entry else None,
+            )
             if nodes:
                 legs.append((tray, self._lane_point(*end, system=system), route.end))
             else:
@@ -957,6 +1014,18 @@ class Cabling:
                 self._missing(motor.tag, what, f"room {motor.room} has no building in the layout")
                 continue
             cable = power_cable(motor.power_kw, motor.voltage_v, motor.power_factor)
+            end = (terminal[0], terminal[1], terminal[2] + DROP)
+            entry = motor.cable_entry if item is not None else None
+            if entry is not None:
+                why = entry_problem(entry, item["bbox"])  # type: ignore[index]
+                if why:
+                    self._missing(motor.tag, what, f"cable_entry: {why}")
+                    continue
+                width = _width([cable], self.rules.fill_max_power, self.rules)[0]
+                clearance = self.lane_margin + width / 2 + self.rules.spacing_m
+                x, y = entry_point(entry, item["bbox"], clearance)  # type: ignore[index]
+                z = terminal[2] + DROP if entry.elevation_m is None else entry.elevation_m
+                end = (x, y, z)
             basis = f"power: {motor.basis}" + (f" ({motor.source})" if motor.source else "")
             if motor.assumed:
                 basis += ", ASSUMED"
@@ -973,11 +1042,12 @@ class Cabling:
                     to=motor.tag,
                     cable=cable,
                     start=self.rooms[motor.room],
-                    end=(terminal[0], terminal[1], terminal[2] + DROP),
+                    end=end,
                     terminal=terminal,  # type: ignore[arg-type]
                     owner=motor.item,
                     power_kw=motor.power_kw,
                     basis=basis,
+                    entry=entry is not None,
                 )
             )
         devices = self.devices()
@@ -1081,6 +1151,7 @@ class Cabling:
                     "system": tray.system,
                     "kind": tray.kind,
                     "points": tray.points,
+                    "drop_to": tray.drop_to,
                     "width": width,
                     "depth": depth,
                     "length": lengths[tray.id],
@@ -1370,6 +1441,48 @@ def _spans(
             )
 
 
+def cable_entry_findings(workspace: Any, model: dict[str, Any]) -> list[Finding]:
+    """``cheme.electrical-cable-entry`` (error, on the electrical list's line): a motor's
+    ``cable_entry`` that cannot be beside its placed item in *model* (a point inside the item's
+    footprint, an offset beyond the side). The build gives that motor no cable
+    (``cable-missing``) rather than end its tray over the machine."""
+    from chemeascode.domains.control.electrical import ELECTRICAL_FILE
+    from chemeascode.foundation.yamlsource import _compose, _yaml_line
+
+    path = workspace.list_file("electrical")
+    if path is None:
+        return []
+    electrical = workspace.parsed_lists(("electrical",)).get("electrical")
+    if electrical is None:
+        return []  # validate reports the schema error
+    items = {e["tag"]: e for e in model.get("equipment", [])}
+    document = None
+    found = []
+    for k, motor in enumerate(electrical.motors):
+        item = items.get(motor.driven.strip())
+        if motor.cable_entry is None or motor.skip or item is None:
+            continue  # an item not placed: cable-missing says so
+        why = entry_problem(motor.cable_entry, item["bbox"])
+        if not why:
+            continue
+        if document is None:
+            document = _compose(path)
+        found.append(
+            Finding(
+                ELECTRICAL_FILE,
+                "error",
+                "cheme.electrical-cable-entry",
+                f"cable_entry of the motor of {motor.driven}: {why}",
+                line=_yaml_line(document, ["motors", k, "cable_entry"]),
+                ids=[motor.driven],
+                hint="give a side of the item (north, south, east, west) with offset_m within "
+                "half its length, or a point outside its footprint, and rebuild",
+                key=motor.driven,
+            )
+        )
+    return found
+
+
 def tray_findings(model: dict[str, Any]) -> list[Finding]:
     """``cheme.layout-tray-fill``, ``-tray-separation``, ``-clash-tray``, ``-tray-zone``,
     ``-tray-span``, ``-cable-missing`` and ``-cable-unrouted`` on a model document (nothing
@@ -1475,7 +1588,8 @@ def tray_findings(model: dict[str, Any]) -> list[Finding]:
             if dist(a, b) > 1e-9:  # type: ignore[arg-type]
                 pipes.add(Capsule(pipe["id"], a, b, r), pipe["id"])  # type: ignore[arg-type]
     for tray in trays:
-        own = tray["refs"].get("tag")
+        # a branch ending at a cable_entry stands beside its item: none of it may touch it
+        own = None if tray.get("drop_to") else tray["refs"].get("tag")
         capsules = _capsules(tray)
         hit: set[str] = set()
         for k, capsule in enumerate(capsules):

@@ -906,6 +906,10 @@ def build_model(
     from chemeascode.domains.spatial.model_rules import model_rules
 
     findings += model_rules(document, layout.routing, plan)
+    if cabling_sources is not None:
+        from chemeascode.domains.spatial.trays import cable_entry_findings
+
+        findings += cable_entry_findings(workspace, document)
     return Model(document, findings, stats)
 
 

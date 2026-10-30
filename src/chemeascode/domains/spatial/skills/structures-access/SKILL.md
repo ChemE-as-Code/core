@@ -189,7 +189,9 @@ review.
    nearest pad whose lane is clear is taken), with the lane from the pad over the item (the
    item's width across the direction of travel plus the margins) clear above the item's top (no pipes, cable trays, ducts,
    racks, steel or roofs: `layout-lifting`; a tray over the item, even its own feed, blocks the
-   lift: bring the cable in from the side or at grade), and a `laydown` zone within reach that
+   lift: give its motor a `cable_entry` beside the machine in `electrical/electrical-list.yaml`
+   (skill `electrical-cabling`; the cable drop from there is not a blocker, a tray inside the
+   lane still is), or bring the cable in at grade), and a `laydown` zone within reach that
    holds the item's footprint (`layout-laydown`). Crane pads and laydown zones stand on open
    ground: one overlapping a rack, a structure or a building is `layout-pad-overlap`. Items
    inside a closed casing are left out.
