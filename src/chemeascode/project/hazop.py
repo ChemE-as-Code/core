@@ -307,13 +307,15 @@ def study_coverage(
                 "kind": "hazop-coverage",
                 "study": inputs.study.id,
                 "walk": walk.model_dump(),
-                "outcomes": [
-                    {k: v for k, v in o.model_dump(mode="json").items() if v not in ("", [])}
-                    for o in outcomes
-                ],
+                "outcomes": [o.model_dump(mode="json") for o in outcomes],
             }
         )
-        text = yaml.safe_dump(data.model_dump(mode="json", by_alias=True), sort_keys=False)
+        dumped = data.model_dump(mode="json", by_alias=True)
+        # Empty reason, by or causes are left out: the file is edited by hand.
+        dumped["outcomes"] = [
+            {k: v for k, v in o.items() if v not in ("", [])} for o in dumped["outcomes"]
+        ]
+        text = yaml.safe_dump(dumped, sort_keys=False)
         with (root / path).open("w", encoding="utf-8", newline="") as handle:
             handle.write(text)
         inputs.triage = data

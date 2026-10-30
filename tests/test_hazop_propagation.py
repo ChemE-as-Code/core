@@ -515,6 +515,7 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     data = yaml.safe_load(triage.read_text(encoding="utf-8"))
     assert data["kind"] == "hazop-coverage" and data["walk"]["sheets"]
     assert b"\r\n" not in triage.read_bytes()
+    assert "reason:" not in triage.read_text(encoding="utf-8")  # empty fields left out
     for entry in data["outcomes"]:
         entry.update(status="dismissed", reason="test: not credible here", by="agent")
     triage.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")

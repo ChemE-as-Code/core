@@ -671,8 +671,12 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         for s in d.scenarios
     ]
     gaps: dict[tuple[Deviation, str | None, str], Gap] = {}
-    covered = 0
-    handled = {"dismissed": 0, "question": 0}
+    # Distinct cause and top event pairs: one cause's several failure modes count once.
+    pairs: dict[str, set[tuple[Any, ...]]] = {
+        "covered": set(),
+        "dismissed": set(),
+        "question": set(),
+    }
     reached: set[str] = set()
     for c in candidates:
         deviation = (c.deviation.guide_word, c.deviation.parameter)
@@ -690,11 +694,12 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
             ),
             None,
         )
+        pair = (c.cause, deviation, c.top_event, at)
         if decision is not None:
-            handled[decision.status] += 1
+            pairs[decision.status].add(pair)
             continue
         if any(at in refs for refs, _ in naming):
-            covered += 1
+            pairs["covered"].add(pair)
             continue
         gap = gaps.setdefault(
             (c.deviation, c.top_event, at),
@@ -706,7 +711,11 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         gap.crosses.extend(n for n, _ in c.crosses if n not in gap.crosses)
     unreached = [sid for _, _, sid in rows if sid not in reached]
     return Coverage(
-        list(gaps.values()), covered, handled["dismissed"], handled["question"], unreached
+        list(gaps.values()),
+        len(pairs["covered"]),
+        len(pairs["dismissed"]),
+        len(pairs["question"]),
+        unreached,
     )
 
 
