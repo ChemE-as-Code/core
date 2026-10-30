@@ -463,7 +463,7 @@ x=.. [--png]` draws plans and sections. Gates of kind `layout-model` (template:
 `layout-plot-plan`, `layout-3d`, `layout-detail`) turn this into stage requirements, and the
 skills `layout-yaml`, `pipe-routing`, `structures-access`, `area-classification` and `review`
 say how to work with it. What the layout does not do (pipe stress, supports, isometrics,
-structural design, HVAC and cable trays, dispersion, CAD export beyond glTF) is listed in
+structural design, HVAC and cable trays, dispersion, CAD export beyond glTF and STL) is listed in
 [`domains/spatial/README.md`](src/chemeascode/domains/spatial/README.md).
 
 Equipment is compared by its outline in plan over the height of its box: a circle for a vertical

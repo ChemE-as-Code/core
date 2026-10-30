@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Viewer: the layout view exports the visible model as a binary STL for 3D printing ("Export
+  .stl"), in millimetres at 1:100, 1:200, 1:500 or 1:1000, with an optional base slab whose top
+  is at ground level, so everything standing on the ground prints as one piece. No thickening
+  or simplification: parts below the printer's resolution are left to the slicer.
+
 ### Fixed
 
 - `cheme layout build` routes a line with battery limits at both ends, such as a cooling water
