@@ -184,3 +184,38 @@
 .md-footer-meta {
   background-color: #061a40;
 }
+
+/* -- the bar above every page: technical documentation, and the way back ---------------------- */
+
+.md-banner {
+  background-color: var(--cac-accent-soft);
+  color: var(--cac-fg);
+  border-bottom: 1px solid var(--cac-border);
+}
+.md-banner__inner {
+  margin: 0.4rem auto;
+  font-size: 0.68rem;
+}
+.cac-docs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+}
+.cac-docs-label {
+  font-weight: 700;
+  color: var(--cac-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cac-docs-for {
+  color: var(--cac-fg-muted);
+}
+.cac-docs-links {
+  margin-left: auto;
+}
+.md-banner a {
+  color: var(--md-typeset-a-color);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}

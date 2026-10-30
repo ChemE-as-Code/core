@@ -1,4 +1,4 @@
-site_name: ChemE-as-Code
+site_name: ChemE-as-Code technical documentation
 site_description: "Plant design as code: DEXPI P&IDs, BFD/PFD and engineering YAML kept in git, checked by cheme."
 site_url: https://docs.cheme-as-code.org/
 repo_url: https://github.com/ChemE-as-Code/core
@@ -8,6 +8,8 @@ copyright: Copyright (C) 2026 Artur Schweidtmann. cheme-as-code is licensed unde
 
 theme:
   name: material
+  # the bar "Technical documentation" with links back to the home page and the Atlas
+  custom_dir: docs/overrides
   # the ChemE-as-Code mark, as on cheme-as-code.org (style: assets/extra.css)
   logo: assets/brand/mark.svg
   favicon: assets/brand/favicon.svg
@@ -46,6 +48,13 @@ hooks:
 
 exclude_docs: |
   hooks/
+  overrides/
+
+# The ChemE-as-Code sites the docs link back to (the bar above every page, overrides/main.html).
+# Builds for previews or local copies set the same variables as the website build.
+extra:
+  home_url: !ENV [PUBLIC_HOME_URL, "https://cheme-as-code.org"]
+  atlas_url: !ENV [PUBLIC_ATLAS_URL, "https://atlas.cheme-as-code.org"]
 
 watch:
   - REFERENCE.md

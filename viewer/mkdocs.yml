@@ -1,6 +1,6 @@
 # Theme, palette and extensions follow ChemE-as-Code/core's mkdocs.yml. Built in CI to check it
 # (the docs job of .github/workflows/viewer.yml); not published.
-site_name: ChemE-as-Code viewer
+site_name: ChemE-as-Code Viewer technical documentation
 site_description: "Read-only web viewer for a cheme-as-code plant repository: P&IDs, diffs, lists, streams and checks, from cheme serve or a static snapshot."
 site_url: https://docs.cheme-as-code.org/viewer/
 repo_url: https://github.com/ChemE-as-Code/core
@@ -13,6 +13,8 @@ site_dir: build/docs
 
 theme:
   name: material
+  # the bar "Technical documentation" with links back to the home page, the Atlas and the toolkit docs
+  custom_dir: docs/overrides
   # the ChemE-as-Code mark, as on cheme-as-code.org (style: assets/extra.css)
   logo: assets/brand/mark.svg
   favicon: assets/brand/favicon.svg
@@ -50,6 +52,14 @@ hooks:
 
 exclude_docs: |
   hooks/
+  overrides/
+
+# The ChemE-as-Code sites the docs link back to (the bar above every page, overrides/main.html).
+# Builds for previews or local copies set the same variables as the website build.
+extra:
+  home_url: !ENV [PUBLIC_HOME_URL, "https://cheme-as-code.org"]
+  atlas_url: !ENV [PUBLIC_ATLAS_URL, "https://atlas.cheme-as-code.org"]
+  docs_url: !ENV [PUBLIC_DOCS_URL, "https://docs.cheme-as-code.org"]
 
 watch:
   - REFERENCE.md
