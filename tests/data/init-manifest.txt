@@ -37,7 +37,7 @@ ee62d07aff399d88982af65c0f3f9c8eb4e6fd64f0db252af7382818f30306b1  .claude/skills
 c196775e34772236f78fe828160ff6310e4c036e6f9cf9ed769500ccc09a41b1  .claude/skills/hazop-node-breakdown/SKILL.md
 d779d298ece32016846565eb9b469d8305c1d904fbf7ce4003140e8f3e6ac7a7  .claude/skills/hazop-review/SKILL.md
 ff7f1dca3d722d56fbfa0a35f0858e9545bc2000bdfe1cdbf720b9e093833f7d  .claude/skills/hazop-risk-classification/SKILL.md
-c0cc63812111061f4cfebc28193bede9e67dd24085b576cf7c25305727791aea  .claude/skills/hazop-scenario-propagation/SKILL.md
+d84eeb33421878702df24c470a8872e19e52faa60375454a16f6481b5b08f01b  .claude/skills/hazop-scenario-propagation/SKILL.md
 ff40ba0f64a9c20f42753dd0c7dabee97098e0b3750afbd568db34fde6101065  .claude/skills/hazop-study/SKILL.md
 b0d980275585f81d89c20de525ea01c0e2f31b7572851bfd7df678b1d2e0f24d  .claude/skills/hazop-study/examples/study.yaml
 b597327e86cf310b483c4d7f1602ed507aadd36ee6da37b029bd4b869628c0f0  .claude/skills/heat-integration-flowsheet-review/SKILL.md
@@ -72,7 +72,7 @@ f3879229cd719a38c6f50aaa4885a24a68c97377a2d272519c4e087c37ba8946  .claude/skills
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md
 959aab9e4e4c19f18e210a496224ee0b1f865c5ba10bfe9f9dba7b17b46dedfd  .claude/skills/pipe-routing/SKILL.md
 4dcd5aa8f633a5d60b862db6e6deb2dd853ac9c6c0fdd81c2974cf087d3f3f62  .claude/skills/process-design/SKILL.md
-4e4289fbd979c8512ee834e236707a181e34406d701e3afb41bb0b5c6f8ddb07  .claude/skills/process-safety/SKILL.md
+272902ecdf39ac75b58484b92997a131eff764d953f907aaa006c9c756aa19fc  .claude/skills/process-safety/SKILL.md
 4eb15a89121d205bc9ff6ebb92f981d4d39095fabf5ba2a902f6bdf99907ec12  .claude/skills/process-simulation/SKILL.md
 cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills/property-retrieval/SKILL.md
 684eccadef18ba60bee8ff01623decae328ff41112353e0d4fc73fea386019b1  .claude/skills/reaction-evidence-search/SKILL.md

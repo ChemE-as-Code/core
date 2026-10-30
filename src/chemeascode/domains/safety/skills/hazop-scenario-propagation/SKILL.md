@@ -26,6 +26,9 @@ nobody followed far enough. You propose; the team decides what is credible.
   fluid codes. DEXPI files often do not say. A missing fluid is a question for the team, never a
   guess.
 - The operating modes of the study: a cause may belong to start-up or shutdown only.
+- Optional: the project's failure-mode library `safety/failure-modes.yaml` (`cheme schema
+  failure-modes`, written by the team with its sources), which `cheme safety hazop propagate`
+  needs. Without it, trace by hand; never write the library yourself to have one.
 
 ## Workflow and tools
 
@@ -94,6 +97,24 @@ nobody followed far enough. You propose; the team decides what is credible.
      `notes:` with the path that showed it, so the team can disagree.
 6. **Check**: `cheme safety hazop check H-01`.
 
+**Optional: the walk as a cross-check.** With a failure-mode library,
+`cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--json]` does steps 2
+and 3 mechanically: each failure mode of the node's objects is walked over the analysed P&IDs
+with the library's responses, and every walk that brings a deviation to the node is printed with
+its cause (local or driver), path, end, fluid, the safeguards on the path and its open
+questions. It is a tool, not a step: use it where it helps (a large or meshed node, a check
+after drafting for a cause or branch nobody followed, the instruments and interlocks along a
+long path) and skip it for a small node. Read its output as candidates, never as rows:
+- the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `visited`,
+  `unknown` (the library has no response there: a question, never a guessed response) or
+  `depth` (cut off after 40 objects: follow it by hand where it matters);
+- it lists every distinct path, so a meshed header gives thousands: group them by cause and top
+  event, and keep only what step 5 keeps;
+- it does not use valve positions (a walk passes through a normally closed drain valve) and
+  judges nothing: credibility and outcome are steps 4 and 5, and a safeguard on the path is a
+  candidate, not an effective one (skill `safeguard-crediting`).
+Say in a scenario's `notes:` when the walk found it.
+
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and
 `notes`, keeping its id; a different cause or outcome is a new scenario with a new id.
 
@@ -106,6 +127,8 @@ nobody followed far enough. You propose; the team decides what is credible.
   there, record it, and ask whether the other sheet belongs to the study.
 - A behaviour the files do not settle (a fail position, a set pressure, whether a vessel is
   rated for the pump's shut-off pressure): write the question in `notes:`; do not choose.
+- `propagate` names the node's objects whose class the library does not cover and the members
+  it cannot resolve: trace those by hand. A gap in the library is for the team to fill.
 
 ## Outputs and provenance
 
@@ -124,6 +147,7 @@ safeguard, and never present a traced path as the team's conclusion.
 ## References
 
 - `safety/README.md`; `cheme schema hazop-study`; `cheme show --help`.
+- `cheme safety hazop propagate --help`, `cheme schema failure-modes` (the optional walk).
 - IEC 61882:2016, Hazard and operability studies (HAZOP studies) - Application guide.
 - Skills `hazop-node-breakdown` (the nodes), `hazop-equipment-causes` (credible deviations and
   causes per equipment type), `safeguard-crediting`, `relief-scenarios`,

@@ -33,7 +33,7 @@ Engineering guidance only; core has no calculation for this. Members, by flat na
 | `area-classification` | Release sources, zones in `layout/zones.yaml`, purged and pressurised enclosures |
 | `hazop-study`, `hazop-assessment`, `hazop-review` | Drafting, rating and reviewing a HAZOP study file with `cheme safety hazop ...` |
 | `hazop-node-breakdown` | Splitting the P&IDs into study nodes by named boundary rules, with design intents |
-| `hazop-scenario-propagation` | Causes inside a node and consequences followed object by object to a top event |
+| `hazop-scenario-propagation` | Causes inside a node and consequences followed object by object to a top event; optionally cross-checked with `cheme safety hazop propagate` |
 | `hazop-risk-classification` | Suggesting severity and likelihood codes from the project's risk matrix, with their basis |
 
 Working rules for every member:
