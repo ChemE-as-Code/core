@@ -42,5 +42,5 @@ exact, reviewed state of the files.
   (pre-release issues 12, 25, 26, 32).
 - Fail closed: pre-release PR 281 (pre-release commit f45d2c6).
 - `src/chemeascode/project/signoff.py`, `project/checks.py`, `foundation/reviews.py`, the
-  template's `STAGES.md` and `AGENTS.md`, `README.md` ("check"),
+  template's `STAGES.md` and `AGENTS.md`, `REFERENCE.md` ("check"),
   [stages and gates](../concepts/stages-and-gates.md).

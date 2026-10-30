@@ -34,4 +34,4 @@ revision's data under the new revision's label.
 
 - pre-release viewer commit 65c45c5 (pre-release viewer PR 52) "Fresh data on revision change, heading anchors, keyboard
   access and page titles".
-- README, "Pages" and the paragraph on page titles and focus.
+- REFERENCE.md (formerly the README), "Pages" and the paragraph on page titles and focus.

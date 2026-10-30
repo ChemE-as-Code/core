@@ -35,5 +35,5 @@ the installed package. Plant teams may also adapt a skill locally.
   `lists-sync`, `review`).
 - pre-release commit 03211e3, pre-release commit 40ecc6c, pre-release commit 0466390
   in pre-release PR 58.
-- `src/chemeascode/templates/install.py`, `README.md` ("How the pieces fit together"),
+- `src/chemeascode/templates/install.py`, `REFERENCE.md` ("How the pieces fit together"),
   [contributing.md](../framework/contributing.md) ("Adding or changing a skill").

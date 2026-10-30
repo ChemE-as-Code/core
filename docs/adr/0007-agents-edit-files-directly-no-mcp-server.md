@@ -39,6 +39,6 @@ files.
 - pre-release commit 62c29e1: the pyDEXPI editor/MCP ban is in `AGENTS.md` from 0.1.0.
 - Authoring API "decided in 0.4, pre-release issue 13": pre-release commit 2ff49ad in pre-release PR 34.
 - MCP boundary README: pre-release PR 58.
-- `AGENTS.md`, `README.md` (end of "Skills": "deliberately no MCP server"),
+- `AGENTS.md`, `REFERENCE.md` (end of "Skills": "deliberately no MCP server"),
   `src/chemeascode/interfaces/mcp/README.md`, [architecture.md](../framework/architecture.md)
   ("MCP boundary").

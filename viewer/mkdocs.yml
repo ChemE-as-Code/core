@@ -1,13 +1,14 @@
 # Theme, palette and extensions follow ChemE-as-Code/core's mkdocs.yml. Built in CI to check it
-# (.github/workflows/docs.yml); not published.
+# (the docs job of .github/workflows/viewer.yml); not published.
 site_name: ChemE-as-Code Viewer technical documentation
 site_description: "Read-only web viewer for a cheme-as-code plant repository: P&IDs, diffs, lists, streams and checks, from cheme serve or a static snapshot."
 site_url: https://docs.cheme-as-code.org/viewer/
 repo_url: https://github.com/ChemE-as-Code/core
-repo_name: ChemE-as-Code/core (viewer/)
+repo_name: ChemE-as-Code/core
+# The Viewer lives in viewer/ of core; the include hook prefixes its repository links the same way.
 edit_uri: edit/main/viewer/docs/
 copyright: Copyright (C) 2026 Artur Schweidtmann. AGPL-3.0-or-later, see LICENSE and NOTICE.
-# Not the default site/: the README's static-snapshot recipe writes there, and a build empties it.
+# Not the default site/: REFERENCE.md's static-snapshot recipe writes there, and a build empties it.
 site_dir: build/docs
 
 theme:
@@ -45,7 +46,7 @@ theme:
 extra_css:
   - assets/extra.css
 
-# Pages include their sections from README.md (the single source), see docs/hooks/includes.py.
+# Pages include their sections from REFERENCE.md (the single source), see docs/hooks/includes.py.
 hooks:
   - docs/hooks/includes.py
 
@@ -61,7 +62,7 @@ extra:
   docs_url: !ENV [PUBLIC_DOCS_URL, "https://docs.cheme-as-code.org"]
 
 watch:
-  - README.md
+  - REFERENCE.md
 
 plugins:
   - search

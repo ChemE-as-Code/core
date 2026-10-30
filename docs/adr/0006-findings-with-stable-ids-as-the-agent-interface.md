@@ -37,6 +37,6 @@ acknowledgeable without silencing the rule everywhere.
 - pre-release commit 62c29e1 (0.1.0 validate with `file:line` findings).
 - Stable ids and accepted findings: pre-release commit bb4cbae, pre-release commit 8ec87fa
   in pre-release PR 34 (pre-release issues 11, 18, 29, 30).
-- `src/chemeascode/foundation/findings.py` (`Finding.id`), `README.md` ("Accepting a finding"),
+- `src/chemeascode/foundation/findings.py` (`Finding.id`), `REFERENCE.md` ("Accepting a finding"),
   `AGENTS.md` ("Every finding a command prints names a file, a line where known, a rule id and a
   hint").

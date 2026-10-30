@@ -41,7 +41,7 @@ theme:
 extra_css:
   - assets/extra.css
 
-# Pages generated or assembled at build time from the code, README.md and the project template.
+# Pages generated or assembled at build time from the code, REFERENCE.md and the project template.
 hooks:
   - docs/hooks/includes.py
   - docs/hooks/reference.py
@@ -57,7 +57,7 @@ extra:
   atlas_url: !ENV [PUBLIC_ATLAS_URL, "https://atlas.cheme-as-code.org"]
 
 watch:
-  - README.md
+  - REFERENCE.md
   - src/chemeascode
 
 plugins:

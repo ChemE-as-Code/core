@@ -1,7 +1,8 @@
-"""MkDocs hook: include sections of repository files (README.md above all) into pages.
+"""MkDocs hook: include sections of repository files (REFERENCE.md above all) into pages.
 
-The README and the project template are the single sources of the command guides; the pages
-only arrange their sections. A page includes one with a comment on a line of its own:
+REFERENCE.md (the full reference, moved out of the README) and the project template are the
+single sources of the command guides; the pages only arrange their sections. A page includes
+one with a comment on a line of its own:
 
     <!-- readme: ### process: BFD, PFD, stream table and properties -->
     <!-- readme: ### validate | without: #### 3D layout -->
@@ -9,7 +10,8 @@ only arrange their sections. A page includes one with a comment on a line of its
     <!-- include: src/chemeascode/templates/project/STAGES.md :: # Stages | body -->
     <!-- include-code: src/chemeascode/templates/project/plant.yaml yaml -->
 
-``readme:`` reads README.md, ``include: PATH ::`` any Markdown file of the repository. The
+``readme:`` reads REFERENCE.md (the directive keeps its name from the time the reference was
+the README), ``include: PATH ::`` any Markdown file of the repository. The
 section runs from the heading to the next heading of the same or a higher level. Its headings
 are shifted so that the section heading becomes ``##``. Options: ``body`` leaves the section
 heading out, ``intro`` keeps only the text before the first subheading, ``without:`` drops
@@ -35,6 +37,8 @@ DIRECTIVE = re.compile(
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 LINK = re.compile(r"\]\((?!https?://|#|mailto:)([^)\s]+)\)")
 REPO_BLOB = "https://github.com/ChemE-as-Code/core/blob/main/"
+#: The file ``readme:`` directives read: the full reference (README.md is a short introduction).
+REFERENCE = "REFERENCE.md"
 
 _root = Path(".")
 
@@ -155,7 +159,7 @@ def on_page_markdown(markdown, page, config, files):
         kind, spec = m.group("kind"), m.group("spec")
         try:
             if kind == "readme":
-                return _section_text("README.md", spec, page.file.src_uri)
+                return _section_text(REFERENCE, spec, page.file.src_uri)
             if kind == "include":
                 source, sep, rest = spec.partition("::")
                 if not sep:

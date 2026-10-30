@@ -12,6 +12,7 @@
 - **[Development](development.md)**: install, dev server, tests, build, design notes, and how
   these docs are built.
 
-The pages are assembled from the repository's `README.md`, so the two do not drift.
+The pages are assembled from the viewer's full reference, `REFERENCE.md` (`README.md` is the
+short introduction), so the two do not drift.
 
 <!-- readme: ## Licence -->

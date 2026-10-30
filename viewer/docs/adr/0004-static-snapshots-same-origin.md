@@ -37,4 +37,4 @@ build time in `VITE_SNAPSHOT_ORIGINS`.
 
 - pre-release viewer commit c4ca23a (pre-release viewer PR 15) "Static snapshot data source: the viewer without a server".
 - pre-release viewer commit b15cac3 (pre-release viewer PR 51, from pre-release viewer issue 41) "Open ?data= snapshots from the page's own origin only".
-- README, "Static snapshot (no server)".
+- REFERENCE.md (formerly the README), "Static snapshot (no server)".
