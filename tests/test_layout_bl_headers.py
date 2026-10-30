@@ -6,6 +6,9 @@ from __future__ import annotations
 import pytest
 
 from chemeascode.domains.piping.schemas.lines import LineList
+from chemeascode.domains.spatial.geometry3d import point_at, split_at_many
+from chemeascode.domains.spatial.model import _round
+from chemeascode.domains.spatial.model_rules import model_rules
 from chemeascode.domains.spatial.pid_network import End
 from chemeascode.domains.spatial.routing import route_model
 from chemeascode.domains.spatial.schemas import Routing, SitePlan
@@ -156,6 +159,82 @@ def test_a_pinned_header_segment_stays_and_wins():
     ]
     # the rest of the header runs from the pinned ends to the battery limits
     assert last(s1) == (40, 25, 7) and first(s3) == (80, 25, 7)
+
+
+def test_each_branch_starts_exactly_where_its_header_is_cut_for_the_tee():
+    # core#95: the battery limits sit on the rack centreline (y 20), off the header's lane (a
+    # jog), and the users at non-round x; the run's cut and the branch's start were computed
+    # apart and rounded to the millimetre on either side (39.053 against 39.052), so the
+    # branch did not leave its header at the tee and was a 0.00 m layout-clash-pipe
+    xs = [37.0525, 39.0525, 41.0525, 58.2175]
+    n = len(xs)
+    equipment = [
+        item(
+            f"U{k}",
+            (x, 10, 1),
+            (1.5, 2, 2),
+            [nozzle(f"U{k}", "N1", [x, 11, 1], [0, 1, 0], [f"B{k}"])],
+        )
+        for k, x in enumerate(xs)
+    ]
+    segments = [seg("H0", "CWS-1", opc("opc_in", "OPC1"), tee("T0", 0), dn=400.0)]
+    segments += [
+        seg(f"H{k}", "CWS-1", tee(f"T{k - 1}", 1), tee(f"T{k}", 0), dn=400.0) for k in range(1, n)
+    ]
+    segments.append(seg(f"H{n}", "CWS-1", tee(f"T{n - 1}", 1), opc("opc_out", "OPC2"), dn=400.0))
+    segments += [seg(f"B{k}", f"CWS-{k + 2}", tee(f"T{k}", 2), nz(f"U{k}")) for k in range(n)]
+    lines = LineList.model_validate(
+        {
+            "lines": [{"number": "CWS-1", "from": "BL", "to": "BL", "nominal_diameter": "DN400"}]
+            + [
+                {
+                    "number": f"CWS-{k + 2}",
+                    "from": "CWS-1",
+                    "to": f"U{k}",
+                    "nominal_diameter": "DN100",
+                }
+                for k in range(n)
+            ]
+        }
+    )
+    limits = [
+        {"id": "W", "lines": ["CWS-1"], "point": [10, 20, 6.203]},
+        {"id": "E", "lines": ["CWS-1"], "point": [110, 20, 6.203]},
+    ]
+    routing = Routing.model_validate({"rules": {"battery_limits": limits}})
+    model_ = {"equipment": equipment, "racks": [], "structures": [], "zones": []}
+    result = route_model(model_, segments, lines, routing, plan=plan())
+    assert result.unrouted == []
+    h0 = pipe(result, "H0")
+    assert first(h0) == (10, 20, 6.203) and first(h0)[1] != h0["points"][-1][1]  # the jog
+    model_["pipes"] = _round(result.pipes)  # as written to layout/plant-model.yaml
+    written = {p["segment"]: p for p in model_["pipes"]}
+    for k, x in enumerate(xs):
+        header, after, branch = (
+            pipe(result, f"H{k}"),
+            pipe(result, f"H{k + 1}"),
+            pipe(result, f"B{k}"),
+        )
+        assert last(header) == first(after) == first(branch)  # one point, before rounding
+        assert last(header)[0] == pytest.approx(x)
+        assert written[f"H{k}"]["points"][-1] == written[f"B{k}"]["points"][0]  # and after
+    clashes = [f for f in model_rules(model_, routing) if f.rule == "cheme.layout-clash-pipe"]
+    assert clashes == []
+
+
+def test_split_at_many_shares_each_cut_point():
+    route = [(20.0, 110.0, -3.8), (124.0, 110.0, -3.8), (124.0, 108.5, -3.8), (295.0, 108.5, -3.8)]
+    cuts = [108.55676565, 201.1525, 203.1525, 205.1525, 223.205]
+    pieces, points = split_at_many(route, cuts)
+    assert len(pieces) == len(cuts) + 1 and pieces[0][0] == route[0] and pieces[-1][-1] == route[-1]
+    for k, point in enumerate(points):
+        assert pieces[k][-1] is point and pieces[k + 1][0] is point
+    assert points[1] == point_at(route, cuts[1])[0]  # the tee where a branch starts (ammonia-1)
+    assert pieces[0] == [route[0], route[1], route[2], points[0]]
+    # a point another pipe already starts at, within 1 µm of the cut, is the cut point
+    near = (points[2][0] + 4e-7, 108.5, -3.8)
+    assert split_at_many(route, cuts, [None, None, near, None, None])[1][2] is near
+    assert split_at_many(route, [], [])[0] == [route]
 
 
 @pytest.mark.parametrize(

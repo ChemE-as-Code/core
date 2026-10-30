@@ -128,7 +128,7 @@ from chemeascode.domains.spatial.geometry3d import (
     scale,
     segment_distance,
     simplify,
-    split_at,
+    split_at_many,
     sub,
 )
 from chemeascode.domains.spatial.pid_network import Segment
@@ -1869,19 +1869,12 @@ class Router:
         total = polyline_length(route)
         n = len(segs)
         cuts = self._cuts(chain, route, total)
-        pieces = []
-        rest = route
-        done = 0.0
-        for cut in cuts:
-            before, rest = split_at(rest, cut - done)
-            done = cut
-            pieces.append(before)
-        pieces.append(rest)
-        junctions = []
-        for cut, key in zip(cuts, chain.junctions, strict=True):
-            point, _ = point_at(route, cut)
-            if key:
-                junctions.append((key, point))
+        # one point per tee: where the run is cut is where the branch starts (#95)
+        pinned = [self.junction_points.get(key or "") for key in chain.junctions]
+        pieces, points_at = split_at_many(route, cuts, pinned)
+        junctions = [
+            (key, point) for key, point in zip(chain.junctions, points_at, strict=True) if key
+        ]
         if extra.get("on_rack") and len(pieces) > 1:
             pieces = _flat_bottom(pieces, sizes, extra["on_rack"], extra.get("lane_z", []))
         planned = []
