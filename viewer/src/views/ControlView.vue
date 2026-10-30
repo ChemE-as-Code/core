@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import SectionBar from "@/components/SectionBar.vue";
+import { computed, ref } from "vue";
 import { api, ApiError, type ControlReport } from "@/api";
 import FindingsList from "@/components/FindingsList.vue";
 import LoadState from "@/components/LoadState.vue";
@@ -41,6 +42,16 @@ const issues = useIssues();
 /** "New issue about <loop>": the action-item form with the loop in its References. */
 const loopIssue = (id: string) => newIssueUrl(issues.value, { refs: `${LOOPS} ${id}` });
 const yesNo = (value: boolean | null, yes: string, no: string) => (value === null ? "?" : value ? yes : no);
+
+// Long loop rows are clamped to three lines (#67); a row unfolds with "more", all with "all details".
+const allLoops = ref(false);
+const openLoops = ref(new Set<string>());
+function toggleLoop(id: string): void {
+  const next = new Set(openLoops.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  openLoops.value = next;
+}
 </script>
 
 <template>
@@ -70,6 +81,7 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
     </div>
 
     <template v-if="data">
+      <SectionBar />
       <p class="muted">
         Proposed control intent, not an implementation. The status of each file comes from the review records:
         <em>drafted</em> (no current review), <em>reviewed</em>, <em>accepted</em> (a human review with no blocking finding open).
@@ -106,9 +118,12 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
           Loops <span class="muted">{{ data.loops.length }}</span>
           <span v-if="status(LOOPS)" class="badge" :class="statusTone(status(LOOPS)!.status)">{{ status(LOOPS)!.status }}</span>
         </h2>
-        <p class="muted">action: direct (the output rises with the measurement) or reverse; fail: the position on loss of signal, power or air; ? not known yet.</p>
+        <div class="loops-head">
+          <p class="muted">action: direct (the output rises with the measurement) or reverse; fail: the position on loss of signal, power or air; ? not known yet.</p>
+          <label class="check"><input v-model="allLoops" type="checkbox" data-action="all-loop-details" /> all details</label>
+        </div>
         <div class="table-wrap">
-          <table class="data loops">
+          <table class="data loops" :class="{ compact: !allLoops }">
             <thead>
               <tr>
                 <th scope="col">Loop</th>
@@ -124,31 +139,45 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
               </tr>
             </thead>
             <tbody>
-              <tr v-for="loop in data.loops" :key="loop.id" :data-loop="loop.id">
+              <tr v-for="loop in data.loops" :key="loop.id" :data-loop="loop.id" :class="{ open: openLoops.has(loop.id) }">
                 <th scope="row">
                   <strong>{{ loop.id }}</strong>
                   <span class="title">{{ loop.title }}</span>
                   <span v-if="loop.section" class="faint">{{ loop.section }}</span>
                   <a v-if="loopIssue(loop.id)" class="new-issue" :href="loopIssue(loop.id)!" target="_blank" rel="noopener" data-action="new-issue">New issue about {{ loop.id }}</a>
+                  <button
+                    v-if="!allLoops"
+                    type="button"
+                    class="more"
+                    :aria-expanded="openLoops.has(loop.id)"
+                    data-action="loop-details"
+                    @click="toggleLoop(loop.id)"
+                  >
+                    {{ openLoops.has(loop.id) ? "less" : "more" }}
+                  </button>
                 </th>
-                <td>{{ loop.variable ?? "?" }}: {{ loop.measurement.join(", ") || "?" }}</td>
-                <td>{{ loop.controller ?? "–" }}</td>
-                <td>{{ loop.action ?? "?" }}</td>
-                <td>{{ loop.final_elements.join("; ") || "–" }}</td>
-                <td>{{ loop.targets.join("; ") || "?" }}</td>
-                <td>{{ loop.modes.join(", ") || "?" }}<template v-if="loop.normal_mode"> (normal {{ loop.normal_mode }})</template></td>
+                <td><div class="cell">{{ loop.variable ?? "?" }}: {{ loop.measurement.join(", ") || "?" }}</div></td>
+                <td><div class="cell">{{ loop.controller ?? "–" }}</div></td>
+                <td><div class="cell">{{ loop.action ?? "?" }}</div></td>
+                <td><div class="cell">{{ loop.final_elements.join("; ") || "–" }}</div></td>
+                <td><div class="cell">{{ loop.targets.join("; ") || "?" }}</div></td>
+                <td><div class="cell">{{ loop.modes.join(", ") || "?" }}<template v-if="loop.normal_mode"> (normal {{ loop.normal_mode }})</template></div></td>
                 <td>
-                  {{ loop.links.join("; ") }}
-                  <template v-if="loop.interlocks.length">
-                    <RouterLink :to="{ name: 'cause-effect' }">C&amp;E {{ loop.interlocks.join(", ") }}</RouterLink>
-                  </template>
+                  <div class="cell">
+                    {{ loop.links.join("; ") }}
+                    <template v-if="loop.interlocks.length">
+                      <RouterLink :to="{ name: 'cause-effect' }">C&amp;E {{ loop.interlocks.join(", ") }}</RouterLink>
+                    </template>
+                  </div>
                 </td>
                 <td>
-                  <span v-for="alarm in loop.alarms" :key="alarm" class="unresolved">{{ alarm }}</span>
+                  <div class="cell"><span v-for="alarm in loop.alarms" :key="alarm" class="unresolved">{{ alarm }}</span></div>
                 </td>
                 <td>
-                  <span v-if="worstLevel(loop.findings)" class="badge" :class="worstLevel(loop.findings)!">{{ countsText(loop.findings) }}</span>
-                  <span v-for="item in loop.unresolved" :key="item" class="muted unresolved">{{ item }}</span>
+                  <div class="cell">
+                    <span v-if="worstLevel(loop.findings)" class="badge" :class="worstLevel(loop.findings)!">{{ countsText(loop.findings) }}</span>
+                    <span v-for="item in loop.unresolved" :key="item" class="muted unresolved">{{ item }}</span>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -161,12 +190,16 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
           Sequences <span class="muted">{{ data.sequences.length }}</span>
           <span v-if="status(SEQUENCES)" class="badge" :class="statusTone(status(SEQUENCES)!.status)">{{ status(SEQUENCES)!.status }}</span>
         </h2>
-        <article v-for="seq in data.sequences" :key="seq.id" class="sequence" :data-sequence="seq.id">
-          <h3>
-            {{ seq.id }} {{ seq.title }}
-            <span class="badge info">{{ seq.mode }}</span>
-            <span v-if="worstLevel(seq.findings)" class="badge" :class="worstLevel(seq.findings)!">{{ countsText(seq.findings) }}</span>
-          </h3>
+        <!-- folded when there are more than two (#67): the summary names each, a click shows its steps -->
+        <details v-for="seq in data.sequences" :key="seq.id" class="sequence" :data-sequence="seq.id" :open="data.sequences.length <= 2">
+          <summary>
+            <h3>
+              {{ seq.id }} {{ seq.title }}
+              <span class="badge info">{{ seq.mode }}</span>
+              <span v-if="worstLevel(seq.findings)" class="badge" :class="worstLevel(seq.findings)!">{{ countsText(seq.findings) }}</span>
+              <span class="muted steps">{{ seq.steps.length }} steps</span>
+            </h3>
+          </summary>
           <p v-if="seq.interlocks.length" class="muted">Trips (C&amp;E): {{ seq.interlocks.join(", ") }}</p>
           <template v-if="seq.permissives.length">
             <p>Start permissives:</p>
@@ -210,7 +243,7 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
             ><template v-if="seq.reset.restart">; restart when {{ seq.reset.restart }}</template>
           </p>
           <p v-for="item in seq.unresolved" :key="item" class="muted">Open: {{ item }}</p>
-        </article>
+        </details>
       </section>
 
       <section v-if="narrative" aria-label="Process narrative">
@@ -281,5 +314,48 @@ const yesNo = (value: boolean | null, yes: string, no: string) => (value === nul
 }
 table.loops td {
   min-width: 8em;
+}
+.loops-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+.loops-head p {
+  flex: 1 1 400px;
+}
+.loops-head .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+.loops.compact tr:not(.open) .cell {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.more {
+  display: block;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.sequence > summary {
+  cursor: pointer;
+}
+.sequence > summary h3 {
+  display: inline;
+}
+.sequence .steps {
+  font-weight: 400;
+  font-size: var(--text-sm);
 }
 </style>

@@ -4,6 +4,7 @@ import {
   balanceDetail,
   bfdConnectionOf,
   filterStreams,
+  compactComposition,
   formatComposition,
   formatValue,
   groupSheets,
@@ -192,5 +193,21 @@ describe("processSections", () => {
 
   it("is null for other kinds", () => {
     expect(processSections({ kind: "equipment", schema: null, data: { equipment: [] } })).toBeNull();
+  });
+});
+
+describe("compactComposition", () => {
+  const stream = (values: Record<string, number>) =>
+    ({ composition: { basis: "mole_fraction", values, provenance: "calculated" } }) as unknown as Parameters<typeof compactComposition>[0];
+
+  it("keeps the largest three fractions and counts the rest", () => {
+    const air = stream({ N2: 0.754593, O2: 0.202435, AR: 0.0090261, H2O: 0.03354, CO2: 0.0004059 });
+    expect(compactComposition(air)).toEqual({ text: "mol: N2 0.755, O2 0.202, H2O 0.0335", more: 2 });
+  });
+
+  it("shows a short composition whole (one left out would save nothing)", () => {
+    expect(compactComposition(stream({ N2: 0.7812, O2: 0.2096 }))).toEqual({ text: "mol: N2 0.7812, O2 0.2096", more: 0 });
+    expect(compactComposition(stream({ A: 0.4, B: 0.3, C: 0.2, D: 0.1 }))?.more).toBe(0);
+    expect(compactComposition({ composition: null } as unknown as Parameters<typeof compactComposition>[0])).toBeNull();
   });
 });

@@ -53,6 +53,23 @@ export function formatComposition(stream: ProcessStream): string {
     .join(", ")}`;
 }
 
+/**
+ * The largest `top` fractions of a composition (`mol: N2 0.755, O2 0.202, AR 0.00903`) and how
+ * many are left out: a stream table row stays a few lines high (#67); the full list is a click away.
+ */
+export function compactComposition(stream: ProcessStream, top = 3): { text: string; more: number } | null {
+  const c = stream.composition;
+  if (!c) return null;
+  const entries = Object.entries(c.values);
+  if (entries.length <= top + 1) return { text: formatComposition(stream), more: 0 };
+  const basis = c.basis === "mole_fraction" ? "mol" : c.basis === "mass_fraction" ? "mass" : c.basis;
+  const largest = [...entries].sort((a, b) => b[1] - a[1]).slice(0, top);
+  return {
+    text: `${basis}: ${largest.map(([k, v]) => `${k} ${Number(v.toPrecision(3))}`).join(", ")}`,
+    more: entries.length - top,
+  };
+}
+
 export function formatPhase(stream: ProcessStream): string {
   const p = stream.phase;
   if (!p) return "";

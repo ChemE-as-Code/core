@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionBar from "@/components/SectionBar.vue";
 import { computed, watch } from "vue";
 import type { MaturityLevel } from "@/api";
 import FindingsList from "@/components/FindingsList.vue";
@@ -132,6 +133,7 @@ function reevaluate(): void {
     </div>
 
     <template v-if="report">
+      <SectionBar />
       <div v-if="report.currency === 'stale'" class="notice warning" role="status" data-testid="maturity-stale">
         <strong>Outdated report.</strong> {{ MATURITY_FILE }} at this revision was recorded for other inputs: changed since
         <code v-for="p in report.inputs?.changed ?? []" :key="p" class="path">{{ p }}</code>. It is shown below as recorded, not as
