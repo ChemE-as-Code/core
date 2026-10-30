@@ -221,9 +221,9 @@ uv run --group docs mkdocs build --strict  # site/, fails on any warning
 
 Most guide pages contain no copy of their text: a comment such as
 `<!-- readme: ### process: BFD, PFD, stream table and properties -->` includes that section of
-`README.md` (or, with `include:`, of another repository file such as the project template's
-`STAGES.md`) when the site is built (`docs/hooks/includes.py`). Change the README, not the page;
-renaming a README heading that a page includes fails the strict build. The CLI, schema and serve
+`REFERENCE.md`, the full reference (or, with `include:`, of another repository file such as the project template's
+`STAGES.md`) when the site is built (`docs/hooks/includes.py`). Change REFERENCE.md, not the page;
+renaming a heading there that a page includes fails the strict build. The CLI, schema and serve
 API reference pages are not files at all: `docs/hooks/reference.py` generates them from the
 Typer app, the `cheme schema` catalogue and the OpenAPI document of `cheme serve` on every build.
 A new page must be added to `nav` in `mkdocs.yml`.

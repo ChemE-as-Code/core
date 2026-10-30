@@ -37,6 +37,6 @@ holds data, not tools: every check runs the installed `cheme`.
 
 - pre-release commit 62c29e1 "plantcode 0.1.0: validate, fmt, render, diff, check for git
   plant repositories" (2026-10-17).
-- `README.md` (opening paragraph, "How the pieces fit together"),
+- `REFERENCE.md` (opening paragraph, "How the pieces fit together"),
   `src/chemeascode/foundation/workspace.py` (`Workspace`: the file kinds of a plant repository),
   `src/chemeascode/templates/project/`.

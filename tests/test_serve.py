@@ -745,10 +745,10 @@ def test_serve_command(committed: Path, monkeypatch):
 
 
 def test_every_route_is_in_the_readme_table(plant: Path):
-    """README's serve table is the endpoint contract the viewer relies on."""
+    """REFERENCE.md's serve table is the endpoint contract the viewer relies on."""
     from fastapi.routing import APIRoute
 
-    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    readme = (Path(__file__).resolve().parents[1] / "REFERENCE.md").read_text(encoding="utf-8")
     rows = {
         line.split("`")[1].split("?")[0] for line in readme.splitlines() if line.startswith("| `")
     }

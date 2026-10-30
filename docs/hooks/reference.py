@@ -277,8 +277,8 @@ def _openapi() -> dict:
 
 
 def _readme_notes() -> dict[str, str]:
-    """What each route returns, from the endpoint table of README.md's ``### serve`` section."""
-    readme = Path(__file__).resolve().parents[2] / "README.md"
+    """What each route returns, from the endpoint table of REFERENCE.md's ``### serve`` section."""
+    readme = Path(__file__).resolve().parents[2] / "REFERENCE.md"
     notes, inside = {}, False
     for line in readme.read_text(encoding="utf-8").splitlines():
         if line.startswith("#"):
@@ -305,7 +305,7 @@ def api_page() -> str:
         " `chemeascode.interfaces.api.serve.create_app`; a running server also serves it at"
         " `/api/openapi.json`. What each route returns, the error codes and the security rules"
         ' are described in [Viewer and cheme serve](../guides/serve.md); the "Returns" notes'
-        " below come from the endpoint table there (README.md).",
+        " below come from the endpoint table there (REFERENCE.md).",
         "",
         "| method | path | summary |",
         "|---|---|---|",

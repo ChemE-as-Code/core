@@ -33,4 +33,4 @@ charts), not engineering results.
 - pre-release viewer commit 76e15e3, pre-release viewer commit 642a723 (pre-release viewer PR 1): "coded against the plantcode serve JSON API
   contract", "Typed API client, Vite dev proxy".
 - pre-release viewer commit c7f2b63 (pre-release viewer PR 7): every field the API sends is typed; contract test.
-- README, "Design notes": "`src/api.ts` is the only code that talks to the server."
+- REFERENCE.md (formerly the README), "Design notes": "`src/api.ts` is the only code that talks to the server."

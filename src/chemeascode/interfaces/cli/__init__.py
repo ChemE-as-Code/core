@@ -110,8 +110,8 @@ def init(
     typer.echo(
         "Note: Claude Code applies .claude/settings.json (the agents' allowlist) only once the "
         "folder is trusted: open it interactively once and accept the trust dialog, or run "
-        "headless with --settings .claude/settings.json (cheme-as-code README, 'Running agents "
-        "headless')."
+        "headless with --settings .claude/settings.json (cheme-as-code REFERENCE.md, "
+        "'Running agents headless')."
     )
 
 

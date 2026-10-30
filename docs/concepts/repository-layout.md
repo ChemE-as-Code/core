@@ -7,7 +7,7 @@ design reviews.
 
 The table below is the template's own map of the repository, as `cheme init` writes it:
 
-<!-- include: src/chemeascode/templates/project/README.md :: # {{plant_name}} | body | intro -->
+<!-- include: src/chemeascode/templates/project/README.md :: ## What is where | body -->
 
 Optional files join as the design advances: the 3D layout (`layout/site-plan.yaml`,
 `layout/building.yaml`, `layout/equipment-placement.yaml`, ...; see [3D layout](../guides/layout.md)),

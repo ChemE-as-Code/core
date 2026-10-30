@@ -17,7 +17,7 @@ sign-off) for $29 of a $50 cap. Everything here ships with the template, in
 - `scripts/agent-run/stages.json`: the stages, each with `id`, `target` (a `plant.yaml` stage),
   `task`, `budget_usd` and `review_budget_usd`.
 - A trusted folder, or the runner's `--settings .claude/settings.json` (see "Running agents
-  headless" in the README): without either, `.claude/settings.json` is ignored and commands are
+  headless" in REFERENCE.md): without either, `.claude/settings.json` is ignored and commands are
   denied. With `--settings` Claude Code still prints `Ignoring N permissions.allow entries`
   for the untrusted project file while the entries apply from the flag; the runner's
   `permission_denials` count in `launch.json` is the measure.
@@ -155,7 +155,7 @@ and $5.11 of $6. Commit midway in every stage.
 Records are kept per run, not per stage: every session, stage or review, leaves its own folder
 `runs/<run-id>/` in the plant repository (run id: the start in UTC, `YYYYMMDD-HHMMSS-<slug>`, the
 slug the stage id or `review-<stage>`), written by `cheme runs record` (ADR 0029; the format is
-in the README, "Run records"):
+in REFERENCE.md, "Run records"):
 
 | file | holds |
 |---|---|
@@ -199,6 +199,6 @@ new run. `cheme runs list` gives one line per run (cost, wall time, turns, compl
 - Branches and merges: the template's `AGENTS.md`, `STAGES.md` and the `review` skill (stage
   work on `stage/<stage>-<topic>`, merged by a human or the reviewer; a stage counts once its
   sign-off is on the default branch).
-- Headless permissions: "Running agents headless" in the README.
+- Headless permissions: "Running agents headless" in REFERENCE.md.
 - Where the repository stands between stages: `cheme status [--json]`.
 - Sign-off: `cheme check --stage <stage> --write --review <record>`.

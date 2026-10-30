@@ -1,10 +1,12 @@
-"""MkDocs hook: include sections of repository files (README.md above all) into pages.
+"""MkDocs hook: include sections of repository files (REFERENCE.md above all) into pages.
 
 Copied from ChemE-as-Code/core (docs/hooks/includes.py), so every ChemE-as-Code docs site
-includes its sources the same way; the only change is that GitHub links follow ``repo_url``.
+includes its sources the same way; the changes are that GitHub links follow ``repo_url`` and
+that ``readme:`` reads the viewer's full reference, REFERENCE.md (README.md is the short
+introduction).
 
-The README and the project template are the single sources of the command guides; the pages
-only arrange their sections. A page includes one with a comment on a line of its own:
+REFERENCE.md is the single source of the viewer's guides; the pages only arrange its
+sections. A page includes one with a comment on a line of its own:
 
     <!-- readme: ### process: BFD, PFD, stream table and properties -->
     <!-- readme: ### validate | without: #### 3D layout -->
@@ -12,7 +14,7 @@ only arrange their sections. A page includes one with a comment on a line of its
     <!-- include: src/chemeascode/templates/project/STAGES.md :: # Stages | body -->
     <!-- include-code: src/chemeascode/templates/project/plant.yaml yaml -->
 
-``readme:`` reads README.md, ``include: PATH ::`` any Markdown file of the repository. The
+``readme:`` reads REFERENCE.md, ``include: PATH ::`` any Markdown file of the repository. The
 section runs from the heading to the next heading of the same or a higher level. Its headings
 are shifted so that the section heading becomes ``##``. Options: ``body`` leaves the section
 heading out, ``intro`` keeps only the text before the first subheading, ``without:`` drops
@@ -32,6 +34,9 @@ from pathlib import Path
 
 log = logging.getLogger("mkdocs.hooks.includes")
 
+# The file ``readme:`` directives read: the viewer's full reference (README.md is the short intro).
+REFERENCE = "REFERENCE.md"
+
 DIRECTIVE = re.compile(
     r"^<!--\s*(?P<kind>readme|include|include-code):\s*(?P<spec>.+?)\s*-->\s*$", re.M
 )
@@ -49,7 +54,8 @@ class IncludeError(ValueError):
 def on_config(config):
     global _root, _repo_blob
     _root = Path(config.config_file_path).parent
-    _repo_blob = (config.repo_url or "").rstrip("/") + "/blob/main/"
+    # The Viewer is the viewer/ folder of ChemE-as-Code/core: repository links get that prefix.
+    _repo_blob = (config.repo_url or "").rstrip("/") + "/blob/main/viewer/"
     return config
 
 
@@ -159,7 +165,7 @@ def on_page_markdown(markdown, page, config, files):
         kind, spec = m.group("kind"), m.group("spec")
         try:
             if kind == "readme":
-                return _section_text("README.md", spec, page.file.src_uri)
+                return _section_text(REFERENCE, spec, page.file.src_uri)
             if kind == "include":
                 source, sep, rest = spec.partition("::")
                 if not sep:
