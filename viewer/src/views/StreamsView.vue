@@ -16,6 +16,7 @@ import {
   balanceDetail,
   bfdConnectionOf,
   filterStreams,
+  compactComposition,
   formatComposition,
   formatPhase,
   streamStatus,
@@ -113,6 +114,8 @@ watch(
     document.querySelector(`tr[data-stream="${CSS.escape(selected.value)}"]`)?.scrollIntoView?.({ block: "center" });
   },
 );
+// A composition shows its largest fractions (#67): the whole list on a selected row, or for all rows.
+const fullComposition = ref(false);
 </script>
 
 <template>
@@ -159,6 +162,7 @@ watch(
           {{ w === "all" ? "All" : w === "bfd" ? "On BFD" : "Problems" }}
         </button>
       </div>
+      <label class="check"><input v-model="fullComposition" type="checkbox" data-action="full-composition" /> full composition</label>
       <span class="spacer" />
       <span class="legend muted">
         <span class="prov given">G</span> given <span class="prov assumed">A</span> assumed
@@ -204,7 +208,7 @@ watch(
               @keydown.enter.self="toggle(s.id)"
               @keydown.space.self.prevent="toggle(s.id)"
             >
-              <td>
+              <td class="stream">
                 <strong>{{ s.id }}</strong> <span class="muted">{{ s.title }}</span>
                 <span v-if="s.kind !== 'material'" class="badge info">{{ s.kind }}</span>
                 <div v-if="s.imbalance.length" class="err">balance: {{ s.imbalance.join(", ") }}</div>
@@ -215,9 +219,13 @@ watch(
               <td class="num" :data-field="'temperature'"><ProcessValueCell :value="s.properties.temperature" /><span v-if="isFilled(s.id, 'temperature')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
               <td class="num" :data-field="'flow'"><ProcessValueCell :value="s.properties.flow" /><span v-if="isFilled(s.id, 'flow')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
               <td class="num" :data-field="'duty'"><ProcessValueCell :value="s.properties.duty" /><span v-if="isFilled(s.id, 'duty')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
-              <td>
+              <td class="composition">
                 <template v-if="s.composition">
-                  {{ formatComposition(s) }} <span class="prov" :class="s.composition.provenance">{{ PROVENANCE_SHORT[s.composition.provenance] }}</span>
+                  <template v-if="fullComposition || selected === s.id || !compactComposition(s)?.more">{{ formatComposition(s) }}</template>
+                  <span v-else :title="formatComposition(s)" data-composition="compact"
+                    >{{ compactComposition(s)!.text }} <span class="muted">+{{ compactComposition(s)!.more }} more</span></span
+                  >
+                  <span class="prov" :class="s.composition.provenance">{{ PROVENANCE_SHORT[s.composition.provenance] }}</span>
                   <span v-if="isFilled(s.id, 'composition')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span>
                 </template>
               </td>
@@ -345,5 +353,18 @@ tr.stale td {
 .err {
   color: var(--bad);
   font-size: 12px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+/* wide enough that a row stays two or three lines (#67); the table scrolls sideways */
+.stream-table td.stream {
+  min-width: 200px;
+}
+.stream-table td.composition {
+  min-width: 280px;
 }
 </style>

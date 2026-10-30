@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionBar from "@/components/SectionBar.vue";
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
@@ -108,6 +109,8 @@ function refresh(): void {
     <LoadState :loading="records.loading.value && !records.data.value" :error="records.error.value" @retry="records.reload" />
 
     <template v-if="records.data.value">
+      <!-- two sections, but the open findings run long: the records are a click away -->
+      <SectionBar :min="2" />
       <section aria-label="Open findings">
         <h2>Open findings</h2>
         <div class="toolbar filters">

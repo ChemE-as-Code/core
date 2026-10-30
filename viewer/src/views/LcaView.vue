@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionBar from "@/components/SectionBar.vue";
 import { computed, ref, watch } from "vue";
 import { api, ApiError, type Branch, type Commit, type Finding, type LcaReport } from "@/api";
 import LciReadiness from "@/components/LciReadiness.vue";
@@ -168,6 +169,7 @@ function downloadResults(): void {
     </div>
 
     <template v-if="data">
+      <SectionBar />
       <p v-if="data.example_factors" class="notice warning" role="note">
         The factors are an example (<code>example: true</code> in <code>lca/factors.yaml</code>): these numbers characterise nothing real.
       </p>

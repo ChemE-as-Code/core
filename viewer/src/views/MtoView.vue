@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionBar from "@/components/SectionBar.vue";
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError, type EquipmentEstimate, type EstimateLine, type Finding, type MtoReport, type MtoRow } from "@/api";
@@ -144,6 +145,7 @@ const SECTION_TITLES: Record<string, string> = { direct: "direct", indirect: "in
     </div>
 
     <template v-if="tab === 'takeoff' && data">
+      <SectionBar />
       <div class="toolbar">
         <input v-model="query" class="filter" type="search" placeholder="Filter: DN100, PN16, HEB300, cold…" aria-label="Filter the rows" />
         <span class="spacer" />

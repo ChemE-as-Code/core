@@ -40,6 +40,8 @@ test.describe("control records", () => {
     await expect(page.locator("[data-control-rev]")).toBeVisible();
     const link = page.getByRole("region", { name: "Files" }).getByRole("link", { name: "control/loops.yaml" });
     await expect(link).not.toHaveAttribute("href", /rev=/);
+    // its seven findings are info, folded (#67)
+    await page.getByTestId("info-findings").locator("summary").click();
     const finding = page.getByRole("region", { name: "Findings" }).getByRole("link").first();
     await expect(finding).not.toHaveAttribute("href", /rev=/);
   });

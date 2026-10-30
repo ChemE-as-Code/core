@@ -442,3 +442,8 @@ details > summary {
     padding: var(--space-3);
   }
 }
+
+/* A section the section bar links to (src/components/SectionBar.vue) lands below the sticky bar. */
+main section[id] {
+  scroll-margin-top: 48px;
+}

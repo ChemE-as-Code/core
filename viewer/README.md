@@ -57,6 +57,14 @@ with its filter, for experts: folded by default, it opens by itself when a page 
 navigation does not list (and keeps the choice made with its toggle in the browser). The home
 page lists the same groups. On phones the sidebar is a drawer behind the menu button.
 
+Long pages (Control, MTO, LCA, TEA, Maturity, Reviews) have a section bar under the title
+(`src/components/SectionBar.vue`): a link to each section, kept in view while the page scrolls,
+the section in view marked; a section deep-links as `#sec-<name>` (`/control#sec-loops`), in a
+snapshot too. A findings list folds its info findings away when there are more than five, the
+control loops are clamped to three lines a row ("more" on a row, "all details" for all), the
+sequences are folded when there are more than two, and the stream table shows a composition's
+three largest fractions ("+n more"; all of it on a selected row or with "full composition").
+
 The revision selector in the header (working tree, a branch, or any tag or sha via `…`) sets
 `?rev=` for every page. While another revision or case loads, a page shows its loading state,
 never the previous one's data under the new label.

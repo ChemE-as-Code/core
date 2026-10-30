@@ -6,6 +6,7 @@
  * page states it (`src/lib/tea.ts`). Sections render only when the payload has their data, and any
  * array of records core adds later shows as a table at the end.
  */
+import SectionBar from "@/components/SectionBar.vue";
 import { computed, ref, watch } from "vue";
 import { api, ApiError, type Finding, type TeaReport } from "@/api";
 import LoadState from "@/components/LoadState.vue";
@@ -202,6 +203,7 @@ const provenanceBadge = (p: string | undefined) => (p === "given" ? "pass" : p =
     </div>
 
     <template v-if="data">
+      <SectionBar />
       <p v-if="data.example" class="notice warning" role="note">
         The premises are an example (<code>example: true</code> in <code>estimate/tea.yaml</code>): these numbers evaluate nothing real.
       </p>
