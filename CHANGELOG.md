@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `cheme layout build` routes a line with battery limits at both ends, such as a cooling water
+  header from the battery limit to its users' dead end (#72). It used to stay unrouted ("no
+  other end to start from"), with every branch waiting for its tee. The line now runs along a
+  rack from end to end: the rack of its `rack` intent, else of its `battery_limits` rule, else
+  the rack nearest its branches. It runs on its tier or at its `elevation` intent, with its
+  tees in the order of its branches. A second matching `battery_limits` rule places its other
+  end. When the line still cannot be placed, it stays unrouted and the reason says why
+  (`battery limits at both ends (...): ...`). Pinned routes stay as they are.
+
 ## 1.1.0 (2026-10-30)
 
 Minor release: a motor's `cable_entry` ends its tray beside the machine, so crane lanes over
