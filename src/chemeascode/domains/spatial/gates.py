@@ -25,7 +25,8 @@ committed model ``layout/plant-model.yaml`` and the findings of ``cheme validate
 - ``cables``: the repository has an electrical list, the model has its cables, and no
   ``layout-cable-missing`` or ``layout-cable-unrouted`` finding is left unaccepted (a cable to
   every motor and instrument, each routed in trays);
-- ``trays``: no ``layout-tray-fill`` or ``layout-tray-separation`` finding is left unaccepted;
+- ``trays``: no ``layout-tray-fill``, ``layout-tray-separation`` or ``layout-tray-voltage``
+  finding is left unaccepted;
 - ``lifting``: every heavy item (``heavy_lift_t``) has its crane (a building's overhead
   crane, or a crane pad within reach with a clear lane) and a laydown, and, when the plant
   gives crane load charts (``layout/crane-chart.yaml``), a chart that carries the lift: no
@@ -77,7 +78,11 @@ REQUIREMENTS = (
 )
 #: Model findings the ``cables`` and ``trays`` requirements fail on.
 CABLE_RULES = ("cheme.layout-cable-missing", "cheme.layout-cable-unrouted")
-TRAY_RULES = ("cheme.layout-tray-fill", "cheme.layout-tray-separation")
+TRAY_RULES = (
+    "cheme.layout-tray-fill",
+    "cheme.layout-tray-separation",
+    "cheme.layout-tray-voltage",
+)
 #: Findings the ``zones`` requirement fails on: a zone source the model cannot place.
 ZONE_RULES = ("cheme.layout-zone-source",)
 #: Findings the ``lifting`` requirement fails on.
@@ -365,8 +370,13 @@ def layout_gate(
         open_ = _unaccepted(findings, TRAY_RULES, accept)
         if open_:
             problems.append(
-                _named([f.key or f.message for f in open_], "tray fill or separation findings")
-                + " not accepted; widen the tier, split the trays or accept with a reason"
+                _named(
+                    [f.key or f.message for f in open_],
+                    "tray fill, separation or voltage findings",
+                )
+                + " not accepted; declare more power trays on the rack, or trays of the "
+                "cables' voltage class (power_trays in electrical/tray-rules.yaml), split the "
+                "loads or accept with a reason"
             )
     if "zones" in needs:
         zones = _load(workspace, "zones")

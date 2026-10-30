@@ -18,7 +18,7 @@ boxes, trays, schedule, rules), `domains/spatial/schemas.py` (`TrayRules`, the m
 | file | kind | what |
 |---|---|---|
 | `electrical/electrical-list.yaml` | `electrical` (control) | `substations` (`id`, `building`, `incoming_kv`), `transformers` (`tag`, `substation`, `rating_kva`, `primary_kv`, `secondary_v`, `feeds`), `rooms` (`id`, `kind: mcc \| switchgear \| control \| rack_room`, `building` or `point`, `voltage_v`), `defaults` (`lv_room`, `mv_room`, `control_room`, `lv_voltage_v` 400, `mv_voltage_v` 6600, `mv_above_kw` 200, `jb_capacity` 24, `spare_pairs` 0.2), `motors` (`driven`, `tag`, `power_kw`, `voltage_v`, `room`, `assumed`, `source`, `skip`, `cable_entry`: see [Motor cable entry](#motor-cable-entry)), `feeders` (`tag`, `item` or `point`, `power_kw`, ...), `junction_boxes` (`tag`, `point` or `area`, `instruments` patterns, `capacity`, `room`), `instruments` (`tag`, `jb`, `point`, `skip`) |
-| `electrical/tray-rules.yaml` (optional) | `trays` (spatial) | `rules`: `widths_mm` (100 .. 900), `depth_mm` 100, `fill_max_power` 0.3, `fill_max_instrument` 0.4, `separation_m` 0.3, `spacing_m` 0.15, `tier_gap_m` 1.5, `tiers: [{rack, elevation}]`, `lane_fraction` 0.25, `entry_elevation_m` 3, `branch_elevation_m` 3, `rack_reach_m` 50, `jb_elevation_m` 1.2, `jb_reach_m` 30, `termination_m` 1.5, `slack` 0.05, `grid_m` 0.5, `avoid_zones` [oxygen_enriched, hazardous], `support_span_m` 6, `support_reach_m` 1. Every default ASSUMED |
+| `electrical/tray-rules.yaml` (optional) | `trays` (spatial) | `rules`: `widths_mm` (100 .. 900), `depth_mm` 100, `fill_max_power` 0.3, `fill_max_instrument` 0.4, `separation_m` 0.3, `spacing_m` 0.15, `tier_gap_m` 1.5, `tiers: [{rack, elevation}]`, `power_trays: [{rack, trays}]` (below), `lv_max_v` 1000, `lane_fraction` 0.25, `entry_elevation_m` 3, `branch_elevation_m` 3, `rack_reach_m` 50, `jb_elevation_m` 1.2, `jb_reach_m` 30, `termination_m` 1.5, `slack` 0.05, `grid_m` 0.5, `avoid_zones` [oxygen_enriched, hazardous], `support_span_m` 6, `support_reach_m` 1. Every default ASSUMED |
 | `equipment/equipment-list.yaml`, `equipment/datasheets/<TAG>.yaml` | | the driven items; their power (`type_specific` or `operating`: `motor_kw`, `motor_power_kw`, `driver_kw`, `driver_power_kw`, `rated_power_kw`, `power_kw`) |
 | `control/instrument-list.yaml`, `pid/*.xml` | | the instruments; what each P&ID function measures (`SensingLocation`) and where it sits (`Location`: `Field` is a local gauge) |
 
@@ -94,6 +94,43 @@ Power cables (motors, feeders) and junction box home runs run in trays from thei
 is orthogonal, from the tray's end to the terminal box), times `1 + slack`, plus
 `termination_m` at each end, rounded up to the metre.
 
+## Several power trays per rack
+
+A rack has one power tray unless `power_trays` gives it more: side by side on its tray tier,
+centred on the power lane, `widths_mm[-1] + spacing_m` apart centre to centre (1.05 m with the
+defaults), the first nearest the rack's centreline.
+
+```yaml
+rules:
+  power_trays:
+    - {rack: PR-1, trays: 2}            # two trays, each takes any cable
+    - {rack: PR-7, trays: [hv, hv, lv]}  # one voltage class per tray
+```
+
+| field | meaning |
+|---|---|
+| `rack` | a rack of the site plan (once) |
+| `trays` | a count (1 .. 9; each tray takes any cable), or one class per tray: `hv` (cables rated above `lv_max_v`), `lv` (up to it) or `any` |
+| `lv_max_v` (rule) | the class limit, V (default 1000: the upper limit of low voltage in IEC 60038) |
+
+The build gives each power cable that runs on such a rack one of its trays, for its whole way
+along that rack (deterministic): the HV cables first, then the larger cross-section first, each
+into a tray of its class (else an `any` tray; else another, finding `tray-voltage`), among
+those the one that keeps its fullest piece along the cable's span under `fill_max_power` at the
+largest width, then the emptiest, then the first. Each tray is then cut and sized as a trunk of
+its own (id `PT-<rack>-<A|B|...>-<k>`) and checked for fill and separation like any tray. The
+room legs and links split with the trays they lead to (`PT-<room>-<A>`, `PT-<rack>-<rack>-<AB>`,
+the letters of the trays at each end; a rack's only tray has none); branches start at the
+cable's tray. The trays of a class record it (`voltage: hv|lv`); the cable schedule names each
+cable's trays. Without `power_trays` the model is unchanged.
+
+Keeping cables above and below about 1 kV in separate trays (or apart by a fixed barrier) is
+common practice; the US National Electrical Code (NFPA 70, 392.20(B), see e.g.
+[EC&M, "Mixing cables over and under 600V in cable tray"](https://www.ecmweb.com/national-electrical-code/article/20901257/mixing-cables-over-and-under-600v-in-cable-tray))
+allows the two in one tray only with a solid fixed barrier between them or with the higher
+voltage cables of type MC. The project's electrical standard decides; `power_trays` only
+declares the trays.
+
 ## Motor cable entry
 
 Without it a motor's branch runs to above the terminal box and drops onto the machine, so the
@@ -133,7 +170,8 @@ or with `offset_m`/`clearance_m` beside a `point`.
 
 | rule | level | when |
 |---|---|---|
-| `cheme.layout-tray-fill` | warning | a tray's fill over its `fill_max` (only at the largest width) |
+| `cheme.layout-tray-fill` | warning | a tray's fill over its `fill_max` (only at the largest width); the hint names the power trays a rack's trunk needs (`power_trays`) |
+| `cheme.layout-tray-voltage` | warning | a power tray of a class (`voltage`) carrying a cable of the other class (`lv_max_v` in `cabling.rules`): no tray of its class or `any` on the rack |
 | `cheme.layout-tray-separation` | warning | a power and an instrument tray closer than `separation_m` (`cabling.rules`) |
 | `cheme.layout-clash-tray` | warning | a tray through an item part (not the branch's drop onto its own item, unless the branch ends at a `cable_entry`), a pipe or a steel member |
 | `cheme.layout-tray-zone` | warning | a tray inside a zone (`layout/zones.yaml`) of a kind in `avoid_zones` (`cabling.rules`; default oxygen-enriched and hazardous areas): move the lane, or record the cable sheath and glands for the zone and accept it |
@@ -144,8 +182,9 @@ or with `offset_m`/`clearance_m` beside a `point`.
 `cheme validate` on the list: `electrical-duplicate`, `-unknown-room`,
 `-unknown-substation`, `-unknown-tag` (a motor's `driven`), `-unknown-jb`, `-cable-entry` (with
 the committed model; errors),
-`-motor-power`, `-motor-room` (warnings); `layout-tray-rack` (error) for a tray tier on a rack
-the site plan lacks.
+`-motor-power`, `-motor-room` (warnings); `layout-tray-rack` for a tray tier or `power_trays`
+entry on a rack the site plan lacks or a rack listed twice in `power_trays` (errors), and for
+more power trays than fit on the power half of the rack at the largest width (warning).
 
 ## Commands and gate
 
@@ -155,8 +194,8 @@ model (Markdown: the cables, totals by size, the trays with width and fill, what
 current.
 
 Gate `kind: layout-model` requirements: `cables` (an electrical list, a model with `cables`, no
-`layout-cable-missing` or `-unrouted` finding unaccepted) and `trays` (no `layout-tray-fill` or
-`-separation` finding unaccepted). The template's detail-stage gate `electrical` requires
+`layout-cable-missing` or `-unrouted` finding unaccepted) and `trays` (no `layout-tray-fill`,
+`-separation` or `-voltage` finding unaccepted). The template's detail-stage gate `electrical` requires
 `[model-current, cables, trays]`.
 
 ## Not modelled

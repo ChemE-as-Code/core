@@ -6,7 +6,7 @@ Electrical rooms, the motor list, junction boxes and the cable trays of the 3D m
 | file | what | written by |
 |---|---|---|
 | `electrical-list.yaml` | substations, transformers, rooms (`kind: mcc \| switchgear \| control \| rack_room`, in a building of `layout/building.yaml`), `defaults`, `motors` (power, voltage and room of the motors derived from the driven equipment; `cable_entry` where a motor's cable leaves the tray beside the machine), `feeders`, `junction_boxes`, `instruments` (`cheme schema electrical`) | people |
-| `tray-rules.yaml` (optional) | tray widths, depth, fill, power/instrument separation, rack tray tiers (`cheme schema trays`); every default is ASSUMED | people |
+| `tray-rules.yaml` (optional) | tray widths, depth, fill, power/instrument separation, rack tray tiers, several power trays per rack (`power_trays`, e.g. HV and LV apart) (`cheme schema trays`); every default is ASSUMED | people |
 | `cable-schedule.csv`, `cable-schedule.md` | every cable: from, to, size, trays, length | `cheme layout cables --write` |
 
 Example `electrical-list.yaml`:
