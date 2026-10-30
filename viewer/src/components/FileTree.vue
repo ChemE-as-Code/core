@@ -1,12 +1,18 @@
 <script setup lang="ts">
+// The raw repository files, for experts: folded by default, the page navigation above lists the
+// sheets and documents. It opens by itself when the page shows a file the navigation does not
+// list (and remembers when it is opened or closed by hand).
 import { computed, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { api, type FileKind, type TreeEntry } from "@/api";
-import { store } from "@/store";
 import { useAsync } from "@/lib/useAsync";
 import { useRev } from "@/lib/useRev";
 import { KIND_ICON, KIND_LABEL, paramPath, pathSegments, viewFor } from "@/lib/format";
-import { KIND_BADGE, groupSheets } from "@/lib/process";
+
+const props = defineProps<{
+  /** The files the page navigation shows (sheets, documents). */
+  navFiles: ReadonlySet<string>;
+}>();
 
 interface Node {
   name: string;
@@ -20,12 +26,36 @@ const route = useRoute();
 const { rev, withRev } = useRev();
 const filter = ref("");
 const expanded = reactive(new Set<string>());
+const OPEN_KEY = "cheme-viewer.files-open";
+
+/** The choice made with the toggle, kept per browser (storage can be blocked: then per page). */
+function storedOpen(): boolean | null {
+  try {
+    const value = localStorage.getItem(OPEN_KEY);
+    return value === null ? null : value === "1";
+  } catch {
+    return null;
+  }
+}
+const chosen = ref<boolean | null>(storedOpen());
 
 const tree = useAsync((signal) => api.tree(rev.value, signal), rev);
 
 const activePath = computed(() =>
   ["pid", "yaml", "file", "diff"].includes(String(route.name)) ? paramPath(route.params.path) : "",
 );
+/** A raw file is shown: one the navigation does not list, or a diff. */
+const showsRawFile = computed(() => Boolean(activePath.value) && (route.name === "diff" || !props.navFiles.has(activePath.value)));
+const open = computed(() => showsRawFile.value || (chosen.value ?? false));
+
+function toggleOpen(): void {
+  chosen.value = !open.value;
+  try {
+    localStorage.setItem(OPEN_KEY, chosen.value ? "1" : "0");
+  } catch {
+    // blocked storage: the choice holds for this page only
+  }
+}
 
 // Open the folders above the file being shown.
 watch(
@@ -69,14 +99,6 @@ function build(entries: TreeEntry[]): Node[] {
 
 const nodes = computed(() => build(tree.data.value ?? []));
 
-const kindOf = computed(() => new Map((tree.data.value ?? []).map((e) => [e.path, e.kind] as const)));
-
-const sheets = computed(() =>
-  (store.repo?.sheets ?? []).filter((s) => !tree.data.value || kindOf.value.has(s.file)),
-);
-
-const groups = computed(() => groupSheets(sheets.value));
-
 const matches = computed(() => {
   const q = filter.value.trim().toLowerCase();
   if (!q) return null;
@@ -107,16 +129,23 @@ function linkFor(path: string, kind: FileKind) {
 </script>
 
 <template>
-  <div class="tree">
-    <div class="filter">
-      <label class="sr-only" for="tree-filter">Filter files</label>
-      <input id="tree-filter" v-model="filter" type="search" placeholder="Filter files" autocomplete="off" />
-    </div>
+  <section class="files" data-testid="files">
+    <h2>
+      <button type="button" class="toggle" :aria-expanded="open" aria-controls="file-tree-body" data-testid="files-toggle" @click="toggleOpen">
+        <span class="caret">{{ open ? "▾" : "▸" }}</span> Files
+        <span class="faint">{{ tree.loading.value ? "loading…" : tree.data.value ? `${tree.data.value.filter((e) => e.type === "file").length}` : "" }}</span>
+      </button>
+    </h2>
+    <p v-if="!open" class="hint faint">The raw repository files, for experts.</p>
+    <div v-show="open" id="file-tree-body">
+      <div class="filter">
+        <label class="sr-only" for="tree-filter">Filter files</label>
+        <input id="tree-filter" v-model="filter" type="search" placeholder="Filter files" autocomplete="off" />
+      </div>
 
-    <p v-if="tree.error.value" class="notice error small">{{ tree.error.value }}</p>
+      <p v-if="tree.error.value" class="notice error small">{{ tree.error.value }}</p>
 
-    <template v-if="matches">
-      <ul class="list">
+      <ul v-if="matches" class="list">
         <li v-for="entry in matches" :key="entry.path">
           <RouterLink class="row" :class="{ active: entry.path === activePath }" :to="linkFor(entry.path, entry.kind)" :title="entry.path">
             <span class="icon" :class="entry.kind" :title="KIND_LABEL[entry.kind]">{{ KIND_ICON[entry.kind] }}</span>
@@ -125,65 +154,65 @@ function linkFor(path: string, kind: FileKind) {
         </li>
         <li v-if="!matches.length" class="empty">No matching files.</li>
       </ul>
-    </template>
 
-    <template v-else>
-      <section v-for="group in groups" :key="group.id" :data-group="group.id">
-        <h2>{{ group.title }}</h2>
-        <ul class="list">
-          <li v-for="sheet in group.sheets" :key="sheet.id">
-            <RouterLink class="row" :class="{ active: sheet.file === activePath }" :to="linkFor(sheet.file, 'pid')" :title="sheet.file">
-              <span class="icon pid">{{ KIND_ICON.pid }}</span>
-              <span class="label"><strong>{{ sheet.id }}</strong> <span class="muted">{{ sheet.title }}</span></span>
-              <span class="kind" :class="sheet.kind ?? 'pid'">{{ KIND_BADGE[sheet.kind ?? "pid"] }}</span>
-            </RouterLink>
-          </li>
-          <li v-if="group.id === 'process'">
-            <RouterLink class="row" :class="{ active: route.name === 'streams' }" :to="{ name: 'streams', query: withRev() }">
-              <span class="icon">≡</span>
-              <span class="label">Stream table</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Files <span v-if="tree.loading.value" class="faint">loading&hellip;</span></h2>
-        <ul class="list">
-          <li v-for="{ node, depth } in rows" :key="node.path">
-            <button
-              v-if="node.type === 'dir'"
-              type="button"
-              class="row dir"
-              :style="{ paddingLeft: `${8 + depth * 14}px` }"
-              :aria-expanded="expanded.has(node.path)"
-              @click="toggle(node.path)"
-            >
-              <span class="caret">{{ expanded.has(node.path) ? "▾" : "▸" }}</span>
-              <span class="label">{{ node.name }}</span>
-            </button>
-            <RouterLink
-              v-else
-              class="row"
-              :class="{ active: node.path === activePath }"
-              :style="{ paddingLeft: `${8 + depth * 14}px` }"
-              :to="linkFor(node.path, node.kind)"
-              :title="node.path"
-            >
-              <span class="icon" :class="node.kind" :title="KIND_LABEL[node.kind]">{{ KIND_ICON[node.kind] }}</span>
-              <span class="label">{{ node.name }}</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
-    </template>
-  </div>
+      <ul v-else class="list">
+        <li v-for="{ node, depth } in rows" :key="node.path">
+          <button
+            v-if="node.type === 'dir'"
+            type="button"
+            class="row dir"
+            :style="{ paddingLeft: `${8 + depth * 14}px` }"
+            :aria-expanded="expanded.has(node.path)"
+            @click="toggle(node.path)"
+          >
+            <span class="caret">{{ expanded.has(node.path) ? "▾" : "▸" }}</span>
+            <span class="label">{{ node.name }}</span>
+          </button>
+          <RouterLink
+            v-else
+            class="row"
+            :class="{ active: node.path === activePath }"
+            :style="{ paddingLeft: `${8 + depth * 14}px` }"
+            :to="linkFor(node.path, node.kind)"
+            :title="node.path"
+          >
+            <span class="icon" :class="node.kind" :title="KIND_LABEL[node.kind]">{{ KIND_ICON[node.kind] }}</span>
+            <span class="label">{{ node.name }}</span>
+          </RouterLink>
+        </li>
+      </ul>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.tree {
-  padding: var(--space-2) 0 var(--space-6);
-  font-size: var(--text-sm);
+.files {
+  margin-top: var(--space-3);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.toggle .faint {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.hint {
+  margin: 0 var(--space-3);
+  font-size: 12px;
 }
 .filter {
   padding: 0 var(--space-3) var(--space-2);
@@ -256,21 +285,6 @@ h2 {
 }
 .icon.json {
   color: var(--bad);
-}
-.kind {
-  margin-left: auto;
-  flex: none;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 0 5px;
-  border-radius: 3px;
-  background: var(--bg-sunk);
-  color: var(--fg-muted);
-}
-.kind.bfd,
-.kind.pfd {
-  background: var(--info-soft);
-  color: var(--info);
 }
 .empty {
   padding: 4px var(--space-3);

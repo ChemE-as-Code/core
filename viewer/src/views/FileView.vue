@@ -12,6 +12,7 @@ import { lineWindow } from "@/lib/lineWindow";
 import { highlightYaml, type YamlToken } from "@/lib/yamlHighlight";
 import { fragmentOf, scrollToId } from "@/lib/inPageLink";
 import { HEADING_ID_PREFIX } from "@/lib/markdown";
+import { parseCsv } from "@/lib/studies";
 
 const route = useRoute();
 const { rev, withRev } = useRev();
@@ -33,6 +34,13 @@ const text = computed(() => {
   return content;
 });
 const lines = computed(() => text.value.split("\n"));
+// A CSV (a generated schedule, inventory or estimate) reads as a table; its source is a click away.
+const isCsv = computed(() => path.value.toLowerCase().endsWith(".csv"));
+const csv = computed(() => {
+  if (!isCsv.value || raw.value || file.data.value === null || targetLine.value) return null;
+  const [header, ...body] = parseCsv(file.data.value);
+  return header ? { header, body } : null;
+});
 const targetLine = computed(() => {
   const value = Number(Array.isArray(route.query.line) ? route.query.line[0] : route.query.line);
   return Number.isInteger(value) && value > 0 ? value : null;
@@ -82,8 +90,8 @@ watch(
       <RouterLink v-if="kind === 'pid'" class="btn" :to="{ name: 'pid', params: { path: pathSegments(path) }, query: withRev() }">Drawing</RouterLink>
       <RouterLink v-if="!store.snapshot" class="btn" :to="{ name: 'history', query: withRev({ path }) }">History</RouterLink>
       <span class="spacer" />
-      <button v-if="kind === 'markdown' || kind === 'json'" class="btn" type="button" @click="raw = !raw">
-        {{ raw ? (kind === "markdown" ? "Rendered" : "Formatted") : "Source" }}
+      <button v-if="kind === 'markdown' || kind === 'json' || isCsv" class="btn" type="button" @click="raw = !raw">
+        {{ raw ? (kind === "markdown" ? "Rendered" : isCsv ? "Table" : "Formatted") : "Source" }}
       </button>
     </div>
     <LoadState :loading="file.loading.value && file.data.value === null" :error="file.error.value" @retry="file.reload" />
@@ -91,6 +99,21 @@ watch(
       <article v-if="kind === 'markdown' && !raw" class="doc">
         <MarkdownRender :source="file.data.value" :path="path" :rev="rev" />
       </article>
+      <template v-else-if="csv">
+        <p class="muted window-note">{{ csv.body.length }} rows</p>
+        <div class="table-wrap csv" data-testid="csv-table">
+          <table class="data">
+            <thead>
+              <tr><th v-for="(h, i) in csv.header" :key="i">{{ h }}</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, r) in csv.body" :key="r">
+                <td v-for="(cell, c) in row" :key="c" :class="{ num: cell.trim() !== '' && !Number.isNaN(Number(cell)) }">{{ cell }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
       <div v-else-if="!window_" class="source" role="region" aria-label="File content">
         <pre class="plain">{{ text }}</pre>
       </div>
@@ -189,6 +212,13 @@ watch(
 }
 .code {
   padding: 0 var(--space-3);
+}
+.csv {
+  max-height: calc(100vh - 210px);
+}
+.csv td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .window-note {
   margin: 0 0 var(--space-2);

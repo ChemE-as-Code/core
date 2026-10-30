@@ -15,11 +15,11 @@ test.describe("equipment datasheets", () => {
     await mockApi(page, { files: asuFiles });
   });
 
-  test("the header and the home page link the datasheets when the tree has them", async ({ page }) => {
+  test("the page navigation and the home page link the datasheets when the tree has them", async ({ page }) => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Pages" });
     await expect(nav.getByRole("link", { name: "Datasheets" })).toBeVisible();
-    await page.locator("main").getByRole("link", { name: "Equipment datasheets" }).click();
+    await page.getByTestId("home-pages").getByRole("link", { name: "Datasheets" }).click();
     await expect(page).toHaveURL(/\/datasheets$/);
     await expect(nav.getByRole("link", { name: "Datasheets" })).toHaveClass(/router-link-active/);
   });
@@ -27,9 +27,9 @@ test.describe("equipment datasheets", () => {
   test("no Datasheets link without equipment/datasheets/", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
-    await expect(page.locator("main").getByRole("link", { name: "Validation of the working tree" })).toBeVisible();
+    await expect(page.getByTestId("home-pages").getByRole("link", { name: "Validation" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Datasheets" })).toHaveCount(0);
-    await expect(page.locator("main").getByRole("link", { name: "Equipment datasheets" })).toHaveCount(0);
+    await expect(page.getByTestId("home-pages").getByRole("link", { name: "Datasheets" })).toHaveCount(0);
   });
 
   test("the index lists every sheet with its counts, filters and sorts", async ({ page }) => {

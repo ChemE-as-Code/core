@@ -2,14 +2,15 @@ import { expect, test } from "@playwright/test";
 import { mockApi, streams } from "./fixtures";
 
 test.describe("process sheets", () => {
-  test("the sheet list groups Process (BFD, PFD) before the P&IDs, with kind badges", async ({ page }) => {
+  test("the page navigation groups Process (BFD, PFD) before the P&IDs, with kind badges", async ({ page }) => {
     await mockApi(page);
     await page.goto("/pid/process/BFD.xml");
-    const groups = page.locator(".tree section[data-group]");
-    await expect(groups).toHaveCount(2);
+    const groups = page.getByRole("navigation", { name: "Pages" }).locator("section[data-group]");
+    await expect(groups.nth(0)).toHaveAttribute("data-group", "process");
     await expect(groups.nth(0).locator("h2")).toHaveText("Process");
     await expect(groups.nth(0).locator(".kind")).toHaveText(["BFD", "PFD"]);
     await expect(groups.nth(0)).toContainText("Stream table");
+    await expect(groups.nth(0).locator("[aria-current=page]")).toHaveText(/^BFD/);
     await expect(groups.nth(1).locator("h2")).toHaveText("P&IDs");
     await expect(groups.nth(1).locator(".kind")).toHaveText(["P&ID"]);
   });

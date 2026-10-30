@@ -72,7 +72,7 @@ test.describe("navigation", () => {
     await mockApi(page);
     await page.goto("/streams");
     await expect(page).toHaveTitle("Stream table – Test plant – cheme-as-code viewer");
-    await page.locator("header").getByRole("link", { name: "Validation" }).click();
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Validation" }).click();
     await expect(page).toHaveTitle("Validation – Test plant – cheme-as-code viewer");
     await expect(page.locator("main h1")).toBeFocused();
     await page.goto(`/pid/${SHEET}`);

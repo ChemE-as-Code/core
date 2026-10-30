@@ -66,6 +66,7 @@ test.describe("maturity", () => {
     await page.goto("/");
     await expect(page.getByTestId("home-maturity")).toHaveText("no report");
     await expect(page.getByTestId("maturity-badge")).toBeHidden();
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
     await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Maturity" }).click();
     await expect(page.getByTestId("maturity-missing")).toContainText("Nothing is shown as achieved");
   });

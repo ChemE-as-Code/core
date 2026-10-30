@@ -3,10 +3,13 @@ import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "@/api";
 import JsonTree from "@/components/JsonTree.vue";
+import YamlDocument from "@/components/YamlDocument.vue";
 import LoadState from "@/components/LoadState.vue";
 import { useAsync } from "@/lib/useAsync";
 import { useRev } from "@/lib/useRev";
 import { cellText, processSections, yamlTable } from "@/lib/yamlTable";
+import { documentBlocks } from "@/lib/yamlDocument";
+import { isRecord } from "@/lib/guards";
 import { paramPath, pathSegments, shortRev } from "@/lib/format";
 
 const route = useRoute();
@@ -21,6 +24,11 @@ const table = computed(() => {
   const all = sections.value;
   if (all) return all.find((t) => t.key === section.value) ?? all[0] ?? null;
   return doc.data.value ? yamlTable(doc.data.value) : null;
+});
+// Not a table (the design basis, a study): a readable document, the tree one click away.
+const blocks = computed(() => {
+  const data = doc.data.value?.data;
+  return !table.value && isRecord(data) ? documentBlocks(data) : null;
 });
 const showEmpty = ref(false);
 // `?filter=`: the filter the page opens with (a datasheet's nozzle links its line in the line list).
@@ -93,7 +101,7 @@ function sortBy(key: string): void {
         <label class="check"><input v-model="showEmpty" type="checkbox" /> empty columns<span v-if="hiddenCount" class="faint"> ({{ hiddenCount }} hidden)</span></label>
       </template>
       <span class="spacer" />
-      <button v-if="table" class="btn" type="button" @click="asTree = !asTree">{{ asTree ? "Table" : "Tree" }}</button>
+      <button v-if="table || blocks" class="btn" type="button" @click="asTree = !asTree">{{ asTree ? (table ? "Table" : "Document") : "Tree" }}</button>
       <RouterLink class="btn" :to="{ name: 'file', params: { path: pathSegments(path) }, query: withRev() }">Source</RouterLink>
     </div>
 
@@ -129,6 +137,7 @@ function sortBy(key: string): void {
           </table>
         </div>
       </template>
+      <YamlDocument v-else-if="blocks && !asTree" :blocks="blocks" data-testid="yaml-document" />
       <div v-else class="tree">
         <JsonTree :value="doc.data.value.data" />
       </div>

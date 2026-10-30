@@ -4,7 +4,6 @@ import { useRoute, useRouter } from "vue-router";
 import { loadMaturity, maturity, store } from "@/store";
 import { useRev } from "@/lib/useRev";
 import { shortRev } from "@/lib/format";
-import { hasReviewData } from "@/lib/reviews";
 import { PHASE_NOTE, maturityBadge } from "@/lib/maturity";
 
 defineProps<{ sidebarOpen: boolean }>();
@@ -71,7 +70,7 @@ function applyCustom(): void {
       class="btn menu"
       type="button"
       :aria-expanded="sidebarOpen"
-      aria-label="Toggle file list"
+      aria-label="Toggle navigation"
       @click="$emit('toggleSidebar')"
     >
       &#9776;
@@ -97,27 +96,8 @@ function applyCustom(): void {
       ><span class="badge-key">Verified maturity:</span> {{ badge.value }}</RouterLink
     >
 
-    <nav class="nav" aria-label="Pages">
-      <RouterLink :to="{ name: 'checks', query: withRev() }">Checks</RouterLink>
-      <RouterLink :to="{ name: 'validate', query: withRev() }">Validation</RouterLink>
-      <RouterLink :to="{ name: 'maturity', query: withRev() }" title="Evidence-based calculation maturity (cheme maturity): the four levels and their requirements">Maturity</RouterLink>
-      <RouterLink v-if="hasReviewData(store.status)" :to="{ name: 'reviews', query: withRev() }" title="Open review findings and stage sign-offs">Reviews</RouterLink>
-      <RouterLink v-if="store.hasInterlocks" :to="{ name: 'cause-effect', query: withRev() }" title="Cause and effect matrix of the interlocks (control/cause-effect.yaml)">C&amp;E</RouterLink>
-      <RouterLink v-if="store.repo?.has_control" :to="{ name: 'control', query: withRev() }" title="Control loops, sequences, narrative and control philosophy (cheme control report)">Control</RouterLink>
-      <RouterLink v-if="store.repo?.has_issues" :to="{ name: 'issues', query: withRev() }" title="Action items, engineering holds, technical queries and design changes (GitHub issues, cheme issues)">Issues</RouterLink>
-      <RouterLink v-if="store.repo?.has_reactions" :to="{ name: 'reactions', query: withRev() }" title="Reactions and reactors (process/reactions.yaml)">Reactions</RouterLink>
-      <RouterLink v-if="store.hasDatasheets" :to="{ name: 'datasheets', query: withRev() }" title="Equipment datasheets (equipment/datasheets/)">Datasheets</RouterLink>
-      <RouterLink v-if="!store.snapshot" :to="{ name: 'history', query: withRev() }">History</RouterLink>
-      <RouterLink v-if="store.repo?.has_layout" :to="{ name: 'layout', query: withRev() }">Layout 3D</RouterLink>
-      <RouterLink
-        v-if="store.repo?.has_layout || store.repo?.has_equipment_estimate"
-        :to="{ name: 'mto', query: withRev() }"
-        :title="store.repo?.has_layout ? 'Material take-off and estimate of the 3D model, equipment estimate' : 'Equipment estimate (cheme assess equipment)'"
-        >MTO</RouterLink
-      >
-      <RouterLink v-if="store.repo?.has_lca" :to="{ name: 'lca', query: withRev() }" title="Life cycle assessment (cheme assess lca)">LCA</RouterLink>
-      <RouterLink :to="{ name: 'about', query: withRev() }" title="About cheme-as-code and Process Intelligence Research">About</RouterLink>
-    </nav>
+    <!-- The pages are in the sidebar (src/lib/pages.ts), grouped; About is not about the plant. -->
+    <RouterLink class="about" :to="{ name: 'about', query: withRev() }" title="About cheme-as-code and Process Intelligence Research">About</RouterLink>
 
     <span
       v-if="store.snapshot"
@@ -155,7 +135,6 @@ function applyCustom(): void {
 
 <style scoped>
 .badge.snapshot {
-  margin-left: auto;
   background: var(--info-soft);
   color: var(--info);
 }
@@ -207,30 +186,22 @@ function applyCustom(): void {
 .brand:hover {
   text-decoration: none;
 }
-.nav {
-  display: flex;
-  gap: var(--space-3);
-  margin-left: var(--space-3);
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.nav a {
+.about {
+  margin-left: auto;
   white-space: nowrap;
   color: var(--fg-muted);
   padding: 4px 2px;
   border-bottom: 2px solid transparent;
 }
-.nav a.router-link-active {
+.about.router-link-active {
   color: var(--fg);
   border-bottom-color: var(--accent);
 }
-.nav a:hover {
+.about:hover {
   text-decoration: none;
   color: var(--fg);
 }
 .rev {
-  margin-left: auto;
   display: flex;
   gap: var(--space-1);
   min-width: 0;
@@ -258,9 +229,7 @@ function applyCustom(): void {
     gap: var(--space-2);
     padding: 0 var(--space-2);
   }
-  .nav {
-    margin-left: 0;
-    gap: var(--space-2);
+  .about {
     font-size: var(--text-sm);
   }
   /* On phones both are on the overview and the Maturity page (the nav keeps its link). */
