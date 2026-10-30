@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The simulation's energy audit closes the plant with component separators in it (#60, ADR
+  0038). A specified split's imbalance is stated, not judged: `status: stated`, `imbalance_kW`
+  = enthalpy out minus in from the solved streams (positive: heat the unit would have to take
+  in). DWSIM's `EnergyImb` is recorded with the sign each run shows (`simulator_convention`)
+  and not relied on. The plant record gains `stated_kW` and `stated`, its residual takes them
+  as stated heat. New rule `cheme.process-sim-energy-stated` (info). `predictive.energy-closure`
+  passes such a plant and names the stated values; runs recorded earlier stay unsupported until
+  simulated again, and `cheme process energy` says so.
+
 ## 1.3.0 (2026-10-31)
 
 Minor release: the Viewer tells an embedding page how far it is and shows large 3D models in stages

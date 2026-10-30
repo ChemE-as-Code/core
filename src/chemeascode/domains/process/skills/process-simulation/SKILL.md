@@ -154,7 +154,11 @@ pass-through, mixer and splitter balances; simulate covers the energy balance an
   `sim-energy-unbalanced` (a unit's or the plant's enthalpy closure fails: check convergence
   and specs) and `sim-energy-unsupported` (info: a reactor whose property package's enthalpy
   reference is not verified, and units without an established duty sign; report it as
-  unsupported, never estimate a residual). Reactors close on a heat-of-formation basis
+  unsupported, never estimate a residual) and `sim-energy-stated` (info: a component
+  separator's imbalance, enthalpy out minus in from the solved streams, positive: heat it would
+  have to take in; the plant closes with it as a stated residual, `stated_kW`; it is no utility
+  and not the real unit's duty, so name it in the review and account for the real absorber's
+  or dryer's duties separately). Reactors close on a heat-of-formation basis
   (`basis: formation` in the record): DWSIM's enthalpy flows plus `sum (n_out - n_in)
   dHf_298` on DWSIM's own formation enthalpies, which its reactor duty takes. What is
   verified (DWSIM 9.0.5, live tests): the reference state (each component's ideal gas at
