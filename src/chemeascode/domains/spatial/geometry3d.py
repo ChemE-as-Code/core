@@ -354,6 +354,50 @@ def split_at(points: list[Vec], s: float) -> tuple[list[Vec], list[Vec]]:
     return simplify(points), [points[-1], points[-1]]
 
 
+def split_at_many(
+    points: list[Vec], cuts: list[float], at: list[Vec | None] | None = None
+) -> tuple[list[list[Vec]], list[Vec]]:
+    """A polyline cut at the increasing arc lengths *cuts*: the ``len(cuts) + 1`` pieces and the
+    cut points. Each cut point is computed once and is both the last point of the piece before
+    and the first of the piece after, so neighbours meet exactly. ``at[i]``, where given and
+    within 1 µm of cut *i*, is used as that cut point (a point another pipe already starts at)."""
+    segs = list(zip(points, points[1:], strict=False))
+    pieces: list[list[Vec]] = []
+    found: list[Vec] = []
+    current = [points[0]]
+    run = 0.0
+    i = 0
+    for k, s in enumerate(cuts):
+        while i < len(segs):
+            a, b = segs[i]
+            length = dist(a, b)
+            if length > 1e-12 and run + length >= s - 1e-12:
+                break
+            run += length
+            current.append(b)
+            i += 1
+        if i < len(segs):
+            a, b = segs[i]
+            p = lerp(a, b, min(1.0, max(0.0, s - run) / dist(a, b)))
+        else:
+            p = points[-1]
+        given = at[k] if at else None
+        if given is not None and dist(given, p) <= 1e-6:
+            p = given
+        current.append(p)
+        pieces.append(current)
+        found.append(p)
+        current = [p]
+    current.extend(b for _, b in segs[i:])
+    pieces.append(current)
+    out = []
+    for piece in pieces:
+        kept = simplify(piece)
+        kept[0], kept[-1] = piece[0], piece[-1]  # simplify may drop an end within 1e-6 of a bend
+        out.append(kept)
+    return out, found
+
+
 def simplify(points: list[Vec]) -> list[Vec]:
     """Drop repeated points, points in the middle of a straight run and spikes (a run that
     turns straight back on itself is cut where it turns)."""
