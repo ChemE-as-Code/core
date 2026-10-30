@@ -60,9 +60,10 @@ and ``slack``). A load that gets no cable (not placed, no room, no position) is 
 :func:`tray_findings` are the rules on them (run with the model rules): ``tray-fill``,
 ``tray-separation``, ``tray-voltage`` (a cable in a power tray of the other voltage class),
 ``clash-tray`` (a tray through an item, a pipe or steel), ``tray-zone`` (a tray inside a zone
-of a kind in ``avoid_zones``: oxygen-enriched and hazardous areas by default), ``tray-span`` (a level tray run longer than ``support_span_m`` with no steel within
-``support_reach_m`` of it: rack bents, tray tiers, structure steel and walls, building walls),
-``cable-missing`` and ``cable-unrouted``.
+of a kind in ``avoid_zones``: oxygen-enriched and hazardous areas by default), ``tray-span`` (a
+level tray run longer than ``support_span_m`` with no steel within ``support_reach_m`` of it:
+rack bents, tray tiers, structure steel and walls, building walls), ``cable-missing`` and
+``cable-unrouted``.
 """
 
 from __future__ import annotations

@@ -171,4 +171,5 @@ nav:
       - "0033 The DWSIM worker iterates the tear streams itself": adr/0033-worker-iterates-tear-streams.md
       - "0034 cheme serve serves a folder of plants": adr/0034-serve-library-mode.md
       - "0035 A motor's cable entry ends its tray beside the machine": adr/0035-motor-cable-entry-beside-the-machine.md
+      - "0036 Several power trays per rack, by voltage class and fill": adr/0036-several-power-trays-per-rack.md
       - Template: adr/template.md
