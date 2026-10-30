@@ -26,7 +26,7 @@ review.
 - `piping/routing.yaml` (`cheme schema routing`), optional. Without it the defaults apply,
   each ASSUMED: `local_max_m` 15, `local_elevation_m` 3.5 (bottom of pipe), `grade_max_m` 3,
   `rack_detour_factor` 2.5, `spacing_m` 0.1, `headroom_road_m` 6,
-  `headroom_walkway_m` 2.2, `grid_m` 0.5. How far an end may be from a rack to use it is
+  `headroom_walkway_m` 2.2, `road_cover_m` 1.2 (buried lines under roads), `grid_m` 0.5. How far an end may be from a rack to use it is
   `rack_reach` in `layout/site-plan.yaml` (default: `max_unsupported_length`, 30 m), the same
   value `cheme validate` checks line routes with; do not set `rack_reach_m` here (deprecated).
 - Where the utilities come from (cooling water plant, nitrogen header, flare) is design
@@ -71,7 +71,20 @@ review.
    - `skip: <reason>` for what is not routed at this stage (field-run small bore, a package's
      internal piping, an item not placed yet). The reason is shown in the report and counts for
      the `layout-3d` gate; "later" is not a reason;
-   - `gravity: true` (or the fluid in `gravity_fluids`) checks a continuous fall.
+   - `gravity: true` (or the fluid in `gravity_fluids`) checks a continuous fall;
+   - `buried: true` or `buried: {cover_m: 1.0, basis: D-NNN}` for a line laid in the ground
+     (large cooling-water and fire-water mains, drains): give its route below grade
+     (`elevation: -1.8`, a `via`, or a pinned `route`; a buried entry takes no `rack`, `tier`
+     or elevation at or above 0). Its runs whose top is below grade are then out of the road
+     and escape-route headroom, the clashes with steel and items above grade, the ladder
+     clearance and the span rules; `layout-buried-cover` checks the soil over the pipe's top
+     instead: at least `cover_m` along the buried run and, under a road, at least
+     `max(cover_m, road_cover_m)` (1.2 m, ASSUMED: put the site's value in `rules:`). Its
+     risers and any run at grade stay pipes above grade (a run at grade across a road is still
+     a `layout-headroom` finding: lay it deeper). The take-off lists its length in the ground
+     as `group: buried`. The depth, the cover and the crossing protection (sleeve, slab) are
+     design decisions: record them in `DESIGN.md`. Do not declare a line buried only to clear
+     a headroom finding.
    Vent and relief lines end in a riser where the P&ID ends them (`vent_rise_m`, or a `vents`
    rule); a silencer or safety valve that discharges elsewhere (a vent stack area) is listed in
    `piping/special-items.yaml` and placed in `layout/equipment-placement.yaml` by its tag:
@@ -87,7 +100,7 @@ review.
    lines over a road below the headroom, too many bends, dead legs, a lane jumping across the
    rack. `cheme serve` (Layout 3D) shows the same in 3D with the findings.
 6. **Fix clashes** (`cheme.layout-clash-pipe`, `-clash-pipe-equipment`, `-clash-pipe-steel`,
-   `-headroom`, `-access-blocked`, `-zone-crossing`): each finding names both objects and a
+   `-headroom`, `-buried-cover`, `-access-blocked`, `-zone-crossing`): each finding names both objects and a
    `box`. Prefer, in this order: move the item or turn the nozzle (skill `layout-yaml`), give a
    tier rule, add a via, change the pipe-way elevation. Rebuild after each step. A clash that is
    real but intended (a line resting on its own support steel) is accepted in the `layout-3d`
@@ -187,7 +200,8 @@ review.
   ends at <tee/line>, which no route reaches` (route the run first, or fix the topology);
   `connector ...: line ... is not in the line list` (add the line).
 - The `layout-3d` gate (`cheme check --stage basic`) fails while a process line of DN 25
-  and above is neither routed nor skipped, or a clash or headroom finding is not accepted; the
+  and above is neither routed nor skipped, or a clash, headroom or buried-cover finding is not
+  accepted; the
   `layout-detail` gate requires every line, utilities included. A gate's `rules:` may add the
   engineering rules (`cheme.layout-tier`, `-wall-penetration`, `-vent-outlet`, ...); a
   finding left as it is gets an acceptance with its reason.

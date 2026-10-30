@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A line or segment in `piping/routing.yaml` can be declared `buried` (`true` or
+  `{cover_m, basis}`). Its runs below grade get no road or escape-route headroom finding, no
+  clash with steel, items, envelopes or zones above grade, no ladder-clearance finding and no
+  span finding. The new `cheme.layout-buried-cover` (warning) checks their soil cover instead:
+  at least `cover_m`, and under a road at least `rules.road_cover_m` (1.2 m, ASSUMED). The
+  gates' `clashes` requirement counts it. Model pipes gain an optional `buried`. The take-off
+  lists buried pipe as `group: buried`. Without the field nothing changes (#70, ADR 0036).
+
 ## 1.1.0 (2026-10-30)
 
 Minor release: a motor's `cable_entry` ends its tray beside the machine, so crane lanes over
