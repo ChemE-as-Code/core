@@ -175,6 +175,16 @@ test.describe("layout", () => {
     const { readFileSync } = await import("node:fs");
     const head = readFileSync(path).subarray(0, 4).toString("latin1");
     expect(head).toBe("glTF");
+
+    await page.getByLabel("STL scale").selectOption("500");
+    const stlDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export .stl" }).click();
+    const stl = await stlDownload;
+    expect(stl.suggestedFilename()).toBe("layout-working-tree.1-500.stl");
+    const bytes = readFileSync(await stl.path());
+    const triangles = bytes.readUInt32LE(80);
+    expect(triangles).toBeGreaterThan(1000);
+    expect(bytes.length).toBe(84 + triangles * 50);
   });
 
   test("lists the model's findings and marks the objects they name", async ({ page }) => {

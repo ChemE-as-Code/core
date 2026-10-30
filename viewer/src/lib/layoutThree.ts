@@ -91,6 +91,8 @@ export interface LayoutRenderer {
   setCamera(state: CameraState): void;
   /** The visible scene as a binary glTF. */
   exportGlb(): Promise<ArrayBuffer>;
+  /** The visible scene as a binary STL for 3D printing (mm at the given scale). */
+  exportStl(options: StlOptions): Promise<ArrayBuffer>;
   /** Draw calls and triangles of the last frame (for the status line and tests). */
   stats(): RenderStats;
   /**
@@ -167,6 +169,71 @@ export function deinstance(mesh: THREE.InstancedMesh): THREE.Mesh {
   plain.scale.copy(mesh.scale);
   plain.renderOrder = mesh.renderOrder;
   return plain;
+}
+
+/** The STL export: the print scale (1:`scale`) and whether a base slab goes under the model. */
+export interface StlOptions {
+  scale: number;
+  base: boolean;
+}
+/** Thickness of the STL base slab below the lowest part, mm on the print. */
+export const STL_BASE_MM = 3;
+
+/**
+ * Binary STL of *meshes* in millimetres at 1:`scale`, z up as in the site frame: every triangle
+ * in its mesh's world frame (`matrixWorld` must be current). With `base`, a slab under their plan
+ * extent, its top at ground level (z = 0) and {@link STL_BASE_MM} below the lowest part, so
+ * everything standing on the ground stands on it.
+ */
+export function stlBytes(meshes: THREE.Mesh[], { scale, base }: StlOptions): ArrayBuffer {
+  const k = 1000 / scale; // m on site -> mm on the print
+  const v = new THREE.Vector3();
+  const sources: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
+  const bounds = new THREE.Box3();
+  let count = 0;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute("position");
+    if (!pos) continue;
+    const matrix = new THREE.Matrix4().makeScale(k, k, k).multiply(mesh.matrixWorld);
+    sources.push({ geometry: mesh.geometry, matrix });
+    for (let i = 0; i < pos.count; i++) bounds.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(matrix));
+    count += (mesh.geometry.getIndex()?.count ?? pos.count) / 3;
+  }
+  if (base && !bounds.isEmpty()) {
+    const bottom = Math.min(bounds.min.z, 0) - STL_BASE_MM;
+    const slab = new THREE.BoxGeometry(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, -bottom);
+    slab.translate((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, bottom / 2);
+    sources.push({ geometry: slab, matrix: new THREE.Matrix4() });
+    count += slab.getIndex()!.count / 3;
+  }
+  const out = new DataView(new ArrayBuffer(84 + count * 50));
+  out.setUint32(80, count, true);
+  const [a, b, c] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const normal = new THREE.Vector3();
+  let at = 84;
+  const put = (p: THREE.Vector3) => {
+    out.setFloat32(at, p.x, true);
+    out.setFloat32(at + 4, p.y, true);
+    out.setFloat32(at + 8, p.z, true);
+    at += 12;
+  };
+  for (const { geometry, matrix } of sources) {
+    const pos = geometry.getAttribute("position");
+    const index = geometry.getIndex();
+    const n = index?.count ?? pos.count;
+    const vertex = (i: number, into: THREE.Vector3) => into.fromBufferAttribute(pos, index ? index.getX(i) : i).applyMatrix4(matrix);
+    for (let i = 0; i + 2 < n; i += 3) {
+      vertex(i, a);
+      vertex(i + 1, b);
+      vertex(i + 2, c);
+      put(normal.subVectors(c, b).cross(v.subVectors(a, b)).normalize());
+      put(a);
+      put(b);
+      put(c);
+      at += 2; // attribute byte count, 0
+    }
+  }
+  return out.buffer;
 }
 
 const LOD_NAMES = ["", ":envelope", ":detail"];
@@ -1492,6 +1559,22 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
   async function exportGlb(): Promise<ArrayBuffer> {
     const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
     const exporter = new GLTFExporter();
+    return exportScene(async () => (await exporter.parseAsync(world, { binary: true, onlyVisible: true })) as ArrayBuffer);
+  }
+
+  async function exportStl(options: StlOptions): Promise<ArrayBuffer> {
+    return exportScene(() => {
+      world.updateMatrixWorld(true);
+      const meshes: THREE.Mesh[] = [];
+      world.traverseVisible((o) => {
+        if (o instanceof THREE.Mesh) meshes.push(o);
+      });
+      return stlBytes(meshes, options);
+    });
+  }
+
+  /** Run *write* on the visible scene prepared for a file: no labels, instanced detail baked in. */
+  async function exportScene(write: () => ArrayBuffer | Promise<ArrayBuffer>): Promise<ArrayBuffer> {
     // Labels are HTML, not geometry: leave them out of the file.
     const hidden: THREE.Object3D[] = [];
     world.traverse((o) => {
@@ -1511,8 +1594,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       instanced.visible = false;
     }
     try {
-      const result = await exporter.parseAsync(world, { binary: true, onlyVisible: true });
-      return result as ArrayBuffer;
+      return await write();
     } finally {
       for (const o of hidden) o.visible = true;
       for (const { instanced, plain } of swapped) {
@@ -1549,6 +1631,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
     getCamera,
     setCamera,
     exportGlb,
+    exportStl,
     setLook,
     setDetail(next) {
       detail = next;

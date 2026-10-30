@@ -11,6 +11,10 @@
   them. The cable schedule names each cable's tray. A `tray-fill` hint on a rack's power trunk
   names the number of trays the rack needs. New rule `cheme.layout-tray-voltage`; model trays
   gain an optional `voltage`. Without `power_trays` the model is unchanged (#71, ADR 0036).
+- Viewer: the layout view exports the visible model as a binary STL for 3D printing ("Export
+  .stl"), in millimetres at 1:100, 1:200, 1:500 or 1:1000, with an optional base slab whose top
+  is at ground level, so everything standing on the ground prints as one piece. No thickening
+  or simplification: parts below the printer's resolution are left to the slicer.
 
 ## 1.1.0 (2026-10-30)
 
