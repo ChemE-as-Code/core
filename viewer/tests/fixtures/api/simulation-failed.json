@@ -49,7 +49,7 @@
   "run": {
     "case": "design",
     "run_at": "2026-10-28T12:00:00Z",
-    "tool": "cheme-as-code 1.0.1",
+    "tool": "cheme-as-code 1.1.0",
     "simulator": {
       "name": "dwsim",
       "version": "9.0.5.0",
