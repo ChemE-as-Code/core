@@ -12,6 +12,9 @@
   `Role` stops it (end `closed`). The command prints one line per outcome with its causes and
   each open question once; `--paths` prints every candidate with its path and safeguards.
   On a 14-node pump station: 126,643 candidates to 12,011, none cut off at the depth limit.
+- Safety: each `propagate` candidate names the study's other nodes its path enters (`[via N3]`,
+  `crosses` in JSON), and `cheme safety hazop propagate STUDY` without `--node` walks every node
+  and groups the top events by consequence, with the nodes and causes reaching each.
 - Skills: `hazop-scenario-propagation` names `cheme safety hazop propagate` as an optional
   cross-check (with a failure-mode library; how to read its ends and limits), not a required
   step; the `process-safety` hub points to it.

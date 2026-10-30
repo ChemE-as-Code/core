@@ -208,7 +208,13 @@ def rate(
 @hazop_app.command("propagate")
 def propagate(
     study: STUDY,
-    node: Annotated[str, typer.Option(help="The node id whose scenarios are walked.")],
+    node: Annotated[
+        str | None,
+        typer.Option(
+            help="The node id whose scenarios are walked (default: every node, printed by "
+            "consequence: each top event with the nodes and causes that reach it)."
+        ),
+    ] = None,
     deviation: Annotated[
         str | None,
         typer.Option(
@@ -227,11 +233,23 @@ def propagate(
     """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
     over the study's analysed P&IDs, object by object, to a top event, a study limit, a closed
     valve or an object that absorbs it, with the safeguards the plant has along the path and the
-    questions the files leave open. One candidate per outcome, on its shortest path. Read-only:
+    questions the files leave open. One candidate per outcome, on its shortest path, with the
+    other nodes it passes through. Without --node, every node, grouped by top event. Read-only:
     proposals for the study, never written into it."""
-    from chemeascode.project.hazop import node_propagation
+    from chemeascode.project.hazop import node_propagation, study_propagation
 
     workspace = _workspace()
+    if node is None:
+        if deviation:
+            typer.echo("--deviation needs --node", err=True)
+            raise typer.Exit(2)
+        try:
+            found_all = study_propagation(workspace, study, library)
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(2) from failure
+        _print_consequences(found_all, as_json)
+        return
     try:
         found = node_propagation(workspace, study, node, deviation, library)
     except ValueError as failure:
@@ -272,6 +290,7 @@ def propagate(
                                 for s in c.path
                             ],
                             "reached": c.reached,
+                            "crosses": [{"node": n, "at": at} for n, at in c.crosses],
                             "safeguards": [asdict(g) for g in c.safeguards],
                             "questions": c.questions,
                         }
@@ -300,23 +319,27 @@ def propagate(
                 + (f" ({c.fluid})" if c.fluid else "")
             )
             typer.echo(f"  path: {c.path_text()}")
+            if c.crosses:
+                typer.echo(f"  crosses: {', '.join(f'{n} at {at}' for n, at in c.crosses)}")
             for guard in c.safeguards:
                 typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
     else:
         # One line per outcome with its causes; ends that say nothing about a consequence
         # (a closed valve, an object already walked, no connection) are only counted.
         shown = ("top-event", "study-limit", "absorbed", "unknown", "depth")
-        outcomes: dict[tuple[str, str, str, str | None], list[str]] = {}
+        outcomes: dict[tuple[str, str, str, str | None], tuple[list[str], list[str]]] = {}
         for c in sorted(candidates, key=lambda c: shown.index(c.end) if c.end in shown else 9):
             if c.end in shown:
                 key = (c.deviation.text(), c.top_event or c.end, c.path[-1].label, c.fluid)
-                causes = outcomes.setdefault(key, [])
+                causes, nodes = outcomes.setdefault(key, ([], []))
                 if c.cause not in causes:
                     causes.append(c.cause)
-        for (deviation_text, ending, where, fluid), causes in outcomes.items():
+                nodes.extend(n for n, _ in c.crosses if n not in nodes)
+        for (deviation_text, ending, where, fluid), (causes, nodes) in outcomes.items():
             typer.echo(
                 f"{deviation_text} -> {ending} at {where}"
                 + (f" ({fluid})" if fluid else "")
+                + (f" [via {', '.join(nodes)}]" if nodes else "")
                 + f": {', '.join(causes)}"
             )
         hidden = sum(n for end, n in ends.items() if end not in shown)
@@ -328,6 +351,63 @@ def propagate(
     for question, n in questions.most_common():
         typer.echo(f"question ({n} candidate(s)): {question}")
     for finding in found.findings:
+        typer.echo(finding.format())
+
+
+def _print_consequences(found_all: list, as_json: bool) -> None:
+    """Every node's top events grouped by consequence: the top event, where it happens, and per
+    node the causes that reach it, the consequences reached from most nodes first."""
+    groups: dict[tuple[str, str, str | None], dict[str, list[str]]] = {}
+    for found in found_all:
+        for c in found.result.candidates:
+            if c.end != "top-event":
+                continue
+            by_node = groups.setdefault((str(c.top_event), c.path[-1].label, c.fluid), {})
+            causes = by_node.setdefault(found.node, [])
+            if c.cause not in causes:
+                causes.append(c.cause)
+    ordered = sorted(groups.items(), key=lambda item: (-len(item[1]), item[0][0], item[0][1]))
+    findings = [f for found in found_all for f in found.findings]
+    if as_json:
+        first = found_all[0] if found_all else None
+        typer.echo(
+            json.dumps(
+                {
+                    "study": first.study if first else None,
+                    "library": first.library if first else None,
+                    "sheets": first.sheets if first else [],
+                    "nodes": [found.node for found in found_all],
+                    "consequences": [
+                        {
+                            "top_event": top_event,
+                            "at": where,
+                            "fluid": fluid,
+                            "nodes": [{"node": n, "causes": cs} for n, cs in by_node.items()],
+                        }
+                        for (top_event, where, fluid), by_node in ordered
+                    ],
+                    "findings": [{**asdict(f), "id": f.id} for f in findings],
+                },
+                indent=2,
+            )
+        )
+        return
+    if found_all:
+        first = found_all[0]
+        typer.echo(
+            f"{first.study}: {len(ordered)} top event(s) reached from {len(found_all)} node(s) "
+            f"with {first.library} over {', '.join(first.sheets)} (proposals: the team decides; "
+            "--node N for one node's outcomes and questions)"
+        )
+    for (top_event, where, fluid), by_node in ordered:
+        typer.echo(
+            f"{top_event} at {where}"
+            + (f" ({fluid})" if fluid else "")
+            + f": {len(by_node)} node(s)"
+        )
+        for node_id, causes in by_node.items():
+            typer.echo(f"  {node_id}: {', '.join(causes)}")
+    for finding in findings:
         typer.echo(finding.format())
 
 

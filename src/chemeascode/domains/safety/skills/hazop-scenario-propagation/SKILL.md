@@ -101,9 +101,14 @@ nobody followed far enough. You propose; the team decides what is credible.
 `cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--paths] [--json]` does
 steps 2 and 3 mechanically: each failure mode of the node's objects is walked over the analysed
 P&IDs with the library's responses, one candidate per outcome on its shortest path. It prints
-one line per outcome (deviation, top event or end, where, the causes that reach it) and the
-open questions once each; `--paths` gives every candidate with its path and the safeguards on
-it. It is a tool, not a step: use it where it helps (a large or meshed node, a check after
+one line per outcome (deviation, top event or end, where, `[via ...]` the other nodes the path
+enters, the causes that reach it) and the open questions once each; `--paths` gives every
+candidate with its path, the nodes it crosses and the safeguards on it. Causes come only from
+the node, consequences lie wherever the walk ends: a consequence in another node is recorded
+here, under its cause, and that node refers back ("see N1"), it does not repeat the row.
+Without `--node`, the command walks every node and groups the top events: each with the nodes
+and causes that reach it, the most shared first. Discuss a shared consequence once and refer to
+it from the other nodes. It is a tool, not a step: use it where it helps (a large or meshed node, a check after
 drafting for a cause or branch nobody followed, the instruments and interlocks along a long
 path) and skip it for a small node. Read its output as candidates, never as rows:
 - the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `unknown`

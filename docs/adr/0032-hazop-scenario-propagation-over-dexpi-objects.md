@@ -53,6 +53,12 @@ Two forces shape how:
   `--json` give every candidate. On the pump-station case (14 nodes) enumerating every route
   gave 126,643 candidates, 31 % of them cut off at the depth limit in loops through recycles
   and closed valves; outcomes on shortest paths give 12,011, none cut off.
+- **Causes are the node's, consequences are wherever the walk ends.** 74 % of the case's
+  top-event candidates lie in another node than their cause, and some top events are reached
+  from up to seven nodes. Each candidate names the other nodes its path enters (and where), and
+  `propagate STUDY` without `--node` groups every node's top events by consequence, so the team
+  discusses a shared consequence once. A node never repeats another node's cause: a deviation
+  entering from outside is that node's reference, not a new row.
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 

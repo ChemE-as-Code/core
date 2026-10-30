@@ -238,6 +238,20 @@ def test_a_valve_closed_in_normal_operation_stops_the_walk(role):
     assert all(c.end != "closed" for c in walk(open_, ["A"]))
 
 
+def test_a_candidate_names_the_other_nodes_its_path_enters(model):
+    others = {"N1": [PlantRef(tag="V-101")], "N3": [PlantRef(tag="FV-104")]}
+    refs = [PlantRef(tag="P-101")]
+    result = propagate([("P-01", model)], library(), refs, deviation=NO_FLOW, others=others)
+    by_end = {c.top_event or c.end: c.crosses for c in result.candidates if c.cause == "P-101"}
+    assert by_end["overfill"] == [("N1", "V-101")]
+    assert by_end["study-limit"] == [("N3", "FV-104")]
+    # A line member of another node: its first object on the path names it.
+    lines = {"N9": [PlantRef(tag="50-P-102")]}
+    result = propagate([("P-01", model)], library(), refs, deviation=NO_FLOW, others=lines)
+    limit = next(c for c in result.candidates if c.end == "study-limit")
+    assert limit.crosses == [("N9", "CV-1")]
+
+
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
     context = Context(interlocks={"LT-102": ["I-01"]})
     result = run(model, ["P-101"], context, NO_FLOW)
@@ -364,11 +378,12 @@ def plant(tmp_path: Path, monkeypatch) -> Path:
     study = root / "safety" / "hazop" / "H-01" / "study.yaml"
     data = yaml.safe_load(study.read_text(encoding="utf-8"))
     data["nodes"] = [
+        {"id": "N1", "members": ["V-101", "80-P-101"]},
         {
             "id": "N2",
             "members": ["P-101", "FV-104", "50-P-102"],
             "deviations": [{"id": "N2-NF", "guide_word": "no", "parameter": "flow"}],
-        }
+        },
     ]
     study.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return root
@@ -396,12 +411,25 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     assert study.read_text(encoding="utf-8") == before
 
     text = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2"])
-    assert text.exit_code == 0 and "no flow -> overfill at V-101 (Water): P-101" in text.output
+    assert text.exit_code == 0
+    assert "no flow -> overfill at V-101 (Water) [via N1]: P-101" in text.output
     assert "path:" not in text.output
     assert "question (" in text.output  # FV-104's fail position, once with its count
     paths = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2", "--paths"])
     assert paths.exit_code == 0 and "P-101 M1 [local]" in paths.output
     assert "path: P-101 (no flow, cause)" in paths.output
+    assert "  crosses: N1 at V-101" in paths.output
+
+    every = runner.invoke(app, ["safety", "hazop", "propagate", "H-01"])
+    assert every.exit_code == 0, every.output
+    assert "overfill at V-101 (Water): 1 node(s)\n  N2: P-101" in every.output
+    data = json.loads(runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--json"]).output)
+    assert data["nodes"] == ["N1", "N2"]
+    overfill = next(c for c in data["consequences"] if c["top_event"] == "overfill")
+    assert overfill["nodes"] == [{"node": "N2", "causes": ["P-101"]}]
+    alone = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--deviation", "no flow"])
+    assert alone.exit_code == 2 and "--deviation needs --node" in alone.output
+    assert study.read_text(encoding="utf-8") == before
 
     missing = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N9"])
     assert missing.exit_code == 2 and "no node N9" in missing.output

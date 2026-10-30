@@ -114,6 +114,8 @@ class Candidate:
     fluid: str | None
     safeguards: list[CandidateSafeguard]
     questions: list[str]
+    #: The other nodes the path enters, in order, each with the first object of it on the path.
+    crosses: list[tuple[str, str]] = field(default_factory=list)
 
     def path_text(self) -> str:
         return " > ".join(f"{s.label} ({s.deviation.text()}, {s.effect})" for s in self.path)
@@ -519,14 +521,34 @@ def propagate(
     members: Iterable[PlantRef],
     context: Context | None = None,
     deviation: Deviation | None = None,
+    others: dict[str, Iterable[PlantRef]] | None = None,
 ) -> Propagation:
     """The candidate scenarios of a node with *members*, over the loaded *models* (``(sheet id,
-    pyDEXPI model)``), for one *deviation* or every one a cause reaches the node with."""
+    pyDEXPI model)``), for one *deviation* or every one a cause reaches the node with. *others*
+    (node id -> members) are the study's other nodes: each candidate names those its path
+    enters."""
     context = context or Context()
     index = _index(models)
     member_list = list(members)
     keys, segments, unresolved = _members(index, member_list)
     in_node = set(keys)
+    other_nodes = []
+    for node_id, refs in (others or {}).items():
+        other_keys, other_segments, _ = _members(index, refs)
+        other_nodes.append((node_id, set(other_keys), other_segments))
+
+    def crosses(path: list[Step]) -> list[tuple[str, str]]:
+        entered: list[tuple[str, str]] = []
+        for step in path:
+            if step.key in in_node:
+                continue
+            for node_id, other_keys, other_segments in other_nodes:
+                inside = step.key in other_keys or (
+                    step.segment in other_segments and step.segment not in segments
+                )
+                if inside and all(node_id != n for n, _ in entered):
+                    entered.append((node_id, step.label))
+        return entered
 
     uncovered = []
     for key in keys:
@@ -597,6 +619,7 @@ def propagate(
                                 fluid=fluid,
                                 safeguards=_safeguards(index, walked.path, context),
                                 questions=questions,
+                                crosses=crosses(walked.path),
                             )
                         )
     return Propagation(candidates, uncovered, unresolved)

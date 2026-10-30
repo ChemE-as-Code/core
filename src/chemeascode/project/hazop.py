@@ -227,6 +227,34 @@ def node_propagation(
 ) -> NodePropagation:
     """Walk the study's analysed P&IDs from the members of node *node_id* with the failure-mode
     library. Reads only; raises ValueError for a missing study, node, library or P&ID."""
+    inputs = _propagation_inputs(workspace, study_id, library_file)
+    node = next((n for n in inputs.study.nodes if n.id == node_id), None)
+    if node is None:
+        raise ValueError(f"{inputs.path}: no node {node_id}")
+    return _walk_node(inputs, node, _deviation(node, deviation) if deviation else None)
+
+
+def study_propagation(
+    workspace: Workspace, study_id: str, library_file: str = LIBRARY_FILE
+) -> list[NodePropagation]:
+    """:func:`node_propagation` for every node of the study, the inputs read once."""
+    inputs = _propagation_inputs(workspace, study_id, library_file)
+    return [_walk_node(inputs, node, None) for node in inputs.study.nodes if node.members]
+
+
+@dataclass
+class _PropagationInputs:
+    path: str
+    study: Any
+    library_file: str
+    library: Any
+    models: list[tuple[str, Any]]
+    context: Context
+
+
+def _propagation_inputs(
+    workspace: Workspace, study_id: str, library_file: str
+) -> _PropagationInputs:
     from pydantic import ValidationError
 
     from chemeascode.domains.piping.sheet_query import load_sheets, sheet_id_of
@@ -239,10 +267,6 @@ def node_propagation(
     loaded = load_study(workspace.root, path)
     if loaded.model is None:
         raise ValueError(f"{path} does not load: cheme safety hazop check {study_id}")
-    node = next((n for n in loaded.model.nodes if n.id == node_id), None)
-    if node is None:
-        raise ValueError(f"{path}: no node {node_id}")
-    wanted = _deviation(node, deviation) if deviation else None
 
     library_path = workspace.root / library_file
     if not library_path.is_file():
@@ -280,8 +304,13 @@ def node_propagation(
             for element in loop.final_elements:
                 if element.fail:
                     context.fail[str(element.tag)] = element.fail
+    return _PropagationInputs(path, loaded.model, library_file, library, models, context)
 
-    result = propagate(models, library, node.members, context, wanted)
+
+def _walk_node(inputs: _PropagationInputs, node: Any, wanted: Deviation | None) -> NodePropagation:
+    path, node_id, library_file = inputs.path, node.id, inputs.library_file
+    others = {n.id: n.members for n in inputs.study.nodes if n.id != node_id}
+    result = propagate(inputs.models, inputs.library, node.members, inputs.context, wanted, others)
     findings = []
     if result.unresolved:
         findings.append(
@@ -307,10 +336,10 @@ def node_propagation(
             )
         )
     return NodePropagation(
-        loaded.model.id,
+        inputs.study.id,
         node_id,
         library_file,
-        [sheet for sheet, _ in models],
+        [sheet for sheet, _ in inputs.models],
         wanted,
         result,
         findings,
