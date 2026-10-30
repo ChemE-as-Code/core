@@ -20,6 +20,10 @@ Rules (``cheme.layout-...``, level):
 - ``clash-equipment-steel`` (error): an equipment part through a steel member;
 - ``headroom`` (warning): a pipe's bottom over a road below ``headroom_road_m``, or in an
   escape route below ``headroom_walkway_m``;
+- ``buried-cover`` (warning): a buried run (below) with less soil cover over its top than its
+  ``buried.cover_m``, or under a road less than ``max(cover_m, road_cover_m)`` (1.2 m,
+  ASSUMED); its vertical runs (the risers through grade) are left out. Key ``<pipe>+<road>``
+  under a road, else ``<pipe>``;
 - ``access-blocked`` (warning): a pipe, member or other item in a bundle-pull, motor-removal
   or access envelope (an item's own pipes may cross its access space);
 - ``zone-crossing`` (warning): a pipe through a keep-clear, laydown or maintenance zone;
@@ -34,6 +38,12 @@ Rules (``cheme.layout-...``, level):
   with a level run;
 - ``separation`` (warning): a separation of the site plan naming a zone, measured in plan to
   the zone's volumes.
+
+A pipe declared ``buried`` in ``piping/routing.yaml`` (the model's ``buried``) is in the ground
+where its top lies at or below grade (:data:`GRADE`): those runs (:func:`buried_run`) are not
+under the road or escape-route headroom, and meet no steel, equipment part, envelope or zone
+volume that lies wholly above grade (a foundation or pit below grade still clashes); its runs
+above grade are pipes like any other.
 
 The cable tray rules (``tray-fill``, ``tray-separation``, ``clash-tray``, ``cable-missing``,
 ``cable-unrouted``) are in :func:`chemeascode.domains.spatial.trays.tray_findings`, the HVAC rules
@@ -70,6 +80,24 @@ Vec = tuple[float, float, float]
 CONNECT_TOL = 0.01
 #: At most this many findings of one rule are reported one by one; the rest are counted.
 LIMIT = 200
+#: Grade, m: a buried pipe's runs whose top is at or below it are in the ground.
+GRADE = 0.0
+
+
+def buried_run(pipe: dict[str, Any], a: Any, b: Any, r: float) -> bool:
+    """Whether the run *a*-*b* of *pipe* (radius *r*, insulation included) is in the ground:
+    the pipe is declared ``buried`` and the run's top is at or below :data:`GRADE`."""
+    return pipe.get("buried") is not None and max(a[2], b[2]) + r <= GRADE + TOUCH
+
+
+def _above_grade(solid: Any) -> bool:
+    """Whether a solid (or a box ``[x0, y0, z0, x1, y1, z1]``) stands wholly above grade: its
+    bottom at or above it; a steel member's (a capsule's) by its axis, so that a column
+    standing on grade is above it."""
+    if isinstance(solid, Capsule):
+        return min(solid.a[2], solid.b[2]) >= GRADE - TOUCH
+    box = solid.aabb if hasattr(solid, "aabb") else solid
+    return box[2] >= GRADE - TOUCH
 
 
 def _junction_label(key: str) -> str:
@@ -113,6 +141,12 @@ class _Rules:
         self.pipe_index = Index(4.0)
         for capsule, pipe, k in self.capsules:
             self.pipe_index.add(capsule, (pipe, k))
+        #: ``(pipe id, run index)`` of the buried runs (:func:`buried_run`).
+        self.buried = {
+            (pipe["id"], k)
+            for capsule, pipe, k in self.capsules
+            if buried_run(pipe, capsule.a, capsule.b, capsule.r)
+        }
         self.steel = Index(4.0)
         for structure in model.get("structures", []):
             for part in structure["parts"]:
@@ -280,8 +314,11 @@ class _Rules:
                     j += 1
                 if j >= 0 and k <= j:
                     skip.add(ends[0])
+            buried = (pipe["id"], k) in self.buried
             for solid, box, part_id in self.parts.near(capsule.aabb, 0.0):
                 if solid.id in skip or (pipe["id"], solid.id) in seen:
+                    continue
+                if buried and _above_grade(solid):
                     continue
                 if segment_distance(capsule.a, capsule.b, solid) < capsule.r - TOUCH:
                     seen.add((pipe["id"], solid.id))
@@ -312,9 +349,10 @@ class _Rules:
 
     def pipe_steel(self) -> None:
         seen: set[tuple[str, str]] = set()
-        for capsule, pipe, _ in self.capsules:
+        for capsule, pipe, k in self.capsules:
+            buried = (pipe["id"], k) in self.buried
             for solid, box, member in self.steel.near(capsule.aabb, 0.0):
-                if (pipe["id"], member) in seen:
+                if (pipe["id"], member) in seen or (buried and _above_grade(solid)):
                     continue
                 if segment_distance(capsule.a, capsule.b, solid) < capsule.r - TOUCH:
                     seen.add((pipe["id"], member))
@@ -350,8 +388,8 @@ class _Rules:
 
     # -- headroom, access, zones ------------------------------------------------------------
 
-    def headroom(self) -> None:
-        from chemeascode.domains.spatial.layout_distances import _inside
+    def roads(self) -> list[tuple[str, list[list[tuple[float, float]]]]]:
+        """Each road's id with its polygons in plan (roads, and areas of kind ``road``)."""
         from chemeascode.domains.spatial.layout_validate import strip
 
         roads = []
@@ -361,11 +399,20 @@ class _Rules:
             if area.get("kind") == "road":
                 x0, y0, x1, y1 = area["box"]
                 roads.append((area["id"], [[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]]))
+        return roads
+
+    def headroom(self) -> None:
+        from chemeascode.domains.spatial.layout_distances import _inside
+
+        roads = self.roads()
         need = self.rules.headroom_road_m
         for pipe in self.pipes:
             r = pipe["od"] / 2 + pipe.get("insulation_mm", 0.0) / 1000
             worst: dict[str, float] = {}
+            buried = pipe.get("buried") is not None
             for p in _samples([tuple(q) for q in pipe["points"]]):
+                if buried and p[2] + r <= GRADE + TOUCH:
+                    continue  # in the ground: the cover rule applies
                 for road_id, polygons in roads:
                     if any(_inside((p[0], p[1]), poly) for poly in polygons):
                         bottom = p[2] - r
@@ -395,7 +442,9 @@ class _Rules:
                     ((x0 + x1) / 2, (y0 + y1) / 2, z0 + walk / 2),
                     (x1 - x0, y1 - y0, walk),
                 )
-                for capsule, pipe, _ in self.capsules:
+                for capsule, pipe, k in self.capsules:
+                    if (pipe["id"], k) in self.buried and _above_grade(band):
+                        continue
                     if segment_distance(capsule.a, capsule.b, band) < capsule.r - TOUCH:
                         self.add(
                             "warning",
@@ -409,6 +458,61 @@ class _Rules:
                         )
                         break
 
+    def buried_cover(self) -> None:
+        from chemeascode.domains.spatial.layout_distances import _inside
+
+        roads = self.roads()
+        road_min = self.rules.road_cover_m
+        for pipe in self.pipes:
+            if pipe.get("buried") is None:
+                continue
+            declared = pipe["buried"].get("cover_m")
+            r = pipe["od"] / 2 + pipe.get("insulation_mm", 0.0) / 1000
+            points = [tuple(q) for q in pipe["points"]]
+            # where (a road, or None off the roads) -> (shortfall, cover, need, point)
+            worst: dict[str | None, tuple[float, float, float, Vec]] = {}
+            for a, b in zip(points, points[1:], strict=False):
+                if math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-6:
+                    continue  # a riser: it passes through the cover
+                for p in _samples([a, b]):
+                    cover = GRADE - (p[2] + r)
+                    if cover < -TOUCH:
+                        continue  # above grade here: not buried
+                    on = [
+                        road_id
+                        for road_id, polygons in roads
+                        if any(_inside((p[0], p[1]), poly) for poly in polygons)
+                    ]
+                    needs: list[tuple[str | None, float]] = [
+                        (road_id, max(declared or 0.0, road_min)) for road_id in on
+                    ]
+                    if not on and declared is not None:
+                        needs.append((None, declared))
+                    for where, need in needs:
+                        short = need - cover
+                        if short > TOUCH and (where not in worst or short > worst[where][0]):
+                            worst[where] = (short, cover, need, p)
+            for where, (_, cover, need, p) in sorted(worst.items(), key=lambda item: item[0] or ""):
+                if where is None:
+                    what, basis = "", "its declared cover_m"
+                elif declared is not None and declared >= road_min:
+                    what, basis = f" under road {where}", "its declared cover_m"
+                else:
+                    what, basis = f" under road {where}", "rules.road_cover_m, ASSUMED"
+                self.add(
+                    "warning",
+                    "buried-cover",
+                    f"buried pipe {pipe['id']} ({pipe['line']}) has {max(cover, 0.0):.2f} m of "
+                    f"cover{what} at [{p[0]:.1f}, {p[1]:.1f}], less than {need:g} m ({basis})",
+                    [pipe["id"], *([where] if where else [])],
+                    _box((p[0] - r, p[1] - r, p[2] - r, p[0] + r, p[1] + r, GRADE)),
+                    "lay the run deeper (its elevation or pinned route in piping/routing.yaml), "
+                    "or protect the crossing (a sleeve or slab) and accept the finding with the "
+                    "reason; the site's least cover goes in rules.road_cover_m or buried.cover_m",
+                    key=f"{pipe['id']}+{where}" if where else pipe["id"],
+                    measured=max(cover, 0.0),
+                )
+
     def access(self) -> None:
         for item in self.model.get("equipment", []):
             for envelope in item["envelopes"]:
@@ -420,8 +524,10 @@ class _Rules:
                 )
                 box = solid.aabb
                 blockers = set()
-                for capsule, pipe, _ in self.capsules:
+                for capsule, pipe, k in self.capsules:
                     if not _overlap(capsule.aabb, box):
+                        continue
+                    if (pipe["id"], k) in self.buried and _above_grade(box):
                         continue
                     if (
                         envelope["kind"] == "access"
@@ -458,8 +564,10 @@ class _Rules:
                 continue
             for volume in zone["volumes"]:
                 solid = volume_solid(volume, zone["id"])
-                for capsule, pipe, _ in self.capsules:
+                for capsule, pipe, k in self.capsules:
                     if not _overlap(capsule.aabb, solid.aabb):
+                        continue
+                    if (pipe["id"], k) in self.buried and _above_grade(solid):
                         continue
                     if segment_distance(capsule.a, capsule.b, solid) < capsule.r - TOUCH:
                         self.add(
@@ -702,6 +810,7 @@ class _Rules:
         self.pipe_steel()
         self.equipment_steel()
         self.headroom()
+        self.buried_cover()
         self.access()
         self.zones()
         self.rack_fill()

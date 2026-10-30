@@ -4,6 +4,13 @@
 
 ### Added
 
+- A line or segment in `piping/routing.yaml` can be declared `buried` (`true` or
+  `{cover_m, basis}`). Its runs below grade get no road or escape-route headroom finding, no
+  clash with steel, items, envelopes or zones above grade, no ladder-clearance finding and no
+  span finding. The new `cheme.layout-buried-cover` (warning) checks their soil cover instead:
+  at least `cover_m`, and under a road at least `rules.road_cover_m` (1.2 m, ASSUMED). The
+  gates' `clashes` requirement counts it. Model pipes gain an optional `buried`. The take-off
+  lists buried pipe as `group: buried`. Without the field nothing changes (#70, ADR 0036).
 - Viewer: the layout view exports the visible model as a binary STL for 3D printing ("Export
   .stl"), in millimetres at 1:100, 1:200, 1:500 or 1:1000, with an optional base slab whose top
   is at ground level, so everything standing on the ground prints as one piece. No thickening

@@ -24,7 +24,7 @@ checks it against the schema.
 | `piping/pipe-specs.yaml` (piping, kind `pipe_specs`, optional) | pipe classes (`code`, `material`, `rating`, `colour`), insulation thickness by type and DN |
 | `electrical/electrical-list.yaml` (control, kind `electrical`, optional), `electrical/tray-rules.yaml` (spatial, kind `trays`, optional), `control/instrument-list.yaml`, datasheets | rooms, motor list, junction boxes; tray rules; with them the model gets its cable trays and cables ([electrical.md](electrical.md)) |
 | `layout/hvac.yaml` (spatial, kind `hvac`, optional) | air handling units, ventilated rooms (air changes, terminals), duct rules; with it the model gets its units, rooms, terminals and ducts (below) |
-| `piping/routing.yaml` (spatial, kind `routing`, optional) | router rules (tiers by fluid or line prefix, `spacing_m`, headroom, `grid_m`, rack bent spacing, gravity fluids, `local_max_m`, `local_elevation_m`, `grade_max_m`, `rack_reach_m` (deprecated: `rack_reach` in the site plan), `rack_detour_factor`, `battery_limits`) and intent per line or segment (`rack`, `tier`, `via`, `elevation`, pinned `route`, `skip`, `gravity`; a segment by DEXPI id, segment number or, where the line repeats the id on another sheet, `<sheet stem>/<DEXPI id>`); `operators` of valves and transmitters out of reach (below) |
+| `piping/routing.yaml` (spatial, kind `routing`, optional) | router rules (tiers by fluid or line prefix, `spacing_m`, headroom, `grid_m`, rack bent spacing, gravity fluids, `local_max_m`, `local_elevation_m`, `grade_max_m`, `rack_reach_m` (deprecated: `rack_reach` in the site plan), `rack_detour_factor`, `battery_limits`) and intent per line or segment (`rack`, `tier`, `via`, `elevation`, pinned `route`, `skip`, `gravity`, `buried` (below); a segment by DEXPI id, segment number or, where the line repeats the id on another sheet, `<sheet stem>/<DEXPI id>`); `operators` of valves and transmitters out of reach (below) |
 
 Package data: `domains/piping/data/pipe-od.yaml` (OD by DN, ISO 4200 / ASME B36.10M, and
 assumed insulation thicknesses by keyword), `domains/safety/data/release-radii.yaml` (indicative
@@ -413,14 +413,19 @@ cold box, reached from the structure's platforms): nothing is proposed.
 generated|pinned, line, segment (DEXPI id), segment_number?, dn, od (m), insulation_mm, class?:
 {code, material?, colour?}, fluid?, points: [[x, y, z], ...] (axis polyline, orthogonal except
 pinned and rack runs along a skewed rack), length, method, racks?, tier?, open_ends?:
-[start|end], ends?: [{kind, ref?}, {kind, ref?}], review_needed?, reason?, jacket?}`. `ends`
+[start|end], ends?: [{kind, ref?}, {kind, ref?}], review_needed?, reason?, jacket?, buried?:
+{cover_m?, basis?}}`. `ends`
 (absent in older models) says what the start and the end connect to: `nozzle` (`ref`: its id),
 `junction` (a tee, an off-page connector pair or a component two segments share; `ref`: the
 router's key, `<sheet>:<tee id>` or `opc:<line>:<k>`), `open` (a vent or relief outlet),
 `item` (a placed component; `ref`: its tag), `battery_limit`, `line` (`ref`: the line it
 ends on). `jacket` (rendering hint) is the cladding of
 an insulated pipe from the line list's insulation text: `cold` (cold, cryogenic, vacuum
-jacketed, PUR, ...: vapour-tight cladding), `personnel` (personnel protection) or `hot`. `method`: `astar`, `astar_coarse`, `astar_fine` (a
+jacketed, PUR, ...: vapour-tight cladding), `personnel` (personnel protection) or `hot`.
+`buried` (absent: above grade) is the line's or segment's `buried` of `piping/routing.yaml`:
+the runs whose top (axis plus OD / 2 and insulation) is at or below grade (z = 0) are in the
+ground (see the rules below and the take-off's `buried` rows); its runs above grade (the risers
+at the users) are pipes like any other. `method`: `astar`, `astar_coarse`, `astar_fine` (a
 leg found only on the half grid with the larger search), `rack` (or `rack+...` when a
 leg fell back), `via`, `open` (a vent or relief end: a riser of 1 m above the stub), `direct`
 (over the obstacles at a clear elevation, `review_needed`), `pinned`. An `open` riser is
@@ -628,8 +633,8 @@ approach to a placed relief valve or silencer along its face),
 a pipe end more than 10 mm from what its `ends` say it connects to: its nozzle's face, another
 pipe of its tee, connector pair or shared component, its placed item, the line it ends on; a
 pinned or `via` route that no longer meets its connection above all; key `<pipe>+start|end`),
-`-headroom`, `-access-blocked`, `-zone-crossing`, `-rack-fill`, `-separation` (a site plan
-separation naming a zone) (warnings), `-nozzle-unconnected`, `-gravity-fall` (info). With
+`-headroom`, `-buried-cover` (below), `-access-blocked`, `-zone-crossing`, `-rack-fill`,
+`-separation` (a site plan separation naming a zone) (warnings), `-nozzle-unconnected`, `-gravity-fall` (info). With
 cables: `-tray-fill`, `-tray-separation`, `-clash-tray`, `-tray-zone` (a tray inside a zone of
 a kind in the tray rules' `avoid_zones`, default oxygen-enriched and hazardous; info with a hint
 to add `oxygen_deficient` to `avoid_zones` for a tray in an oxygen-deficient zone), `-tray-span`
@@ -643,6 +648,27 @@ tray tier within `support_reach_m`, 1 m), `-cable-missing`, `-cable-unrouted` (w
 | `-hvac-capacity` | warning | a duct above the velocity limit of its kind at the largest standard size (key: the duct id; names the rooms that cannot get their air changes), a louvre whose free area passes its air above the louvre limit (key `<building>/<opening>`), a unit supplying more than its `capacity_m3h` (key: the unit), a room or unit without its air path (`hvac.missing`: a unit in another building, no intake; no exhaust opening is `info`) |
 | `-duct-unrouted` | warning | a duct the router could not fit inside its building (`method: direct`) |
 | `-clash-duct` | warning | a duct through an item, steel, a pipe, a tray, a unit or another system's duct (LOD 1 envelopes; its own unit at its port ends excepted), or a unit standing in an item, steel, a pipe or a tray (key `<duct or unit>+<other>`) |
+
+**Buried lines.** A line or segment declared `buried` in `piping/routing.yaml` (`buried: true`,
+or `buried: {cover_m: 1.0, basis: D-012}`) is laid in the ground where its route lies below
+grade: a run whose top (axis plus OD / 2 and insulation) is at or below z = 0. Such a run is
+not under the road headroom (`headroom_road_m`) nor an escape route's headroom, meets no steel
+member, equipment part, envelope or zone volume that stands wholly above grade (a column on
+grade, an item on its plinth; a footing or pit below grade still clashes), is no
+`-ladder-clearance` finding and needs no supports (`-free-span`, `-support-missing`). Its
+cover is checked instead: `-buried-cover` (warning) where the soil over its top is less than
+its `cover_m`, or under a road less than `max(cover_m, road_cover_m)`; `road_cover_m` is a
+routing rule, 1.2 m ASSUMED (secondary sources cite 1.2 m (4 ft) under the road surface for
+uncased pipeline crossings after API RP 1102, e.g. the
+[Technical Toolboxes API 1102 highway crossing help](https://help.technicaltoolboxes.com/?p=1956):
+"4ft <= H <= 10 ft for highways (API 1102)"; not verified against the standard: the site's or
+road authority's rule replaces it). `buried` is set per line or segment; `buried: false` is no
+declaration and does not take one segment out of its line's `buried`. The worst point is reported per pipe and road (key
+`<pipe>+<road>`) and off the roads (key `<pipe>`), with the cover as `measured`; vertical runs
+(risers through grade) are left out. Its runs above grade, and a run of it at or above grade
+over a road, have every rule of a pipe above grade. The gates' `clashes` requirement counts
+`-buried-cover` with the clashes and `-headroom`. Without `buried` nothing changes: a pipe below
+grade is checked as any other.
 
 The engineering rules (`engineering_rules.py`; criteria from package tables, every value
 ASSUMED with its basis, overridden per plant under `criteria:` in `layout/site-plan.yaml`:
@@ -774,7 +800,7 @@ pipes are pinned with it). The files are edited as text, so comments stay (excep
 replaced route entry or `access:`); a pin is refused (exit 1, nothing written) when the result
 would not validate against the file's schema, when the entry cannot be placed so the data is
 the old data plus the pinned entry, or when the structure already declares the id. A replaced
-route entry keeps its `gravity` and `notes`; an item with several pinned platforms gets no
+route entry keeps its `gravity`, `buried` and `notes`; an item with several pinned platforms gets no
 `ladder_side` (each ladder stands where the build puts it);
 `cheme layout report [--json]` lists every line routed, partly routed, skipped or unrouted
 with the reasons, lengths, how and why each was routed, the chain counts per method and per

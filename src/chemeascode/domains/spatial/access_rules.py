@@ -31,7 +31,8 @@ the same state (its walking levels, criteria, pipe capsules, steel index and ``a
 - ``ladder-clearance`` (warning): a pipe less than ``ladder_clearance_m`` (0.2 m, ASSUMED) from
   a ladder's rails (from grade to the top of its handhold extension), or through its cage: the
   climb, the toe space behind the rungs or the step-off at its head is blocked; a structure's,
-  a rack's, an item platform's and an item's own ladder. Key ``<pipe>+<ladder>``;
+  a rack's, an item platform's and an item's own ladder; not a buried run (in the ground under
+  its foot). Key ``<pipe>+<ladder>``;
 - ``access-unconnected`` (warning): an item platform's ladder whose foot stands on no walking
   level (not on the platform below, a floor or grade within
   :data:`~chemeascode.domains.spatial.structures.CONNECT` in plan, nor where the item stands),
@@ -606,7 +607,9 @@ class AccessRules:
             solid = Capsule(part["id"], tuple(part["start"]), tuple(part["end"]), float(r))
             index.add(solid, (ladder, cage))
         worst: dict[tuple[str, str], tuple[float, bool, dict[str, Any], list[float]]] = {}
-        for capsule, pipe, _ in self.base.capsules:
+        for capsule, pipe, k in self.base.capsules:
+            if (pipe["id"], k) in self.base.buried:
+                continue  # in the ground, under the ladder's foot
             for solid, _, (ladder, cage) in index.near(capsule.aabb, need):
                 gap = segment_segment(capsule.a, capsule.b, solid.a, solid.b) - capsule.r - solid.r
                 if (cage and gap >= -TOUCH) or (not cage and gap >= need - TOUCH):
