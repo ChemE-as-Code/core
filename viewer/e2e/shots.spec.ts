@@ -1,12 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { asuFiles } from "./asuFiles";
-import { mepLayout, mockApi, mtoMep, reactionsBedCooled, reactionsUnbalanced, simulationStale, streamsSimulation } from "./fixtures";
+import { mepLayout, mockApi, mtoMep, reactionsBedCooled, reactionsUnbalanced, simulationStale, streamsSimulation, teaAsu, teaBlocks } from "./fixtures";
 
 /**
  * Screenshots for checking by eye, only with `LAYOUT_SHOTS=<dir>`: a pump close up, the tank's
  * spiral stair, the cold box's stairs and proposals, the realistic look, trays and a cable route,
- * ducts, a wall penetration, the take-off page, the LCA page, the simulation tab and the reactions
- * page (light and dark).
+ * ducts, a wall penetration, the take-off page, the LCA page, the TEA page (the ASU's and the blocks
+ * example's), the simulation tab and the reactions page (light and dark).
  */
 const SHOTS = process.env.LAYOUT_SHOTS ?? "";
 const TWO_FRAMES = "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))";
@@ -78,6 +78,27 @@ test.describe("screenshots", () => {
     await page.screenshot({ path: `${SHOTS}/mto-page.png`, fullPage: false });
     await page.locator('section.category[data-category="steel"]').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/mto-steel.png` });
+  });
+
+  test("the TEA page", async ({ page }) => {
+    for (const [name, tea] of [["asu", teaAsu], ["blocks", teaBlocks]] as const) {
+      await mockApi(page, { tea });
+      for (const scheme of ["light", "dark"] as const) {
+        await page.emulateMedia({ colorScheme: scheme });
+        // tall: the page scrolls inside the app's main pane, so a full-page shot would not hold it
+        await page.setViewportSize({ width: 1280, height: 7000 });
+        await page.goto("/tea");
+        await expect(page.getByRole("region", { name: "Results" })).toBeVisible();
+        await page.locator('[data-action="cashflow-table"]').click();
+        await page.screenshot({ path: `${SHOTS}/tea-${name}-${scheme}.png`, fullPage: true });
+      }
+      await page.emulateMedia({ colorScheme: "light" });
+      await page.setViewportSize({ width: 390, height: 12000 });
+      await page.goto("/tea");
+      await expect(page.getByRole("region", { name: "Results" })).toBeVisible();
+      await page.screenshot({ path: `${SHOTS}/tea-${name}-phone.png`, fullPage: true });
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    }
   });
 
   test("the LCA page", async ({ page }) => {

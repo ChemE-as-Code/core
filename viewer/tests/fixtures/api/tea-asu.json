@@ -1,0 +1,1742 @@
+{
+  "rev": null,
+  "currency": "USD",
+  "cost_year": 2023,
+  "example": false,
+  "stage": "basic",
+  "estimate_class": 5,
+  "expected_class": 4,
+  "decision": {
+    "question": "Take ASU-1 from basic engineering into FEED as the 500 t/d GOX pipeline supply?",
+    "metric": "lcop",
+    "threshold": 100.0,
+    "confidence": 0.8,
+    "alternatives": [
+      "buy GOX over the fence from an industrial gas company at about the threshold price",
+      "a smaller ASU without liquid production (no LOX/LIN, no liquefier duty)"
+    ]
+  },
+  "metric": "lcop",
+  "threshold": 100.0,
+  "basis": {
+    "product": "GOXP",
+    "specification": "GOX 99.5 mol% O2, 30 barg at the battery limit (process/design-basis.yaml)",
+    "boundary": "ambient air intake to the GOX, GAN, LOX and LIN battery limits; cooling water and 6.6 kV power supplied by the site (not in the capital cost)",
+    "scale": "500 t/d O2 (14,600 Nm3/h GOX, 10,000 Nm3/h GAN)",
+    "location": "assumed coastal industrial site, United States (prices at the US average)",
+    "currency": "USD",
+    "cost_year": "2023",
+    "case": "design",
+    "operation": "8400 h/a, 25 a",
+    "discount_rate": "0.08",
+    "tax_rate": "0"
+  },
+  "operation": {
+    "hours_per_year": 8400.0,
+    "life_years": 25,
+    "ramp_up": [],
+    "utilisation": null,
+    "batches_per_year": null,
+    "cycle_time": null,
+    "operating_hours": 8400.0,
+    "cases": [
+      {
+        "case": "design",
+        "share": 1.0
+      }
+    ]
+  },
+  "capex": [
+    {
+      "id": "isbl",
+      "title": "ISBL (given)",
+      "basis": "given",
+      "value": 36500000.0,
+      "status": "ASSUMED",
+      "source": "Thunder Said Energy, 'Cryogenic air separation: costs and energy economics?' (data file, updated before 2025, no cost year stated; companion report 'Industrial gases: air separation units' dated 2023-05-31) gives an average all-in capital of about USD 200 per t/a of oxygen capacity (paraphrased); x 500 t/d x 365 d = 182,500 t/a. Taken as USD 2023, not escalated: if it were of 2024 the CEPCI factor would be about 1.00 (2023 annual 797.9, cost-basis.yaml; 2024 monthly values stayed just below 800, Chemical Engineering CEPCI updates 2024), far inside the class 5 range",
+      "year": 2023,
+      "currency": "",
+      "tea_value": 36500000.0
+    },
+    {
+      "id": "osbl",
+      "title": "OSBL (offsites, utilities)",
+      "basis": "0 x ISBL",
+      "value": 0.0,
+      "status": "ASSUMED",
+      "source": "the site supplies cooling water and power at the battery limit (basis.boundary); the all-in benchmark per tonne of capacity holds the plant's own offsites",
+      "year": null,
+      "currency": "USD",
+      "tea_value": 0.0
+    }
+  ],
+  "capex_range": {
+    "class": 5,
+    "low": [
+      18250000.0,
+      29200000.0
+    ],
+    "high": [
+      47450000.0,
+      73000000.0
+    ]
+  },
+  "flows": [
+    {
+      "key": "feed:AIR",
+      "title": "Ambient air",
+      "kind": "material",
+      "rate": 113335.0,
+      "rate_unit": "kg/h",
+      "provenance": "given",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "ambient air",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "feed:POWER",
+      "title": "Electric power (6.6 kV grid supply)",
+      "kind": "energy",
+      "rate": 10465.048999999999,
+      "rate_unit": "kWh/h",
+      "provenance": "assumed",
+      "price": 80.4,
+      "price_unit": "MWh",
+      "per_year": -7067675.49264,
+      "status": "QUOTED",
+      "source": "US EIA, Electricity sales, revenue and average price, 2023 data, Table 4: average price to the industrial sector, US total, 8.04 cents/kWh",
+      "year": 2023,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": [
+        {
+          "component": "",
+          "price": 80.4,
+          "unit": "MWh"
+        }
+      ]
+    },
+    {
+      "key": "product:GOXP",
+      "title": "GOX to pipeline",
+      "kind": "material",
+      "rate": 20860.0,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": 0.0,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:GANP",
+      "title": "GAN to battery limit",
+      "kind": "material",
+      "rate": 12510.0,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:LOX",
+      "title": "LOX to storage",
+      "kind": "material",
+      "rate": 470.0,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:LIN",
+      "title": "LIN to storage",
+      "kind": "material",
+      "rate": 470.0,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:VENT",
+      "title": "Vent to atmosphere",
+      "kind": "material",
+      "rate": 76772.8,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "waste nitrogen vented to atmosphere",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:COND",
+      "title": "Condensate (MAC cooler drains; DCAC condensate into its circulating water)",
+      "kind": "material",
+      "rate": 2252.288,
+      "rate_unit": "kg/h",
+      "provenance": "calculated",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "compressor cooler condensate to the site drain, no charge assumed",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    },
+    {
+      "key": "product:CW",
+      "title": "Cooling water return (heat rejected)",
+      "kind": "energy",
+      "rate": 10721.438000000002,
+      "rate_unit": "kWh/h",
+      "provenance": "calculated",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    }
+  ],
+  "lines": [
+    {
+      "key": "feed:POWER",
+      "category": "utility",
+      "revenue": false,
+      "rate": 10465.048999999999,
+      "unit": "kWh",
+      "price": 0.0804,
+      "per_year": 7067675.49264,
+      "profile": []
+    },
+    {
+      "key": "product:GOXP",
+      "category": "main",
+      "revenue": true,
+      "rate": 20860.0,
+      "unit": "kg",
+      "price": 0.0,
+      "per_year": 0.0,
+      "profile": []
+    }
+  ],
+  "variable": [],
+  "emissions": null,
+  "opex": [
+    {
+      "id": "maintenance",
+      "title": "Maintenance",
+      "basis": "0.03 x fixed capital",
+      "per_year": 1095000.0,
+      "status": "ASSUMED",
+      "source": "Towler and Sinnott, Chemical Engineering Design, fixed costs of production, maintenance typically 3 to 5 % of ISBL per year (low end for rotating equipment under contract)",
+      "year": null
+    },
+    {
+      "id": "labour",
+      "title": "Operating labour",
+      "basis": "4.8 operators x 79450 x (1 + 0.25 supervision)",
+      "per_year": 476700.0,
+      "status": "ASSUMED",
+      "source": "US Bureau of Labor Statistics, Occupational Employment and Wages, May 2023, 51-8091 Chemical Plant and System Operators: national mean annual wage $79,450 (wage only)",
+      "year": 2023
+    },
+    {
+      "id": "insurance_tax",
+      "title": "Insurance and local taxes",
+      "basis": "0.02 x fixed capital",
+      "per_year": 730000.0,
+      "status": "ASSUMED",
+      "source": "Towler and Sinnott, Chemical Engineering Design, fixed costs of production, property taxes and insurance typically 1 to 2 % of fixed capital per year",
+      "year": null
+    }
+  ],
+  "events": [],
+  "results": {
+    "isbl": 36500000.0,
+    "osbl": 0.0,
+    "owners_cost": 0.0,
+    "contingency": 0.0,
+    "fixed_capital": 36500000.0,
+    "working_capital": 730000.0,
+    "revenue_per_year": 0.0,
+    "variable_cost_per_year": 7067675.49264,
+    "fixed_cost_per_year": 2301700.0,
+    "main_per_year": 175224000.0,
+    "main_unit": "kg/a",
+    "operating_hours": 8400.0,
+    "npv": -128062401.24091884,
+    "irr": null,
+    "lcop": 73.9423123657121,
+    "cash_cost": 53.470845846687666,
+    "lcop_unit": "USD/t",
+    "lcop_unsubsidised": null,
+    "payback_years": null,
+    "meets": true,
+    "main_priced": false
+  },
+  "cost_of_production": [
+    {
+      "category": "utility",
+      "per_unit": 40.33508818791946,
+      "per_year": 7067675.49264
+    },
+    {
+      "category": "fixed",
+      "per_unit": 13.135757658768204,
+      "per_year": 2301700.0
+    },
+    {
+      "category": "capital_and_tax",
+      "per_unit": 20.471466519024432,
+      "per_year": 3587092.249329537
+    }
+  ],
+  "cashflow": [
+    {
+      "year": 0,
+      "phase": "construction",
+      "capacity": 0.0,
+      "capital": 14600000.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 0.0,
+      "fixed_cost": 0.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 0.0,
+      "cash_flow": -14600000.0,
+      "discounted": -14600000.0,
+      "cumulative": -14600000.0
+    },
+    {
+      "year": 1,
+      "phase": "construction",
+      "capacity": 0.0,
+      "capital": 21900000.0,
+      "working_capital": -730000.0,
+      "revenue": 0.0,
+      "variable_cost": 0.0,
+      "fixed_cost": 0.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 0.0,
+      "cash_flow": -22630000.0,
+      "discounted": -20953703.7037037,
+      "cumulative": -35553703.7037037
+    },
+    {
+      "year": 2,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -8032729.331824415,
+      "cumulative": -43586433.035528116
+    },
+    {
+      "year": 3,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -7437712.344281866,
+      "cumulative": -51024145.37980998
+    },
+    {
+      "year": 4,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -6886770.689149876,
+      "cumulative": -57910916.06895986
+    },
+    {
+      "year": 5,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -6376639.526990625,
+      "cumulative": -64287555.595950484
+    },
+    {
+      "year": 6,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -5904295.858324653,
+      "cumulative": -70191851.45427513
+    },
+    {
+      "year": 7,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -5466940.609559863,
+      "cumulative": -75658792.063835
+    },
+    {
+      "year": 8,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -5061982.045888762,
+      "cumulative": -80720774.10972376
+    },
+    {
+      "year": 9,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -4687020.412859964,
+      "cumulative": -85407794.52258372
+    },
+    {
+      "year": 10,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -4339833.715611078,
+      "cumulative": -89747628.2381948
+    },
+    {
+      "year": 11,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -4018364.5514917383,
+      "cumulative": -93765992.78968653
+    },
+    {
+      "year": 12,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -3720707.918047906,
+      "cumulative": -97486700.70773444
+    },
+    {
+      "year": 13,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -3445099.924118431,
+      "cumulative": -100931800.63185287
+    },
+    {
+      "year": 14,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -3189907.3371466952,
+      "cumulative": -104121707.96899956
+    },
+    {
+      "year": 15,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2953617.904765458,
+      "cumulative": -107075325.87376502
+    },
+    {
+      "year": 16,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2734831.39330135,
+      "cumulative": -109810157.26706637
+    },
+    {
+      "year": 17,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2532251.2900938424,
+      "cumulative": -112342408.55716021
+    },
+    {
+      "year": 18,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2344677.1204572613,
+      "cumulative": -114687085.67761748
+    },
+    {
+      "year": 19,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2170997.3337567234,
+      "cumulative": -116858083.0113742
+    },
+    {
+      "year": 20,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -2010182.7164414106,
+      "cumulative": -118868265.72781561
+    },
+    {
+      "year": 21,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -1861280.293001306,
+      "cumulative": -120729546.02081692
+    },
+    {
+      "year": 22,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -1723407.6787049125,
+      "cumulative": -122452953.69952184
+    },
+    {
+      "year": 23,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -1595747.8506526968,
+      "cumulative": -124048701.55017453
+    },
+    {
+      "year": 24,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -1477544.3061599045,
+      "cumulative": -125526245.85633443
+    },
+    {
+      "year": 25,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -9369375.49264,
+      "discounted": -1368096.579777689,
+      "cumulative": -126894342.43611212
+    },
+    {
+      "year": 26,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 730000.0,
+      "revenue": 0.0,
+      "variable_cost": 7067675.49264,
+      "fixed_cost": 2301700.0,
+      "periodic": 0.0,
+      "depreciation": 1460000.0,
+      "tax": -0.0,
+      "cash_flow": -8639375.49264,
+      "discounted": -1168058.8048067242,
+      "cumulative": -128062401.24091884
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "power-texas",
+      "title": "Industrial power at the Texas 2023 average",
+      "source": "US EIA table_5c, Texas industrial 2023, 6.60 cents/kWh",
+      "fixed_capital": 36500000.0,
+      "npv": -115550650.98262624,
+      "irr": null,
+      "lcop": 66.71811746638325,
+      "meets": true,
+      "cash_cost": 46.24665094735881
+    },
+    {
+      "id": "power-california",
+      "title": "Industrial power at the California 2023 average",
+      "source": "US EIA table_5c, California industrial 2023, 18.64 cents/kWh",
+      "fixed_capital": 36500000.0,
+      "npv": -220162785.08668393,
+      "irr": null,
+      "lcop": 127.12041370799399,
+      "meets": false,
+      "cash_cost": 106.64894718896954
+    },
+    {
+      "id": "capex-market-report",
+      "title": "Capital at the market-report benchmark, scaled from 2,000 to 500 t/d",
+      "source": "Mordor Intelligence, Air Separation Unit market report, 2026 edition (page updated 2026-09-11): a 2,000 t/d plant costs about USD 250 to 300 million (paraphrased), no method and no cost year stated, not escalated to 2023; scaled to 500 t/d with the capacity exponent 0.6 (six-tenths rule, Towler and Sinnott, Chemical Engineering Design, ch. 7), ASSUMED",
+      "fixed_capital": 119720000.0,
+      "npv": -250027356.35182628,
+      "irr": null,
+      "lcop": 144.36400305004386,
+      "meets": false,
+      "cash_cost": 77.21759286764369
+    }
+  ],
+  "inputs": [
+    {
+      "id": "price:feed:POWER",
+      "value": 80.4,
+      "unit": "USD/MWh",
+      "status": "QUOTED",
+      "source": "US EIA, Electricity sales, revenue and average price, 2023 data, Table 4: average price to the industrial sector, US total, 8.04 cents/kWh"
+    },
+    {
+      "id": "price:product:GOXP",
+      "value": 0.0,
+      "unit": "USD/kg",
+      "status": "",
+      "source": ""
+    },
+    {
+      "id": "rate:feed:POWER",
+      "value": 10465.048999999999,
+      "unit": "kWh/h",
+      "status": "assumed",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "rate:product:GOXP",
+      "value": 20860.0,
+      "unit": "kg/h",
+      "status": "assumed",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "capex:isbl",
+      "value": 36500000.0,
+      "unit": "USD",
+      "status": "ASSUMED",
+      "source": "Thunder Said Energy, 'Cryogenic air separation: costs and energy economics?' (data file, updated before 2025, no cost year stated; companion report 'Industrial gases: air separation units' dated 2023-05-31) gives an average all-in capital of about USD 200 per t/a of oxygen capacity (paraphrased); x 500 t/d x 365 d = 182,500 t/a. Taken as USD 2023, not escalated: if it were of 2024 the CEPCI factor would be about 1.00 (2023 annual 797.9, cost-basis.yaml; 2024 monthly values stayed just below 800, Chemical Engineering CEPCI updates 2024), far inside the class 5 range"
+    },
+    {
+      "id": "opex:maintenance",
+      "value": 0.03,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "Towler and Sinnott, Chemical Engineering Design, fixed costs of production, maintenance typically 3 to 5 % of ISBL per year (low end for rotating equipment under contract)"
+    },
+    {
+      "id": "opex:labour",
+      "value": 476700.0,
+      "unit": "USD/a",
+      "status": "ASSUMED",
+      "source": "US Bureau of Labor Statistics, Occupational Employment and Wages, May 2023, 51-8091 Chemical Plant and System Operators: national mean annual wage $79,450 (wage only)"
+    },
+    {
+      "id": "opex:insurance_tax",
+      "value": 0.02,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "Towler and Sinnott, Chemical Engineering Design, fixed costs of production, property taxes and insurance typically 1 to 2 % of fixed capital per year"
+    },
+    {
+      "id": "operation:hours_per_year",
+      "value": 8400.0,
+      "unit": "h/a",
+      "status": "",
+      "source": "design basis operating_hours_per_year 8400 (ASSUMED); 25 a service life ASSUMED, as lca/lca.yaml"
+    },
+    {
+      "id": "finance:discount_rate",
+      "value": 0.08,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "screening real discount rate; the owner's hurdle rate is not given yet"
+    }
+  ],
+  "break_even": [
+    {
+      "input": "price:feed:POWER",
+      "base": 80.4,
+      "unit": "USD/MWh",
+      "multiplier": 1.6460302631020967,
+      "value": 132.34083315340857
+    },
+    {
+      "input": "rate:feed:POWER",
+      "base": 10465.048999999999,
+      "unit": "kWh/h",
+      "multiplier": 1.6460302631020967,
+      "value": 17225.787358846334
+    },
+    {
+      "input": "rate:product:GOXP",
+      "base": 20860.0,
+      "unit": "kg/h",
+      "multiplier": 0.7394231236571215,
+      "value": 15424.366359487554
+    },
+    {
+      "input": "capex:isbl",
+      "base": 36500000.0,
+      "unit": "USD",
+      "multiplier": 1.8436538121825439,
+      "value": 67293364.14466286
+    },
+    {
+      "input": "opex:maintenance",
+      "base": 0.03,
+      "unit": "fraction",
+      "multiplier": 5.1698011488862665,
+      "value": 0.15509403446658798
+    },
+    {
+      "input": "opex:labour",
+      "base": 476700.0,
+      "unit": "USD/a",
+      "multiplier": 10.57820905817173,
+      "value": 5042632.258030464
+    },
+    {
+      "input": "opex:insurance_tax",
+      "base": 0.02,
+      "unit": "fraction",
+      "multiplier": 7.254701723329396,
+      "value": 0.14509403446658792
+    },
+    {
+      "input": "operation:hours_per_year",
+      "base": 8400.0,
+      "unit": "h/a",
+      "multiplier": 0.5632661334293307,
+      "value": 4731.435520806378
+    },
+    {
+      "input": "finance:discount_rate",
+      "base": 0.08,
+      "unit": "fraction",
+      "multiplier": 2.511818139387593,
+      "value": 0.20094545115100743
+    }
+  ],
+  "tornado": [
+    {
+      "input": "capex:isbl",
+      "low": 0.7738612787525831,
+      "high": 1.6127016653792583,
+      "basis": "P10/P90",
+      "at_low": 66.95763206771387,
+      "at_high": 92.8666488398845,
+      "width": 25.90901677217063
+    },
+    {
+      "input": "operation:hours_per_year",
+      "low": 0.8,
+      "high": 1.2,
+      "basis": "default",
+      "at_low": 82.34411841016028,
+      "at_high": 68.34110833608001,
+      "width": 14.003010074080265
+    },
+    {
+      "input": "price:feed:POWER",
+      "low": 0.8452552155961437,
+      "high": 1.183074628288117,
+      "basis": "P10/P90",
+      "at_low": 67.70066784016198,
+      "at_high": 81.32664364268388,
+      "width": 13.625975802521893
+    },
+    {
+      "input": "finance:discount_rate",
+      "low": 0.75,
+      "high": 1.5,
+      "basis": "swing",
+      "at_low": 70.40689239226334,
+      "at_high": 81.80445793837198,
+      "width": 11.397565546108638
+    },
+    {
+      "input": "rate:product:GOXP",
+      "low": 0.9407550748315238,
+      "high": 1.0629759293927659,
+      "basis": "P10/P90",
+      "at_low": 78.59889820839302,
+      "at_high": 69.56160560282137,
+      "width": 9.03729260557165
+    },
+    {
+      "input": "rate:feed:POWER",
+      "low": 0.9407550748315238,
+      "high": 1.0629759293927659,
+      "basis": "P10/P90",
+      "at_low": 71.55266308435493,
+      "at_high": 76.48245203148551,
+      "width": 4.929788947130575
+    },
+    {
+      "input": "opex:maintenance",
+      "low": 0.771196385896071,
+      "high": 1.2966865746369867,
+      "basis": "P10/P90",
+      "at_low": 72.51248564423672,
+      "at_high": 75.79634947950645,
+      "width": 3.2838638352697274
+    },
+    {
+      "input": "opex:insurance_tax",
+      "low": 0.771196385896071,
+      "high": 1.2966865746369867,
+      "basis": "P10/P90",
+      "at_low": 72.98909455139517,
+      "at_high": 75.17833710824168,
+      "width": 2.1892425568465086
+    },
+    {
+      "input": "opex:labour",
+      "low": 0.771196385896071,
+      "high": 1.2966865746369867,
+      "basis": "P10/P90",
+      "at_low": 73.31984807518488,
+      "at_high": 74.7494534544297,
+      "width": 1.4296053792448191
+    },
+    {
+      "input": "price:product:GOXP",
+      "low": 0.8,
+      "high": 1.2,
+      "basis": "default",
+      "at_low": 73.9423123657121,
+      "at_high": 73.9423123657121,
+      "width": 0.0
+    }
+  ],
+  "uncertainty": {
+    "iterations": 2000,
+    "seed": 1,
+    "statistics": [
+      {
+        "metric": "fixed_capital",
+        "unit": "USD",
+        "deterministic": 36500000.0,
+        "mean": 42803419.843018405,
+        "p10": 28201496.979694482,
+        "p50": 41924321.69999474,
+        "p90": 59231842.09546473,
+        "valid": 2000,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            1.0
+          ],
+          [
+            "price:feed:POWER",
+            -0.06589044147261036
+          ],
+          [
+            "opex:insurance_tax",
+            -0.035672900918225225
+          ],
+          [
+            "opex:maintenance",
+            -0.030833962708490675
+          ],
+          [
+            "rate:feed:POWER",
+            0.027635505908876475
+          ],
+          [
+            "opex:labour",
+            0.02430956707739177
+          ],
+          [
+            "rate:product:GOXP",
+            -0.013103328275832066
+          ]
+        ]
+      },
+      {
+        "metric": "lcop",
+        "unit": "USD/t",
+        "deterministic": 73.9423123657121,
+        "mean": 79.93039612686367,
+        "p10": 65.15051802921337,
+        "p50": 79.15752409235412,
+        "p90": 95.94007011741604,
+        "valid": 2000,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            0.7941406265351567
+          ],
+          [
+            "price:feed:POWER",
+            0.37975855993964
+          ],
+          [
+            "rate:product:GOXP",
+            -0.3047801876950469
+          ],
+          [
+            "rate:feed:POWER",
+            0.16131935382983845
+          ],
+          [
+            "opex:maintenance",
+            0.10222686005671501
+          ],
+          [
+            "opex:labour",
+            0.07982874195718549
+          ],
+          [
+            "opex:insurance_tax",
+            0.05900061275015318
+          ]
+        ]
+      },
+      {
+        "metric": "cash_cost",
+        "unit": "USD/t",
+        "deterministic": 53.470845846687666,
+        "mean": 55.88968682385581,
+        "p10": 46.93673387054321,
+        "p50": 55.21647220371936,
+        "p90": 65.48798557413357,
+        "valid": 2000,
+        "sensitivity": [
+          [
+            "price:feed:POWER",
+            0.7009550127387532
+          ],
+          [
+            "capex:isbl",
+            0.3909492752373188
+          ],
+          [
+            "rate:product:GOXP",
+            -0.3515102468775617
+          ],
+          [
+            "rate:feed:POWER",
+            0.24714088528522132
+          ],
+          [
+            "opex:maintenance",
+            0.20707119526779882
+          ],
+          [
+            "opex:insurance_tax",
+            0.1370053752513438
+          ],
+          [
+            "opex:labour",
+            0.10658030214507554
+          ]
+        ]
+      }
+    ],
+    "varied": [
+      "capex:isbl",
+      "opex:insurance_tax",
+      "opex:labour",
+      "opex:maintenance",
+      "price:feed:POWER",
+      "rate:feed:POWER",
+      "rate:product:GOXP"
+    ],
+    "probability": 0.945
+  },
+  "boundary": {
+    "complete": false,
+    "categories": {
+      "unclassified": [
+        "AIR",
+        "POWER",
+        "GOXP",
+        "GANP",
+        "LOX",
+        "LIN",
+        "VENT",
+        "COND",
+        "CW"
+      ]
+    },
+    "unassigned_duties": [
+      "C1101U",
+      "C1102",
+      "K3101",
+      "E3105",
+      "C3101",
+      "HL3101",
+      "C3102"
+    ],
+    "checked": [
+      "steps of the unit kinds compressor, pump, heater, cooler, shortcut_column, conversion_reactor, equilibrium_reactor, gibbs_reactor have an energy stream at a port (or are declared adiabatic)",
+      "every product terminal has a category"
+    ],
+    "noted": [
+      "every feed terminal has a category",
+      "energy terminals are classified utility; heat utilities declare a kind and supply temperature"
+    ],
+    "not_checked": [
+      "steps of other unit kinds (component separators, flash drums, mixers, splitters, unknown classes)",
+      "whether a step's energy stream reaches a utility terminal (a step-to-step stream counts)",
+      "whether duties are given or balance (cheme process energy)"
+    ],
+    "gaps": [
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "info",
+        "ids": [
+          "AIR"
+        ],
+        "message": "feed AIR (Ambient air) has no category: the TEA and LCA cannot tell a raw material from a utility",
+        "file": "process/flowsheet.yaml",
+        "line": 17
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "info",
+        "ids": [
+          "POWER"
+        ],
+        "message": "feed POWER (Electric power (6.6 kV grid supply)) has no category: the TEA and LCA cannot tell a raw material from a utility",
+        "file": "process/flowsheet.yaml",
+        "line": 20
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "GOXP"
+        ],
+        "message": "product GOXP (GOX to pipeline) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 29
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "GANP"
+        ],
+        "message": "product GANP (GAN to battery limit) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 30
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "LOX"
+        ],
+        "message": "product LOX (LOX to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 31
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "LIN"
+        ],
+        "message": "product LIN (LIN to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 32
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "VENT"
+        ],
+        "message": "product VENT (Vent to atmosphere) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 33
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "COND"
+        ],
+        "message": "product COND (Condensate (MAC cooler drains; DCAC condensate into its circulating water)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 36
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "CW"
+        ],
+        "message": "product CW (Cooling water return (heat rejected)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 39
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "C1101U"
+        ],
+        "message": "step C1101U (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 129
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "C1102"
+        ],
+        "message": "step C1102 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 138
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "K3101"
+        ],
+        "message": "step K3101 (Compressing) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 191
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "E3105"
+        ],
+        "message": "step E3105 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 209
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "C3101"
+        ],
+        "message": "step C3101 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 237
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "HL3101"
+        ],
+        "message": "step HL3101 (ExchangingThermalEnergy) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 266
+      },
+      {
+        "rule": "cheme.boundary-utility-unassigned",
+        "level": "warning",
+        "ids": [
+          "C3102"
+        ],
+        "message": "step C3102 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+        "file": "process/flowsheet.yaml",
+        "line": 273
+      }
+    ],
+    "excluded_products": [
+      "GANP",
+      "LOX",
+      "LIN",
+      "CW"
+    ]
+  },
+  "findings": [
+    {
+      "file": "estimate/tea.yaml",
+      "level": "warning",
+      "rule": "cheme.tea-class-stage",
+      "message": "the capital cost is AACE class 5; stage basic expects class 4 before its decision",
+      "line": 54,
+      "ids": [],
+      "hint": "define the scope further (sizes, quotations) and update the estimate's class",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-class-stage:54"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "info",
+      "rule": "cheme.boundary-unclassified",
+      "message": "feed AIR (Ambient air) has no category: the TEA and LCA cannot tell a raw material from a utility",
+      "line": 17,
+      "ids": [
+        "AIR"
+      ],
+      "hint": "category: raw_material | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:AIR"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "info",
+      "rule": "cheme.boundary-unclassified",
+      "message": "feed POWER (Electric power (6.6 kV grid supply)) has no category: the TEA and LCA cannot tell a raw material from a utility",
+      "line": 20,
+      "ids": [
+        "POWER"
+      ],
+      "hint": "category: raw_material | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:POWER"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product GOXP (GOX to pipeline) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 29,
+      "ids": [
+        "GOXP"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:GOXP"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product GANP (GAN to battery limit) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 30,
+      "ids": [
+        "GANP"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:GANP"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product LOX (LOX to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 31,
+      "ids": [
+        "LOX"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:LOX"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product LIN (LIN to storage) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 32,
+      "ids": [
+        "LIN"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:LIN"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product VENT (Vent to atmosphere) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 33,
+      "ids": [
+        "VENT"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:VENT"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product COND (Condensate (MAC cooler drains; DCAC condensate into its circulating water)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 36,
+      "ids": [
+        "COND"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:COND"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product CW (Cooling water return (heat rejected)) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 39,
+      "ids": [
+        "CW"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:CW"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step C1101U (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 129,
+      "ids": [
+        "C1101U"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:C1101U"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step C1102 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 138,
+      "ids": [
+        "C1102"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:C1102"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step K3101 (Compressing) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 191,
+      "ids": [
+        "K3101"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:K3101"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step E3105 (Cooling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 209,
+      "ids": [
+        "E3105"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:E3105"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step C3101 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 237,
+      "ids": [
+        "C3101"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:C3101"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step HL3101 (ExchangingThermalEnergy) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 266,
+      "ids": [
+        "HL3101"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:HL3101"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-utility-unassigned",
+      "message": "step C3102 (Distilling) exchanges heat or work but no energy stream connects it to a utility: its steam, cooling, refrigeration or power is in no inventory",
+      "line": 273,
+      "ids": [
+        "C3102"
+      ],
+      "hint": "give the step an energy port and a stream to a utility terminal (category: utility), or declare it adiabatic: mode: adiabatic in process/simulation.yaml (a reactor) or heat: adiabatic on its bed, tank or batch",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-utility-unassigned:C3102"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "warning",
+      "rule": "cheme.tea-price-missing",
+      "message": "4 feeds and products have no price and count as free: product:GANP, product:LOX, product:LIN, product:CW",
+      "line": 20,
+      "ids": [
+        "product:GANP",
+        "product:LOX",
+        "product:LIN",
+        "product:CW"
+      ],
+      "hint": "give each a price (status, source, year), or list it under free: with why",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-price-missing:product:GANP+product:LOX+product:LIN+product:CW"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "info",
+      "rule": "cheme.tea-emission-unpriced",
+      "message": "lca/lca.yaml maps product:COND, product:VENT as emissions; the TEA prices no emissions",
+      "line": null,
+      "ids": [],
+      "hint": "give emissions: {price, sources} when a carbon price applies",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-emission-unpriced:"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "info",
+      "rule": "cheme.tea-capex-missing",
+      "message": "no owners_cost: the fixed capital holds none",
+      "line": 36,
+      "ids": [],
+      "hint": "give capex.owners_cost with its source, or 0 with why",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-capex-missing:36"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "info",
+      "rule": "cheme.tea-capex-missing",
+      "message": "no contingency: the fixed capital holds none",
+      "line": 36,
+      "ids": [],
+      "hint": "give capex.contingency with its source, or 0 with why",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-capex-missing:36"
+    }
+  ]
+}

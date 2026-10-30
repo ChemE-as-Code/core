@@ -1,0 +1,1587 @@
+{
+  "rev": null,
+  "currency": "EUR",
+  "cost_year": 2025,
+  "example": true,
+  "stage": "concept",
+  "estimate_class": 4,
+  "expected_class": 5,
+  "decision": {
+    "question": "Proceed to basic engineering with the blocks plant?",
+    "metric": "cash_cost",
+    "threshold": 600.0,
+    "confidence": 0.9,
+    "alternatives": [
+      "toll manufacturing at a contract producer"
+    ]
+  },
+  "metric": "cash_cost",
+  "threshold": 600.0,
+  "basis": {
+    "product": "PROD",
+    "specification": "95 wt% ethanol",
+    "boundary": "feed to product tank",
+    "scale": "3,200 t/a product",
+    "location": "NL",
+    "currency": "EUR",
+    "cost_year": "2025",
+    "case": "design",
+    "operation": "8000 h/a, 20 a, ramp-up 0.5, 0.8",
+    "discount_rate": "0.08",
+    "tax_rate": "0.25"
+  },
+  "operation": {
+    "hours_per_year": 8000.0,
+    "life_years": 20,
+    "ramp_up": [
+      0.5,
+      0.8
+    ],
+    "utilisation": null,
+    "batches_per_year": null,
+    "cycle_time": null,
+    "operating_hours": 8000.0,
+    "cases": [
+      {
+        "case": "design",
+        "share": 1.0
+      }
+    ]
+  },
+  "capex": [
+    {
+      "id": "isbl",
+      "title": "ISBL (given)",
+      "basis": "given",
+      "value": 5000000.0,
+      "status": "ASSUMED",
+      "source": "fixture: a factored estimate",
+      "year": 2025,
+      "currency": "",
+      "tea_value": 5000000.0
+    },
+    {
+      "id": "osbl",
+      "title": "OSBL (offsites, utilities)",
+      "basis": "0.3 x ISBL",
+      "value": 1500000.0,
+      "status": "ASSUMED",
+      "source": "fixture: offsites at 30 % of ISBL",
+      "year": null,
+      "currency": "EUR",
+      "tea_value": 1500000.0
+    },
+    {
+      "id": "owners_cost",
+      "title": "Owner's cost",
+      "basis": "0.1 x (ISBL + OSBL)",
+      "value": 650000.0,
+      "status": "ASSUMED",
+      "source": "fixture: owner's cost",
+      "year": null,
+      "currency": "EUR",
+      "tea_value": 650000.0
+    },
+    {
+      "id": "contingency",
+      "title": "Contingency",
+      "basis": "0.2 x (ISBL + OSBL + owner's cost)",
+      "value": 1430000.0,
+      "status": "ASSUMED",
+      "source": "fixture: process and project contingency",
+      "year": null,
+      "currency": "EUR",
+      "tea_value": 1430000.0
+    }
+  ],
+  "capex_range": {
+    "class": 4,
+    "low": [
+      6006000.0,
+      7293000.0
+    ],
+    "high": [
+      10296000.0,
+      12870000.0
+    ]
+  },
+  "flows": [
+    {
+      "key": "feed:FEED",
+      "title": "Aqueous feed",
+      "kind": "material",
+      "rate": 1000.0,
+      "rate_unit": "kg/h",
+      "provenance": "given",
+      "price": 50.0,
+      "price_unit": "t",
+      "per_year": -400000.0,
+      "status": "QUOTED",
+      "source": "fixture: supplier quote",
+      "year": 2025,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": [
+        {
+          "component": "",
+          "price": 50.0,
+          "unit": "t"
+        }
+      ]
+    },
+    {
+      "key": "feed:STEAM",
+      "title": "LP steam",
+      "kind": "energy",
+      "rate": 350.0,
+      "rate_unit": "kWh/h",
+      "provenance": "assumed",
+      "price": 30.0,
+      "price_unit": "MWh",
+      "per_year": -84000.0,
+      "status": "ASSUMED",
+      "source": "fixture: site steam tariff",
+      "year": 2025,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": [
+        {
+          "component": "",
+          "price": 30.0,
+          "unit": "MWh"
+        }
+      ]
+    },
+    {
+      "key": "product:PROD",
+      "title": "Ethanol product",
+      "kind": "material",
+      "rate": 400.0,
+      "rate_unit": "kg/h",
+      "provenance": "given",
+      "price": 900.0,
+      "price_unit": "t",
+      "per_year": 2880000.0,
+      "status": "ASSUMED",
+      "source": "fixture: market price",
+      "year": 2024,
+      "free": "",
+      "component": "",
+      "per_case": {},
+      "prices": [
+        {
+          "component": "",
+          "price": 900.0,
+          "unit": "t"
+        }
+      ]
+    },
+    {
+      "key": "product:WATER",
+      "title": "Waste water",
+      "kind": "material",
+      "rate": 600.0,
+      "rate_unit": "kg/h",
+      "provenance": "assumed",
+      "price": null,
+      "price_unit": "",
+      "per_year": null,
+      "status": "",
+      "source": "",
+      "year": null,
+      "free": "to the site's treatment",
+      "component": "",
+      "per_case": {},
+      "prices": []
+    }
+  ],
+  "lines": [
+    {
+      "key": "feed:FEED",
+      "category": "feed",
+      "revenue": false,
+      "rate": 1000.0,
+      "unit": "kg",
+      "price": 0.05,
+      "per_year": 400000.0,
+      "profile": []
+    },
+    {
+      "key": "feed:STEAM",
+      "category": "utility",
+      "revenue": false,
+      "rate": 350.0,
+      "unit": "kWh",
+      "price": 0.03,
+      "per_year": 84000.0,
+      "profile": []
+    },
+    {
+      "key": "product:PROD",
+      "category": "main",
+      "revenue": true,
+      "rate": 400.0,
+      "unit": "kg",
+      "price": 0.9,
+      "per_year": 2880000.0,
+      "profile": []
+    },
+    {
+      "key": "variable:naoh",
+      "category": "chemical",
+      "revenue": false,
+      "rate": 2.0,
+      "unit": "kg NaOH",
+      "price": 0.45,
+      "per_year": 7200.0,
+      "profile": []
+    },
+    {
+      "key": "emission:wastewater",
+      "category": "emission",
+      "revenue": false,
+      "rate": 0.030000000000000002,
+      "unit": "t CO2-eq",
+      "price": 80.0,
+      "per_year": 19200.000000000004,
+      "profile": []
+    }
+  ],
+  "variable": [
+    {
+      "id": "naoh",
+      "title": "Caustic soda for neutralisation",
+      "per": "feed:FEED",
+      "component": "",
+      "amount": 0.002,
+      "unit": "kg NaOH",
+      "price": 0.45,
+      "category": "chemical",
+      "rate": 2.0,
+      "status": "QUOTED",
+      "source": "fixture: supplier quote",
+      "year": 2025
+    }
+  ],
+  "emissions": {
+    "t_per_year": 240.00000000000003,
+    "free_t_per_year": 0,
+    "cost_per_year": 19200.000000000004,
+    "per_unit": 6.000000000000001
+  },
+  "opex": [
+    {
+      "id": "maintenance",
+      "title": "Maintenance",
+      "basis": "0.03 x fixed capital",
+      "per_year": 257400.0,
+      "status": "ASSUMED",
+      "source": "fixture: 3 % of fixed capital",
+      "year": null
+    },
+    {
+      "id": "labour",
+      "title": "Operating labour",
+      "basis": "5 operators x 65000 x (1 + 0.2 supervision)",
+      "per_year": 390000.0,
+      "status": "ASSUMED",
+      "source": "fixture: NL operator, loaded",
+      "year": 2025
+    }
+  ],
+  "events": [
+    {
+      "id": "catalyst",
+      "title": "Catalyst replacement",
+      "kind": "replacement",
+      "amount": 150000.0,
+      "every_years": 3.0,
+      "every_hours": null,
+      "first_year": 3,
+      "downtime_days": 5.0,
+      "treatment": "expense",
+      "status": "ASSUMED",
+      "source": "fixture: catalyst life 3 years"
+    }
+  ],
+  "results": {
+    "isbl": 5000000.0,
+    "osbl": 1500000.0,
+    "owners_cost": 650000.0,
+    "contingency": 1430000.0,
+    "fixed_capital": 8580000.0,
+    "working_capital": 355068.4931506849,
+    "revenue_per_year": 2880000.0,
+    "variable_cost_per_year": 510400.0,
+    "fixed_cost_per_year": 647400.0,
+    "main_per_year": 3200000.0,
+    "main_unit": "kg/a",
+    "operating_hours": 8000.0,
+    "npv": 3202068.585832052,
+    "irr": 0.12266198840524412,
+    "lcop": 740.0973105431697,
+    "cash_cost": 361.8125,
+    "lcop_unit": "EUR/t",
+    "lcop_unsubsidised": null,
+    "payback_years": 10.89991820655074,
+    "meets": true,
+    "main_priced": true
+  },
+  "cost_of_production": [
+    {
+      "category": "feed",
+      "per_unit": 125.0,
+      "per_year": 400000.0
+    },
+    {
+      "category": "utility",
+      "per_unit": 26.25,
+      "per_year": 84000.0
+    },
+    {
+      "category": "chemical",
+      "per_unit": 2.25,
+      "per_year": 7199.999999999999
+    },
+    {
+      "category": "emission",
+      "per_unit": 6.000000000000001,
+      "per_year": 19200.000000000004
+    },
+    {
+      "category": "fixed",
+      "per_unit": 202.3125,
+      "per_year": 647400.0
+    },
+    {
+      "category": "events",
+      "per_unit": 13.782777735258383,
+      "per_year": 44104.888752826824
+    },
+    {
+      "category": "capital_and_tax",
+      "per_unit": 364.5020328079113,
+      "per_year": 1166406.504985316
+    }
+  ],
+  "cashflow": [
+    {
+      "year": 0,
+      "phase": "construction",
+      "capacity": 0.0,
+      "capital": 3432000.0,
+      "working_capital": 0.0,
+      "revenue": 0.0,
+      "variable_cost": 0.0,
+      "fixed_cost": 0.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 0.0,
+      "cash_flow": -3432000.0,
+      "discounted": -3432000.0,
+      "cumulative": -3432000.0
+    },
+    {
+      "year": 1,
+      "phase": "construction",
+      "capacity": 0.0,
+      "capital": 5148000.0,
+      "working_capital": -355068.4931506849,
+      "revenue": 0.0,
+      "variable_cost": 0.0,
+      "fixed_cost": 0.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 0.0,
+      "cash_flow": -5503068.493150685,
+      "discounted": -5095433.789954337,
+      "cumulative": -8527433.789954338
+    },
+    {
+      "year": 2,
+      "phase": "operation",
+      "capacity": 0.5,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 1440000.0,
+      "variable_cost": 255200.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": -80150.0,
+      "cash_flow": 617550.0,
+      "discounted": 529449.5884773661,
+      "cumulative": -7997984.201476973
+    },
+    {
+      "year": 3,
+      "phase": "operation",
+      "capacity": 0.8,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2304000.0,
+      "variable_cost": 408320.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 97570.0,
+      "cash_flow": 1150710.0,
+      "discounted": 913470.6980643193,
+      "cumulative": -7084513.503412653
+    },
+    {
+      "year": 4,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 858000.0,
+      "tax": 169664.0,
+      "cash_flow": 1366992.0,
+      "discounted": 1004779.9285339293,
+      "cumulative": -6079733.574878723
+    },
+    {
+      "year": 5,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 216050.0,
+      "cash_flow": 1506150.0,
+      "discounted": 1025060.3822123869,
+      "cumulative": -5054673.192666337
+    },
+    {
+      "year": 6,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 216050.0,
+      "cash_flow": 1506150.0,
+      "discounted": 949129.9835299879,
+      "cumulative": -4105543.209136349
+    },
+    {
+      "year": 7,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 858000.0,
+      "tax": 169664.0,
+      "cash_flow": 1366992.0,
+      "discounted": 797626.7024001747,
+      "cumulative": -3307916.506736174
+    },
+    {
+      "year": 8,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 216050.0,
+      "cash_flow": 1506150.0,
+      "discounted": 813725.9803926508,
+      "cumulative": -2494190.5263435235
+    },
+    {
+      "year": 9,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 216050.0,
+      "cash_flow": 1506150.0,
+      "discounted": 753449.9818450469,
+      "cumulative": -1740740.5444984767
+    },
+    {
+      "year": 10,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 858000.0,
+      "tax": 169664.0,
+      "cash_flow": 1366992.0,
+      "discounted": 633181.7926638586,
+      "cumulative": -1107558.751834618
+    },
+    {
+      "year": 11,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 858000.0,
+      "tax": 216050.0,
+      "cash_flow": 1506150.0,
+      "discounted": 645961.9185914324,
+      "cumulative": -461596.83324318554
+    },
+    {
+      "year": 12,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 512931.98635509453,
+      "cumulative": 51335.15311190899
+    },
+    {
+      "year": 13,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 0.0,
+      "tax": 384164.0,
+      "cash_flow": 1152492.0,
+      "discounted": 423768.9166013293,
+      "cumulative": 475104.0697132383
+    },
+    {
+      "year": 14,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 439756.5040767271,
+      "cumulative": 914860.5737899654
+    },
+    {
+      "year": 15,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 407181.9482191917,
+      "cumulative": 1322042.522009157
+    },
+    {
+      "year": 16,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 0.0,
+      "tax": 384164.0,
+      "cash_flow": 1152492.0,
+      "discounted": 336401.4287403226,
+      "cumulative": 1658443.9507494797
+    },
+    {
+      "year": 17,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 349092.89113442355,
+      "cumulative": 2007536.8418839034
+    },
+    {
+      "year": 18,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 323234.1584577996,
+      "cumulative": 2330771.000341703
+    },
+    {
+      "year": 19,
+      "phase": "operation",
+      "capacity": 0.985,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2836800.0,
+      "variable_cost": 502744.0,
+      "fixed_cost": 647400.0,
+      "periodic": 150000.0,
+      "depreciation": 0.0,
+      "tax": 384164.0,
+      "cash_flow": 1152492.0,
+      "discounted": 267046.30005931715,
+      "cumulative": 2597817.3004010203
+    },
+    {
+      "year": 20,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 0.0,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1291650.0,
+      "discounted": 277121.1920934495,
+      "cumulative": 2874938.49249447
+    },
+    {
+      "year": 21,
+      "phase": "operation",
+      "capacity": 1.0,
+      "capital": 0.0,
+      "working_capital": 355068.4931506849,
+      "revenue": 2880000.0,
+      "variable_cost": 510400.0,
+      "fixed_cost": 647400.0,
+      "periodic": 0.0,
+      "depreciation": 0.0,
+      "tax": 430550.0,
+      "cash_flow": 1646718.493150685,
+      "discounted": 327130.09333758196,
+      "cumulative": 3202068.585832052
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "dear-feed",
+      "title": "Feed at twice the price",
+      "source": "fixture",
+      "fixed_capital": 8580000.0,
+      "npv": 663064.7384682959,
+      "irr": 0.0894740194189595,
+      "lcop": 866.8883310513102,
+      "meets": true,
+      "cash_cost": 486.8125
+    },
+    {
+      "id": "overrun",
+      "title": "Capital overrun of 30 %",
+      "source": "fixture",
+      "fixed_capital": 11154000.0,
+      "npv": 615779.4477945118,
+      "irr": 0.08691016495919646,
+      "lcop": 869.2496312383021,
+      "meets": true,
+      "cash_cost": 385.94374999999997
+    }
+  ],
+  "inputs": [
+    {
+      "id": "price:feed:FEED",
+      "value": 50.0,
+      "unit": "EUR/t",
+      "status": "QUOTED",
+      "source": "fixture: supplier quote"
+    },
+    {
+      "id": "price:feed:STEAM",
+      "value": 30.0,
+      "unit": "EUR/MWh",
+      "status": "ASSUMED",
+      "source": "fixture: site steam tariff"
+    },
+    {
+      "id": "price:product:PROD",
+      "value": 900.0,
+      "unit": "EUR/t",
+      "status": "ASSUMED",
+      "source": "fixture: market price"
+    },
+    {
+      "id": "price:variable:naoh",
+      "value": 0.45,
+      "unit": "EUR/kg NaOH",
+      "status": "QUOTED",
+      "source": "fixture: supplier quote"
+    },
+    {
+      "id": "price:carbon",
+      "value": 80.0,
+      "unit": "EUR/t CO2-eq",
+      "status": "ASSUMED",
+      "source": "fixture: EU ETS allowance"
+    },
+    {
+      "id": "rate:feed:FEED",
+      "value": 1000.0,
+      "unit": "kg/h",
+      "status": "given",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "rate:feed:STEAM",
+      "value": 350.0,
+      "unit": "kWh/h",
+      "status": "assumed",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "rate:product:PROD",
+      "value": 400.0,
+      "unit": "kg/h",
+      "status": "given",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "rate:variable:naoh",
+      "value": 0.002,
+      "unit": "kg NaOH/kg",
+      "status": "ASSUMED",
+      "source": "fixture: 2 kg NaOH per t of feed"
+    },
+    {
+      "id": "rate:emission:wastewater",
+      "value": 0.05,
+      "unit": "t CO2-eq/t",
+      "status": "ASSUMED",
+      "source": "fixture: t CO2-eq per t of waste water treated"
+    },
+    {
+      "id": "rate:product:WATER",
+      "value": 600.0,
+      "unit": "kg/h",
+      "status": "assumed",
+      "source": "process/flowsheet.yaml"
+    },
+    {
+      "id": "capex:isbl",
+      "value": 5000000.0,
+      "unit": "EUR",
+      "status": "ASSUMED",
+      "source": "fixture: a factored estimate"
+    },
+    {
+      "id": "capex:osbl",
+      "value": 0.3,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "fixture: offsites at 30 % of ISBL"
+    },
+    {
+      "id": "capex:owners_cost",
+      "value": 0.1,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "fixture: owner's cost"
+    },
+    {
+      "id": "capex:contingency",
+      "value": 0.2,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "fixture: process and project contingency"
+    },
+    {
+      "id": "opex:maintenance",
+      "value": 0.03,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "fixture: 3 % of fixed capital"
+    },
+    {
+      "id": "opex:labour",
+      "value": 390000.0,
+      "unit": "EUR/a",
+      "status": "ASSUMED",
+      "source": "fixture: NL operator, loaded"
+    },
+    {
+      "id": "event:catalyst",
+      "value": 150000.0,
+      "unit": "EUR",
+      "status": "ASSUMED",
+      "source": "fixture: vendor quote for one charge"
+    },
+    {
+      "id": "operation:hours_per_year",
+      "value": 8000.0,
+      "unit": "h/a",
+      "status": "",
+      "source": "fixture"
+    },
+    {
+      "id": "finance:discount_rate",
+      "value": 0.08,
+      "unit": "fraction",
+      "status": "ASSUMED",
+      "source": "fixture: real hurdle rate"
+    },
+    {
+      "id": "finance:wc:feed_inventory",
+      "value": 30.0,
+      "unit": "days",
+      "status": "ASSUMED",
+      "source": "fixture"
+    },
+    {
+      "id": "finance:wc:receivables",
+      "value": 45.0,
+      "unit": "days",
+      "status": "ASSUMED",
+      "source": "fixture"
+    },
+    {
+      "id": "finance:wc:payables",
+      "value": 30.0,
+      "unit": "days",
+      "status": "ASSUMED",
+      "source": "fixture"
+    }
+  ],
+  "break_even": [
+    {
+      "input": "price:feed:FEED",
+      "base": 50.0,
+      "unit": "EUR/t",
+      "multiplier": 2.9055,
+      "value": 145.275
+    },
+    {
+      "input": "price:feed:STEAM",
+      "base": 30.0,
+      "unit": "EUR/MWh",
+      "multiplier": 10.073809523809514,
+      "value": 302.21428571428544
+    },
+    {
+      "input": "price:variable:naoh",
+      "base": 0.45,
+      "unit": "EUR/kg NaOH",
+      "multiplier": 106.86111111111103,
+      "value": 48.08749999999996
+    },
+    {
+      "input": "price:carbon",
+      "base": 80.0,
+      "unit": "EUR/t CO2-eq",
+      "multiplier": 40.69791666666666,
+      "value": 3255.8333333333326
+    },
+    {
+      "input": "rate:feed:FEED",
+      "base": 1000.0,
+      "unit": "kg/h",
+      "multiplier": 2.8718074656188577,
+      "value": 2871.807465618858
+    },
+    {
+      "input": "rate:feed:STEAM",
+      "base": 350.0,
+      "unit": "kWh/h",
+      "multiplier": 10.073809523809514,
+      "value": 3525.83333333333
+    },
+    {
+      "input": "rate:product:PROD",
+      "base": 400.0,
+      "unit": "kg/h",
+      "multiplier": 0.6030208333333329,
+      "value": 241.20833333333314
+    },
+    {
+      "input": "rate:variable:naoh",
+      "base": 0.002,
+      "unit": "kg NaOH/kg",
+      "multiplier": 106.86111111111103,
+      "value": 0.21372222222222206
+    },
+    {
+      "input": "rate:emission:wastewater",
+      "base": 0.05,
+      "unit": "t CO2-eq/t",
+      "multiplier": 40.69791666666666,
+      "value": 2.034895833333333
+    },
+    {
+      "input": "rate:product:WATER",
+      "base": 600.0,
+      "unit": "kg/h",
+      "multiplier": 40.69791666666666,
+      "value": 24418.749999999993
+    },
+    {
+      "input": "capex:isbl",
+      "base": 5000000.0,
+      "unit": "EUR",
+      "multiplier": 3.9611499611499617,
+      "value": 19805749.805749808
+    },
+    {
+      "input": "capex:osbl",
+      "base": 0.3,
+      "unit": "fraction",
+      "multiplier": 13.831649831649827,
+      "value": 4.149494949494948
+    },
+    {
+      "input": "capex:owners_cost",
+      "base": 0.1,
+      "unit": "fraction",
+      "multiplier": 33.57264957264958,
+      "value": 3.357264957264958
+    },
+    {
+      "input": "capex:contingency",
+      "base": 0.2,
+      "unit": "fraction",
+      "multiplier": 18.76689976689977,
+      "value": 3.753379953379954
+    },
+    {
+      "input": "opex:maintenance",
+      "base": 0.03,
+      "unit": "fraction",
+      "multiplier": 3.9611499611499617,
+      "value": 0.11883449883449884
+    },
+    {
+      "input": "opex:labour",
+      "base": 390000.0,
+      "unit": "EUR/a",
+      "multiplier": 2.9543589743589713,
+      "value": 1152199.9999999988
+    },
+    {
+      "input": "event:catalyst",
+      "base": 150000.0,
+      "unit": "EUR",
+      "multiplier": null,
+      "value": null
+    },
+    {
+      "input": "operation:hours_per_year",
+      "base": 8000.0,
+      "unit": "h/a",
+      "multiplier": 0.4592792281498293,
+      "value": 3674.2338251986343
+    },
+    {
+      "input": "finance:discount_rate",
+      "base": 0.08,
+      "unit": "fraction",
+      "multiplier": null,
+      "value": null
+    },
+    {
+      "input": "finance:wc:feed_inventory",
+      "base": 30.0,
+      "unit": "days",
+      "multiplier": null,
+      "value": null
+    },
+    {
+      "input": "finance:wc:receivables",
+      "base": 45.0,
+      "unit": "days",
+      "multiplier": null,
+      "value": null
+    },
+    {
+      "input": "finance:wc:payables",
+      "base": 30.0,
+      "unit": "days",
+      "multiplier": null,
+      "value": null
+    }
+  ],
+  "tornado": [
+    {
+      "input": "capex:isbl",
+      "low": 0.8549193338482967,
+      "high": 1.3,
+      "basis": "P10/P90",
+      "at_low": 350.1425739164224,
+      "at_high": 385.94374999999997,
+      "width": 35.80117608357756
+    },
+    {
+      "input": "opex:labour",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 348.37442754974694,
+      "at_high": 376.9158888259444,
+      "width": 28.54146127619748
+    },
+    {
+      "input": "opex:maintenance",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 352.94337218283295,
+      "at_high": 371.7807366251232,
+      "width": 18.837364442290266
+    },
+    {
+      "input": "price:feed:STEAM",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 358.91814593379166,
+      "at_high": 365.0655375932803,
+      "width": 6.147391659488619
+    },
+    {
+      "input": "capex:osbl",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 359.7657781960384,
+      "at_high": 364.1128622981054,
+      "width": 4.347084102067015
+    },
+    {
+      "input": "capex:contingency",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 360.33431203047223,
+      "at_high": 363.4738727708539,
+      "width": 3.1395607403816825
+    },
+    {
+      "input": "capex:owners_cost",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 361.00621565298485,
+      "at_high": 362.7187033295567,
+      "width": 1.7124876765718682
+    },
+    {
+      "input": "price:carbon",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 361.15093335629524,
+      "at_high": 362.55605144989266,
+      "width": 1.405118093597423
+    },
+    {
+      "input": "rate:emission:wastewater",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 361.15093335629524,
+      "at_high": 362.5560514498926,
+      "width": 1.4051180935973662
+    },
+    {
+      "input": "rate:variable:naoh",
+      "low": 0.8897388927158725,
+      "high": 1.1239252416487744,
+      "basis": "P10/P90",
+      "at_low": 361.5644125086107,
+      "at_high": 362.0913317937098,
+      "width": 0.5269192850990976
+    }
+  ],
+  "uncertainty": {
+    "iterations": 400,
+    "seed": 7,
+    "statistics": [
+      {
+        "metric": "fixed_capital",
+        "unit": "EUR",
+        "deterministic": 8580000.0,
+        "mean": 9238871.972937185,
+        "p10": 7371446.655284154,
+        "p50": 9120238.133187773,
+        "p90": 11324355.889737237,
+        "valid": 400,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            0.9835818348864679
+          ],
+          [
+            "capex:osbl",
+            0.12231507696923104
+          ],
+          [
+            "event:catalyst",
+            0.09297526859542872
+          ],
+          [
+            "capex:contingency",
+            0.08512571953574709
+          ],
+          [
+            "rate:variable:naoh",
+            -0.07371196069975437
+          ],
+          [
+            "rate:emission:wastewater",
+            0.06612997581234883
+          ],
+          [
+            "finance:wc:feed_inventory",
+            -0.05214182588641179
+          ],
+          [
+            "price:carbon",
+            -0.049597997487484294
+          ]
+        ]
+      },
+      {
+        "metric": "npv",
+        "unit": "EUR",
+        "deterministic": 3202068.585832052,
+        "mean": 2420806.612921487,
+        "p10": -443306.413915137,
+        "p50": 2366188.1836126084,
+        "p90": 5275214.12095801,
+        "valid": 400,
+        "sensitivity": [
+          [
+            "price:product:PROD",
+            0.677577859861624
+          ],
+          [
+            "capex:isbl",
+            -0.6638538990868693
+          ],
+          [
+            "capex:contingency",
+            -0.0927652672829205
+          ],
+          [
+            "capex:osbl",
+            -0.08215945099656871
+          ],
+          [
+            "opex:maintenance",
+            -0.07749067181669884
+          ],
+          [
+            "price:feed:STEAM",
+            -0.06651285320533253
+          ],
+          [
+            "opex:labour",
+            -0.06355614722592016
+          ],
+          [
+            "rate:variable:naoh",
+            0.04949112181951137
+          ]
+        ]
+      },
+      {
+        "metric": "irr",
+        "unit": "fraction",
+        "deterministic": 0.12266198840524412,
+        "mean": 0.11250499457693763,
+        "p10": 0.07452354206621618,
+        "p50": 0.1106440834434711,
+        "p90": 0.1521984084291164,
+        "valid": 400,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            -0.7451092194326214
+          ],
+          [
+            "price:product:PROD",
+            0.594494965593535
+          ],
+          [
+            "capex:contingency",
+            -0.09718560741004631
+          ],
+          [
+            "capex:osbl",
+            -0.09049500309376932
+          ],
+          [
+            "opex:maintenance",
+            -0.07328145800911255
+          ],
+          [
+            "price:feed:STEAM",
+            -0.06241070256689103
+          ],
+          [
+            "rate:variable:naoh",
+            0.05854199088744304
+          ],
+          [
+            "rate:emission:wastewater",
+            -0.05174901093131832
+          ]
+        ]
+      },
+      {
+        "metric": "lcop",
+        "unit": "EUR/t",
+        "deterministic": 740.0973105431697,
+        "mean": 773.880184371818,
+        "p10": 679.0297445004041,
+        "p50": 766.3326922839342,
+        "p90": 878.5507050129015,
+        "valid": 400,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            0.961177507359421
+          ],
+          [
+            "capex:osbl",
+            0.13175463596647477
+          ],
+          [
+            "opex:maintenance",
+            0.1293666210413815
+          ],
+          [
+            "opex:labour",
+            0.1274837342733392
+          ],
+          [
+            "event:catalyst",
+            0.10583859899124368
+          ],
+          [
+            "capex:contingency",
+            0.08516078225488907
+          ],
+          [
+            "rate:emission:wastewater",
+            0.06610391314945718
+          ],
+          [
+            "price:feed:STEAM",
+            0.06583597397483734
+          ]
+        ]
+      },
+      {
+        "metric": "cash_cost",
+        "unit": "EUR/t",
+        "deterministic": 361.8125,
+        "mean": 368.6429871174342,
+        "p10": 343.4250521670035,
+        "p50": 367.83151889968644,
+        "p90": 396.13278981598603,
+        "valid": 400,
+        "sensitivity": [
+          [
+            "capex:isbl",
+            0.6714385089906811
+          ],
+          [
+            "opex:labour",
+            0.5337232107700672
+          ],
+          [
+            "opex:maintenance",
+            0.43749067181669876
+          ],
+          [
+            "price:feed:STEAM",
+            0.16651022818892616
+          ],
+          [
+            "capex:osbl",
+            0.13991093694335588
+          ],
+          [
+            "finance:wc:receivables",
+            -0.08446234038962742
+          ],
+          [
+            "capex:contingency",
+            0.06809011306320664
+          ],
+          [
+            "price:carbon",
+            0.06232801455009093
+          ]
+        ]
+      }
+    ],
+    "varied": [
+      "capex:contingency",
+      "capex:isbl",
+      "capex:osbl",
+      "capex:owners_cost",
+      "event:catalyst",
+      "finance:wc:feed_inventory",
+      "finance:wc:payables",
+      "finance:wc:receivables",
+      "opex:labour",
+      "opex:maintenance",
+      "price:carbon",
+      "price:feed:STEAM",
+      "price:product:PROD",
+      "rate:emission:wastewater",
+      "rate:variable:naoh"
+    ],
+    "probability": 1.0
+  },
+  "boundary": {
+    "complete": false,
+    "categories": {
+      "unclassified": [
+        "FEED",
+        "STEAM",
+        "PROD",
+        "WATER"
+      ]
+    },
+    "unassigned_duties": [],
+    "checked": [
+      "steps of the unit kinds compressor, pump, heater, cooler, shortcut_column, conversion_reactor, equilibrium_reactor, gibbs_reactor have an energy stream at a port (or are declared adiabatic)",
+      "every product terminal has a category"
+    ],
+    "noted": [
+      "every feed terminal has a category",
+      "energy terminals are classified utility; heat utilities declare a kind and supply temperature"
+    ],
+    "not_checked": [
+      "steps of other unit kinds (component separators, flash drums, mixers, splitters, unknown classes)",
+      "whether a step's energy stream reaches a utility terminal (a step-to-step stream counts)",
+      "whether duties are given or balance (cheme process energy)"
+    ],
+    "gaps": [
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "info",
+        "ids": [
+          "FEED"
+        ],
+        "message": "feed FEED (Aqueous feed) has no category: the TEA and LCA cannot tell a raw material from a utility",
+        "file": "process/flowsheet.yaml",
+        "line": 12
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "info",
+        "ids": [
+          "STEAM"
+        ],
+        "message": "feed STEAM (LP steam) has no category: the TEA and LCA cannot tell a raw material from a utility",
+        "file": "process/flowsheet.yaml",
+        "line": 13
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "PROD"
+        ],
+        "message": "product PROD (Ethanol product) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 15
+      },
+      {
+        "rule": "cheme.boundary-unclassified",
+        "level": "warning",
+        "ids": [
+          "WATER"
+        ],
+        "message": "product WATER (Waste water) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+        "file": "process/flowsheet.yaml",
+        "line": 16
+      }
+    ],
+    "excluded_products": []
+  },
+  "findings": [
+    {
+      "file": "estimate/tea.yaml",
+      "level": "warning",
+      "rule": "cheme.tea-class-stage",
+      "message": "the capital cost claims AACE class 4, finer than a concept stage supports (class 5): the scope is not defined that far yet",
+      "line": 26,
+      "ids": [],
+      "hint": "claim the class the scope supports (isbl.estimate_class)",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-class-stage:26"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "info",
+      "rule": "cheme.boundary-unclassified",
+      "message": "feed FEED (Aqueous feed) has no category: the TEA and LCA cannot tell a raw material from a utility",
+      "line": 12,
+      "ids": [
+        "FEED"
+      ],
+      "hint": "category: raw_material | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:FEED"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "info",
+      "rule": "cheme.boundary-unclassified",
+      "message": "feed STEAM (LP steam) has no category: the TEA and LCA cannot tell a raw material from a utility",
+      "line": 13,
+      "ids": [
+        "STEAM"
+      ],
+      "hint": "category: raw_material | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:STEAM"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product PROD (Ethanol product) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 15,
+      "ids": [
+        "PROD"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:PROD"
+    },
+    {
+      "file": "process/flowsheet.yaml",
+      "level": "warning",
+      "rule": "cheme.boundary-unclassified",
+      "message": "product WATER (Waste water) has no category: the TEA and LCA cannot tell a product from wastewater, off-gas, solid waste or an emission",
+      "line": 16,
+      "ids": [
+        "WATER"
+      ],
+      "hint": "category: product | by_product | wastewater | off_gas | solid_waste | emission | utility",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "process/flowsheet.yaml#boundary-unclassified:WATER"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "info",
+      "rule": "cheme.tea-price-year",
+      "message": "product:PROD is of 2024, the TEA of 2025: not escalated",
+      "line": 55,
+      "ids": [
+        "product:PROD"
+      ],
+      "hint": "escalate it to the cost year, or say in its source why it holds",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-price-year:product:PROD"
+    },
+    {
+      "file": "estimate/tea.yaml",
+      "level": "warning",
+      "rule": "cheme.tea-example",
+      "message": "the premises are an example (example: true): the results evaluate nothing real",
+      "line": 3,
+      "ids": [],
+      "hint": "replace every value with the project's own, each with its status, source and year, and remove example: true",
+      "key": "",
+      "box": null,
+      "crop": null,
+      "accepted": null,
+      "measured": null,
+      "id": "estimate/tea.yaml#tea-example:3"
+    }
+  ]
+}

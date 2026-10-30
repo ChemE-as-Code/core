@@ -18,6 +18,9 @@ import mtoMepJson from "../tests/fixtures/api/mto-mep.json" with { type: "json" 
 import lcaAsuJson from "../tests/fixtures/api/lca-asu.json" with { type: "json" };
 import lcaReadinessJson from "../tests/fixtures/api/lca-asu-readiness.json" with { type: "json" };
 import datasetYamlAsu from "../tests/fixtures/api/yaml-dataset-asu.json" with { type: "json" };
+// Real /api/tea answers (scripts/regen-fixtures.py): the ASU (an LCOP decision) and core's process-blocks (an NPV decision, example premises).
+import teaAsuJson from "../tests/fixtures/api/tea-asu.json" with { type: "json" };
+import teaBlocksJson from "../tests/fixtures/api/tea-blocks.json" with { type: "json" };
 import equipmentAsuJson from "../tests/fixtures/api/equipment-estimate-asu.json" with { type: "json" };
 import asuTreeJson from "../tests/fixtures/api/tree-asu.json" with { type: "json" };
 // The ASU's /api/status with two sign-offs (one off main) and its review records (scripts/regen-fixtures.py).
@@ -84,6 +87,8 @@ export const mtoAsu = mtoAsuJson;
 export const lcaAsu = lcaAsuJson;
 /** `/api/lca` of the ASU with core main (the balance of pre-release issue 174, the emission estimates of pre-release issue 176); its `lca/dataset.yaml` as `/api/yaml` serves it. */
 export const lcaReadiness = lcaReadinessJson;
+export const teaAsu = teaAsuJson;
+export const teaBlocks = teaBlocksJson;
 export const interlocksAsu = interlocksAsuJson;
 /** `/api/control` of core's examples/process-separation (pre-release issue 140). */
 export const controlSeparation = controlSeparationJson;
@@ -380,6 +385,9 @@ export async function mockApi(
     layout?: unknown;
     mto?: unknown;
     lca?: unknown;
+    /** `/api/tea` (none: 404 and `has_tea: false`, as without estimate/tea.yaml); `teaError`: a 422 with that message. */
+    tea?: unknown;
+    teaError?: string;
     files?: Record<string, string>;
     /** Entries added to `/api/tree` (a test's own files; no request leaves the browser). */
     extraTree?: { path: string; type: string; kind: string }[];
@@ -439,6 +447,7 @@ export async function mockApi(
           ...options.repo,
           has_layout: options.hasLayout ?? repo.has_layout,
           has_lca: Boolean(lca),
+          has_tea: Boolean(options.tea || options.teaError),
           has_equipment_estimate: Boolean(equipment),
           has_simulation: Boolean(simulation),
           has_reactions: Boolean(reactions),
@@ -510,6 +519,10 @@ export async function mockApi(
           return route.fulfill({ status: issuesUnavailableJson.status, contentType: "application/json", body: JSON.stringify(issuesUnavailableJson.body) });
         if (!options.issues) return route.fulfill({ status: 404, contentType: "application/json", body: '{"error":"plant.yaml declares no issues"}' });
         return json(route, options.issues);
+      case "tea":
+        if (options.teaError) return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ error: options.teaError }) });
+        if (!options.tea) return route.fulfill({ status: 404, contentType: "application/json", body: '{"error":"no estimate/tea.yaml at the working tree"}' });
+        return json(route, options.tea);
       case "interlocks": {
         const at = url.searchParams.get("rev");
         const body = at ? options.interlocksAt?.[at] : interlocks;

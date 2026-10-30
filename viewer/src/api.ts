@@ -154,7 +154,7 @@ export interface RepoInfo {
   has_layout?: boolean;
   /** `lca/lca.yaml` exists: the LCA page has something to show (older servers leave it out). */
   has_lca?: boolean;
-  /** `estimate/tea.yaml` exists (the viewer has no techno-economic page yet); older servers leave it out. */
+  /** `estimate/tea.yaml` exists: `GET /api/tea` answers (older servers leave it out). */
   has_tea?: boolean;
   /** There is an equipment list to cost (`GET /api/estimate/equipment` answers); older servers leave it out. */
   has_equipment_estimate?: boolean;
@@ -2386,6 +2386,352 @@ export interface LcaUncertainty {
   varied: string[];
 }
 
+// -- techno-economic analysis (GET /api/tea) ------------------------------------------------------
+// Every field is typed defensively: core grows the payload (new optional keys), a number that does
+// not exist (no IRR, an infinite break-even) is null, and a TEA without a baseline has `{}` results.
+
+/** The decision metrics core knows (newer cores may add more). */
+export type TeaMetric = "npv" | "irr" | "lcop" | "cash_cost";
+
+/** The decision the TEA informs (`decision:` of estimate/tea.yaml). */
+export interface TeaDecision {
+  question?: string;
+  metric?: TeaMetric | (string & {});
+  threshold?: number | null;
+  /** The probability of meeting the threshold the decision asks for (0..1). */
+  confidence?: number | null;
+  alternatives?: string[];
+}
+
+/** The premises' basis, every value as text (product, boundary, discount rate, ...). */
+export type TeaBasis = Record<string, string | number | boolean | null | undefined>;
+
+/** One line of the capital cost build-up (ISBL, OSBL, owner's cost, contingency). */
+export interface TeaCapexLine {
+  id: string;
+  title?: string;
+  /** How it is computed, e.g. `0.3 x ISBL` or `given`. */
+  basis?: string;
+  value?: number | null;
+  status?: string;
+  source?: string;
+  year?: number | null;
+  /** The currency `value` is in (the estimate's; empty: the TEA's). */
+  currency?: string;
+  /** Its contribution in the TEA's currency and cost year. */
+  tea_value?: number | null;
+}
+
+/** The AACE accuracy range of the fixed capital: the low and high ends, each a band `[from, to]`. */
+export interface TeaCapexRange {
+  class?: number | null;
+  low?: number[] | null;
+  high?: number[] | null;
+}
+
+/** A feed or product of the flowsheet with its price and value per year. */
+export interface TeaFlowLine {
+  /** `feed:<id>` or `product:<id>`. */
+  key: string;
+  title?: string;
+  /** `material` or `energy`. */
+  kind?: string;
+  rate?: number | null;
+  rate_unit?: string;
+  /** `given`, `calculated` or `assumed`. */
+  provenance?: string;
+  price?: number | null;
+  /** The price is per one of this (`t`, `MWh`, ...), in the report's currency. */
+  price_unit?: string;
+  /** Net income of the flow's lines per year at full load: revenue positive, cost negative
+   * (null: unpriced). */
+  per_year?: number | null;
+  status?: string;
+  source?: string;
+  year?: number | null;
+  /** Why the flow costs nothing (listed under `free:`), else empty. */
+  free?: string;
+  /** The component priced (e.g. `H2` of an off-gas); empty: the whole flow. */
+  component?: string;
+  /** The rate per flowsheet case, when the TEA weighs several cases. */
+  per_case?: Record<string, number | null>;
+  /** Every price of the flow (several when components are priced). */
+  prices?: { component?: string; price?: number | null; unit?: string }[];
+}
+
+/** How the plant runs (`operation:` of estimate/tea.yaml, as evaluated). */
+export interface TeaOperation {
+  hours_per_year?: number | null;
+  life_years?: number | null;
+  /** Capacity fractions of the first operating years. */
+  ramp_up?: number[];
+  utilisation?: number | null;
+  batches_per_year?: number | null;
+  cycle_time?: number | null;
+  /** The hours a year the cash flow counts. */
+  operating_hours?: number | null;
+  /** Flowsheet cases and their share of the year. */
+  cases?: { case: string; share?: number | null }[];
+}
+
+/** Every priced line of the variable cost and revenue (`feed:X`, `product:Y@CO2`, `feed:POWER~summer`, `variable:<id>`, `emission:<id>`, `allowance:carbon`). */
+export interface TeaLine {
+  key: string;
+  /** `main`, `feed`, `utility`, `chemical`, `catalyst`, `disposal`, `emission`, `incentive`, `byproduct`, `other`. */
+  category?: string;
+  /** A revenue (a product) rather than a cost. */
+  revenue?: boolean;
+  /** Per operating hour, in `unit`. */
+  rate?: number | null;
+  unit?: string;
+  /** Currency per `unit`. */
+  price?: number | null;
+  per_year?: number | null;
+  /** Price multipliers by operating year. */
+  profile?: number[];
+}
+
+/** A variable cost the flowsheet does not carry (a chemical, a catalyst consumed, a fee). */
+export interface TeaVariableItem {
+  id: string;
+  title?: string;
+  /** `feed:<id>`, `product:<id>`, `hour` or `batch`. */
+  per?: string;
+  component?: string;
+  /** Quantity of `unit` per kg/kWh of `per` (or per hour, per batch). */
+  amount?: number | null;
+  unit?: string;
+  price?: number | null;
+  category?: string;
+  /** Quantity of `unit` per operating hour. */
+  rate?: number | null;
+  status?: string;
+  source?: string;
+  year?: number | null;
+}
+
+/** The priced emissions. */
+export interface TeaEmissions {
+  t_per_year?: number | null;
+  free_t_per_year?: number | null;
+  cost_per_year?: number | null;
+  /** Per unit of the main product (the LCOP's unit). */
+  per_unit?: number | null;
+}
+
+/** A recurring or one-off cost (catalyst replacement, turnaround, a grant). */
+export interface TeaEvent {
+  id: string;
+  title?: string;
+  /** `replacement`, `turnaround`, `sustaining`, `one_off`. */
+  kind?: string;
+  amount?: number | null;
+  every_years?: number | null;
+  every_hours?: number | null;
+  first_year?: number | null;
+  downtime_days?: number | null;
+  /** `expense` or `capital`. */
+  treatment?: string;
+  status?: string;
+  source?: string;
+}
+
+/** One category of the cost of production per unit of the main product (they sum to the LCOP). */
+export interface TeaCostOfProduction {
+  /** A line category, or `fixed`, `events`, `capital_and_tax`; a credit (by-product) is negative. */
+  category: string;
+  per_unit?: number | null;
+  per_year?: number | null;
+}
+
+/** A fixed operating cost (maintenance, labour, insurance, ...). */
+export interface TeaOpexLine {
+  id: string;
+  title?: string;
+  basis?: string;
+  per_year?: number | null;
+  status?: string;
+  source?: string;
+  year?: number | null;
+}
+
+/** The baseline's results; `{}` when the TEA has no baseline. */
+export interface TeaResults {
+  isbl?: number | null;
+  osbl?: number | null;
+  owners_cost?: number | null;
+  contingency?: number | null;
+  fixed_capital?: number | null;
+  working_capital?: number | null;
+  revenue_per_year?: number | null;
+  variable_cost_per_year?: number | null;
+  fixed_cost_per_year?: number | null;
+  npv?: number | null;
+  /** A fraction (0.12 is 12 %); null when there is none. */
+  irr?: number | null;
+  /** Levelised cost of the main product, in `lcop_unit`. */
+  lcop?: number | null;
+  lcop_unit?: string;
+  /** The cash cost of the main product (no capital charge), in `lcop_unit`. */
+  cash_cost?: number | null;
+  /** The LCOP without incentives (null: there are none). */
+  lcop_unsubsidised?: number | null;
+  /** The main product per year, in `main_unit` (e.g. `kg/a`). */
+  main_per_year?: number | null;
+  main_unit?: string;
+  operating_hours?: number | null;
+  /** The main product has a price: false means NPV and IRR leave out its revenue. */
+  main_priced?: boolean | null;
+  payback_years?: number | null;
+  /** The decision metric meets the threshold (null: no threshold or no value). */
+  meets?: boolean | null;
+}
+
+/** One year of the cash flow (in the report's currency); newer cores may add columns. */
+export interface TeaCashflowRow {
+  year: number;
+  /** `construction` or `operation` (newer cores may add more). */
+  phase?: "construction" | "operation" | (string & {});
+  capacity?: number | null;
+  capital?: number | null;
+  working_capital?: number | null;
+  revenue?: number | null;
+  /** Events expensed that year. */
+  periodic?: number | null;
+  variable_cost?: number | null;
+  fixed_cost?: number | null;
+  depreciation?: number | null;
+  tax?: number | null;
+  cash_flow?: number | null;
+  discounted?: number | null;
+  cumulative?: number | null;
+  [column: string]: number | string | boolean | null | undefined;
+}
+
+/** A scenario of estimate/tea.yaml evaluated: its fixed capital and metrics. */
+export interface TeaScenario {
+  id: string;
+  title?: string;
+  source?: string;
+  fixed_capital?: number | null;
+  npv?: number | null;
+  irr?: number | null;
+  lcop?: number | null;
+  cash_cost?: number | null;
+  meets?: boolean | null;
+}
+
+/** An input the sensitivity and break-even vary (`price:feed:POWER`, `capex:isbl`, ...). */
+export interface TeaInput {
+  id: string;
+  value?: number | null;
+  unit?: string;
+  status?: string;
+  source?: string;
+}
+
+/** The value of an input at which the decision metric reaches the threshold (null: none in range). */
+export interface TeaTurn {
+  input: string;
+  base?: number | null;
+  unit?: string;
+  multiplier?: number | null;
+  value?: number | null;
+}
+
+/** One tornado bar: the decision metric at the low and high multiplier of an input. */
+export interface TeaTornadoBar {
+  input: string;
+  /** Multipliers of the input. */
+  low?: number | null;
+  high?: number | null;
+  /** `P10/P90`, `swing`, `default`, ... */
+  basis?: string;
+  /** The decision metric (absolute) at the low and high end; null when it does not exist. */
+  at_low?: number | null;
+  at_high?: number | null;
+  width?: number | null;
+}
+
+/** The Monte Carlo distribution of one metric. */
+export interface TeaStatistic {
+  metric: string;
+  unit?: string;
+  deterministic?: number | null;
+  mean?: number | null;
+  p10?: number | null;
+  p50?: number | null;
+  p90?: number | null;
+  /** Iterations where the metric exists (an IRR may not). */
+  valid?: number | null;
+  /** Inputs by Spearman rank correlation with the metric. */
+  sensitivity?: [string, number][];
+}
+
+export interface TeaUncertainty {
+  iterations?: number | null;
+  seed?: number | null;
+  statistics?: TeaStatistic[];
+  varied?: string[];
+  /** P(the decision metric meets the threshold). */
+  probability?: number | null;
+}
+
+/**
+ * What core's boundary check found (`boundary` of `GET /api/tea`): `complete` when its rules
+ * (`checked`; `noted` are info only) warn of no gap, which is not a complete inventory
+ * (`not_checked`); the gaps (the `cheme.boundary-*` findings, also in `findings`); the terminals
+ * by category; the steps with a duty but no energy stream; and the products without a category
+ * that the operating cost counts at no cost.
+ */
+export interface TeaBoundary {
+  complete: boolean;
+  categories: Record<string, string[]>;
+  unassigned_duties: string[];
+  checked: string[];
+  noted: string[];
+  not_checked: string[];
+  gaps: Finding[];
+  excluded_products: string[];
+}
+
+/** `GET /api/tea`: `cheme assess tea --json` of a revision, without the source. */
+export interface TeaReport {
+  rev?: string | null;
+  currency?: string;
+  cost_year?: number | null;
+  /** The premises are an example: the results evaluate nothing real. */
+  example?: boolean;
+  stage?: string | null;
+  /** The AACE class the capital cost claims, and the one the stage expects. */
+  estimate_class?: number | null;
+  expected_class?: number | null;
+  decision?: TeaDecision | null;
+  metric?: TeaMetric | (string & {});
+  threshold?: number | null;
+  basis?: TeaBasis | null;
+  /** Core's boundary check; older cores leave it out. */
+  boundary?: TeaBoundary | null;
+  operation?: TeaOperation | null;
+  capex?: TeaCapexLine[];
+  capex_range?: TeaCapexRange | null;
+  flows?: TeaFlowLine[];
+  lines?: TeaLine[];
+  variable?: TeaVariableItem[];
+  emissions?: TeaEmissions | null;
+  opex?: TeaOpexLine[];
+  events?: TeaEvent[];
+  results?: TeaResults | null;
+  cost_of_production?: TeaCostOfProduction[];
+  cashflow?: TeaCashflowRow[];
+  scenarios?: TeaScenario[];
+  inputs?: TeaInput[];
+  break_even?: TeaTurn[];
+  tornado?: TeaTornadoBar[];
+  uncertainty?: TeaUncertainty | null;
+  findings?: Finding[];
+}
+
 /** What an interlock does to one item (core's `Action`). */
 export type InterlockAction = "trip" | "stop" | "start" | "close" | "open" | "depressurize" | "alarm";
 
@@ -2653,6 +2999,7 @@ export interface JsonEndpoints {
   mto: MtoReport;
   "estimate/equipment": EquipmentEstimate;
   lca: LcaReport;
+  tea: TeaReport;
   interlocks: InterlockMatrix;
   control: ControlReport;
   issues: IssuesReport;
@@ -2884,6 +3231,8 @@ export const api = {
     getJson("estimate/equipment", { rev: revParam(rev) }, signal),
   /** The LCA at `rev`; a 404 means no `lca/lca.yaml` there (or an older server), a 422 that it does not compute. */
   lca: (rev?: Rev, signal?: AbortSignal) => getJson("lca", { rev: revParam(rev) }, signal),
+  /** The TEA at `rev`: a 404 means no `estimate/tea.yaml` there (or an older server), a 422 that it does not compute. */
+  tea: (rev?: Rev, signal?: AbortSignal) => getJson("tea", { rev: revParam(rev) }, signal),
   interlocks: fetchInterlocks,
   /**
    * Loops, sequences, narrative and control philosophy of the working tree with their review

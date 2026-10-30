@@ -547,7 +547,7 @@ export interface IntervalGeometry {
 }
 
 /** Where the 95 % interval, the median and the deterministic value sit on one axis. */
-export function intervalGeometry(stats: LcaStatistics): IntervalGeometry {
+export function intervalGeometry<T extends Pick<LcaStatistics, "low" | "high" | "median" | "deterministic">>(stats: T): IntervalGeometry {
   const lo = Math.min(stats.low, stats.deterministic, 0);
   const hi = Math.max(stats.high, stats.deterministic, 0);
   const span = hi - lo || 1;

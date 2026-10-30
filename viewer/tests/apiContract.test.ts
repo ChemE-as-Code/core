@@ -107,9 +107,32 @@ import type {
   RateLawView,
   CatalystEntry,
   ReactionHeat,
+  TeaReport,
+  TeaCapexLine,
+  TeaFlowLine,
+  TeaOpexLine,
+  TeaResults,
+  TeaCashflowRow,
+  TeaScenario,
+  TeaInput,
+  TeaTurn,
+  TeaTornadoBar,
+  TeaStatistic,
+  TeaUncertainty,
+  TeaBoundary,
+  TeaDecision,
+  TeaCapexRange,
+  TeaOperation,
+  TeaLine,
+  TeaVariableItem,
+  TeaEmissions,
+  TeaEvent,
+  TeaCostOfProduction,
 } from "@/api";
 import { streams as mockStreams } from "../e2e/fixtures";
 import repoJson from "./fixtures/api/repo.json";
+import teaAsuJson from "./fixtures/api/tea-asu.json";
+import teaBlocksJson from "./fixtures/api/tea-blocks.json";
 import treeJson from "./fixtures/api/tree.json";
 import streamsJson from "./fixtures/api/streams.json";
 import yamlJson from "./fixtures/api/yaml-flowsheet.json";
@@ -1143,5 +1166,80 @@ describe("real cheme maturity --json of the ASU (cheme/maturity-report/v1)", () 
       ["engineering", "pass", false],
     ]);
     expect(report.manifest.claim_exceeds_evidence).toBe(true);
+  });
+});
+
+// GET /api/tea: the ASU (an LCOP decision, unpriced main product) and core's process-blocks (a cash
+// cost decision with a chemical, an event, an emission). Core grows this payload: a new key fails
+// here until src/api.ts (and the TEA page, or its generic tables) knows it.
+const TEA_KEYS: (keyof TeaReport)[] = [
+  "rev", "currency", "cost_year", "example", "stage", "estimate_class", "expected_class", "decision", "metric", "threshold", "basis", "boundary", "operation",
+  "capex", "capex_range", "flows", "lines", "variable", "emissions", "opex", "events", "results", "cost_of_production", "cashflow", "scenarios",
+  "inputs", "break_even", "tornado", "uncertainty", "findings",
+];
+const TEA_BOUNDARY_KEYS: (keyof TeaBoundary)[] = ["complete", "categories", "unassigned_duties", "checked", "noted", "not_checked", "gaps", "excluded_products"];
+const TEA_DECISION_KEYS: (keyof TeaDecision)[] = ["question", "metric", "threshold", "confidence", "alternatives"];
+const TEA_OPERATION_KEYS: (keyof TeaOperation)[] = ["hours_per_year", "life_years", "ramp_up", "utilisation", "batches_per_year", "cycle_time", "operating_hours", "cases"];
+const TEA_CAPEX_KEYS: (keyof TeaCapexLine)[] = ["id", "title", "basis", "value", "status", "source", "year", "currency", "tea_value"];
+const TEA_RANGE_KEYS: (keyof TeaCapexRange)[] = ["class", "low", "high"];
+const TEA_FLOW_KEYS: (keyof TeaFlowLine)[] = ["key", "title", "kind", "rate", "rate_unit", "provenance", "price", "price_unit", "per_year", "status", "source", "year", "free", "component", "per_case", "prices"];
+const TEA_LINE_KEYS: (keyof TeaLine)[] = ["key", "category", "revenue", "rate", "unit", "price", "per_year", "profile"];
+const TEA_VARIABLE_KEYS: (keyof TeaVariableItem)[] = ["id", "title", "per", "component", "amount", "unit", "price", "category", "rate", "status", "source", "year"];
+const TEA_EMISSIONS_KEYS: (keyof TeaEmissions)[] = ["t_per_year", "free_t_per_year", "cost_per_year", "per_unit"];
+const TEA_EVENT_KEYS: (keyof TeaEvent)[] = ["id", "title", "kind", "amount", "every_years", "every_hours", "first_year", "downtime_days", "treatment", "status", "source"];
+const TEA_OPEX_KEYS: (keyof TeaOpexLine)[] = ["id", "title", "basis", "per_year", "status", "source", "year"];
+const TEA_RESULTS_KEYS: (keyof TeaResults)[] = [
+  "isbl", "osbl", "owners_cost", "contingency", "fixed_capital", "working_capital", "revenue_per_year", "variable_cost_per_year", "fixed_cost_per_year",
+  "main_per_year", "main_unit", "operating_hours", "npv", "irr", "lcop", "cash_cost", "lcop_unit", "lcop_unsubsidised", "payback_years", "meets", "main_priced",
+];
+const TEA_COST_KEYS: (keyof TeaCostOfProduction)[] = ["category", "per_unit", "per_year"];
+// TeaCashflowRow has an index signature (columns a newer core adds), so this list is checked by the
+// fixture only, not by keyof.
+const TEA_CASHFLOW_KEYS: Extract<keyof TeaCashflowRow, string>[] = [
+  "year", "phase", "capacity", "capital", "working_capital", "revenue", "variable_cost", "fixed_cost", "periodic", "depreciation", "tax", "cash_flow", "discounted", "cumulative",
+];
+const TEA_SCENARIO_KEYS: (keyof TeaScenario)[] = ["id", "title", "source", "fixed_capital", "npv", "irr", "lcop", "cash_cost", "meets"];
+const TEA_INPUT_KEYS: (keyof TeaInput)[] = ["id", "value", "unit", "status", "source"];
+const TEA_TURN_KEYS: (keyof TeaTurn)[] = ["input", "base", "unit", "multiplier", "value"];
+const TEA_TORNADO_KEYS: (keyof TeaTornadoBar)[] = ["input", "low", "high", "basis", "at_low", "at_high", "width"];
+const TEA_UNCERTAINTY_KEYS: (keyof TeaUncertainty)[] = ["iterations", "seed", "statistics", "varied", "probability"];
+const TEA_STATISTIC_KEYS: (keyof TeaStatistic)[] = ["metric", "unit", "deterministic", "mean", "p10", "p50", "p90", "valid", "sensitivity"];
+
+describe("GET /api/tea", () => {
+  for (const [name, json] of [["ASU", teaAsuJson], ["process-blocks", teaBlocksJson]] as const) {
+    it(`${name}: every key is one the viewer's types know`, () => {
+      const tea = json as unknown as TeaReport;
+      expectKnown([tea], TEA_KEYS, "tea");
+      expectKnown([tea.decision!], TEA_DECISION_KEYS, "tea decision");
+      expectKnown([tea.boundary!], TEA_BOUNDARY_KEYS, "tea boundary");
+      expectKnown(tea.boundary!.gaps, FINDING_KEYS, "boundary gap");
+      expectKnown([tea.operation!], TEA_OPERATION_KEYS, "tea operation");
+      expectKnown(tea.capex!, TEA_CAPEX_KEYS, "capex line");
+      expectKnown([tea.capex_range!], TEA_RANGE_KEYS, "capex range");
+      expectKnown(tea.flows!, TEA_FLOW_KEYS, "flow");
+      expectKnown(tea.lines!, TEA_LINE_KEYS, "priced line");
+      expectKnown(tea.variable!, TEA_VARIABLE_KEYS, "variable item", true);
+      expectKnown(tea.emissions ? [tea.emissions] : [], TEA_EMISSIONS_KEYS, "emissions", true);
+      expectKnown(tea.events!, TEA_EVENT_KEYS, "event", true);
+      expectKnown(tea.opex!, TEA_OPEX_KEYS, "fixed opex");
+      expectKnown([tea.results!], TEA_RESULTS_KEYS, "results");
+      expectKnown(tea.cost_of_production!, TEA_COST_KEYS, "cost of production");
+      expectKnown(tea.cashflow!, TEA_CASHFLOW_KEYS, "cash flow row");
+      expectKnown(tea.scenarios!, TEA_SCENARIO_KEYS, "scenario");
+      expectKnown(tea.inputs!, TEA_INPUT_KEYS, "input");
+      expectKnown(tea.break_even!, TEA_TURN_KEYS, "break-even");
+      expectKnown(tea.tornado!, TEA_TORNADO_KEYS, "tornado bar");
+      expectKnown([tea.uncertainty!], TEA_UNCERTAINTY_KEYS, "uncertainty");
+      expectKnown(tea.uncertainty!.statistics!, TEA_STATISTIC_KEYS, "statistic");
+      expectKnown(tea.findings!, FINDING_KEYS, "finding");
+    });
+  }
+  it("the blocks fixture exercises the newer sections (so the page is not ASU-shaped)", () => {
+    const tea = teaBlocksJson as unknown as TeaReport;
+    expect(tea.variable!.length).toBeGreaterThan(0);
+    expect(tea.events!.length).toBeGreaterThan(0);
+    expect(tea.emissions).not.toBeNull();
+    expect(tea.metric).toBe("cash_cost");
+    expect(tea.cashflow!.some((r) => (r.periodic ?? 0) > 0)).toBe(true);
   });
 });
