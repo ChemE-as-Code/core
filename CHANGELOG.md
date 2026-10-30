@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-10-30)
+
+Minor release: buried lines with a cover rule (#70, ADR 0036), several power trays per rack
+(#71, ADR 0037), and lines with battery limits at both ends are routed (#72). No breaking change.
 
 ### Added
 
@@ -22,6 +25,7 @@
   .stl"), in millimetres at 1:100, 1:200, 1:500 or 1:1000, with an optional base slab whose top
   is at ground level, so everything standing on the ground prints as one piece. No thickening
   or simplification: parts below the printer's resolution are left to the slicer.
+- Viewer: drawings can be downloaded as vector PDF and SVG (#93).
 
 ### Fixed
 

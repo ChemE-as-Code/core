@@ -265,7 +265,7 @@
     "provenance": {
       "generator": "cheme layout build",
       "generator_version": "2",
-      "generator_sha256": "63e5e11a3a977a8bff3c3a981a9110ad3a9d2a82c1f66d8ba2946a5343ba882e",
+      "generator_sha256": "2092d2c091cce7deb0f3303f99c8291e97167490790a609c89384e29ec6a82be",
       "sources": {
         "control/instrument-list.yaml": "sha256:b9cdb56012ee7243a1435945ca4794430b43afa08045501de5e5b8bd04adc408",
         "electrical/electrical-list.yaml": "sha256:fb64e97d71ee025320d56ecd84b2b682f77e27b8138bd5292dc9a84b3abbde18",
