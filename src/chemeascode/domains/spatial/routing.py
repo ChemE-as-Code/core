@@ -1906,6 +1906,9 @@ class Router:
             entry["reason"] = extra["reason"]
         if method.startswith("direct") or "direct" in method:
             entry["review_needed"] = True
+        buried = self._intent(s, "buried")
+        if buried is not None:
+            entry["buried"] = buried.model_dump(exclude_defaults=True)
         self.result.pipes.append({k: v for k, v in entry.items() if v is not None})
         self.line_points.setdefault(s.line, []).append(points)
         r = od / 2 + ins

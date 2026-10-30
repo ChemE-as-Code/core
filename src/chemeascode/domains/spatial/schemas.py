@@ -1211,6 +1211,11 @@ class RoutingRules(LayoutModel):
     spacing_m: float = Field(default=0.1, description="Clear gap between pipes, m (ASSUMED).")
     headroom_road_m: float = Field(default=6.0, description="Under pipes over roads, m.")
     headroom_walkway_m: float = Field(default=2.2, description="Over escape routes, m.")
+    road_cover_m: float = Field(
+        default=1.2,
+        description="Least soil cover over the top of a buried pipe under a road, m (ASSUMED; "
+        "the site's or road authority's rule replaces it).",
+    )
     grid_m: float = Field(default=0.5, description="Router grid, m (0.25 .. 1).")
     rack_bent_spacing_m: float = Field(default=6.0, description="Rack bents, m (ASSUMED).")
     gravity_fluids: list[str] = Field(
@@ -1232,6 +1237,7 @@ class RoutingRules(LayoutModel):
         for name in (
             "headroom_road_m",
             "headroom_walkway_m",
+            "road_cover_m",
             "rack_bent_spacing_m",
             "local_max_m",
             "local_elevation_m",
@@ -1244,6 +1250,37 @@ class RoutingRules(LayoutModel):
         if self.spacing_m < 0:
             raise ValueError("spacing_m must not be negative")
         return self
+
+
+class Buried(LayoutModel):
+    """A line (or segment) laid in the ground. Its runs whose top lies below grade are buried:
+    the road and escape-route headroom, the clash rules against steel, items, envelopes and
+    zones above grade, and the span rules leave them out; the cover over them is checked
+    instead (``cheme.layout-buried-cover``). Its runs above grade (the risers at the users)
+    are pipes like any other."""
+
+    cover_m: float | None = Field(
+        default=None,
+        description="Least soil cover over the pipe's top the design needs, m (grade to the "
+        "outside of the pipe and its insulation); under a road at least the rules' "
+        "road_cover_m. Default: road_cover_m under roads, unchecked elsewhere.",
+    )
+    basis: str = Field(default="", description="Why, e.g. a DESIGN.md decision.")
+
+    @model_validator(mode="after")
+    def _check(self) -> "Buried":
+        if self.cover_m is not None:
+            _positive("cover_m", self.cover_m)
+        return self
+
+
+def _buried(value: Any) -> Any:
+    """``buried: true`` is ``buried: {}``; ``false`` is no declaration."""
+    if value is True:
+        return {}
+    if value is False:
+        return None
+    return value
 
 
 class LineRouting(LayoutModel):
@@ -1268,6 +1305,11 @@ class LineRouting(LayoutModel):
     )
     skip: str | None = Field(default=None, description="Do not route it, for this reason.")
     gravity: bool = False
+    buried: Annotated[Buried | None, BeforeValidator(_buried)] = Field(
+        default=None,
+        description="Laid in the ground (`true` or `{cover_m: 1.2, basis: ...}`): its runs "
+        "below grade are buried (see Buried).",
+    )
     notes: str = ""
 
     @model_validator(mode="after")
@@ -1276,6 +1318,14 @@ class LineRouting(LayoutModel):
             raise ValueError(f"{self.line}: route needs at least two points")
         if self.route is not None and self.segment is None:
             raise ValueError(f"{self.line}: a pinned route belongs to one segment")
+        if self.buried is not None:
+            if self.rack is not None or self.tier is not None:
+                raise ValueError(f"{self.line}: a buried line runs on no rack or tier")
+            if self.elevation is not None and self.elevation >= 0:
+                raise ValueError(
+                    f"{self.line}: a buried line runs below grade, not at elevation "
+                    f"{self.elevation:g} (give its centreline below 0)"
+                )
         return self
 
 
@@ -2070,6 +2120,11 @@ class ModelPipe(ModelObject):
     )
     jacket: Literal["cold", "hot", "personnel"] | None = Field(
         default=None, description="The cladding of an insulated pipe (a rendering hint)."
+    )
+    buried: Buried | None = Field(
+        default=None,
+        description="Declared buried in piping/routing.yaml: its runs whose top is below grade "
+        "are in the ground (absent: above grade).",
     )
 
 
