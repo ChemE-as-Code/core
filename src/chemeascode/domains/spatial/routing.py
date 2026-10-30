@@ -14,7 +14,15 @@ as ``CW`` or ``CWR``) a *battery limit*: the first ``battery_limits`` rule of ``
 matching the line (number pattern or fluid) gives a point or a rack end, else the line's
 ``from_area``/``to_area`` edge, else the free rack end nearest the other end (in the line's
 lane on its tier), else the site edge nearest the other end; a placed tag is its nozzle on that
-line (else its box), another line number the nearest point of that line.
+line (else its box), another line number the nearest point of that line. A chain whose both ends
+are battery limits (a header from a battery limit to a battery limit, or to a dead end the line
+list names by text) is placed as a whole (:meth:`Router._limits`): the first matching rule
+places one end, a second matching rule the other; an end no rule places is the end of a rack
+away from the other end, the rack being the line's ``rack`` intent, else the rule's rack, else
+the rack nearest the rule's point or the line's branches, else the longest. The rack ends lie
+on the line's tier (or at its ``elevation`` intent), and the line runs the way its tees come
+along it (the branches in their order). Without a rack and two points it is unrouted with the
+reason (``battery limits at both ends (...): ...``).
 A component two segments share (a safety valve with its outlet line) joins them; one only one
 segment reaches is the open end of a vent or relief line, unless it is placed. An open end
 beyond a silencer or safety valve of the segment that is placed in the layout ends at that
@@ -934,17 +942,128 @@ class Router:
 
     def _battery_limit(self, line: str, fluid: str | None) -> Any:
         """The first ``battery_limits`` rule matching *line* (pattern) or *fluid*."""
+        found = self._battery_limits(line, fluid)
+        return found[0] if found else None
+
+    def _battery_limits(self, line: str, fluid: str | None) -> list[Any]:
+        """The ``battery_limits`` rules matching *line* (pattern) or *fluid*, in file order."""
+        found = []
         for rule in self.rules.battery_limits:
             fluids = {f.strip().lower() for f in rule.fluids}
-            if fluid and fluid.strip().lower() in fluids:
-                return rule
-            for pattern in rule.lines:
-                if any(c in pattern for c in "*?["):
-                    if fnmatch.fnmatchcase(line, pattern):
-                        return rule
-                elif line.startswith(pattern):
-                    return rule
-        return None
+            if (fluid and fluid.strip().lower() in fluids) or any(
+                fnmatch.fnmatchcase(line, pattern)
+                if any(c in pattern for c in "*?[")
+                else line.startswith(pattern)
+                for pattern in rule.lines
+            ):
+                found.append(rule)
+        return found
+
+    def _limits(self, chain: Chain, segs: list[Segment], r: float) -> tuple[EndPoint, EndPoint]:
+        """The two ends of *chain* when both are battery limits (a header from a battery limit
+        to a battery limit, or to a dead end that is no tag or line): the first matching
+        ``battery_limits`` rule places one end, a second one the other; an end no rule places
+        is an end of the rack the line runs along (its ``rack`` intent, else a rule's rack,
+        else the rack nearest the rule points or the line's branches, else the longest), the
+        one away from the other end. A rack end lies at the line's ``elevation`` intent, else
+        on its tier (``tier`` intent, else :meth:`tier_for`). The pair is ``(start, end)`` the
+        way round in which the branches leave in their order along the chain. Ends that cannot
+        be placed come back ``unresolved`` with the reason."""
+        line = segs[0].line
+        info = self.lines.get(line)
+        fluid = info.fluid if info else None
+        dn = (info.dn if info else None) or 50.0
+
+        def intent(name: str) -> Any:
+            return next((v for s in segs if (v := self._intent(s, name)) is not None), None)
+
+        wanted, tier, elevation = intent("rack"), intent("tier"), intent("elevation")
+        racks = {rack.id: rack for rack in (self.plan.racks if self.plan is not None else [])}
+        labels = f"{chain.start.label} and {chain.end.label}"
+
+        def refused(why: str) -> tuple[EndPoint, EndPoint]:
+            reason = f"battery limits at both ends ({labels}): {why}"
+            return EndPoint("unresolved", reason=reason), EndPoint("unresolved", reason=reason)
+
+        def at_end(rack: Any, which: str, basis: str) -> EndPoint:
+            x, y = rack.points[0] if which == "start" else rack.points[-1]
+            z = elevation
+            if z is None:
+                z = (tier if tier is not None else self.tier_for(rack, line, fluid, dn)) + r
+            return EndPoint(
+                "fixed",
+                (x, y, z),
+                None,
+                label=f"battery limit (rack {rack.id} {which})",
+                rack_end=rack.id,
+                basis=basis,
+            )
+
+        def far_end(rack: Any, p: Vec) -> str:
+            first, last = rack.points[0], rack.points[-1]
+            near = math.hypot(first[0] - p[0], first[1] - p[1])
+            return "start" if math.hypot(last[0] - p[0], last[1] - p[1]) < near else "end"
+
+        if wanted is not None and wanted not in racks:
+            return refused(f"its rack intent {wanted} is not a rack of the site plan")
+        placed: list[EndPoint] = []
+        for rule in self._battery_limits(line, fluid)[:2]:
+            name = rule.id or (rule.lines or rule.fluids)[0]
+            if rule.point is not None:
+                placed.append(
+                    EndPoint(
+                        "fixed",
+                        tuple(rule.point),
+                        None,
+                        label=f"battery limit {name}",
+                        basis="battery limit rule",
+                    )
+                )
+                continue
+            rack = racks.get(rule.rack or "")
+            if rack is None:
+                return refused(f"battery limit {name}: rack {rule.rack} is not in the site plan")
+            which = rule.rack_end
+            if which == "nearest":  # nothing to be near but the other end: away from it
+                which = far_end(rack, placed[0].point) if placed else "start"  # type: ignore[arg-type]
+            placed.append(at_end(rack, which, "battery limit rule"))
+        if len(placed) < 2:
+            rack = racks.get(wanted or "") or next(
+                (racks[e.rack_end] for e in placed if e.rack_end in racks), None
+            )
+            if rack is None and racks:
+                anchors = [e.point for e in placed if e.point is not None]
+                anchors = anchors or [
+                    t for t in (self._branch_target(k) for k in chain.junctions) if t is not None
+                ]
+                from chemeascode.domains.spatial.layout_distances import _polyline_project
+
+                def score(rack: Any) -> tuple[float, ...]:
+                    centre = [tuple(p) for p in rack.points]
+                    near = sum(_polyline_project(centre, (p[0], p[1]))[0] for p in anchors)
+                    return (near, -_plan_length(centre)) if anchors else (-_plan_length(centre),)
+
+                rack = min(sorted(racks.values(), key=lambda k: k.id), key=score)
+            if rack is None:
+                rules = "a battery_limits point for each end" if placed else "battery_limits rules"
+                return refused(f"no rack in the site plan to run along; give {rules} or pin it")
+            if not placed:
+                placed.append(at_end(rack, "start", "rack end"))
+            placed.append(at_end(rack, far_end(rack, placed[0].point), "rack end"))  # type: ignore[arg-type]
+        a, b = placed
+        assert a.point is not None and b.point is not None
+        if math.hypot(a.point[0] - b.point[0], a.point[1] - b.point[1]) < 1.0:
+            return refused(
+                f"both placed at the same point ({a.label}, {b.label}); give the other end a "
+                "battery_limits rule of its own (a point or the other rack end)"
+            )
+        # the way round in which the branches leave in their order along the line (the tees
+        # from its start to its end): fewer branches out of order, else as the rules say
+        targets = [self._branch_target(k) for k in chain.junctions]
+        arcs = [_project([a.point, b.point], t) for t in targets if t is not None]
+        late = sum(x > y for i, x in enumerate(arcs) for y in arcs[i + 1 :])
+        early = sum(x < y for i, x in enumerate(arcs) for y in arcs[i + 1 :])
+        return (b, a) if late > early else (a, b)
 
     def _rack_end(
         self,
@@ -1523,12 +1642,15 @@ class Router:
             point = other.point if other is not None and other.kind == "fixed" else None
             return self._place(e, point, r)
 
-        a = place(start, None) if start.kind != "edge" else None
-        b = place(end, a) if end.kind != "edge" else None
-        if start.kind == "edge":
-            a = place(start, b)
-        if end.kind == "edge":
-            b = place(end, a)
+        if start.kind == end.kind == "edge":  # a header from a battery limit to another
+            a, b = self._limits(chain, segs, r)
+        else:
+            a = place(start, None) if start.kind != "edge" else None
+            b = place(end, a) if end.kind != "edge" else None
+            if start.kind == "edge":
+                a = place(start, b)
+            if end.kind == "edge":
+                b = place(end, a)
         if a is not None and b is not None and start.kind == "item" and b.kind == "fixed":
             a = place(start, b)
         if a is None or b is None:
