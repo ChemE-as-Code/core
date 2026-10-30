@@ -180,6 +180,11 @@ def test_a_pinned_header_segment_stays_and_wins():
             "both placed at the same point",
         ),
         ({"lines": [{"line": "CWS-1", "rack": "PR-9"}]}, None, "rack intent PR-9 is not a rack"),
+        (
+            {"rules": {"battery_limits": [{"lines": ["CWS-1"], "rack": "PR-9"}]}},
+            None,
+            "rack PR-9 is not in the site plan",
+        ),
     ],
 )
 def test_a_header_that_cannot_be_placed_says_why(routing, site, why):

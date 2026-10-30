@@ -611,8 +611,9 @@ matching rule the other; an end no rule places is the end of a rack away from th
 or the line's branches, else the longest). The rack ends lie on the line's tier (its `tier`
 intent or `tiers` rule) or at its `elevation` intent; the line runs the way its tees come, so
 its branches tee off in their order, and is routed (with its branches) as any other. Without a
-rack and two points it stays unrouted with the reason `battery limits at both ends (...): ...`. On the ASU (218 segments, 124 chains) routing takes
-about 3 s and a build about 6 s.
+rack and two points it stays unrouted with the reason `battery limits at both ends (...): ...`;
+its `from_area`/`to_area` and the site edge are not used for it. On the ASU (218 segments, 124
+chains) routing takes about 3 s and a build about 6 s.
 
 ## Rules on the model (C4)
 

@@ -455,8 +455,8 @@ enters the rack at the point nearest each end and takes a lane of its own. Local
 the pipe-way elevation (`local_elevation_m`, 3.5 m), pump suction and discharge runs at grade.
 Battery-limit ends (`BL`, `CW`, `CWR`) go to a `battery_limits:` point or rack end of
 `piping/routing.yaml`, else the nearest rack end; a line with battery limits at both ends (a
-header) runs along a rack from end to end, or between the points of two matching rules. Each pipe records how (`method`) and why
-(`reason`) it was routed. `cheme layout report` lists every line routed, skipped or
+header) runs along a rack from end to end, or between the points of two matching rules. Each
+pipe records how (`method`) and why (`reason`) it was routed. `cheme layout report` lists every line routed, skipped or
 unrouted with the reasons and the counts per method and reason; `layout route --line L`
 reroutes some lines, `layout pin` keeps a route or platform, `layout render --plan | --section
 x=.. [--png]` draws plans and sections. Gates of kind `layout-model` (template:
