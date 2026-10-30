@@ -889,8 +889,21 @@ def cause_effect(
 @app.command()
 def serve(
     repo: Annotated[
-        Path | None, typer.Option(help="Plant repository (default: the one around the cwd).")
+        Path | None,
+        typer.Option(
+            help="Plant repository (default: the one around the cwd), or a folder of plants "
+            "(a process library): then every plant is served under /p/<id>/."
+        ),
     ] = None,
+    library: Annotated[
+        bool,
+        typer.Option(
+            "--library",
+            help="Serve every plant below the folder (at most 3 levels down), also when it "
+            "lies inside a plant. Without it, a folder with no plant.yaml above it but plants "
+            "below it is served as a library.",
+        ),
+    ] = False,
     host: Annotated[
         str,
         typer.Option(
@@ -920,7 +933,10 @@ def serve(
         ),
     ] = False,
 ) -> None:
-    """Serve the repository read-only as a JSON API (and the viewer, with --ui)."""
+    """Serve the repository read-only as a JSON API (and the viewer, with --ui).
+
+    In a folder of plants (process-library's root, or a folder of plant repositories) it serves
+    each plant under /p/<id>/ and lists them at /api/plants (ADR 0034)."""
     try:
         from chemeascode.interfaces.api.serve import accepted_hosts, is_local_bind
         from chemeascode.interfaces.api.serve import serve as run_server
@@ -928,12 +944,28 @@ def serve(
         typer.echo(f"{missing}. Install the extra: cheme-as-code[serve]", err=True)
         raise typer.Exit(2) from missing
 
-    root = repo.resolve() if repo else _workspace().root
-    try:
-        Workspace.find(root)
-    except NotAPlantRepository as failure:
-        typer.echo(str(failure), err=True)
-        raise typer.Exit(2) from failure
+    from chemeascode.foundation.workspace import PLANT_FILE
+    from chemeascode.interfaces.api.library import MAX_DEPTH, discover_plants
+
+    root = (repo or Path.cwd()).resolve()
+    plants = []
+    if library:
+        plants = discover_plants(root)
+        if not plants:
+            typer.echo(f"No {PLANT_FILE} below {root} ({MAX_DEPTH} levels).", err=True)
+            raise typer.Exit(2)
+    else:
+        try:
+            found = Workspace.find(root)
+        except NotAPlantRepository as failure:
+            plants = discover_plants(root)
+            if not plants:
+                typer.echo(f"{failure} No plant below it either ({MAX_DEPTH} levels).", err=True)
+                raise typer.Exit(2) from failure
+            library = True
+        else:
+            if repo is None:
+                root = found.root
     try:
         hosts = accepted_hosts(host, allow_host or ())
     except ValueError as failure:
@@ -953,7 +985,13 @@ def serve(
             )
         else:
             typer.echo("  the viewer cannot run the checks (--allow-remote-checks)", err=True)
-    typer.echo(f"Serving {root} on http://{host}:{port}/api/repo")
+    if library:
+        typer.echo(
+            f"Serving the library {root} ({len(plants)} plants) on http://{host}:{port}/: "
+            "/api/plants, each plant under /p/<id>/"
+        )
+    else:
+        typer.echo(f"Serving {root} on http://{host}:{port}/api/repo")
     try:
         run_server(
             root,
@@ -962,6 +1000,7 @@ def serve(
             ui_dir=ui,
             allow_hosts=allow_host or (),
             allow_remote_checks=allow_remote_checks,
+            library=library,
         )
     except FileNotFoundError as failure:  # --ui without index.html
         typer.echo(str(failure), err=True)

@@ -122,6 +122,24 @@ cheme serve --repo ../process-library/processes/asu-1 --ui dist --port 8765
 `cheme serve` serves `dist/` at `/`, falls back to `index.html` for client routes, and
 answers `/api/*` itself. It binds to 127.0.0.1 by default.
 
+### Several plants (a library)
+
+```sh
+cheme serve --repo ../process-library --ui dist   # every plant below, each under /p/<id>/
+```
+
+On a folder of plants (process-library's root, or a folder of plant repositories), `cheme
+serve` serves each plant under `/p/<id>/` and lists them at `/api/plants` (core's ADR 0034).
+The viewer reads its plant from the page's path (`src/lib/plants.ts`, `src/main.ts`): under
+`/p/<id>/` its API calls and routes are the plant's; at `/` of a library it shows the index of
+the plants (`src/PlantsApp.vue`: name, path, stage, the recorded maturity, sheets, and a
+`process.yaml`'s title, summary and families when there is one; filter by text, family and
+stage). In a plant the header has a plant switcher and a link to the index ("<library> /").
+Switching loads the other plant's page: the same page when it is a plant-wide one (stream table,
+LCA, checks, ...), its overview for a page of one sheet, file or tag; `?embed` and `?theme` stay,
+the revision does not. A server of one plant answers `/api/plants` with a 404 and the viewer is
+as before. `npm run dev` proxies `/p/<id>/api/` too.
+
 ## Static snapshot (no server)
 
 `cheme export-static DIR` (core) writes the API answers of one revision as files. The viewer
@@ -160,6 +178,10 @@ the router carries them over to every in-app navigation). They work with and wit
 - `?theme=light|dark|system` (default `system`): forces the colour scheme by setting
   `data-theme="light"|"dark"` on `<html>`; `system` leaves it unset and follows
   `prefers-color-scheme`.
+- `?back=<url>&back_label=<text>`: a "← <text>" link at the start of the header back to the
+  page that opened the viewer (the Process Atlas's process page opens its full viewer so). Only a
+  link on this site is shown (a relative URL or the same origin, http or https); any other is
+  ignored.
 
 The Process Atlas frames a route of a snapshot this way:
 

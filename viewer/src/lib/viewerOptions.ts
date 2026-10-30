@@ -2,12 +2,16 @@
 // they stay when the hash route changes. The Process Atlas relies on exactly these:
 //   ?embed=1                  no header, no file tree; the routed view fills the frame
 //   ?theme=light|dark|system  force the colour scheme (default: system)
+//   ?back=<url>&back_label=   a link back to the page that opened it (this site only)
 
 export type ThemeChoice = "light" | "dark" | "system";
 
 export interface ViewerOptions {
   embed: boolean;
   theme: ThemeChoice;
+  /** `?back=`, as given (src/lib/plants.ts `safeBackUrl` decides whether it is linked). */
+  back: string | null;
+  backLabel: string | null;
 }
 
 /** Parse `location.search`. Unknown values fall back to the defaults (not embedded, system theme). */
@@ -18,6 +22,8 @@ export function viewerOptions(search: string): ViewerOptions {
   return {
     embed: embed === "1" || embed === "true",
     theme: theme === "light" || theme === "dark" ? theme : "system",
+    back: params.get("back"),
+    backLabel: params.get("back_label"),
   };
 }
 

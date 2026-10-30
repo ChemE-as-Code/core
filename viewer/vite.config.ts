@@ -14,7 +14,8 @@ export default defineConfig({
   },
   server: {
     host: "127.0.0.1",
-    proxy: { "/api": { target: api, changeOrigin: false } },
+    // `/p/<id>/api`: a plant of a library server (core's ADR 0034); its pages stay the viewer's
+    proxy: { "/api": { target: api, changeOrigin: false }, "^/p/[^/]+/api/": { target: api, changeOrigin: false } },
   },
   // three.js (about 570 kB) is its own chunk, loaded only on the /layout route.
   build: { outDir: "dist", sourcemap: true, chunkSizeWarningLimit: 700 },

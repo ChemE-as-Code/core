@@ -5,6 +5,7 @@ import { loadMaturity, maturity, store } from "@/store";
 import { useRev } from "@/lib/useRev";
 import { shortRev } from "@/lib/format";
 import { PHASE_NOTE, maturityBadge } from "@/lib/maturity";
+import { indexUrl, plantName, switchUrl } from "@/lib/plants";
 
 defineProps<{ sidebarOpen: boolean }>();
 defineEmits<{ toggleSidebar: [] }>();
@@ -52,6 +53,15 @@ function onSelect(event: Event): void {
   setRev((event.target as HTMLSelectElement).value);
 }
 
+// A plant of a library server: the other plants, a page load away (core's ADR 0034).
+const plants = computed(() => (store.plant && store.plants ? store.plants.plants : []));
+const allPlants = computed(() => indexUrl(window.location.search));
+function switchPlant(event: Event): void {
+  const id = (event.target as HTMLSelectElement).value;
+  if (id && id !== store.plant)
+    window.location.assign(switchUrl(id, { name: String(route.name ?? ""), path: route.path }, window.location.search));
+}
+
 const showCustom = ref(false);
 function openCustom(): void {
   customRev.value = rev.value ?? "";
@@ -75,10 +85,19 @@ function applyCustom(): void {
     >
       &#9776;
     </button>
+    <a v-if="store.back" class="back" :href="store.back.href" data-testid="back-link">&larr; {{ store.back.label }}</a>
     <RouterLink class="brand" :to="{ name: 'home', query: withRev() }">
       <img class="logo" :src="logo" alt="" width="34" height="34" data-testid="header-logo" />
-      <span class="name">{{ store.repo?.name || store.repo?.root_name || "cheme-as-code" }}</span>
+      <!-- in a library the plant switcher names the plant -->
+      <span v-if="!plants.length" class="name">{{ store.repo?.name || store.repo?.root_name || "cheme-as-code" }}</span>
     </RouterLink>
+    <template v-if="plants.length">
+      <a class="all-plants" :href="allPlants" title="Every plant of this library" data-testid="all-plants">{{ store.plants!.root_name }} /</a>
+      <label class="sr-only" for="plant-select">Plant</label>
+      <select id="plant-select" class="plant-select" :value="store.plant ?? ''" title="Switch plant" data-testid="plant-select" @change="switchPlant">
+        <option v-for="p in plants" :key="p.id" :value="p.id">{{ plantName(p) }}</option>
+      </select>
+    </template>
     <span
       v-if="stageTitle"
       class="badge stage"
@@ -186,6 +205,16 @@ function applyCustom(): void {
 .brand:hover {
   text-decoration: none;
 }
+.back,
+.all-plants {
+  flex: none;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.plant-select {
+  max-width: 220px;
+}
 .about {
   margin-left: auto;
   white-space: nowrap;
@@ -239,6 +268,12 @@ function applyCustom(): void {
   }
   .rev select {
     max-width: 110px;
+  }
+  .plant-select {
+    max-width: 120px;
+  }
+  .all-plants {
+    display: none;
   }
   .custom input {
     width: 110px;

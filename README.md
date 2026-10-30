@@ -1534,7 +1534,7 @@ cannot load is shown as its XML under a `(cheme textconv could not load ...)` li
 
 ### serve
 
-`cheme serve [--repo DIR] [--host 127.0.0.1] [--port 8765] [--ui DIST_DIR]` serves the plant
+`cheme serve [--repo DIR] [--library] [--host 127.0.0.1] [--port 8765] [--ui DIST_DIR]` serves the plant
 repository as JSON over HTTP, for the viewer. Every `GET` only reads. It needs the `serve` extra
 (`uv tool install 'cheme-as-code[serve] @ git+...'`). Every endpoint takes an optional `rev` (a
 branch, tag or sha; absent: the working tree) and repo-relative POSIX `path`s:
@@ -1588,6 +1588,21 @@ revisions are resolved with `git rev-parse --verify --end-of-options` and may no
 The server binds 127.0.0.1 and accepts only local `Host` headers. With `--ui` (or `CHEME_UI`)
 it also serves a built single-page app at `/`, falling back to its `index.html`. Rendered sheets
 and diffs are cached in memory by git blob id.
+
+**A folder of plants (library mode, ADR 0034).** `cheme serve` in a folder that has no
+`plant.yaml` above it but plants below it (at most 3 levels down: process-library's root, or a
+folder of plant repositories), or with `--library`, serves every plant under `/p/<id>/` (the id
+is the plant's folder name; when two share it, their relative paths, `a-same`). Each plant's
+endpoints are the ones above, unchanged (`/p/asu-1/api/repo`); a plant in a subfolder of a git
+repository reads its history from that repository, a plant repository its own. The library adds:
+
+| endpoint | returns |
+|---|---|
+| `GET /api/plants` | `{root_name, plants: [{id, path, name, stage, sheets, maturity, maturity_checked, title, summary, families, error}]}`: `name`, `stage` and the number of `sheets` from `plant.yaml` (`error` when it does not validate), the recorded maturity level of `checks/maturity.json` (never evaluated live), and the optional `title`, `summary` and `families` of a `process.yaml` beside it |
+
+`/p/<id>` redirects to `/p/<id>/`; an unknown id is a 404. With `--ui` the viewer is served at
+`/` (its index of the plants) and at every `/p/<id>/` page. The same guards apply to the library
+and to each plant (the `Host` check, the cross-site refusal, a session token per plant).
 
 ## The plant repository
 
