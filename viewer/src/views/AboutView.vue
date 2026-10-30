@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Served from public/ so the logo can be swapped without a rebuild; BASE_URL keeps it working in a static snapshot.
 const logo = `${import.meta.env.BASE_URL}logo.svg`;
+const photo = `${import.meta.env.BASE_URL}team/schweidtmann.jpg`;
+import { SITES } from "@/lib/sites";
 
 const groupLinks = [
   { label: "Group website", url: "https://www.pi-research.org/" },
@@ -35,7 +37,8 @@ const personLinks = [
           <li v-for="l in groupLinks" :key="l.url"><a :href="l.url" target="_blank" rel="noopener">{{ l.label }}</a></li>
         </ul>
       </section>
-      <section class="card" data-testid="about-person">
+      <section class="card person" data-testid="about-person">
+        <img class="photo" :src="photo" alt="Portrait of Artur M. Schweidtmann" width="96" height="96" data-testid="about-photo" />
         <strong>Artur M. Schweidtmann</strong>
         <span>Tenured Assistant Professor, head of Process Intelligence Research</span>
         <p class="muted"><a href="mailto:a.schweidtmann@tudelft.nl">a.schweidtmann@tudelft.nl</a></p>
@@ -45,9 +48,12 @@ const personLinks = [
       </section>
     </div>
 
-    <h2>Software</h2>
-    <ul class="links">
-      <li><a href="https://github.com/ChemE-as-Code" target="_blank" rel="noopener">ChemE-as-Code on GitHub</a> (core, viewer, examples)</li>
+    <h2>ChemE-as-Code</h2>
+    <ul class="links" data-testid="about-sites">
+      <li><a :href="SITES.home" target="_blank" rel="noopener">Home page (cheme-as-code.org)</a></li>
+      <li><a :href="SITES.code" target="_blank" rel="noopener">The code on GitHub</a> (ChemE-as-Code/core, the Viewer in viewer/)</li>
+      <li><a :href="SITES.viewerDocs" target="_blank" rel="noopener">Viewer documentation</a></li>
+      <li><a :href="SITES.atlas" target="_blank" rel="noopener">Process Atlas</a></li>
       <li>Licence: AGPL-3.0-or-later</li>
     </ul>
   </div>
@@ -89,6 +95,14 @@ h2 {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+}
+.photo {
+  width: 96px;
+  height: 96px;
+  margin-bottom: var(--space-2);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px var(--border);
 }
 .card p {
   margin: var(--space-1) 0 0;

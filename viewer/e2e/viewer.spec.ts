@@ -188,6 +188,13 @@ test("the About page names the group and shows the logo", async ({ page }) => {
   await expect(page.getByTestId("about-group")).toContainText("Process Intelligence Research");
   await expect(page.getByTestId("about-person")).toContainText("Artur M. Schweidtmann");
   await expect(page.getByTestId("about-logo")).toHaveJSProperty("complete", true);
+  // Artur's photo, and the way out to the home page and the code
+  await expect(page.getByTestId("about-photo")).toHaveJSProperty("complete", true);
+  expect(await page.getByTestId("about-photo").evaluate((img) => (img as { naturalWidth: number }).naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByTestId("about-sites").getByRole("link", { name: /Home page/ })).toHaveAttribute("href", "https://cheme-as-code.org");
+  await expect(page.getByTestId("about-sites").getByRole("link", { name: "The code on GitHub" })).toHaveAttribute("href", "https://github.com/ChemE-as-Code/core");
+  await expect(page.getByTestId("header-home")).toHaveAttribute("href", "https://cheme-as-code.org");
+  await expect(page.getByTestId("header-code")).toHaveAttribute("href", "https://github.com/ChemE-as-Code/core");
 });
 
 test("a planned sheet is listed on the home page without a link", async ({ page }) => {

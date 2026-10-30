@@ -6,6 +6,7 @@ import { useRev } from "@/lib/useRev";
 import { shortRev } from "@/lib/format";
 import { PHASE_NOTE, maturityBadge } from "@/lib/maturity";
 import { indexUrl, plantName, switchUrl } from "@/lib/plants";
+import { SITES } from "@/lib/sites";
 
 defineProps<{ sidebarOpen: boolean }>();
 defineEmits<{ toggleSidebar: [] }>();
@@ -117,6 +118,11 @@ function applyCustom(): void {
 
     <!-- The pages are in the sidebar (src/lib/pages.ts), grouped; About is not about the plant. -->
     <RouterLink class="about" :to="{ name: 'about', query: withRev() }" title="About cheme-as-code and Process Intelligence Research">About</RouterLink>
+    <!-- the ChemE-as-Code home page and the code, outside the Viewer -->
+    <a class="ext" :href="SITES.home" target="_blank" rel="noopener" title="The ChemE-as-Code home page" data-testid="header-home">cheme-as-code.org&nbsp;&#8599;</a>
+    <a class="ext gh" :href="SITES.code" target="_blank" rel="noopener" aria-label="The code on GitHub (ChemE-as-Code/core)" title="The code on GitHub" data-testid="header-code">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z" /></svg>
+    </a>
 
     <span
       v-if="store.snapshot"
@@ -222,6 +228,24 @@ function applyCustom(): void {
   padding: 4px 2px;
   border-bottom: 2px solid transparent;
 }
+.ext {
+  flex: none;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+.ext:hover {
+  color: var(--fg);
+  text-decoration: none;
+}
+.gh {
+  display: inline-flex;
+}
+.gh svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
 .about.router-link-active {
   color: var(--fg);
   border-bottom-color: var(--accent);
@@ -260,6 +284,10 @@ function applyCustom(): void {
   }
   .about {
     font-size: var(--text-sm);
+  }
+  /* phones: the GitHub mark stays, the home page is on About */
+  .ext:not(.gh) {
+    display: none;
   }
   /* On phones both are on the overview and the Maturity page (the nav keeps its link). */
   .badge.stage,
