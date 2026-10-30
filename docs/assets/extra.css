@@ -1,15 +1,186 @@
-/* Primary colour close to the Process Atlas (#1f5f99). */
+/* The ChemE-as-Code look for the docs (MkDocs Material), close to the home and Atlas sites
+   (ChemE-as-Code/website packages/brand/src/brand.css): a white header with the mark, navy
+   headings, cyan accents, soft surfaces. The same file is viewer/docs/assets/extra.css; keep the
+   two in step. The published site adds the brand fonts (website docs-build); without them the
+   system fonts stand in. */
+
+:root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #1f5f99;
-  --md-primary-fg-color--light: #4a82b8;
-  --md-primary-fg-color--dark: #164672;
-  --md-accent-fg-color: #2a7bc4;
+  --cac-navy: #0b2350;
+  --cac-cyan: #12b4d6;
+  --cac-accent: #0f3f7a;
+  --cac-bg: #ffffff;
+  --cac-bg-soft: #f5f6f8;
+  --cac-surface: #ffffff;
+  --cac-border: #d9dde3;
+  --cac-fg: #1d2127;
+  --cac-fg-muted: #5b6470;
+  --cac-accent-soft: #e1f4fa;
+
+  --md-text-font: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --md-primary-fg-color: #0b2350;
+  --md-primary-fg-color--light: #0f3f7a;
+  --md-primary-fg-color--dark: #061a40;
+  --md-accent-fg-color: #12b4d6;
+  --md-accent-fg-color--transparent: #12b4d61a;
+  --md-typeset-a-color: #0f3f7a;
+  --md-default-fg-color: #1d2127;
+  --md-code-bg-color: #f5f6f8;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #1f5f99;
-  --md-primary-fg-color--light: #4a82b8;
-  --md-primary-fg-color--dark: #164672;
-  --md-accent-fg-color: #6aa7e0;
-  --md-typeset-a-color: #7db3e6;
+  --cac-navy: #e5e8ec;
+  --cac-accent: #5cd0ea;
+  --cac-bg: #14171b;
+  --cac-bg-soft: #1b1f24;
+  --cac-surface: #1e2329;
+  --cac-border: #2f363e;
+  --cac-fg: #e5e8ec;
+  --cac-fg-muted: #a3acb6;
+  --cac-accent-soft: #12303a;
+
+  --md-primary-fg-color: #0b2350;
+  --md-accent-fg-color: #5cd0ea;
+  --md-typeset-a-color: #5cd0ea;
+  --md-default-bg-color: #14171b;
+  --md-code-bg-color: #1b1f24;
+  --md-hue: 215;
+}
+
+/* -- header: white with the mark and navy text, as on cheme-as-code.org ---------------------- */
+
+.md-header {
+  background-color: var(--cac-surface);
+  color: var(--cac-navy);
+  box-shadow: 0 1px 0 var(--cac-border);
+}
+.md-header--shadow {
+  box-shadow: 0 1px 0 var(--cac-border), 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+.md-header__button.md-logo {
+  margin: 0.2rem 0.2rem 0.2rem 0.4rem;
+  padding: 0.2rem;
+}
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2rem;
+  width: auto;
+}
+.md-header__title {
+  font-family: "Montserrat Variable", "Montserrat", "Inter Variable", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.md-header__source,
+.md-source {
+  color: var(--cac-fg-muted);
+}
+/* the search box sits on white */
+.md-search__form {
+  background-color: var(--cac-bg-soft);
+  border: 1px solid var(--cac-border);
+  border-radius: 999px;
+}
+.md-search__form:hover {
+  background-color: var(--cac-bg-soft);
+  border-color: var(--cac-cyan);
+}
+.md-search__input,
+.md-search__input::placeholder,
+.md-search__icon {
+  color: var(--cac-fg-muted);
+}
+[data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+  border-radius: 0.6rem 0.6rem 0 0;
+}
+.md-tabs {
+  background-color: var(--cac-surface);
+  color: var(--cac-navy);
+  border-bottom: 1px solid var(--cac-border);
+}
+
+/* -- typography --------------------------------------------------------------------------------- */
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-family: "Montserrat Variable", "Montserrat", "Inter Variable", system-ui, sans-serif;
+  color: var(--cac-navy);
+  letter-spacing: -0.01em;
+}
+.md-typeset h1 {
+  font-weight: 800;
+  margin-bottom: 0.8em;
+}
+.md-typeset h2 {
+  font-weight: 700;
+  margin-top: 2em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--cac-border);
+}
+.md-typeset h3 {
+  font-weight: 700;
+}
+/* the first section of a page needs no rule above it */
+.md-typeset h1 + h2,
+.md-typeset h1 + p + h2 {
+  border-top: 0;
+}
+.md-typeset a {
+  text-underline-offset: 0.15em;
+}
+.md-typeset a:hover {
+  color: var(--md-accent-fg-color);
+}
+
+/* -- code, tables, notes ------------------------------------------------------------------------ */
+
+.md-typeset code {
+  border-radius: 4px;
+}
+.md-typeset pre > code {
+  border: 1px solid var(--cac-border);
+  border-radius: 8px;
+}
+.md-typeset table:not([class]) {
+  border: 1px solid var(--cac-border);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  box-shadow: none;
+}
+.md-typeset table:not([class]) th {
+  background-color: var(--cac-bg-soft);
+  color: var(--cac-navy);
+}
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 8px;
+  border-width: 1px;
+  border-left-width: 4px;
+  box-shadow: none;
+  font-size: 0.72rem;
+}
+
+/* -- navigation ----------------------------------------------------------------------------------- */
+
+.md-nav__item--section > .md-nav__link {
+  color: var(--cac-navy);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.62rem;
+}
+.md-nav__link--active,
+.md-nav__link--active code {
+  color: var(--cac-accent);
+  font-weight: 600;
+}
+
+/* -- footer: navy, like the brand ------------------------------------------------------------- */
+
+.md-footer {
+  background-color: #0b2350;
+}
+.md-footer-meta {
+  background-color: #061a40;
 }
