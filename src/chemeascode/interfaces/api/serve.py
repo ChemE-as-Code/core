@@ -2013,15 +2013,22 @@ def serve(
     ui_dir: Path | None = None,
     allow_hosts: Iterable[str] = (),
     allow_remote_checks: bool = False,
+    library: bool = False,
 ) -> None:
     """Run the API (and the viewer, with *ui_dir*) until interrupted.
 
     *allow_hosts*: further names the server accepts in the ``Host`` header (see
     :func:`accepted_hosts`). *allow_remote_checks*: let ``POST /api/checks/run`` run the checks
-    although *host* is not a local address."""
+    although *host* is not a local address. *library*: *repo_root* is a folder of plants, each
+    served under ``/p/<id>/`` (:mod:`.library`)."""
     import uvicorn
 
-    app = create_app(
+    make: Callable[..., Any] = create_app
+    if library:
+        from chemeascode.interfaces.api.library import create_library_app
+
+        make = create_library_app
+    app = make(
         repo_root,
         ui_dir,
         allowed_hosts=accepted_hosts(host, allow_hosts),

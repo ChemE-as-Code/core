@@ -6,19 +6,23 @@ import { applyTheme, fullViewerHref, isDarkScheme, viewerOptions } from "@/lib/v
 
 describe("viewerOptions", () => {
   it("defaults to the full app in the system theme", () => {
-    expect(viewerOptions("")).toEqual({ embed: false, theme: "system" });
-    expect(viewerOptions("?data=../snapshot/")).toEqual({ embed: false, theme: "system" });
+    expect(viewerOptions("")).toEqual({ embed: false, theme: "system", back: null, backLabel: null });
+    expect(viewerOptions("?data=../snapshot/")).toEqual({ embed: false, theme: "system", back: null, backLabel: null });
   });
 
   it("reads embed and theme next to data", () => {
-    expect(viewerOptions("?data=../snapshot/&embed=1&theme=dark")).toEqual({ embed: true, theme: "dark" });
-    expect(viewerOptions("?embed=true&theme=light")).toEqual({ embed: true, theme: "light" });
-    expect(viewerOptions("?theme=system")).toEqual({ embed: false, theme: "system" });
+    expect(viewerOptions("?data=../snapshot/&embed=1&theme=dark")).toEqual({ embed: true, theme: "dark", back: null, backLabel: null });
+    expect(viewerOptions("?embed=true&theme=light")).toEqual({ embed: true, theme: "light", back: null, backLabel: null });
+    expect(viewerOptions("?theme=system")).toEqual({ embed: false, theme: "system", back: null, backLabel: null });
   });
 
   it("ignores unknown values", () => {
-    expect(viewerOptions("?embed=0&theme=sepia")).toEqual({ embed: false, theme: "system" });
-    expect(viewerOptions("?embed=&theme=")).toEqual({ embed: false, theme: "system" });
+    expect(viewerOptions("?embed=0&theme=sepia")).toEqual({ embed: false, theme: "system", back: null, backLabel: null });
+    expect(viewerOptions("?embed=&theme=")).toEqual({ embed: false, theme: "system", back: null, backLabel: null });
+  });
+
+  it("reads the page to link back to (src/lib/plants.ts decides whether it is linked)", () => {
+    expect(viewerOptions("?data=x/&back=/processes/asu-1/&back_label=Process%20Atlas")).toMatchObject({ back: "/processes/asu-1/", backLabel: "Process Atlas" });
   });
 });
 

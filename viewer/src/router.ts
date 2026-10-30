@@ -10,7 +10,7 @@ import { paramPath } from "./lib/format";
 
 // Page options (`src/lib/viewerOptions.ts`) that in-app links must not drop in web history mode,
 // where they are part of the route query rather than sitting before the hash.
-const STICKY_QUERY = ["embed", "theme"] as const;
+const STICKY_QUERY = ["embed", "theme", "back", "back_label"] as const;
 
 /** `to` with the sticky page options of `from` added where `to` lacks them; null if none missing. */
 export function keepStickyQuery(to: LocationQuery, from: LocationQuery): LocationQuery | null {
@@ -94,9 +94,12 @@ export function pageTitle(route: Pick<RouteLocationNormalizedLoaded, "name" | "p
   return [pageName(route), plant, "cheme-as-code viewer"].filter(Boolean).join(" – ");
 }
 
-/** Web history against a server; hash history for a static snapshot (any static host, no rewrites). */
-export function createAppRouter(mode: "web" | "hash" = "web") {
-  const history = mode === "hash" ? createWebHashHistory() : createWebHistory(import.meta.env.BASE_URL);
+/**
+ * Web history against a server (under `base`: `/p/<id>/` for a plant of a library server); hash
+ * history for a static snapshot (any static host, no rewrites).
+ */
+export function createAppRouter(mode: "web" | "hash" = "web", base: string = import.meta.env.BASE_URL) {
+  const history = mode === "hash" ? createWebHashHistory() : createWebHistory(base);
   const router = createRouter({ history, routes });
   if (mode === "web") {
     router.beforeEach((to, from) => {
