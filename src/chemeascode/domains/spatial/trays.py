@@ -40,6 +40,11 @@ it), instrument trays as far to the right; a trunk is cut where its set of cable
 each piece is as wide as its cables need: the smallest of ``widths_mm`` whose cross-section
 times ``fill_max_power`` (``fill_max_instrument``) holds the cables' (``fill`` is the cables'
 cross-section over the tray's; above the limit at the largest width: finding ``tray-fill``).
+A rack in ``power_trays`` has that many power trays side by side, centred on the power lane,
+the largest width and ``spacing_m`` apart (:meth:`Cabling._assign` gives each cable one of
+them for its way along the rack: its voltage class first, then fill); its trunks are cut per
+tray (``PT-<rack>-<letter>-<k>``) and the room legs and links split with the trays at their
+ends (``PT-<room>-<letter>``, ``PT-<rack>-<rack>-<letters>``).
 The legs off the rack are orthogonal A* routes of the pipe router
 (:meth:`~chemeascode.domains.spatial.routing.Router.leg`) clear of the items, steel, pipes and
 the trays before them by ``spacing_m``; instrument trays keep ``separation_m`` from the power
@@ -53,11 +58,12 @@ and ``slack``). A load that gets no cable (not placed, no room, no position) is 
 ``review_needed`` with its ``reason``.
 
 :func:`tray_findings` are the rules on them (run with the model rules): ``tray-fill``,
-``tray-separation``, ``clash-tray`` (a tray through an item, a pipe or steel), ``tray-zone`` (a
-tray inside a zone of a kind in ``avoid_zones``: oxygen-enriched and hazardous areas by
-default), ``tray-span`` (a level tray run longer than ``support_span_m`` with no steel within
-``support_reach_m`` of it: rack bents, tray tiers, structure steel and walls, building walls),
-``cable-missing`` and ``cable-unrouted``.
+``tray-separation``, ``tray-voltage`` (a cable in a power tray of the other voltage class),
+``clash-tray`` (a tray through an item, a pipe or steel), ``tray-zone`` (a tray inside a zone
+of a kind in ``avoid_zones``: oxygen-enriched and hazardous areas by default), ``tray-span`` (a
+level tray run longer than ``support_span_m`` with no steel within ``support_reach_m`` of it:
+rack bents, tray tiers, structure steel and walls, building walls), ``cable-missing`` and
+``cable-unrouted``.
 """
 
 from __future__ import annotations
@@ -151,6 +157,8 @@ class Tray:
     ends_at: str | None = None  # the item a branch ends at
     width: float = 0.0
     drop_to: Vec | None = None  # a branch ending at a cable_entry: the terminal its cable drops to
+    voltage: str | None = None  # lv, hv: a power tray of a rack with power_trays of that class
+    slot: int | None = None  # a trunk's power tray on a rack with power_trays
 
 
 def _rules(trays: Any) -> TrayRuleSet:
@@ -219,6 +227,18 @@ def entry_point(entry: Any, bbox: list[float], clearance: float) -> tuple[float,
         "east": (x1 + c, ym),
         "west": (x0 - c, ym),
     }[entry.side]
+
+
+def _peak(loads: list[tuple[float, float, float]], lo: float, hi: float) -> float:
+    """The largest cross-section *loads* (``(lo, hi, area)`` along a rack) put on one piece of
+    ``[lo, hi]``; at the point *lo* for an empty span."""
+    if hi - lo <= 1e-6:
+        return sum(area for a, b, area in loads if a - 1e-9 <= lo <= b + 1e-9)
+    stops = sorted({lo, hi, *(s for a, b, _ in loads for s in (a, b) if lo < s < hi)})
+    return max(
+        sum(area for a, b, area in loads if a < (p + q) / 2 < b)
+        for p, q in zip(stops, stops[1:], strict=False)
+    )
 
 
 def _manhattan(a: Vec, b: Vec) -> float:
@@ -315,6 +335,7 @@ class Cabling:
         self.room_kind: dict[str, str] = {}
         self.network = None
         self.tiers: dict[str, float] = {}
+        self.power_trays: dict[str, list[str]] = {}
         racks = list(plan.racks) if plan is not None else []
         self.racks = {rack.id: rack for rack in racks}
         if racks:
@@ -322,6 +343,10 @@ class Cabling:
 
             self.network = RackNetwork(racks)
             declared = {tier.rack: tier.elevation for tier in self.rules.tiers}
+            #: The voltage class of each power tray of the racks with power_trays.
+            self.power_trays = {
+                p.rack: p.classes for p in self.rules.power_trays if p.rack in self.racks
+            }
             for rack in racks:
                 top = max(rack.levels) if rack.levels else 0.0
                 self.tiers[rack.id] = declared.get(rack.id, top + self.rules.tier_gap_m)
@@ -662,12 +687,75 @@ class Cabling:
                 best = (d, rack_id, s)
         return (best[1], best[2]) if best is not None else None
 
-    def _lane(self, rack_id: str, system: str) -> float:
+    def _lane(self, rack_id: str, system: str, slot: int | None = None) -> float:
+        """The offset of a tray's centreline from its rack's (left positive): power trays
+        ``lane_fraction`` of the width to the left, the power trays of a rack with power_trays
+        centred there, the largest width and ``spacing_m`` apart."""
         rack = self.racks[rack_id]
         d = self.rules.lane_fraction * rack.width
-        return d if system == "power" else -d
+        if system != "power":
+            return -d
+        classes = self.power_trays.get(rack_id)
+        if classes and slot is not None:
+            pitch = self.rules.widths_mm[-1] / 1000 + self.rules.spacing_m
+            d += (slot - (len(classes) - 1) / 2) * pitch
+        return d
 
-    def _lane_points(self, rack_id: str, system: str, s0: float, s1: float) -> list[Vec]:
+    def _letter(self, rack_id: str, slot: int | None) -> str:
+        """The letter of power tray *slot* of a rack in tray ids ('' for a rack's only one)."""
+        if slot is None or len(self.power_trays.get(rack_id) or ()) < 2:
+            return ""
+        return chr(ord("A") + slot)
+
+    def _class(self, route: Route) -> str:
+        voltage = route.cable.voltage_v
+        return "hv" if voltage is not None and voltage > self.rules.lv_max_v + 1e-9 else "lv"
+
+    def _assign(self, routes: list[Route], paths: dict[str, Any]) -> dict[tuple[str, str], int]:
+        """The power tray of each cable on each rack with power_trays, by (tag, rack): the
+        cables of the higher voltage class first, the larger first, each into a tray of its
+        class (else an ``any`` tray, else any other), the one that stays under
+        ``fill_max_power`` at the largest width, then the one whose fullest piece along the
+        cable's span is emptiest, then the first."""
+        spans: dict[str, dict[str, tuple[float, float]]] = {}
+        for route in routes:
+            for rack_id, s in paths[route.tag][2]:
+                if rack_id in self.power_trays:
+                    lo, hi = spans.setdefault(rack_id, {}).get(route.tag, (s, s))
+                    spans[rack_id][route.tag] = (min(lo, s), max(hi, s))
+        by_tag = {r.tag: r for r in routes}
+        cap = self.rules.widths_mm[-1] * self.rules.depth_mm * self.rules.fill_max_power
+        found: dict[tuple[str, str], int] = {}
+        for rack_id in sorted(spans):
+            classes = self.power_trays[rack_id]
+            loads: list[list[tuple[float, float, float]]] = [[] for _ in classes]
+            tags = sorted(
+                spans[rack_id],
+                key=lambda t: (self._class(by_tag[t]) != "hv", -by_tag[t].cable.area_mm2, t),
+            )
+            for tag in tags:
+                lo, hi = spans[rack_id][tag]
+                area = by_tag[tag].cable.area_mm2
+                wanted = self._class(by_tag[tag])
+                ranked = []
+                for k, kind in enumerate(classes):
+                    peak = _peak(loads[k], lo, hi) + area
+                    match = 0 if kind == wanted else 1 if kind == "any" else 2
+                    ranked.append((match == 2, peak > cap + 1e-9, match, round(peak, 6), k))
+                k = min(ranked)[-1]
+                loads[k].append((lo, hi, area))
+                found[(tag, rack_id)] = k
+        return found
+
+    def _voltage(self, rack_id: str, slot: int | None) -> str | None:
+        classes = self.power_trays.get(rack_id)
+        if slot is None or not classes or classes[slot] == "any":
+            return None
+        return classes[slot]
+
+    def _lane_points(
+        self, rack_id: str, system: str, s0: float, s1: float, slot: int | None = None
+    ) -> list[Vec]:
         from chemeascode.domains.spatial.layout_distances import offset_polyline, sub_polyline
 
         centre = [tuple(p) for p in self.racks[rack_id].points]
@@ -675,15 +763,16 @@ class Cabling:
         piece = sub_polyline(centre, lo, hi)
         if len(piece) < 2:
             piece = [piece[0], piece[0]]
-        lane = offset_polyline(piece, self._lane(rack_id, system))
+        lane = offset_polyline(piece, self._lane(rack_id, system, slot))
         z = self.tiers[rack_id]
         points = [(p[0], p[1], z) for p in lane]
         return points if s0 <= s1 else points[::-1]
 
-    def _lane_point(self, rack_id: str, s: float, *, system: str) -> Vec:
-        """The point of the lane of *system* at arc *s* of the rack's centreline."""
+    def _lane_point(self, rack_id: str, s: float, *, system: str, slot: int | None = None) -> Vec:
+        """The point of the lane of *system* (power tray *slot*) at arc *s* of the rack's
+        centreline."""
         points = [tuple(p) for p in self.racks[rack_id].points]
-        d = self._lane(rack_id, system)
+        d = self._lane(rack_id, system, slot)
         run = 0.0
         x, y, ux, uy = points[0][0], points[0][1], 1.0, 0.0
         for a, b in zip(points, points[1:], strict=False):
@@ -718,6 +807,8 @@ class Cabling:
         for tray in trunks:
             # one id per lane: a leg starting anywhere on it may leave it (the router's bubble)
             lane = f"lane:{tray.rack}:{tray.system}"
+            if tray.rack is not None and self._letter(tray.rack, tray.slot):
+                lane += f":{self._letter(tray.rack, tray.slot)}"
             self._block(
                 lane, tray.points, tray.width, extra if tray.system == "instrument" else 0.0
             )
@@ -812,24 +903,37 @@ class Cabling:
                     links.setdefault(key, []).append(route.tag)  # type: ignore[arg-type]
         by_tag = {r.tag: r for r in routes}
         prefix = "PT" if system == "power" else "IT"
-        pieces: dict[str, list[tuple[float, float, str]]] = {}
+        # the power tray of each cable on a rack with power_trays (none elsewhere: its only one)
+        slot_of = self._assign(routes, paths) if system == "power" else {}
+
+        def order(slot: int | None) -> int:
+            return -1 if slot is None else slot
+
+        pieces: dict[tuple[str, int | None], list[tuple[float, float, str]]] = {}
         trunk_trays: list[Tray] = []
         for rack_id in sorted(trunks):
-            spans = trunks[rack_id]
-            stops = sorted({s for lo, hi, _ in spans for s in (lo, hi)})
-            k = 0
-            for a, b in zip(stops, stops[1:], strict=False):
-                if b - a <= 1e-6:
-                    continue
-                cables = sorted({t for lo, hi, t in spans if lo <= a + 1e-9 and hi >= b - 1e-9})
-                if not cables:
-                    continue
-                k += 1
-                tray = Tray(f"{prefix}-{rack_id}-{k}", system, "trunk", cables, rack=rack_id)
-                tray.points = self._lane_points(rack_id, system, a, b)
-                tray.width = self._tray_width(tray, by_tag)
-                trunk_trays.append(tray)
-                pieces.setdefault(rack_id, []).append((a, b, tray.id))
+            by_slot: dict[int | None, list[tuple[float, float, str]]] = {}
+            for span in trunks[rack_id]:
+                by_slot.setdefault(slot_of.get((span[2], rack_id)), []).append(span)
+            for slot in sorted(by_slot, key=order):
+                spans = by_slot[slot]
+                letter = self._letter(rack_id, slot)
+                name = f"{prefix}-{rack_id}" + (f"-{letter}" if letter else "")
+                stops = sorted({s for lo, hi, _ in spans for s in (lo, hi)})
+                k = 0
+                for a, b in zip(stops, stops[1:], strict=False):
+                    if b - a <= 1e-6:
+                        continue
+                    cables = sorted({t for lo, hi, t in spans if lo <= a + 1e-9 and hi >= b - 1e-9})
+                    if not cables:
+                        continue
+                    k += 1
+                    tray = Tray(f"{name}-{k}", system, "trunk", cables, rack=rack_id)
+                    tray.slot, tray.voltage = slot, self._voltage(rack_id, slot)
+                    tray.points = self._lane_points(rack_id, system, a, b, slot)
+                    tray.width = self._tray_width(tray, by_tag)
+                    trunk_trays.append(tray)
+                    pieces.setdefault((rack_id, slot), []).append((a, b, tray.id))
         legs: list[tuple[Tray, Vec, Vec]] = []
         link_ids: dict[Any, Tray] = {}
         for room in sorted(room_access):
@@ -837,19 +941,43 @@ class Cabling:
             cables = sorted(r.tag for r in routes if r.room == room and paths[r.tag][2])
             if access is None or not cables:
                 continue
-            tray = Tray(f"{prefix}-{room}", system, "room", cables)
-            legs.append((tray, by_tag[cables[0]].start, self._lane_point(*access, system=system)))
+            groups: dict[int | None, list[str]] = {}
+            for tag in cables:
+                groups.setdefault(slot_of.get((tag, access[0])), []).append(tag)
+            for slot in sorted(groups, key=order):
+                letter = self._letter(access[0], slot)
+                tray = Tray(
+                    f"{prefix}-{room}" + (f"-{letter}" if letter else ""),
+                    system,
+                    "room",
+                    groups[slot],
+                    voltage=self._voltage(access[0], slot),
+                )
+                end = self._lane_point(*access, system=system, slot=slot)
+                legs.append((tray, by_tag[groups[slot][0]].start, end))
         for key, cables in sorted(links.items()):
             (r1, s1), (r2, s2) = key
-            tray = Tray(f"{prefix}-{r1}-{r2}", system, "link", sorted(set(cables)))
-            link_ids[key] = tray
-            legs.append(
-                (
-                    tray,
-                    self._lane_point(r1, s1, system=system),
-                    self._lane_point(r2, s2, system=system),
+            pairs: dict[tuple[int | None, int | None], list[str]] = {}
+            for tag in sorted(set(cables)):
+                pairs.setdefault((slot_of.get((tag, r1)), slot_of.get((tag, r2))), []).append(tag)
+            for k1, k2 in sorted(pairs, key=lambda pair: (order(pair[0]), order(pair[1]))):
+                letters = self._letter(r1, k1) + self._letter(r2, k2)
+                voltages = {self._voltage(r1, k1), self._voltage(r2, k2)} - {None}
+                tray = Tray(
+                    f"{prefix}-{r1}-{r2}" + (f"-{letters}" if letters else ""),
+                    system,
+                    "link",
+                    pairs[(k1, k2)],
+                    voltage=voltages.pop() if len(voltages) == 1 else None,
                 )
-            )
+                link_ids[(key, k1, k2)] = tray
+                legs.append(
+                    (
+                        tray,
+                        self._lane_point(r1, s1, system=system, slot=k1),
+                        self._lane_point(r2, s2, system=system, slot=k2),
+                    )
+                )
         for route in routes:
             start, end, nodes = paths[route.tag]
             tray = Tray(
@@ -861,7 +989,8 @@ class Cabling:
                 drop_to=route.terminal if route.entry else None,
             )
             if nodes:
-                legs.append((tray, self._lane_point(*end, system=system), route.end))
+                slot = slot_of.get((route.tag, end[0]))
+                legs.append((tray, self._lane_point(*end, system=system, slot=slot), route.end))
             else:
                 legs.append((tray, route.start, route.end))
         return {
@@ -873,6 +1002,7 @@ class Cabling:
             "trunks": trunk_trays,
             "legs": legs,
             "links": link_ids,
+            "slots": slot_of,
         }
 
     def _chains(self, plan: dict[str, Any], trays: list[Tray]) -> None:
@@ -886,6 +1016,7 @@ class Cabling:
         branches = {
             t.cables[0]: t.id for t in trays if t.kind == "branch" and t.system == plan["system"]
         }
+        slot_of = plan["slots"]
         for route in plan["routes"]:
             start, end, nodes = plan["paths"][route.tag]
             if not nodes:
@@ -896,12 +1027,14 @@ class Cabling:
             for (r1, s1), (r2, s2) in zip(nodes, nodes[1:], strict=False):
                 if r1 != r2:
                     key = tuple(sorted(((r1, s1), (r2, s2))))
-                    chain.append(plan["links"][key].id)
+                    (q1, _), (q2, _) = key
+                    slots = (slot_of.get((route.tag, q1)), slot_of.get((route.tag, q2)))
+                    chain.append(plan["links"][(key, *slots)].id)
                     continue
                 lo, hi = min(s1, s2), max(s1, s2)
                 hits = [
                     (a, tid)
-                    for a, b, tid in plan["pieces"].get(r1, [])
+                    for a, b, tid in plan["pieces"].get((r1, slot_of.get((route.tag, r1))), [])
                     if a >= lo - 1e-9 and b <= hi + 1e-9 and b - a > 1e-6
                 ]
                 hits.sort(reverse=s2 < s1)
@@ -1159,6 +1292,7 @@ class Cabling:
                     "fill": round(area / (width * 1000 * self.rules.depth_mm), 3),
                     "fill_max": fill_max,
                     "rack": tray.rack,
+                    "voltage": tray.voltage,
                     "method": tray.method,
                     "review_needed": True if tray.method == "direct" else None,
                     "parts": _run_parts(tray.id, tray.points, width, depth, f"tray_{tray.system}"),
@@ -1188,6 +1322,9 @@ class Cabling:
             },
             "missing": sorted(self.missing, key=lambda m: (m["kind"], m["tag"])),
         }
+        if self.power_trays:
+            summary["rules"]["power_trays"] = dict(sorted(self.power_trays.items()))
+            summary["rules"]["lv_max_v"] = self.rules.lv_max_v
         return {
             "tray_tiers": tiers,
             "trays": tray_entries,
@@ -1483,10 +1620,36 @@ def cable_entry_findings(workspace: Any, model: dict[str, Any]) -> list[Finding]
     return found
 
 
+def _fill_hint(tray: dict[str, Any], rules: dict[str, Any]) -> str:
+    """The way out of a ``tray-fill`` finding on *tray*: on a rack's power trunk, as many
+    power trays on the rack (``power_trays``) as its cables need; on a power room leg or link,
+    more power trays on the racks it joins (it splits with them)."""
+    tail = (
+        "split the loads over more rooms, or allow a fuller tray in electrical/tray-rules.yaml "
+        "with a reason"
+    )
+    kind = tray.get("kind")
+    if tray["system"] != "power" or kind == "branch":
+        return f"run a second tray beside it, {tail}"
+    rack = tray.get("rack")
+    if kind == "trunk" and rack:
+        declared = (rules.get("power_trays") or {}).get(rack)
+        need = (len(declared) if declared else 1) - 1 + math.ceil(tray["fill"] / tray["fill_max"])
+        return (
+            f"declare {need} power trays on rack {rack} in electrical/tray-rules.yaml "
+            f"(power_trays: [{{rack: {rack}, trays: {need}}}], or one voltage class per tray, "
+            f"e.g. [hv, hv, lv]): the build shares the cables out over them; else {tail}"
+        )
+    return (
+        "declare more power trays on the rack it leads to (power_trays in "
+        "electrical/tray-rules.yaml): its cables then split with the rack's trays; else " + tail
+    )
+
+
 def tray_findings(model: dict[str, Any]) -> list[Finding]:
-    """``cheme.layout-tray-fill``, ``-tray-separation``, ``-clash-tray``, ``-tray-zone``,
-    ``-tray-span``, ``-cable-missing`` and ``-cable-unrouted`` on a model document (nothing
-    without its ``trays``)."""
+    """``cheme.layout-tray-fill``, ``-tray-separation``, ``-tray-voltage``, ``-clash-tray``,
+    ``-tray-zone``, ``-tray-span``, ``-cable-missing`` and ``-cable-unrouted`` on a model
+    document (nothing without its ``trays``)."""
     trays = model.get("trays")
     cabling = model.get("cabling") or {}
     if trays is None:
@@ -1532,8 +1695,31 @@ def tray_findings(model: dict[str, Any]) -> list[Finding]:
                 f"(at most {tray['fill_max']:.0%}): {len(tray['cables'])} cables",
                 [tray["id"]],
                 None,
-                "run a second tray beside it (a tiers rule per rack), split the loads over "
-                "more rooms, or allow a fuller tray in electrical/tray-rules.yaml with a reason",
+                _fill_hint(tray, rules),
+                key=tray["id"],
+            )
+    lv_max = float(rules.get("lv_max_v", 1000.0))
+    voltages = {c["tag"]: c.get("voltage_v") for c in model.get("cables") or []}
+    for tray in trays:
+        if tray.get("voltage") is None:
+            continue
+        other = [
+            tag
+            for tag in tray["cables"]
+            if voltages.get(tag) is not None
+            and ("hv" if voltages[tag] > lv_max + 1e-9 else "lv") != tray["voltage"]
+        ]
+        if other:
+            add(
+                "warning",
+                "tray-voltage",
+                f"{tray['voltage']} power tray {tray['id']} carries {len(other)} cable(s) of "
+                f"the other voltage class (limit {lv_max:g} V): {', '.join(other[:5])}",
+                [tray["id"], *other[:5]],
+                None,
+                "give the rack a power tray of their class or an any tray (power_trays in "
+                "electrical/tray-rules.yaml) and rebuild; HV and LV cables share a tray only "
+                "with a fixed barrier between them (accept the finding with that reason)",
                 key=tray["id"],
             )
     power = [(c, t) for t in trays if t["system"] == "power" for c in _capsules(t)]

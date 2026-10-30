@@ -4,6 +4,13 @@
 
 ### Added
 
+- Several power trays per rack: `power_trays: [{rack, trays}]` in
+  `electrical/tray-rules.yaml` (a count, or one voltage class per tray: `hv`, `lv`, `any`;
+  `lv_max_v` 1000 V). The trays stand side by side on the rack's tray tier. The build shares
+  the cables out by voltage class, then by fill, and splits the room legs and links with
+  them. The cable schedule names each cable's tray. A `tray-fill` hint on a rack's power trunk
+  names the number of trays the rack needs. New rule `cheme.layout-tray-voltage`; model trays
+  gain an optional `voltage`. Without `power_trays` the model is unchanged (#71, ADR 0037).
 - A line or segment in `piping/routing.yaml` can be declared `buried` (`true` or
   `{cover_m, basis}`). Its runs below grade get no road or escape-route headroom finding, no
   clash with steel, items, envelopes or zones above grade, no ladder-clearance finding and no

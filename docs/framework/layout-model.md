@@ -95,7 +95,7 @@ cables:     [Cable]         # the cable schedule
 cabling:    {cables, power, instrument, motors, motors_skipped, instruments, junction_boxes,
              trays, tray_length_m, cable_length_m, rules: {separation_m, spacing_m,
              fill_max_power, fill_max_instrument, avoid_zones, support_span_m,
-             support_reach_m}, missing: [{tag, kind, reason}]}
+             support_reach_m, power_trays?, lv_max_v?}, missing: [{tag, kind, reason}]}
 # only with layout/hvac.yaml (absent otherwise):
 hvac_units: [HvacUnit]      # air handling units
 hvac_rooms: [HvacRoom]      # ventilated rooms with their terminals
@@ -635,7 +635,7 @@ pipe of its tee, connector pair or shared component, its placed item, the line i
 pinned or `via` route that no longer meets its connection above all; key `<pipe>+start|end`),
 `-headroom`, `-buried-cover` (below), `-access-blocked`, `-zone-crossing`, `-rack-fill`,
 `-separation` (a site plan separation naming a zone) (warnings), `-nozzle-unconnected`, `-gravity-fall` (info). With
-cables: `-tray-fill`, `-tray-separation`, `-clash-tray`, `-tray-zone` (a tray inside a zone of
+cables: `-tray-fill`, `-tray-separation`, `-tray-voltage`, `-clash-tray`, `-tray-zone` (a tray inside a zone of
 a kind in the tray rules' `avoid_zones`, default oxygen-enriched and hazardous; info with a hint
 to add `oxygen_deficient` to `avoid_zones` for a tray in an oxygen-deficient zone), `-tray-span`
 (a tray off the racks running level more than `support_span_m`, 6 m, with no steel, wall or

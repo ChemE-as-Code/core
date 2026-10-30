@@ -1,6 +1,6 @@
 ---
 name: electrical-cabling
-description: Declare the electrical rooms, the motor list and the junction boxes in electrical/electrical-list.yaml, set the cable tray rules, and let cheme layout build route the power and instrument trays and write the cable schedule. Use when the plant has motors or instruments to cable, before the detail-stage gate electrical, or when tray-fill, tray-separation, clash-tray, tray-zone, tray-span, cable-missing or electrical-* findings appear.
+description: Declare the electrical rooms, the motor list and the junction boxes in electrical/electrical-list.yaml, set the cable tray rules, and let cheme layout build route the power and instrument trays and write the cable schedule. Use when the plant has motors or instruments to cable, before the detail-stage gate electrical, or when tray-fill, tray-separation, tray-voltage, clash-tray, tray-zone, tray-span, cable-missing or electrical-* findings appear.
 ---
 
 # Electrical cabling
@@ -55,7 +55,10 @@ detail stage (gate `electrical`).
 4. **Tray rules** (optional, `electrical/tray-rules.yaml`, `cheme schema trays`): standard
    widths, depth, fill per system, the separation between power and instrument trays, the tray
    tier per rack (`tiers: [{rack, elevation}]`; default 1.5 m above the top pipe tier on steel
-   of its own), the branch elevation, the zone kinds a tray may not run in (`avoid_zones`,
+   of its own), more power trays on a rack whose cables one tray cannot hold (`power_trays:
+   [{rack: PR-1, trays: 2}]`, or one voltage class per tray, `trays: [hv, hv, lv]`, HV above
+   `lv_max_v`, 1000 V; side by side, the build shares the cables out and names each cable's
+   tray in the schedule), the branch elevation, the zone kinds a tray may not run in (`avoid_zones`,
    default `[oxygen_enriched, hazardous]`; add `oxygen_deficient` where the cables must stay
    out of inert vent plumes), the longest tray run between supports (`support_span_m`, 6 m)
    and how close steel must be to carry it (`support_reach_m`, 1 m). Every default is
@@ -67,7 +70,11 @@ detail stage (gate `electrical`).
    rooms where the cables leave.
 6. **Findings.** `layout-cable-missing` (a motor not placed, a room without building, an
    instrument the model cannot place), `layout-cable-unrouted` (a tray with no clear way),
-   `layout-tray-fill` (more cables than the largest width holds: a second tray, another room),
+   `layout-tray-fill` (more cables than the largest width holds: the hint names the number of
+   power trays the rack needs, declare them in `power_trays`; or another room),
+   `layout-tray-voltage` (a cable in a power tray of the other voltage class: give the rack a
+   tray of its class or an `any` tray), `layout-tray-rack` (a `power_trays` rack the site plan
+   lacks, or more trays than fit on the power half of the rack),
    `layout-tray-separation` (power and instrument trays too close: move one, or a metal divider
    with an accepted finding), `layout-clash-tray`, `layout-tray-zone` (a tray inside an
    oxygen-enriched or hazardous zone: move the lane or the release, or record the cable sheath
@@ -91,8 +98,8 @@ detail stage (gate `electrical`).
   `electrical-duplicate`, `electrical-motor-power`, `electrical-motor-room`; the model findings
   above.
 - Gate `electrical` (`kind: layout-model`, `require: [model-current, cables, trays]`): the
-  model is current, every motor and instrument has a cable routed in trays, no tray fill or
-  separation finding is left unaccepted.
+  model is current, every motor and instrument has a cable routed in trays, no tray fill,
+  separation or voltage finding is left unaccepted.
 - A build that cannot route a tray marks it `direct` and `review_needed`: give the room a
   `point`, a rack nearer the load, or move what blocks it.
 
