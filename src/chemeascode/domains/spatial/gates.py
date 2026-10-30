@@ -370,9 +370,13 @@ def layout_gate(
         open_ = _unaccepted(findings, TRAY_RULES, accept)
         if open_:
             problems.append(
-                _named([f.key or f.message for f in open_], "tray fill or separation findings")
-                + " not accepted; declare more power trays on the rack (power_trays in "
-                "electrical/tray-rules.yaml), split the loads or accept with a reason"
+                _named(
+                    [f.key or f.message for f in open_],
+                    "tray fill, separation or voltage findings",
+                )
+                + " not accepted; declare more power trays on the rack, or trays of the "
+                "cables' voltage class (power_trays in electrical/tray-rules.yaml), split the "
+                "loads or accept with a reason"
             )
     if "zones" in needs:
         zones = _load(workspace, "zones")
