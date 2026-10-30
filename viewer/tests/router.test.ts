@@ -26,5 +26,7 @@ describe("pageTitle", () => {
     expect(pageTitle({ name: "pid", params: { path: ["pid", "P-01.xml"] } }, "ASU")).toBe("P&ID pid/P-01.xml – ASU – cheme-as-code viewer");
     expect(pageTitle({ name: "datasheet", params: { tag: "C-101" } }, "ASU")).toBe("Datasheet C-101 – ASU – cheme-as-code viewer");
     expect(pageTitle({ name: "file", params: { path: ["README.md"] } }, null)).toBe("README.md – cheme-as-code viewer");
+    expect(pageTitle({ name: "section", params: { id: "pid" } }, "ASU")).toBe("P&IDs – ASU – cheme-as-code viewer");
+    expect(pageTitle({ name: "section", params: { id: "nope" } }, "ASU")).toBe("Section – ASU – cheme-as-code viewer");
   });
 });

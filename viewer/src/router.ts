@@ -7,6 +7,7 @@ import {
   type RouteRecordRaw,
 } from "vue-router";
 import { paramPath } from "./lib/format";
+import { section } from "./lib/pages";
 
 // Page options (`src/lib/viewerOptions.ts`) that in-app links must not drop in web history mode,
 // where they are part of the route query rather than sitting before the hash.
@@ -24,6 +25,7 @@ export function keepStickyQuery(to: LocationQuery, from: LocationQuery): Locatio
 // Repo paths use repeatable params (`:path(.*)*`) so their slashes stay readable in the URL.
 const routes: RouteRecordRaw[] = [
   { path: "/", name: "home", component: () => import("./views/HomeView.vue") },
+  { path: "/section/:id", name: "section", component: () => import("./views/SectionView.vue") },
   { path: "/pid/:path(.*)*", name: "pid", component: () => import("./views/PidView.vue") },
   { path: "/diff/:path(.*)*", name: "diff", component: () => import("./views/DiffView.vue") },
   { path: "/yaml/:path(.*)*", name: "yaml", component: () => import("./views/YamlView.vue") },
@@ -84,6 +86,8 @@ function pageName(route: Pick<RouteLocationNormalizedLoaded, "name" | "params">)
       return path;
     case "datasheet":
       return `Datasheet ${String(route.params.tag ?? "")}`;
+    case "section":
+      return section(String(route.params.id ?? ""))?.title ?? "Section";
     default:
       return PAGE_TITLES[name] ?? "";
   }

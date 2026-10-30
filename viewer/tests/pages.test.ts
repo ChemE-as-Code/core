@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Sheet } from "@/api";
-import { isCurrent, navFiles, navGroups, type NavInput } from "@/lib/pages";
+import { SECTIONS, isCurrent, isDrawing, navFiles, navGroups, section, type NavInput } from "@/lib/pages";
 
 const sheets: Sheet[] = [
   { id: "P-01", file: "pid/P-01.xml", title: "Feed", kind: "pid" },
@@ -118,5 +118,37 @@ describe("isCurrent", () => {
     expect(isCurrent(item("PFD"), { name: "pid", path: "process/BFD.xml", tab: null })).toBe(false);
     expect(isCurrent(item("Design basis"), { name: "yaml", path: "process/design-basis.yaml", tab: null })).toBe(true);
     expect(isCurrent(item("Design basis"), { name: "file", path: "process/design-basis.yaml", tab: null })).toBe(false);
+  });
+});
+
+describe("sections", () => {
+  const everything: NavInput = {
+    ...bare,
+    repo: { has_simulation: true, has_reactions: true, has_layout: true, has_equipment_estimate: true, has_lca: true, has_tea: true, has_control: true, has_issues: true },
+    sheets,
+    paths: new Set(["process/design-basis.yaml", "equipment/equipment-list.yaml", "safety/risk-matrix.yaml", "README.md"]),
+    hasDatasheets: true,
+    hasInterlocks: true,
+    hasReviews: true,
+  };
+
+  it("names every group with its title and an intro, in the navigation's order", () => {
+    const groups = navGroups(everything);
+    expect(groups.map((g) => g.id)).toEqual(Object.keys(SECTIONS));
+    for (const g of groups) {
+      expect(g.title).toBe(SECTIONS[g.id as keyof typeof SECTIONS].title);
+      expect(g.intro.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("finds a section by id, none for an unknown one", () => {
+    expect(section("pid")).toEqual({ id: "pid", title: "P&IDs", intro: SECTIONS.pid.intro });
+    expect(section("nope")).toBeUndefined();
+    expect(section("toString")).toBeUndefined();
+  });
+
+  it("tells the drawn sheets from the pages and documents", () => {
+    const items = navGroups(everything).flatMap((g) => g.items);
+    expect(items.filter(isDrawing).map((i) => i.file)).toEqual(["process/BFD.xml", "process/PFD.xml", "pid/P-01.xml"]);
   });
 });

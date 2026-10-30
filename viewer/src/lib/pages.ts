@@ -30,7 +30,58 @@ export interface NavItem {
 export interface NavGroup {
   id: string;
   title: string;
+  /** What the section holds, in a sentence or two (its page, `/section/<id>`). */
+  intro: string;
   items: NavItem[];
+}
+
+/** The sections of the navigation, in order: title and intro (also for the router's document titles). */
+export const SECTIONS = {
+  process: {
+    title: "Process",
+    intro:
+      "How the plant works as a process: the block and process flow diagrams, the stream table with its balances, and the design basis and narrative behind them.",
+  },
+  pid: {
+    title: "P&IDs",
+    intro: "The piping and instrumentation diagrams: every line, valve, instrument and piece of equipment, sheet by sheet.",
+  },
+  equipment: {
+    title: "Equipment and lists",
+    intro: "The equipment datasheets and the engineering lists: equipment, lines, instruments, electrical loads and cables.",
+  },
+  safety: {
+    title: "Control and safety",
+    intro: "How the plant is controlled and protected: control loops and sequences, interlocks, the risk matrix, HAZOP studies and relief.",
+  },
+  layout: {
+    title: "Layout",
+    intro: "Where everything stands: the 3D plant model and the lifting study.",
+  },
+  cost: {
+    title: "Cost and impact",
+    intro: "What the plant costs and what it emits: material take-off, cost estimates, techno-economics and the life cycle assessment.",
+  },
+  quality: {
+    title: "Quality",
+    intro: "How far the design can be trusted: checks, validation findings, calculation maturity, reviews and open issues.",
+  },
+  project: {
+    title: "Project",
+    intro: "The project around the plant: its README, design notes, stages, progress and history.",
+  },
+} as const satisfies Record<string, { title: string; intro: string }>;
+
+export type SectionId = keyof typeof SECTIONS;
+
+/** The section `id` names, or undefined for an id that is none. */
+export function section(id: string): { id: SectionId; title: string; intro: string } | undefined {
+  return Object.hasOwn(SECTIONS, id) ? { id: id as SectionId, ...SECTIONS[id as SectionId] } : undefined;
+}
+
+/** Whether the item is a drawn sheet (BFD, PFD, P&ID): its card shows a thumbnail of the drawing. */
+export function isDrawing(item: NavItem): item is NavItem & { file: string } {
+  return item.to.name === "pid" && item.file !== undefined && item.badge !== undefined;
 }
 
 /** What the navigation needs to know about the plant. */
@@ -138,7 +189,7 @@ export function navGroups(input: NavInput): NavGroup[] {
   const groups: NavGroup[] = [
     {
       id: "process",
-      title: "Process",
+      ...SECTIONS.process,
       items: [
         ...process.map(sheetItem),
         page("streams", "Stream table", "Stream values, provenance and balances (process/flowsheet.yaml)"),
@@ -147,10 +198,10 @@ export function navGroups(input: NavInput): NavGroup[] {
         ...documents("process", paths),
       ],
     },
-    { id: "pid", title: "P&IDs", items: pids.map(sheetItem) },
+    { id: "pid", ...SECTIONS.pid, items: pids.map(sheetItem) },
     {
       id: "equipment",
-      title: "Equipment and lists",
+      ...SECTIONS.equipment,
       items: [
         ...(input.hasDatasheets ? [page("datasheets", "Datasheets", "Equipment datasheets (equipment/datasheets/)")] : []),
         ...documents("equipment", paths),
@@ -158,7 +209,7 @@ export function navGroups(input: NavInput): NavGroup[] {
     },
     {
       id: "safety",
-      title: "Control and safety",
+      ...SECTIONS.safety,
       items: [
         ...(repo?.has_control ? [page("control", "Control", "Control loops, sequences, narrative and control philosophy (cheme control report)")] : []),
         ...(input.hasInterlocks ? [page("cause-effect", "Cause & effect", "Cause and effect matrix of the interlocks (control/cause-effect.yaml)")] : []),
@@ -167,12 +218,12 @@ export function navGroups(input: NavInput): NavGroup[] {
     },
     {
       id: "layout",
-      title: "Layout",
+      ...SECTIONS.layout,
       items: [...(repo?.has_layout ? [page("layout", "Layout 3D", "The 3D plant model (layout/)")] : []), ...documents("layout", paths)],
     },
     {
       id: "cost",
-      title: "Cost and impact",
+      ...SECTIONS.cost,
       items: [
         ...(repo?.has_layout || repo?.has_equipment_estimate
           ? [page("mto", "MTO and estimate", repo?.has_layout ? "Material take-off and estimate of the 3D model, equipment estimate" : "Equipment estimate (cheme assess equipment)")]
@@ -187,7 +238,7 @@ export function navGroups(input: NavInput): NavGroup[] {
     },
     {
       id: "quality",
-      title: "Quality",
+      ...SECTIONS.quality,
       items: [
         page("checks", "Checks", "Engineering-step checks of the current stage (checks/checks.yaml)"),
         page("validate", "Validation", "Schema and consistency findings of the working tree (cheme validate)"),
@@ -198,7 +249,7 @@ export function navGroups(input: NavInput): NavGroup[] {
     },
     {
       id: "project",
-      title: "Project",
+      ...SECTIONS.project,
       items: [
         ...documents("project", paths),
         ...(input.snapshot ? [] : [page("history", "History", "Commits of the plant")]),

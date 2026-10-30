@@ -54,7 +54,11 @@ const pages = computed(() =>
       </dl>
 
       <template v-for="group in groups" :key="group.id">
-        <h2>{{ group.id === "pid" ? "P&ID sheets" : group.title }}</h2>
+        <h2 class="sheet-group">
+          <RouterLink class="section-link" :to="{ name: 'section', params: { id: group.id }, query: withRev() }">{{
+            group.id === "pid" ? "P&ID sheets" : group.title
+          }}</RouterLink>
+        </h2>
         <div class="cards">
           <template v-for="s in group.sheets" :key="s.id">
             <!-- A planned sheet is listed in plant.yaml but not drawn yet: there is nothing to open. -->
@@ -81,7 +85,7 @@ const pages = computed(() =>
       <h2>Pages and documents</h2>
       <div class="page-groups" data-testid="home-pages">
         <section v-for="g in pages" :key="g.id" :data-group="g.id">
-          <h3>{{ g.title }}</h3>
+          <h3><RouterLink class="section-link" :to="{ name: 'section', params: { id: g.id }, query: withRev() }">{{ g.title }}</RouterLink></h3>
           <ul>
             <li v-for="item in g.items" :key="item.key">
               <RouterLink :to="{ ...item.to, query: withRev(item.to.query) }" :title="item.title">{{ item.label }}</RouterLink>
@@ -188,6 +192,20 @@ h2 {
   font-size: var(--text-sm);
   color: var(--fg-muted);
   margin: 0 0 var(--space-1);
+}
+/* a heading that opens its section page (`/section/<id>`): the heading's colour, a chevron as the cue */
+.section-link {
+  color: inherit;
+}
+.section-link::after {
+  content: "\203A" / ""; /* decorative: not part of the link's name */
+  margin-left: 0.35em;
+  color: var(--fg-muted);
+}
+.section-link:hover,
+.section-link:hover::after {
+  color: var(--accent);
+  text-decoration: none;
 }
 .page-groups ul {
   list-style: none;

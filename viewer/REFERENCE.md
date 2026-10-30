@@ -22,6 +22,7 @@ Status: in use; against a server (`cheme serve`) or on a static snapshot (below)
 | Route | Shows |
 | --- | --- |
 | `/` | Plant name, branch, the declared project phase and the verified (evidence-based) maturity (see `/maturity`), sheets. A sign-off strip, one chip per stage: who signed it off and when, the short commit (opening the plant there), its branch, the review record it names (and its reviewer kind when not human), and "not on main" when the signed-off commit is not on the default branch (the sign-off has not taken effect). From `GET /api/status` for the working tree (loaded once per session: it validates the plant, seconds on a large one), else from `checks/status.json` at the revision (the default branch then unknown) |
+| `/section/<id>` | A section of the page navigation (`process`, `pid`, `equipment`, `safety`, `layout`, `cost`, `quality`, `project`): its title, a short intro of what it holds and its pages and documents as cards (label, sheet kind, title, what the page shows or the file), each drawn sheet (BFD, PFD, P&ID) with a thumbnail of its drawing (`GET /api/pid.svg`, loaded lazily); each card opens its page at the revision shown. A section the plant has nothing in, or an unknown id, says so and links back to the overview |
 | `/pid/<path>` | A P&ID as SVG: drag to pan, wheel or pinch to zoom, `+` `-` `0` and arrow keys, Fit and 1:1. Clicking an object shows its id and labels; from the keyboard, `N` steps to the next object and `P` (or `Shift+N`) to the previous one (centred, marked and announced to screen readers), `Enter` or `Space` shows the marked object's details and `Escape` clears the selection. Ctrl/Cmd/Alt shortcuts pass through to the browser. `?select=` picks and centres an object by its id, or by a printed tag (`?select=LIA-4107`: the object whose own label reads it) |
 | `/diff/<path>?old=&new=` | Two revisions side by side or overlaid, with synced pan/zoom. Added items are green, removed red, modified orange. Includes the change table (click a row, or `Enter` on it, to centre the object) and the pyDEXPI projection diff. The panes pick objects from the keyboard as on `/pid`. If `new` is missing, the working tree is used |
 | `/yaml/<path>?filter=` | Equipment, line, instrument and check lists as tables, with columns from the JSON Schema (`filter` sets the row filter it opens with). Any other YAML mapping (the design basis, a risk matrix, a HAZOP study) as a document: its values as a key-value list, lists of objects as tables (nested values as `key: value` text), lists of values as bullets and nested mappings as sections (deeper ones as a tree); "Tree" shows the whole file as a tree |
@@ -52,10 +53,14 @@ risk matrix, HAZOP studies and session, relief study; Layout: 3D, lifting study;
 impact: MTO and estimate, cost estimate, equipment cost, TEA, LCA; Quality: checks, validation,
 maturity, reviews, issues; Project: README, design notes, stages, progress, history, the reaction
 library). A page is listed when the plant has something for it to show, a document when its
-file (at the template's path) is in the working tree. Below, "Files" is the raw repository tree
-with its filter, for experts: folded by default, it opens by itself when a page shows a file the
-navigation does not list (and keeps the choice made with its toggle in the browser). The home
-page lists the same groups. On phones the sidebar is a drawer behind the menu button.
+file (at the template's path) is in the working tree. Each group's heading (marked with a
+chevron) opens its section page (`/section/<id>`), an overview of the group's pages and
+documents as cards, the sheets with a thumbnail of the drawing. Below, "Files" is the raw
+repository tree with its filter, for experts: folded by default, it opens by itself when a page
+shows a file the navigation does not list (and keeps the choice made with its toggle in the
+browser). The home page lists the same groups, each heading linking to its section page, as do
+its sheet headings ("Process", "P&ID sheets"). On phones the sidebar is a drawer behind the menu
+button.
 
 Long pages (Control, MTO, LCA, TEA, Maturity, Reviews) have a section bar under the title
 (`src/components/SectionBar.vue`): a link to each section, kept in view while the page scrolls,

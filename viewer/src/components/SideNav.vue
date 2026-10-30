@@ -18,6 +18,8 @@ const current = computed(() => ({
   path: paramPath(route.params.path),
   tab: typeof route.query.tab === "string" ? route.query.tab : null,
 }));
+// a group's heading opens its section page (`/section/<id>`)
+const sectionShown = (id: string) => route.name === "section" && route.params.id === id;
 </script>
 
 <template>
@@ -27,7 +29,15 @@ const current = computed(() => ({
         <span class="label">Overview</span>
       </RouterLink>
       <section v-for="group in groups" :key="group.id" :data-group="group.id">
-        <h2>{{ group.title }}</h2>
+        <h2>
+          <RouterLink
+            class="heading"
+            :class="{ active: sectionShown(group.id) }"
+            :aria-current="sectionShown(group.id) ? 'page' : undefined"
+            :to="{ name: 'section', params: { id: group.id }, query: withRev() }"
+            >{{ group.title }}</RouterLink
+          >
+        </h2>
         <ul class="list">
           <li v-for="item in group.items" :key="item.key">
             <RouterLink
@@ -59,6 +69,29 @@ h2 {
   letter-spacing: 0.06em;
   color: var(--fg-muted);
   margin: var(--space-3) var(--space-3) var(--space-1);
+}
+h2 .heading {
+  display: block;
+  /* padded so the current page's background does not touch the text, pulled back to stay aligned */
+  padding: 1px 4px;
+  margin: 0 -4px;
+  color: inherit;
+  border-radius: 3px;
+}
+/* a cue that the heading opens a page, also without hover (phones); in CSS so the text stays the title */
+h2 .heading::after {
+  content: "\203A" / ""; /* decorative: not part of the link's name */
+  margin-left: 0.4em;
+  font-size: 13px;
+  line-height: 1;
+}
+h2 .heading:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+h2 .heading.active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .list {
   list-style: none;
