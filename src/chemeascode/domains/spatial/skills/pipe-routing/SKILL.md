@@ -26,8 +26,8 @@ review.
 - `piping/routing.yaml` (`cheme schema routing`), optional. Without it the defaults apply,
   each ASSUMED: `local_max_m` 15, `local_elevation_m` 3.5 (bottom of pipe), `grade_max_m` 3,
   `rack_detour_factor` 2.5, `spacing_m` 0.1, `headroom_road_m` 6,
-  `headroom_walkway_m` 2.2, `road_cover_m` 1.2 (buried lines under roads), `grid_m` 0.5. How far an end may be from a rack to use it is
-  `rack_reach` in `layout/site-plan.yaml` (default: `max_unsupported_length`, 30 m), the same
+  `headroom_walkway_m` 2.2, `road_cover_m` 1.2 (buried lines under roads), `grid_m` 0.5. How
+  far an end may be from a rack to use it is `rack_reach` in `layout/site-plan.yaml` (default: `max_unsupported_length`, 30 m), the same
   value `cheme validate` checks line routes with; do not set `rack_reach_m` here (deprecated).
 - Where the utilities come from (cooling water plant, nitrogen header, flare) is design
   information: ask, or record an assumption in `DESIGN.md`, before declaring battery limits.
@@ -100,8 +100,8 @@ review.
    lines over a road below the headroom, too many bends, dead legs, a lane jumping across the
    rack. `cheme serve` (Layout 3D) shows the same in 3D with the findings.
 6. **Fix clashes** (`cheme.layout-clash-pipe`, `-clash-pipe-equipment`, `-clash-pipe-steel`,
-   `-headroom`, `-buried-cover`, `-access-blocked`, `-zone-crossing`): each finding names both objects and a
-   `box`. Prefer, in this order: move the item or turn the nozzle (skill `layout-yaml`), give a
+   `-headroom`, `-buried-cover`, `-access-blocked`, `-zone-crossing`): each finding names both
+   objects and a `box`. Prefer, in this order: move the item or turn the nozzle (skill `layout-yaml`), give a
    tier rule, add a via, change the pipe-way elevation. Rebuild after each step. A clash that is
    real but intended (a line resting on its own support steel) is accepted in the `layout-3d`
    gate with a reason, never silently left.
@@ -201,8 +201,7 @@ review.
   `connector ...: line ... is not in the line list` (add the line).
 - The `layout-3d` gate (`cheme check --stage basic`) fails while a process line of DN 25
   and above is neither routed nor skipped, or a clash, headroom or buried-cover finding is not
-  accepted; the
-  `layout-detail` gate requires every line, utilities included. A gate's `rules:` may add the
+  accepted; the `layout-detail` gate requires every line, utilities included. A gate's `rules:` may add the
   engineering rules (`cheme.layout-tier`, `-wall-penetration`, `-vent-outlet`, ...); a
   finding left as it is gets an acceptance with its reason.
 

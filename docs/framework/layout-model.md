@@ -650,8 +650,11 @@ grade, an item on its plinth; a footing or pit below grade still clashes), is no
 cover is checked instead: `-buried-cover` (warning) where the soil over its top is less than
 its `cover_m`, or under a road less than `max(cover_m, road_cover_m)`; `road_cover_m` is a
 routing rule, 1.2 m ASSUMED (secondary sources cite 1.2 m (4 ft) under the road surface for
-uncased pipeline crossings after API RP 1102; not verified against the standard: the site's or
-road authority's rule replaces it). The worst point is reported per pipe and road (key
+uncased pipeline crossings after API RP 1102, e.g. the
+[Technical Toolboxes API 1102 highway crossing help](https://help.technicaltoolboxes.com/?p=1956):
+"4ft <= H <= 10 ft for highways (API 1102)"; not verified against the standard: the site's or
+road authority's rule replaces it). `buried` is set per line or segment; `buried: false` is no
+declaration and does not take one segment out of its line's `buried`. The worst point is reported per pipe and road (key
 `<pipe>+<road>`) and off the roads (key `<pipe>`), with the cover as `measured`; vertical runs
 (risers through grade) are left out. Its runs above grade, and a run of it at or above grade
 over a road, have every rule of a pipe above grade. The gates' `clashes` requirement counts

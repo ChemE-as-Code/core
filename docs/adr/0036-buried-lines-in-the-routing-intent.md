@@ -40,8 +40,9 @@ of the headroom rule (it hides what the crossing needs); a declaration on the li
   are left out. The finding names the model file, the pipe and road ids, a `box` and the cover
   as `measured`, with a hint pointing at `piping/routing.yaml`.
 - New routing rule `rules.road_cover_m`, default 1.2 m. The value is ASSUMED. Secondary sources
-  cite 1.2 m (4 ft) under the road surface for uncased pipeline crossings after API RP 1102. It
-  was not checked against the standard, and the site's or road authority's value replaces it.
+  cite 1.2 m (4 ft) under the road surface for uncased pipeline crossings after API RP 1102
+  (e.g. <https://help.technicaltoolboxes.com/?p=1956>: "4ft <= H <= 10 ft for highways (API
+  1102)"). It was not checked against the standard, and the site's or road authority's value replaces it.
 - The `clashes` requirement of the `layout-model` gates counts `cheme.layout-buried-cover` by
   default, with the clashes and `cheme.layout-headroom`. Declaring a line buried therefore does
   not take its road crossings out of the gate.

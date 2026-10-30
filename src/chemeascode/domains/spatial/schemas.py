@@ -1308,7 +1308,8 @@ class LineRouting(LayoutModel):
     buried: Annotated[Buried | None, BeforeValidator(_buried)] = Field(
         default=None,
         description="Laid in the ground (`true` or `{cover_m: 1.2, basis: ...}`): its runs "
-        "below grade are buried (see Buried).",
+        "below grade are buried (see Buried). `false` is no declaration: a segment entry "
+        "with it still takes its line entry's `buried`.",
     )
     notes: str = ""
 
