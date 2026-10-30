@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{#- A bar above every page: this is the technical documentation, and the way back to the
+    ChemE-as-Code sites for readers who wanted those (config.extra.home_url, atlas_url; mkdocs.yml).
+    The same template is viewer/docs/overrides/main.html; keep the two in step. -#}
+{% block announce %}
+<div class="cac-docs-bar" data-testid="docs-bar">
+  <span class="cac-docs-label">Technical documentation</span>
+  <span class="cac-docs-for">for engineers and developers who use or extend the <code>cheme</code> toolkit.</span>
+  <span class="cac-docs-links">
+    New here? <a href="{{ config.extra.home_url }}/toolkit/">What ChemE-as-Code does</a>
+    <span aria-hidden="true">·</span> <a href="{{ config.extra.home_url }}/">ChemE-as-Code home</a>
+    <span aria-hidden="true">·</span> <a href="{{ config.extra.atlas_url }}/">Process Atlas</a>
+  </span>
+</div>
+{% endblock %}
