@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 (2026-10-30)
+
+Minor release: a motor's `cable_entry` ends its tray beside the machine, so crane lanes over
+machines stay clear (#73, ADR 0035). No breaking change.
 
 ### Added
 
