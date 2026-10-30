@@ -86,6 +86,7 @@ The paper is in preparation (working title). Until it appears, please cite:
   author = {Schweidtmann, Artur M.},
   title  = {{ChemE-as-Code}: An Open-Source Platform for {AI}-Accelerated Chemical Process Engineering},
   url    = {https://cheme-as-code.org},
+  year   = {2026},
   note   = {in preparation}
 }
 ```
