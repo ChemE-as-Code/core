@@ -608,8 +608,17 @@ battery limit, from the first `battery_limits` rule matching the line (`{id?, li
 CWR-*], fluids?, point: [x, y, z]}` or `{..., rack: PR1, rack_end: start|end|nearest}`), else the
 `from_area`/`to_area` edge, else the free rack end nearest the other end (the line stops at the
 end of its lane), else the nearest site edge at the road headroom; a placed tag: its nozzle on
-that line; another line: its nearest point. On the ASU (218 segments, 124 chains) routing takes
-about 3 s and a build about 6 s.
+that line; another line: its nearest point. A line whose both ends are battery limits (a
+header from a battery limit to a battery limit, or to a dead end named by text such as "CW
+users") is placed as a whole: the first matching `battery_limits` rule places one end, a second
+matching rule the other; an end no rule places is the end of a rack away from the other end
+(the rack of the line's `rack` intent, else of the rule, else the rack nearest the rule's point
+or the line's branches, else the longest). The rack ends lie on the line's tier (its `tier`
+intent or `tiers` rule) or at its `elevation` intent; the line runs the way its tees come, so
+its branches tee off in their order, and is routed (with its branches) as any other. Without a
+rack and two points it stays unrouted with the reason `battery limits at both ends (...): ...`;
+its `from_area`/`to_area` and the site edge are not used for it. On the ASU (218 segments, 124
+chains) routing takes about 3 s and a build about 6 s.
 
 ## Rules on the model (C4)
 

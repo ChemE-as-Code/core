@@ -50,7 +50,13 @@ review.
    - `battery_limits`: where lines that leave the plot end (`BL`, `CW`, `CWR`, ... ends in the
      line list): `{id, lines: [CW-*, CWR-*], point: [x, y, z]}` or `{id, fluids: [Steam], rack:
      PR1, rack_end: start | end | nearest}`. Without a rule: the line's `from_area`/`to_area`,
-     else the free end of the nearest rack, else the site edge;
+     else the free end of the nearest rack, else the site edge. A line with battery limits at
+     both ends (a header from the battery limit to "CW users", a utility main through the
+     plant) runs along a rack from one end to the other with its tees where its branches leave:
+     the rack of its `rack` intent (else of the rule, else the nearest to its branches), on its
+     tier or at its `elevation` intent. One matching rule places one end; a second matching
+     rule (a `point`) places the other, e.g. the dead end of a header just past its last tee.
+     Do not pin such a header by hand: give it intent and pin it only after reviewing it;
    - `local_elevation_m` (the pipe-way of an area), `local_max_m` (longer goes to the rack),
      `grade_max_m`, `spacing_m`, headroom, `gravity_fluids`;
    - `vent_rise_m` (default 1 m): how far an open vent or relief end rises above its stub;
@@ -198,6 +204,9 @@ review.
 - Unrouted reasons and what to do: `<tag> is not placed` (place it, or skip the line with the
   reason); `both ends are open` (a vent between two open ends: check the P&ID); `it starts or
   ends at <tee/line>, which no route reaches` (route the run first, or fix the topology);
+  `battery limits at both ends (...): ...` (no rack to run along, a rack intent that is no
+  rack, or both ends at one point: give the line a rack, a `battery_limits` rule for each end
+  or a pinned route, as the reason says);
   `connector ...: line ... is not in the line list` (add the line).
 - The `layout-3d` gate (`cheme check --stage basic`) fails while a process line of DN 25
   and above is neither routed nor skipped, or a clash, headroom or buried-cover finding is not
