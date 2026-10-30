@@ -1,4 +1,4 @@
-# 0036. Several power trays per rack, by voltage class and fill
+# 0037. Several power trays per rack, by voltage class and fill
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

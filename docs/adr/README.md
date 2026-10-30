@@ -83,4 +83,5 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0033](0033-worker-iterates-tear-streams.md) | The DWSIM worker iterates the tear streams itself | Accepted | 2026-10-29 |
 | [0034](0034-serve-library-mode.md) | `cheme serve` serves a folder of plants, each under its own prefix | Accepted | 2026-10-30 |
 | [0035](0035-motor-cable-entry-beside-the-machine.md) | A motor's cable entry ends its tray beside the machine | Accepted | 2026-10-30 |
-| [0036](0036-several-power-trays-per-rack.md) | Several power trays per rack, by voltage class and fill | Accepted | 2026-10-30 |
+| [0036](0036-buried-lines-in-the-routing-intent.md) | Buried lines in the routing intent, with a cover rule instead of headroom | Accepted | 2026-10-30 |
+| [0037](0037-several-power-trays-per-rack.md) | Several power trays per rack, by voltage class and fill | Accepted | 2026-10-30 |

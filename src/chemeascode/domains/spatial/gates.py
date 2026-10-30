@@ -16,8 +16,8 @@ committed model ``layout/plant-model.yaml`` and the findings of ``cheme validate
   stands on another item;
 - ``routed``: every line of the line list at or above ``min_dn`` (and not excluded by number
   pattern or fluid) is routed or skipped with a reason;
-- ``clashes``: no model finding of ``rules`` (default: clashes and headroom) at warning or
-  above is left unaccepted;
+- ``clashes``: no model finding of ``rules`` (default: clashes, headroom and the cover of
+  buried lines) at warning or above is left unaccepted;
 - ``zones``: ``layout/zones.yaml`` declares at least one zone, and no
   ``layout-zone-source`` finding (a source the model cannot place) is left unaccepted;
 - ``drawings``: a review record of ``topic`` (default ``layout``) cites the plot plan and at
@@ -94,7 +94,7 @@ LIFT_RULES = (
 #: Model findings the ``hvac`` requirement fails on.
 HVAC_RULES = ("cheme.layout-hvac-capacity", "cheme.layout-duct-unrouted")
 #: Model findings a ``clashes`` requirement fails on when the gate names no ``rules``.
-CLASH_RULES = ("cheme.layout-clash-*", "cheme.layout-headroom")
+CLASH_RULES = ("cheme.layout-clash-*", "cheme.layout-headroom", "cheme.layout-buried-cover")
 MODEL_STATE_RULES = (
     "cheme.layout-model-edited",
     "cheme.layout-model-outdated",

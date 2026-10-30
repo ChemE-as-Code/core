@@ -22,7 +22,7 @@ The files are edited as text at the spans the YAML parser reports, so comments a
 the file stay as they are (block or flow style), except comments inside a replaced value (a
 route entry, an item's ``access``); the edited text is written only when it is a valid file of
 its schema whose data is the old data with the pinned entry where it belongs (a replaced route
-entry keeps its ``gravity`` and ``notes``), and an id the structure already declares is
+entry keeps its ``gravity``, ``buried`` and ``notes``), and an id the structure already declares is
 refused. The next ``layout build`` takes the pinned
 objects as declared (``source: pinned`` for routes, ``declared`` for platforms).
 """
@@ -212,7 +212,7 @@ def _entry_of(data: dict[str, Any], section: str, ident: str) -> dict[str, Any]:
 
 #: Keys of a routing entry a pinned route keeps (the route replaces the others: rack, tier,
 #: via, elevation and skip only steer the router).
-ROUTE_KEEPS = ("gravity", "notes")
+ROUTE_KEEPS = ("gravity", "buried", "notes")
 
 
 def _route_edit(
