@@ -16,6 +16,7 @@ import { store, useIssues } from "@/store";
 import { newIssueUrl, objectTag } from "@/lib/issues";
 import ProcessPanel from "@/components/ProcessPanel.vue";
 import { KIND_BADGE, isProcessSheet } from "@/lib/process";
+import { drawingFileName, drawingPdf, saveBlob } from "@/lib/pdfExport";
 
 const route = useRoute();
 const { rev, withRev } = useRev();
@@ -75,6 +76,38 @@ const issueLink = computed(() => {
   return url ? { url, tag } : null;
 });
 const layoutLink = computed(() => (picked.value && store.repo?.has_layout ? { name: "layout", query: withRev({ select: picked.value.id }) } : null));
+/**
+ * "PDF" and "SVG": the drawing at the revision shown, as the API served it and cleaned (never the
+ * pane's DOM, so no selection or highlight), named `<plant>-<sheet>[-<rev>]`.
+ */
+const exporting = ref(false);
+const exportError = ref<string | null>(null);
+watch([path, rev], () => (exportError.value = null));
+function fileName(ext: "pdf" | "svg"): string {
+  const shown = rev.value ?? store.snapshot?.commit ?? null;
+  return drawingFileName({ plant: store.repo?.name || store.repo?.root_name, sheet: sheet.value?.id, path: path.value, rev: shown ? shortRev(shown) : null, ext });
+}
+async function downloadPdf(): Promise<void> {
+  const drawing = svg.data.value;
+  if (!drawing || exporting.value) return;
+  exporting.value = true;
+  exportError.value = null;
+  try {
+    const title = sheet.value ? `${sheet.value.id} ${sheet.value.title}`.trim() : path.value;
+    const plant = store.repo?.name || store.repo?.root_name || "";
+    const at = rev.value ? shortRev(rev.value) : store.snapshot?.commit ? shortRev(store.snapshot.commit) : "working tree";
+    const name = fileName("pdf");
+    saveBlob(await drawingPdf(drawing.element, { title, subject: `${plant ? `${plant}, ` : ""}${path.value} at ${at}` }), name);
+  } catch (error) {
+    exportError.value = `Cannot make the PDF: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    exporting.value = false;
+  }
+}
+function downloadSvg(): void {
+  const drawing = svg.data.value;
+  if (drawing) saveBlob(new Blob([drawing.markup], { type: "image/svg+xml" }), fileName("svg"));
+}
 const diffQuery = computed(() => (rev.value ? { old: rev.value, rev: rev.value } : { old: "HEAD" }));
 </script>
 
@@ -91,6 +124,29 @@ const diffQuery = computed(() => (rev.value ? { old: rev.value, rev: rev.value }
         <RouterLink v-if="layoutLink" class="btn" :to="layoutLink" title="Show the selected object in the 3D layout" data-action="show-3d">Show in 3D</RouterLink>
         <RouterLink v-if="isProcess" class="btn" :to="{ name: 'streams', query: withRev() }">Stream table</RouterLink>
         <RouterLink class="btn" :to="{ name: 'file', params: { path: pathSegments(path) }, query: withRev() }">XML</RouterLink>
+        <button
+          type="button"
+          class="btn"
+          data-action="download-pdf"
+          :disabled="!svg.data.value || exporting"
+          :aria-busy="exporting"
+          :aria-label="exporting ? 'Making the PDF of this drawing' : 'Download this drawing as PDF'"
+          title="Download this drawing as a vector PDF (ISO A sheet)"
+          @click="downloadPdf"
+        >
+          {{ exporting ? "PDF…" : "PDF" }}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          data-action="download-svg"
+          :disabled="!svg.data.value"
+          aria-label="Download this drawing as SVG"
+          title="Download this drawing as SVG"
+          @click="downloadSvg"
+        >
+          SVG
+        </button>
         <RouterLink v-if="!store.snapshot" class="btn" :to="{ name: 'history', query: withRev({ path }) }">History</RouterLink>
         <RouterLink
           v-if="!store.snapshot"
@@ -104,6 +160,10 @@ const diffQuery = computed(() => (rev.value ? { old: rev.value, rev: rev.value }
     </div>
     <div class="body">
       <LoadState class="state" :loading="svg.loading.value && !svg.data.value" :error="svg.error.value" @retry="svg.reload" />
+      <div v-if="exportError" class="notice error state" role="alert" data-testid="export-error">
+        {{ exportError }}
+        <button type="button" class="btn" aria-label="Dismiss" @click="exportError = null">Dismiss</button>
+      </div>
       <SvgPane
         ref="pane"
         class="canvas"
@@ -157,6 +217,7 @@ h1 small {
 }
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   margin-left: auto;
 }
