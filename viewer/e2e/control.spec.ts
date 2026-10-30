@@ -9,7 +9,7 @@ test.describe("control records", () => {
   test("files with their review status, the loop summary, the sequences and the findings", async ({ page }) => {
     await mockApi(page, { control: controlSeparation });
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control" }).click();
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control", exact: true }).click();
     await expect(page).toHaveURL(/\/control/);
 
     const files = page.getByRole("region", { name: "Files" });
@@ -49,7 +49,7 @@ test.describe("control records", () => {
   test("a plant without control records shows no link, and the page says so", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
-    await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control" })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control", exact: true })).toHaveCount(0);
     await page.goto("/control");
     await expect(page.locator("[data-control-missing]")).toContainText("No control records");
   });

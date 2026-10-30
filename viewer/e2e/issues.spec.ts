@@ -103,7 +103,7 @@ test.describe("issues", () => {
     await expect(link).toHaveText("New issue about T-101");
     await expect(link).toHaveAttribute("href", /refs=P-01%20T-101$/);
 
-    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control" }).click();
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Control", exact: true }).click();
     const loop = page.locator('tr[data-loop="PIC-104"] [data-action="new-issue"]');
     await expect(loop).toHaveText("New issue about PIC-104");
     await expect(loop).toHaveAttribute("href", `${issuesSeparation.new.action}&refs=control%2Floops.yaml%20PIC-104`);

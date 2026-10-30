@@ -20,6 +20,8 @@ export interface Store {
   hasDatasheets: boolean;
   /** The file paths of the working tree (the same `/api/tree`), null until loaded: the navigation lists the documents in it. */
   paths: Set<string> | null;
+  /** The `/api/tree` request has answered or failed: until then, a page cannot tell an empty section from one still loading. */
+  treeSettled: boolean;
   /** Set when the viewer shows a static snapshot (`?data=`) instead of a server. */
   snapshot: SnapshotInfo | null;
   /** Why the snapshot asked for with `?data=` could not be opened. */
@@ -49,6 +51,7 @@ export const store = reactive<Store>({
   hasInterlocks: false,
   hasDatasheets: false,
   paths: null,
+  treeSettled: false,
   snapshot: null,
   snapshotError: null,
   embed: false,
@@ -246,6 +249,9 @@ export async function loadRepo(): Promise<void> {
         store.hasInterlocks = false;
         store.hasDatasheets = Boolean(repo.has_datasheets);
         store.paths = null;
+      })
+      .finally(() => {
+        store.treeSettled = true;
       });
   } catch (e) {
     store.error = e instanceof Error ? e.message : String(e);
