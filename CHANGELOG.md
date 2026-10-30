@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 (2026-10-30)
+
+Patch release: a branch starts exactly at its tee on a battery-limit header (#95). No breaking change.
 
 ### Fixed
 
