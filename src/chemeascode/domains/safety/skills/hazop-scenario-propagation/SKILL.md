@@ -123,6 +123,25 @@ path) and skip it for a small node. Read its output as candidates, never as rows
   or at a seal come from its own responses in the library, not from the walk.
 Say in a scenario's `notes:` when the walk found it.
 
+**Coverage after drafting.** Once the node's rows are written (by hand, steps 1 to 5), `cheme
+safety hazop propagate H-01 --node N1 --coverage` (or the whole study without `--node`)
+compares them with the walk by tag: a top event is covered when a scenario of that deviation
+names the cause and the object the walk ends at in its `refs`. It lists each top event that is
+not (`no scenario`, or `cause only` where a row has the cause but another consequence), with
+the nodes the path crosses, and the scenarios no walk reaches (outside the library: seals,
+maintenance, operators; expected, not a fault). It exits 1 while a gap is open. Close each gap
+one of two ways, never by adding rows only to silence it:
+- a scenario (steps 4 and 5), its `refs` naming the cause and where the walk ends; or
+- a dismissal under the node, with the reason, as a proposal:
+  ```yaml
+  dismissed:
+    - {guide_word: more, parameter: pressure, top_event: overpressure, at: E-301,
+       causes: [MOV-411A], reason: "covered by S19 for the pump train", status: proposed, by: agent}
+  ```
+  `causes` left out dismisses the top event for every cause. Good reasons: a train covered by
+  one representative row, a library response the team does not accept, a consequence analysed
+  in the node it lies in. Never dismiss what you have not traced.
+
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and
 `notes`, keeping its id; a different cause or outcome is a new scenario with a new id.
 

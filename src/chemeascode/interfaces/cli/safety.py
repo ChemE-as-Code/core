@@ -228,6 +228,15 @@ def propagate(
     paths: Annotated[
         bool, typer.Option("--paths", help="Print each path with its candidate safeguards.")
     ] = False,
+    coverage: Annotated[
+        bool,
+        typer.Option(
+            "--coverage",
+            help="Compare the node's (or every node's) scenarios with the top events the walk "
+            "brings to it: those no scenario covers or dismisses, and the scenarios no walk "
+            "reaches. Exits 1 while a top event is neither covered nor dismissed.",
+        ),
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
@@ -239,6 +248,22 @@ def propagate(
     from chemeascode.project.hazop import node_propagation, study_propagation
 
     workspace = _workspace()
+    if coverage:
+        if deviation:
+            typer.echo("--coverage compares every deviation: drop --deviation", err=True)
+            raise typer.Exit(2)
+        try:
+            found_all = (
+                study_propagation(workspace, study, library)
+                if node is None
+                else [node_propagation(workspace, study, node, None, library)]
+            )
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(2) from failure
+        if _print_coverage(found_all, as_json):
+            raise typer.Exit(1)
+        return
     if node is None:
         if deviation:
             typer.echo("--deviation needs --node", err=True)
@@ -352,6 +377,73 @@ def propagate(
         typer.echo(f"question ({n} candidate(s)): {question}")
     for finding in found.findings:
         typer.echo(finding.format())
+
+
+def _print_coverage(found_all: list, as_json: bool) -> int:
+    """Each node's coverage; returns the number of gaps."""
+    gaps = sum(len(f.coverage.gaps) for f in found_all)
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "study": found_all[0].study if found_all else None,
+                    "library": found_all[0].library if found_all else None,
+                    "nodes": [
+                        {
+                            "node": f.node,
+                            "covered": f.coverage.covered,
+                            "dismissed": f.coverage.dismissed,
+                            "gaps": [
+                                {
+                                    "deviation": {
+                                        "guide_word": g.deviation.guide_word,
+                                        "parameter": g.deviation.parameter,
+                                    },
+                                    "top_event": g.top_event,
+                                    "at": g.at,
+                                    "fluid": g.fluid,
+                                    "crosses": g.crosses,
+                                    "uncovered": g.uncovered,
+                                    "cause_only": g.cause_only,
+                                }
+                                for g in f.coverage.gaps
+                            ],
+                            "unreached": f.coverage.unreached,
+                        }
+                        for f in found_all
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return gaps
+    covered = sum(f.coverage.covered for f in found_all)
+    dismissed = sum(f.coverage.dismissed for f in found_all)
+    unreached = sum(len(f.coverage.unreached) for f in found_all)
+    if found_all:
+        typer.echo(
+            f"{found_all[0].study} coverage over {len(found_all)} node(s): {gaps} top event(s) "
+            f"no scenario covers, {covered} cause and top event pair(s) covered, {dismissed} "
+            f"dismissed; {unreached} scenario(s) no walk reaches (proposals: add a scenario or "
+            "dismiss each gap with its reason under the node's dismissed:)"
+        )
+    for f in found_all:
+        for g in f.coverage.gaps:
+            line = (
+                f"{f.node}: {g.deviation.text()} -> {g.top_event} at {g.at}"
+                + (f" ({g.fluid})" if g.fluid else "")
+                + (f" [via {', '.join(g.crosses)}]" if g.crosses else "")
+            )
+            if g.uncovered:
+                line += f"; no scenario: {', '.join(g.uncovered)}"
+            if g.cause_only:
+                line += f"; cause only, another consequence: {', '.join(g.cause_only)}"
+            typer.echo(line)
+        if f.coverage.unreached:
+            typer.echo(
+                f"{f.node}: no walk reaches {', '.join(f.coverage.unreached)} (outside the library)"
+            )
+    return gaps
 
 
 def _print_consequences(found_all: list, as_json: bool) -> None:

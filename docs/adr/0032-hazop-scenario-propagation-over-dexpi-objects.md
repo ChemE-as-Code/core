@@ -59,6 +59,12 @@ Two forces shape how:
   `propagate STUDY` without `--node` groups every node's top events by consequence, so the team
   discusses a shared consequence once. A node never repeats another node's cause: a deviation
   entering from outside is that node's reference, not a new row.
+- **The walk checks the study; it does not seed it.** `propagate --coverage` compares each
+  node's scenarios with its top events by tag (the deviation, the cause and the object the walk
+  ends at named in the scenario's `refs`; no text is compared, ADR 0010) and lists what no
+  scenario covers, and the scenarios no walk reaches. A gap is closed by a scenario or by a
+  `dismissed:` entry on the node with its reason, a proposal like every other. Seeding rows from
+  the walk was set aside: it anchors the draft on the library and hides what the library lacks.
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 

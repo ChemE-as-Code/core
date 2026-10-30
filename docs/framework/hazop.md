@@ -26,6 +26,7 @@ study: scope, modes, analysed inputs, risk_matrix, assessment_basis, team
     deviations[]: id, guide_word, parameter, notes
       scenarios[]: id, cause, consequence, refs, modes, safeguards (ids), actions (ids), status
         risk.initial[] / risk.residual[]: category, severity, likelihood, basis, evidence, status, band
+    dismissed[]: guide_word, parameter, top_event, at, causes, reason, status (propagate --coverage)
   safeguards[]: id, title, kind, refs, interlock, status
   actions[]: id, text, owner, due, status, response
 ```
@@ -124,7 +125,9 @@ impact` adds `cheme.review-needed` for a changed analysed input and for stale ba
 
 ## Not covered
 
-Automated node selection, scenario propagation over the P&ID, frequency estimation, safeguard
-credit (LOPA), consequence modelling and LLM classification; a dedicated viewer page. None of
+Automated node selection, frequency estimation, safeguard credit (LOPA), consequence modelling
+and LLM classification; a dedicated viewer page. Scenario propagation over the P&ID exists as a
+read-only cross-check (`cheme safety hazop propagate`, ADR 0032): it never writes scenarios,
+`--coverage` reports the top events no scenario covers. None of
 them is needed for authoring, validation or reporting, and no database, external analysis
 package, LLM service or credential is.

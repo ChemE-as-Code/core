@@ -33,7 +33,14 @@ from chemeascode.domains.safety.hazop import (
     study_state,
     workspace_studies,
 )
-from chemeascode.domains.safety.propagation import Context, Deviation, Propagation, propagate
+from chemeascode.domains.safety.propagation import (
+    Context,
+    Coverage,
+    Deviation,
+    Propagation,
+    coverage,
+    propagate,
+)
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.workspace import Workspace
 
@@ -202,6 +209,8 @@ class NodePropagation:
     deviation: Deviation | None
     result: Propagation
     findings: list[Finding]
+    #: The node's scenarios against its candidates (all deviations only).
+    coverage: Coverage | None = None
 
 
 def _deviation(node: Any, wanted: str) -> Deviation:
@@ -343,4 +352,5 @@ def _walk_node(inputs: _PropagationInputs, node: Any, wanted: Deviation | None) 
         wanted,
         result,
         findings,
+        None if wanted else coverage(node, result.candidates),
     )

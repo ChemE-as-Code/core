@@ -35,6 +35,7 @@ from chemeascode.domains.safety.schemas import (
     ClassEntry,
     FailureMode,
     FailureModeLibrary,
+    Node,
     PlantRef,
     Response,
 )
@@ -623,3 +624,75 @@ def propagate(
                             )
                         )
     return Propagation(candidates, uncovered, unresolved)
+
+
+# ---------------------------------------------------------------------------
+# Coverage: the node's scenarios against the walk
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Gap:
+    """A top event the walk brings to the node that no scenario of the node covers."""
+
+    deviation: Deviation
+    top_event: str
+    #: The object the walk ends at.
+    at: str
+    fluid: str | None
+    crosses: list[str]
+    #: Causes no scenario of this deviation names.
+    uncovered: list[str]
+    #: Causes a scenario of this deviation names, but none of those names where the walk ends.
+    cause_only: list[str]
+
+
+@dataclass
+class Coverage:
+    gaps: list[Gap]
+    #: Cause and top event pairs a scenario names, and those the node dismisses.
+    covered: int
+    dismissed: int
+    #: Scenarios no walk reaches with their deviation from a cause they name: outside the library.
+    unreached: list[str]
+
+
+def coverage(node: Node, candidates: list[Candidate]) -> Coverage:
+    """Compare the node's scenarios with its candidates by tag: a scenario covers a top event
+    when it has the deviation and its ``refs`` name the cause and the object the walk ends at.
+    A ``dismissed`` entry of the node takes a top event out, with its reason."""
+    rows = [
+        ((d.guide_word, d.parameter), {str(r.tag or r.object) for r in s.refs}, s.id)
+        for d in node.deviations
+        for s in d.scenarios
+    ]
+    gaps: dict[tuple[Deviation, str | None, str], Gap] = {}
+    covered = dismissed = 0
+    reached: set[str] = set()
+    for c in candidates:
+        deviation = (c.deviation.guide_word, c.deviation.parameter)
+        naming = [(refs, sid) for dev, refs, sid in rows if dev == deviation and c.cause in refs]
+        reached.update(sid for _, sid in naming)
+        if c.end != "top-event":
+            continue
+        at = c.path[-1].label
+        if any(
+            (x.guide_word, x.parameter, x.top_event, x.at) == (*deviation, c.top_event, at)
+            and (not x.causes or c.cause in x.causes)
+            for x in node.dismissed
+        ):
+            dismissed += 1
+            continue
+        if any(at in refs for refs, _ in naming):
+            covered += 1
+            continue
+        gap = gaps.setdefault(
+            (c.deviation, c.top_event, at),
+            Gap(c.deviation, str(c.top_event), at, c.fluid, [], [], []),
+        )
+        causes = gap.cause_only if naming else gap.uncovered
+        if c.cause not in causes:
+            causes.append(c.cause)
+        gap.crosses.extend(n for n, _ in c.crosses if n not in gap.crosses)
+    unreached = [sid for _, _, sid in rows if sid not in reached]
+    return Coverage(list(gaps.values()), covered, dismissed, unreached)

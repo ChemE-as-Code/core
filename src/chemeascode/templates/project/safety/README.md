@@ -46,6 +46,8 @@ nodes:
                 - {category: people, severity: "3", likelihood: C, basis: ..., status: accepted}
               residual:          # with them, as the team judges it; never derived by a tool
                 - {category: people, severity: "3", likelihood: A, basis: ..., status: accepted}
+    dismissed:                   # top events of propagate --coverage that need no scenario here
+      - {guide_word: more, parameter: pressure, top_event: overpressure, at: E-301, causes: [FV-104], reason: ...}
 safeguards:
   - {id: SG1, title: Interlock I-01 stops P-101, kind: interlock, interlock: I-01, refs: [LT-102], status: accepted}
 actions:
@@ -76,7 +78,11 @@ actions:
 3. **Deviations.** For each node, the guide words that make sense with each parameter of its
    intent (flow, pressure, temperature, level, composition, ...).
 4. **Causes and consequences.** One scenario per credible cause and consequence; a deviation
-   without a credible cause says so in `notes:`. Skill `hazop-scenario-propagation`.
+   without a credible cause says so in `notes:`. Skill `hazop-scenario-propagation`. With a
+   failure-mode library (`safety/failure-modes.yaml`), `cheme safety hazop propagate H-01
+   --coverage` then lists the top events the walk brings to a node that no scenario names (by
+   its `refs`): add a scenario, or dismiss the top event under the node's `dismissed:` with the
+   reason.
 5. **Safeguards.** The ones the P&IDs and the cause and effect actually have, by tag or
    interlock id.
 6. **Assessment and recommendations.** The team rates severity and likelihood per category,

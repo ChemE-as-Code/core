@@ -252,6 +252,40 @@ def test_a_candidate_names_the_other_nodes_its_path_enters(model):
     assert limit.crosses == [("N9", "CV-1")]
 
 
+def test_coverage_compares_the_scenarios_by_tag_and_takes_dismissals(model):
+    from chemeascode.domains.safety.schemas import Node
+
+    candidates = run(model, ["P-101"]).candidates
+
+    def node(refs, dismissed=()):
+        scenario = {"id": "S1", "cause": "P-101 stops", "refs": refs}
+        return Node.model_validate(
+            {
+                "id": "N2",
+                "members": ["P-101"],
+                "deviations": [{"guide_word": "no", "parameter": "flow", "scenarios": [scenario]}],
+                "dismissed": list(dismissed),
+            }
+        )
+
+    def at_vessel(result):
+        return [g for g in result.gaps if g.at == "V-101"]
+
+    full = prop.coverage(node(["P-101", "V-101"]), candidates)
+    assert not at_vessel(full) and full.covered and full.unreached == []
+    cause_only = at_vessel(prop.coverage(node(["P-101"]), candidates))
+    assert [(g.top_event, g.cause_only, g.uncovered) for g in cause_only] == [
+        ("overfill", ["P-101"], [])
+    ]
+    elsewhere = prop.coverage(node(["X-1"]), candidates)
+    assert at_vessel(elsewhere)[0].uncovered == ["P-101"] and elsewhere.unreached == ["S1"]
+    reason = {"guide_word": "no", "parameter": "flow", "top_event": "overfill", "at": "V-101"}
+    gone = prop.coverage(node(["X-1"], [{**reason, "reason": "the team's call"}]), candidates)
+    assert not at_vessel(gone) and gone.dismissed == 1
+    other = prop.coverage(node(["X-1"], [{**reason, "causes": ["P-9"], "reason": "x"}]), candidates)
+    assert at_vessel(other) and other.dismissed == 0
+
+
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
     context = Context(interlocks={"LT-102": ["I-01"]})
     result = run(model, ["P-101"], context, NO_FLOW)
@@ -429,6 +463,17 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     assert overfill["nodes"] == [{"node": "N2", "causes": ["P-101"]}]
     alone = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--deviation", "no flow"])
     assert alone.exit_code == 2 and "--deviation needs --node" in alone.output
+
+    node_coverage = ["safety", "hazop", "propagate", "H-01", "--node", "N2", "--coverage"]
+    gaps = runner.invoke(app, node_coverage)
+    assert gaps.exit_code == 1, gaps.output
+    assert "N2: no flow -> overfill at V-101 (Water) [via N1]; no scenario: P-101" in gaps.output
+    every = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--coverage", "--json"])
+    assert every.exit_code == 1
+    nodes = {n["node"]: n for n in json.loads(every.output)["nodes"]}
+    assert nodes["N1"]["gaps"] == [] and nodes["N2"]["gaps"]
+    both = ["safety", "hazop", "propagate", "H-01", "--coverage", "--deviation", "N2-NF"]
+    assert runner.invoke(app, both).exit_code == 2
     assert study.read_text(encoding="utf-8") == before
 
     missing = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N9"])

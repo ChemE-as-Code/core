@@ -191,6 +191,9 @@ ActionStatus = Literal["proposed", "open", "closed", "rejected"]
 #: Data of other tools, by tool name; cheme-as-code keeps it and does not read it.
 Extensions = dict[str, Any]
 
+#: The events that end a chain: a loss of primary containment or a fire or explosion inside.
+TopEvent = Literal["loss-of-containment", "overpressure", "overfill", "internal-fire-explosion"]
+
 
 def _plant_ref(value: Any) -> Any:
     """``V-101`` is short for ``{tag: V-101}``."""
@@ -308,6 +311,22 @@ class Deviation(Strict):
     notes: str = Field(default="", description="e.g. why no cause is credible.")
 
 
+class Dismissal(Strict):
+    """A top event ``cheme safety hazop propagate --coverage`` reports for the node that needs no
+    scenario of its own, and why (a library artefact, covered at train level by another row)."""
+
+    guide_word: GuideWord
+    parameter: str = Field(min_length=1)
+    top_event: TopEvent
+    at: str = Field(min_length=1, description="The tag or object id where the walk ends.")
+    causes: list[str] = Field(
+        default_factory=list, description="Only these causes (tags); none: every cause."
+    )
+    reason: str = Field(min_length=1)
+    status: Judgement = "proposed"
+    by: str = ""
+
+
 class Node(Strict):
     """A study node: a part of the plant with one design intent."""
 
@@ -317,6 +336,10 @@ class Node(Strict):
     members: PlantRefs = Field(default_factory=list, description="The plant items of the node.")
     modes: list[str] = Field(default_factory=list, description="Operating mode ids; none: all.")
     deviations: list[Deviation] = Field(default_factory=list)
+    dismissed: list[Dismissal] = Field(
+        default_factory=list,
+        description="Propagated top events that need no scenario here, each with its reason.",
+    )
     status: Judgement = "proposed"
     by: str = ""
     notes: str = ""
@@ -424,8 +447,6 @@ Towards = Literal["downstream", "upstream", "both", "none"]
 #: it through (``passes``, ``no-effect``: not recorded as a step), takes it up (``absorbs``) or
 #: ends the chain at a top event (``stops``).
 ResponseEffect = Literal["responds", "passes", "no-effect", "absorbs", "stops"]
-#: The events that end a chain: a loss of primary containment or a fire or explosion inside.
-TopEvent = Literal["loss-of-containment", "overpressure", "overfill", "internal-fire-explosion"]
 
 
 class DeviationSpec(Strict):
