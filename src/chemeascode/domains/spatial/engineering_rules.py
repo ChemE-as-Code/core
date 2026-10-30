@@ -68,7 +68,9 @@ Rules (``cheme.layout-...``, level):
   nearest point of the pad over the item to its far side, as wide as the item across the
   direction of travel (the load keeps its orientation) plus ``lane_margin_m`` each side,
   above the item's top plus ``lift_clearance_m`` (pipes not ending at the item, cable trays
-  but the drop of the item's own, ducts, steel, walls and roofs, other items);
+  but the drop of the item's own (all of a branch that ends at its motor's ``cable_entry``
+  beside it: the cable drop from there is no tray), ducts, steel, walls and roofs, other
+  items);
 - ``laydown`` (warning): no ``laydown`` zone within the crane's reach of a heavy item whose plan
   is at least the item's footprint;
 - ``pad-overlap`` (warning): a ``crane_pad`` or ``laydown`` zone overlapping a rack's strip, a
@@ -1353,7 +1355,12 @@ class EngineeringRules:
         for kind, run_of in (("trays", _tray_runs), ("ducts", _duct_runs)):
             for entry in self.model.get(kind) or []:
                 runs = run_of(entry)
-                if kind == "trays" and (entry.get("refs") or {}).get("tag") == tag and runs:
+                if (
+                    kind == "trays"
+                    and (entry.get("refs") or {}).get("tag") == tag
+                    and runs
+                    and not entry.get("drop_to")  # ends at a cable_entry beside the item
+                ):
                     last = runs[-1]
                     if abs(last.a[2] - last.b[2]) > 1e-6:
                         runs = runs[:-1]  # the drop onto the item it feeds

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -26,6 +27,7 @@ from chemeascode.domains.control.schemas import ElectricalList
 from chemeascode.domains.equipment.schemas.equipment import EquipmentList
 from chemeascode.domains.spatial.drawing2d import render_plan, render_section
 from chemeascode.domains.spatial.gates import layout_gate
+from chemeascode.domains.spatial.lifting import study
 from chemeascode.domains.spatial.model import build_model, model_findings, read, write_model
 from chemeascode.domains.spatial.schemas import LayoutModelFile, TrayRuleSet
 from chemeascode.domains.spatial.trays import (
@@ -318,6 +320,95 @@ def test_missing_cables_and_declared_junction_boxes(cabled: Path):
     assert not boxes["JB-1"].get("review_needed")  # LT-102 skipped, AT-9 placed by the list
     findings = [f for f in model.findings if f.rule == "cheme.layout-cable-missing"]
     assert [f.ids for f in findings] == [["M-P-102"]]
+
+
+def _lifted(plant: Path, entry: str = "") -> tuple[dict, Any]:
+    """The model and the lift of P-101 made heavy (8 t) with a crane pad south of it: its lane
+    runs north over the pump from the pad, the motor's tray comes south from the rack."""
+    (plant / "equipment" / "equipment-list.yaml").write_text(
+        EQUIPMENT.replace("height: 1.0}", "height: 1.0, weight: 8}")
+    )
+    (plant / "layout" / "zones.yaml").write_text(
+        "zones:\n  - {id: CP-1, kind: crane_pad, reach_m: 20, shape: box,\n"
+        "     box: [12, 1, 0, 16, 5, 1]}\n"
+    )
+    (plant / "electrical" / "electrical-list.yaml").write_text(
+        ELECTRICAL.replace("source: vendor data}", f"source: vendor data{entry}}}")
+    )
+    model = build_model(Workspace(plant))
+    (lift,) = [x for x in study(model.document).lifts if x.tag == "P-101"]
+    return model, lift
+
+
+def test_a_cable_entry_ends_the_motor_tray_beside_the_machine(cabled: Path):
+    # before: the branch runs over the pump to above its terminal box and blocks the lane
+    model, lift = _lifted(cabled)
+    branch = _by_id(model.document["trays"])["PT-M-P-101"]
+    assert "drop_to" not in branch
+    assert lift.pad == "CP-1" and lift.blockers == ["PT-M-P-101"]
+    item = _by_id([{**e, "id": e["tag"]} for e in model.document["equipment"]])["P-101"]
+    x0, y0, _, x1, y1, _ = item["bbox"]
+    # after: the tray ends east of the pump, across the lane (margin 1 m + half the 0.1 m tray
+    # + spacing), and the cable drops from there to the terminal box
+    model, lift = _lifted(cabled, ", cable_entry: {side: east}")
+    document = model.document
+    branch = _by_id(document["trays"])["PT-M-P-101"]
+    end, terminal = branch["points"][-1], branch["drop_to"]
+    spacing = TrayRuleSet().spacing_m
+    assert end[0] == pytest.approx(x1 + 1.0 + 0.05 + spacing, abs=1e-3)
+    assert end[1] == pytest.approx((y0 + y1) / 2, abs=1e-3)
+    assert all(p[0] > x1 + 1.0 for p in branch["points"])  # no run over the pump
+    assert lift.blockers == [] and lift.status.startswith("lane clear")
+    # the schedule's length takes the drop (orthogonal, tray end to terminal box)
+    cable = _by_id(document["cables"])["C-M-P-101"]
+    trays = _by_id(document["trays"])
+    run = sum(trays[t]["length"] for t in cable["trays"])
+    drop = sum(abs(a - b) for a, b in zip(end, terminal, strict=True))
+    assert cable["to_point"] == terminal
+    assert cable["route_length"] == pytest.approx(run + drop, abs=2e-3)
+    assert not {f.rule for f in model.findings} & {
+        "cheme.layout-clash-tray",
+        "cheme.layout-cable-missing",
+        "cheme.electrical-cable-entry",
+    }
+    LayoutModelFile.model_validate(document)
+    # an elevation and an absolute point: the tray ends there
+    model, lift = _lifted(cabled, ", cable_entry: {point: [17, 10], elevation_m: 3.5}")
+    branch = _by_id(model.document["trays"])["PT-M-P-101"]
+    assert branch["points"][-1] == [17.0, 10.0, 3.5] and lift.blockers == []
+    # a tray still inside the lane counts: an entry on the pad's side, between pad and pump
+    model, lift = _lifted(cabled, ", cable_entry: {side: south}")
+    assert lift.blockers == ["PT-M-P-101"]
+
+
+def test_an_impossible_cable_entry_is_an_error_on_its_line(cabled: Path):
+    _lifted(cabled, ", cable_entry: {side: north, offset_m: 3}")
+    workspace = Workspace(cabled)
+    model = build_model(workspace)
+    missing = {m["tag"]: m["reason"] for m in model.document["cabling"]["missing"]}
+    assert "offset_m 3 is beyond the north side" in missing["M-P-101"]
+    assert "PT-M-P-101" not in _by_id(model.document["trays"])
+    (finding,) = [f for f in model.findings if f.rule == "cheme.electrical-cable-entry"]
+    assert finding.file == "electrical/electrical-list.yaml" and finding.line == 5
+    assert finding.hint and finding.ids == ["P-101"]
+    write_model(workspace, model)
+    report = validate_workspace(workspace)
+    (finding,) = [f for f in report.findings if f.rule == "cheme.electrical-cable-entry"]
+    assert finding.line == 5 and finding.level == "error"
+    model, _ = _lifted(cabled, ", cable_entry: {point: [14, 10]}")
+    (finding,) = [f for f in model.findings if f.rule == "cheme.electrical-cable-entry"]
+    assert "inside the item's footprint" in finding.message
+    # the schema refuses an entry that says neither or both where it is
+    for bad in ({}, {"side": "east", "point": [1, 2]}, {"point": [1, 2], "offset_m": 1}):
+        with pytest.raises(ValueError, match="cable_entry"):
+            ElectricalList.model_validate({"motors": [{"driven": "P-1", "cable_entry": bad}]})
+    (cabled / "electrical" / "electrical-list.yaml").write_text(
+        ELECTRICAL.replace("vendor data}", "vendor data,\n     cable_entry: {side: up}}")
+    )
+    report = validate_workspace(Workspace(cabled))
+    (finding,) = [f for f in report.findings if f.file == "electrical/electrical-list.yaml"]
+    assert finding.level == "error" and finding.line == 6 and finding.hint
+    assert "cable_entry" in finding.message
 
 
 def test_fill_and_separation_rules():

@@ -2162,6 +2162,11 @@ class ModelTray(ModelObject):
     system: Literal["power", "instrument"]
     kind: Literal["trunk", "room", "branch", "link"]
     points: list[Vec3]
+    drop_to: Vec3 | None = Field(
+        default=None,
+        description="A branch ending at its motor's cable_entry beside the item: the terminal "
+        "box its cable drops to from the tray's last point (that drop is cable, not tray).",
+    )
     width: float = Field(description="m.")
     depth: float = Field(description="m.")
     length: float

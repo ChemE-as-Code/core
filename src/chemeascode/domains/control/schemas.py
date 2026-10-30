@@ -604,10 +604,56 @@ class Room(Strict):
         return self
 
 
+#: A side of the driven item's plan footprint in site axes: north +y, south -y, east +x, west -x.
+EntrySide = Literal["north", "south", "east", "west"]
+
+
+class CableEntry(Strict):
+    """Where a motor's cable leaves its tray for the terminal box: beside the driven item, so
+    the tray does not run over the machine (a crane lane over it stays clear). The tray ends
+    there; the cable drops from there to the terminal box as cable, not tray.
+
+    Either ``side`` (of the item's footprint in plan, the axis-aligned box of the placed item
+    in site axes) with ``offset_m`` along it and ``clearance_m`` out from it, or ``point``
+    [x, y] in site m. ``elevation_m``: the height of the tray's end (default: 0.6 m above the
+    terminal box, as without an entry)."""
+
+    side: EntrySide | None = Field(default=None, description="Side of the driven item.")
+    offset_m: float | None = Field(
+        default=None,
+        description="Along the side from its middle, m: toward +x on north and south, toward +y "
+        "on east and west (default 0); at most half the side's length.",
+    )
+    clearance_m: float | None = Field(
+        default=None,
+        ge=0,
+        description="From the side out to the tray's centreline, m (default: the layout "
+        "criteria's lane_margin_m plus half the tray's width plus the tray rules' spacing_m, "
+        "so a crane lane square to that side stays clear).",
+    )
+    point: tuple[float, float] | None = Field(
+        default=None, description="The tray's end [x, y], site m, outside the item's footprint."
+    )
+    elevation_m: float | None = Field(
+        default=None, ge=0, description="The tray's end above grade, m."
+    )
+
+    @model_validator(mode="after")
+    def _check(self) -> "CableEntry":
+        if self.side is None and self.point is None:
+            raise ValueError("cable_entry: give its side (of the driven item) or its point")
+        if self.side is not None and self.point is not None:
+            raise ValueError("cable_entry: give its side or its point, not both")
+        if self.point is not None and (self.offset_m is not None or self.clearance_m is not None):
+            raise ValueError("cable_entry: offset_m and clearance_m go with side, not point")
+        return self
+
+
 class Motor(Strict):
     """A motor of the motor list. A motor driving an equipment-list item is derived from that
     item (``driven``); an entry here gives or overrides its power, voltage and room, or says
-    why it has no cable of the plant's own (``skip``: a vendor package, a steam turbine)."""
+    why it has no cable of the plant's own (``skip``: a vendor package, a steam turbine), and
+    where its cable leaves the tray (``cable_entry``)."""
 
     driven: Identifier = Field(description="The equipment-list tag it drives.")
     tag: Identifier | None = Field(default=None, description="Motor tag (default M-<driven>).")
@@ -617,6 +663,11 @@ class Motor(Strict):
     assumed: bool = Field(default=False, description="True: the power is an assumption.")
     source: str = Field(default="", description="Where the power comes from.")
     skip: str | None = Field(default=None, description="No cable of its own, for this reason.")
+    cable_entry: CableEntry | None = Field(
+        default=None,
+        description="Where its cable leaves the tray beside the item (default: the tray runs "
+        "to above the terminal box and drops onto it).",
+    )
     notes: str = ""
 
 

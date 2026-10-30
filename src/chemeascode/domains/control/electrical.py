@@ -226,6 +226,7 @@ class MotorEntry:
     power_factor_assumed: bool = False  # a feeder's default 1.0, not given in the list
     item: str | None = None  # the placed tag it is at
     point: tuple[float, float, float] | None = None
+    cable_entry: Any = None  # a motor's CableEntry: where its cable leaves the tray
 
 
 def is_driven(item: Any) -> bool:
@@ -349,6 +350,7 @@ def motor_list(
                 source=source,
                 skip=entry.skip if entry is not None else None,
                 item=tag,
+                cable_entry=entry.cable_entry if entry is not None else None,
             )
         )
     for feeder in getattr(electrical, "feeders", None) or ():

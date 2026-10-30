@@ -819,12 +819,14 @@ def workspace_model_rules(workspace: Any, model: dict[str, Any] | None = None) -
         if model is None:
             return []
     from chemeascode.domains.spatial.lifting import capacity_findings
+    from chemeascode.domains.spatial.trays import cable_entry_findings
 
     layout = workspace_layout(workspace, None)
     return (
         zone_findings(model, layout.zones)
         + model_rules(model, layout.routing, layout.site_plan)
         + capacity_findings(workspace, model, layout.routing, layout.site_plan)
+        + cable_entry_findings(workspace, model)
     )
 
 
