@@ -75,10 +75,11 @@ detail stage (gate `electrical`).
    running more than `support_span_m` with no steel near it: run it along a rack or a
    structure, declare support steel, or bring the cable in at grade or in a trench). A tray
    over a heavy item blocks its crane lift (`layout-lifting`, skill `structures-access`):
-   give its motor a `cable_entry` on a side across the lane or away from the crane pad (not
-   between pad and machine), so the tray ends beside the machine; its default clearance keeps
-   it outside a lane square to that side; `electrical-cable-entry` (error) is an entry the
-   placed item makes impossible (a point inside its footprint, an offset beyond the side).
+   give its motor a `cable_entry` on a side the lane runs along or on the side away from the
+   crane pad (not between pad and machine), so the tray ends beside the machine; its default
+   clearance keeps it outside a lane running along that side or ending at it;
+   `electrical-cable-entry` (error) is an entry the placed item makes impossible (a point
+   inside its footprint, an offset beyond the side).
    Rerun `cheme layout lifting`: a tray still in the lane is still named. Fix the cause and
    rebuild.
 7. **Schedule.** `cheme layout cables --write` writes `electrical/cable-schedule.csv` and

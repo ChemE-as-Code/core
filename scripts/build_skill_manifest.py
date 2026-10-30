@@ -6,7 +6,9 @@ For each file of each skill under ``domains/<d>/skills/<name>/`` and ``project/s
 the manifest lists the sha256 of the current file first, then of every earlier version this
 repository's git history has of it, at its current path, at that path under the package's name
 before 0.7.0 (``src/plantcode/...``) or at the earlier bundled location
-``src/plantcode/template/dot-claude/skills/<name>/``. ``cheme skills status`` uses it to tell
+``src/plantcode/template/dot-claude/skills/<name>/``, then every hash the committed manifest
+already lists (git history starts at the 0.8.0 monorepo baseline, so the earlier versions are
+known only from there). ``cheme skills status`` uses it to tell
 an installed copy that is only out of date from one changed locally. Rerun it whenever a skill
 changes; ``tests/test_skills.py`` fails until then.
 """
@@ -46,6 +48,10 @@ def history(paths: list[str]) -> list[str]:
 
 
 def main() -> None:
+    out = ROOT / "src/chemeascode/templates" / MANIFEST_FILE
+    # the history before the 0.8.0 monorepo baseline commit is not in git: keep what the
+    # committed manifest already lists
+    known = json.loads(out.read_text(encoding="utf-8"))["skills"] if out.exists() else {}
     skills: dict[str, dict[str, list[str]]] = {}
     for name, files in bundled_files().items():
         entry = skills.setdefault(name, {})
@@ -54,9 +60,12 @@ def main() -> None:
             paths = [source.resolve().relative_to(ROOT).as_posix()]
             paths.append(paths[0].replace(*OLD_PACKAGE, 1))
             paths += [p.format(name=name, file=relative) for p in EARLIER]
-            entry[relative] = [current] + [h for h in history(paths) if h != current]
+            hashes = [current]
+            for h in history(paths) + known.get(name, {}).get(relative, []):
+                if h not in hashes:
+                    hashes.append(h)
+            entry[relative] = hashes
     manifest = {"schema": MANIFEST_SCHEMA, "skills": skills}
-    out = ROOT / "src/chemeascode/templates" / MANIFEST_FILE
     out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(f"{out.relative_to(ROOT)}: {sum(len(f) for f in skills.values())} files")
 

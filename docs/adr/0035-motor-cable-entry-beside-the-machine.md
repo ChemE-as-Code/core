@@ -50,8 +50,8 @@ an exemption would hide fixed steel over the machine from the lifting study.
 - Negative: two new optional fields (`motors[].cable_entry` in the electrical list,
   `trays[].drop_to` in the model). Older readers that forbid unknown keys see `drop_to` only in
   models built with an entry.
-- Known limitations: the default clearance keeps the tray end outside a lane square to the
-  chosen side. A lane that runs diagonally to the footprint is wider, and an entry between the
+- Known limitations: the default clearance keeps the tray end outside a lane that runs along
+  the chosen side or ends at it. A lane that runs diagonally to the footprint is wider, and an entry between the
   pad and the machine is inside the lane. The router chooses the branch's way from the rack to
   the entry, and that way can still cross the lane higher up. `cheme layout lifting` reports
   both cases. The cable drop has no geometry in the model.

@@ -112,13 +112,13 @@ motors:
 |---|---|
 | `side` | `north` (+y), `south` (-y), `east` (+x) or `west` (-x) side of the driven item's footprint in plan (the placed item's axis-aligned box in site axes) |
 | `offset_m` | along that side from its middle, m: toward +x on north and south, toward +y on east and west (default 0); at most half the side's length |
-| `clearance_m` | from the side out to the tray's centreline, m (default: the layout criteria's `lane_margin_m` + half the tray's width + `spacing_m`: just outside a crane lane square to that side) |
+| `clearance_m` | from the side out to the tray's centreline, m (default: the layout criteria's `lane_margin_m` + half the tray's width + `spacing_m`: just outside a crane lane that runs along that side or ends at it) |
 | `point` | instead of `side`: the tray's end [x, y], site m, outside the footprint |
 | `elevation_m` | the tray's end above grade, m (default 0.6 m above the terminal box); the branch runs at `branch_elevation_m` to above the entry and drops to it as tray |
 
 The branch's tray entry records the terminal box it drops to (`drop_to`); its last run is no
-longer the item's own drop, so the lifting lane and `clash-tray` count every run of it. Pick the
-side across the lane or away from the crane pad: an entry between the pad and the machine is
+longer the item's own drop, so the lifting lane and `clash-tray` count every run of it. Pick a
+side the lane runs along or the side away from the crane pad: an entry between the pad and the machine is
 still in the lane. A crane lane that runs diagonally to the footprint is wider than the
 footprint's sides: check with `cheme layout lifting`. The branch's way from the rack to the
 entry is the router's; it may still cross the lane higher up (the study names it).

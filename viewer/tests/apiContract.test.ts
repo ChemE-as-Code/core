@@ -464,7 +464,7 @@ const UNROUTED_KEYS: (keyof ModelUnrouted)[] = ["line", "segment", "segment_numb
 const MEP_MODEL_KEYS: (keyof LayoutModel)[] = ["tray_tiers", "trays", "junction_boxes", "cables", "cabling", "hvac_units", "hvac_rooms", "ducts", "hvac"];
 const PENETRATION_KEYS: (keyof ModelPenetration)[] = [...OBJECT_KEYS, "owner", "wall", "pipe", "point", "material", "end_inside", "length", "opening", "review_needed", "reason"];
 const TRAY_TIER_KEYS: (keyof ModelTrayTier)[] = [...OBJECT_KEYS, "rack", "elevation", "parts"];
-const TRAY_KEYS: (keyof ModelTray)[] = [...OBJECT_KEYS, "system", "kind", "points", "width", "depth", "length", "cables", "fill", "fill_max", "rack", "method", "review_needed", "parts"];
+const TRAY_KEYS: (keyof ModelTray)[] = [...OBJECT_KEYS, "system", "kind", "points", "drop_to", "width", "depth", "length", "cables", "fill", "fill_max", "rack", "method", "review_needed", "parts"];
 const JB_KEYS: (keyof ModelJunctionBox)[] = [...OBJECT_KEYS, "tag", "point", "area", "instruments", "room", "review_needed", "parts"];
 const CABLE_KEYS: (keyof ModelCable)[] = [
   ...OBJECT_KEYS,

@@ -629,7 +629,7 @@ class CableEntry(Strict):
         ge=0,
         description="From the side out to the tray's centreline, m (default: the layout "
         "criteria's lane_margin_m plus half the tray's width plus the tray rules' spacing_m, "
-        "so a crane lane square to that side stays clear).",
+        "so a crane lane running along that side or ending at it stays clear).",
     )
     point: tuple[float, float] | None = Field(
         default=None, description="The tray's end [x, y], site m, outside the item's footprint."
