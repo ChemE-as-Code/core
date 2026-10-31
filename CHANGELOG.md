@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0 (2026-10-31)
+
+Minor release: the Viewer tells an embedding page how far it is and shows large 3D models in stages
+(website#136, website#137). No breaking change.
+
+### Added
+
+- Viewer: an embedded Viewer reports its stage (`app`, `visual`, `detail`, `error`) and the object
+  picked (`select`) to its page by `postMessage`, to the same origin only (`REFERENCE.md`, Embedding).
+- Viewer: the 3D view shows the plan drawing as a poster while the model loads.
+- Viewer: the 3D view names its stage on screen and sets `performance.mark`s (`layout:*`).
+
+### Changed
+
+- Viewer: a 3D model of 2000 meshes or more draws its overview first and builds the fine geometry
+  afterwards in short slices. Exports and the benchmark complete the model first.
+
 ## 1.2.1 (2026-10-30)
 
 Patch release: a branch starts exactly at its tee on a battery-limit header (#95). No breaking change.
