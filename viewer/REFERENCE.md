@@ -196,9 +196,10 @@ The Process Atlas frames a route of a snapshot this way:
 
 An embedded viewer tells its page how far it is (`src/lib/embedSignal.ts`): `postMessage` to the
 same origin, `{ type: "cheme-viewer", version: 1, stage, route }`, where `stage` is `app` (running
-and routed), `visual` (the drawing or the 3D overview is on screen), `detail` (the 3D model is
-complete) or `error`, and `route` is the view it belongs to. The page should check the message's
-`origin` and `source`.
+and routed), `visual` (a drawing, or the plan as the poster of the 3D view, is on screen), `detail`
+(the 3D model is complete), `error` or `select` (with `select`, the object picked in this view or
+null), and `route` is the view it belongs to. The page should check the message's `origin` and
+`source`. `?select=` on a drawing's or the layout's route picks that object.
 
 ## Design notes
 

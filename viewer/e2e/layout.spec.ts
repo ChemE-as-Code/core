@@ -7,6 +7,25 @@ test.describe("layout", () => {
     await mockApi(page);
   });
 
+  test("shows the plan as a poster until the model is there", async ({ page }) => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname === "/api/layout",
+      async (route) => {
+        await held;
+        await route.fallback();
+      },
+    );
+    await page.goto("/layout");
+    await expect(page.getByTestId("layout-poster").locator("svg")).toBeVisible();
+    await expect(page.getByTestId("model-stage")).toHaveText("Loading the 3D model\u2026");
+    await expect(page.locator("canvas.layout-canvas")).toHaveCount(0);
+    release();
+    await expect(page.locator("canvas.layout-canvas")).toBeVisible();
+    await expect(page.getByTestId("layout-poster")).toHaveCount(0);
+  });
+
   test("draws the model, toggles a layer and keeps it in the URL", async ({ page }) => {
     await page.goto("/layout");
     await expect(page.locator("canvas.layout-canvas")).toBeVisible();
