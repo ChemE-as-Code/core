@@ -5,12 +5,21 @@
 //   visual  the first useful picture: a drawing, or the 3D overview
 //   detail  the 3D model's fine geometry is complete
 //   error   the view could not load
+//   select  the object picked in this view (`select`, null when none), for the next view to keep
 import { store } from "@/store";
 
 export type EmbedStage = "app" | "visual" | "detail" | "error";
 
-export function signalEmbed(stage: EmbedStage): void {
+function post(message: Record<string, unknown>): void {
   if (!store.embed || window.parent === window) return;
   const route = window.location.hash.replace(/^#/, "").split("?")[0] ?? "";
-  window.parent.postMessage({ type: "cheme-viewer", version: 1, stage, route }, window.location.origin);
+  window.parent.postMessage({ type: "cheme-viewer", version: 1, route, ...message }, window.location.origin);
+}
+
+export function signalEmbed(stage: EmbedStage): void {
+  post({ stage });
+}
+
+export function signalEmbedSelection(select: string | null): void {
+  post({ stage: "select", select });
 }

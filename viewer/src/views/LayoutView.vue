@@ -4,7 +4,7 @@ import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, ApiError, type Finding, type Layout } from "@/api";
 import LoadState from "@/components/LoadState.vue";
 import SvgPane from "@/components/SvgPane.vue";
-import { signalEmbed } from "@/lib/embedSignal";
+import { signalEmbed, signalEmbedSelection } from "@/lib/embedSignal";
 import { useAsync } from "@/lib/useAsync";
 import { FINDINGS_OPEN_MAX, groupFindings } from "@/lib/findings";
 import { useRev } from "@/lib/useRev";
@@ -195,7 +195,49 @@ const renderer = shallowRef<LayoutRenderer | null>(null);
 const renderError = ref<string | null>(null);
 /** How far the 3D model is: named stages for the page, the tests and the embedding page. */
 const modelStage = ref<"idle" | "building" | "overview" | "detail">("idle");
-const nextPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+// The next frame, or soon after in a hidden tab, which draws none.
+const nextPaint = () =>
+  new Promise<void>((resolve) => {
+    const timer = window.setTimeout(resolve, 200);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        window.clearTimeout(timer);
+        resolve();
+      }),
+    );
+  });
+// The plan drawing is the poster while the 3D model loads: small, and asked for at once. It is a
+// courtesy, so a plant without one (or a failure) just shows the loading note.
+const poster = useAsync<SanitizedSvg | null>(
+  async (signal) => {
+    if (state.tab !== "3d") return null;
+    try {
+      return sanitizeSvg(await api.layoutPlanSvg({ rev: rev.value }, signal));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      return null;
+    }
+  },
+  [rev],
+);
+const posterHost = ref<HTMLElement | null>(null);
+const showPoster = computed(() => state.tab === "3d" && Boolean(poster.data.value) && !renderError.value && (modelStage.value === "idle" || modelStage.value === "building"));
+watch(
+  posterHost,
+  (host) => {
+    if (!host || !poster.data.value) return;
+    host.replaceChildren(document.importNode(poster.data.value.element, true));
+    signalEmbed("visual");
+  },
+  { flush: "post" },
+);
+/** What the model is doing, while it is not there yet or not complete. */
+const modelNote = computed(() => {
+  if (state.tab !== "3d" || renderError.value || layout.error.value) return null;
+  if (modelStage.value === "overview") return "Adding fine detail\u2026";
+  if (modelStage.value === "building") return "Building the 3D model\u2026";
+  return layout.loading.value && !layout.data.value && poster.data.value ? "Loading the 3D model\u2026" : null;
+});
 const nav = ref<NavMode>("orbit");
 const tool = ref<"pick" | "measure">("pick");
 const measured = ref<MeasureResult | null>(null);
@@ -319,6 +361,7 @@ watch(
 watch(
   () => state.select,
   (item) => {
+    signalEmbedSelection(item ?? null);
     renderer.value?.setSelected(item && scene.value?.items.has(item) ? item : null);
     applyMarks();
   },
@@ -770,10 +813,12 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
     <div class="body">
       <LoadState
         class="state"
-        :loading="layout.loading.value && !layout.data.value"
+        :loading="layout.loading.value && !layout.data.value && !poster.data.value"
         :error="layout.error.value ?? renderError"
         @retry="layout.reload"
       />
+      <div v-if="showPoster" ref="posterHost" class="layout-poster" role="img" aria-label="Plan of the plant, shown while the 3D model loads" data-testid="layout-poster" />
+      <p v-if="modelNote" class="model-stage" role="status" data-testid="model-stage">{{ modelNote }}</p>
       <div v-if="missing" class="notice empty">
         <p><strong>No layout files at {{ shortRev(rev) }}.</strong></p>
         <p class="muted">The layout view reads these files (all optional):</p>
@@ -784,9 +829,6 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
       </div>
       <div v-show="scene && state.tab === '3d'" class="stage-wrap">
         <div ref="container" class="stage" :class="{ measuring: tool === 'measure', moving: nav !== 'orbit' }" :data-model-stage="modelStage" aria-label="3D layout. Drag to orbit, scroll to zoom, right-drag to pan." />
-        <p v-if="modelStage === 'building' || modelStage === 'overview'" class="model-stage" role="status" data-testid="model-stage">
-          {{ modelStage === "building" ? "Building the 3D model\u2026" : "Adding fine detail\u2026" }}
-        </p>
         <p v-if="nav !== 'orbit'" class="nav-help">
           <template v-if="nav === 'walk'">Walking at 1.7 m eye height.</template>
           <template v-else>Flying at {{ flySpeed }} m/s (+/- or wheel).</template>
@@ -1183,6 +1225,17 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
 </template>
 
 <style scoped>
+.layout-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+.layout-poster :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .model-stage {
   position: absolute;
   top: var(--space-2);
