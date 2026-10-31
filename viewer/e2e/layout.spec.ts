@@ -89,6 +89,9 @@ test.describe("layout", () => {
   });
 
   test("tags on, line numbers off and decluttered; the selection's labels always show", async ({ page }) => {
+    // It opens the whole ASU model three times: with software rendering on a CI runner, that is
+    // about the default 30 s.
+    test.slow();
     await page.goto("/layout");
     await expect(page.locator("canvas.layout-canvas")).toBeVisible();
     await expect(page.locator(".layout-label", { hasText: "K-1101" })).toBeVisible();
@@ -116,8 +119,7 @@ test.describe("layout", () => {
     await expect(lines).not.toBeChecked();
     await lines.check();
     await expect(page).toHaveURL(/layers=[^&]*lines/);
-    // Line numbers show up close: zoom in on the middle of the plant, once the model is complete
-    // (with software rendering on a CI runner, zooming while it builds can outlast the test).
+    // Line numbers show up close: zoom in on the middle of the plant, once the model is complete.
     await expect(page.locator('.layout .stage[data-model-stage="detail"]')).toBeAttached({ timeout: 60_000 });
     const stage = (await page.locator(".layout .stage").boundingBox())!;
     await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
