@@ -32,6 +32,8 @@ from chemeascode.domains.process import FLOWSHEET_FILE
 from chemeascode.domains.process.model import End, Process, stream_flows
 from chemeascode.domains.process.schema import DUTY_UNITS, FLOW_UNITS, Quantity, StreamDef
 from chemeascode.domains.process.simulation import SIMULATION_FILE, SOURCE
+from chemeascode.domains.process.simulation.backends import IDAES, IDAES_PACKAGES
+from chemeascode.domains.process.simulation.backends import model_findings as backend_findings
 from chemeascode.domains.process.simulation.schema import (
     KineticCoupling,
     Simulation,
@@ -463,6 +465,9 @@ def property_package_findings(
         )
 
     package = sim.property_package
+    if sim.simulator == IDAES:
+        _idaes_package_findings(sim, add, require_selection)
+        return found
     supported = simulation_packages()
     if method_for_package(package) is None:
         add(
@@ -548,6 +553,85 @@ def property_package_findings(
         ),
     )
     return found
+
+
+def _idaes_package_findings(sim: Simulation, add: Any, require_selection: bool) -> None:
+    """:func:`property_package_findings` for the IDAES backend: a package it does not build is
+    ``sim-property-package``; the recorded selection is compared by method (methods.yml id), as
+    the IDAES packages are no DWSIM packages; no package of it is benchmarked
+    (``sim-method-unbenchmarked``, info)."""
+    from chemeascode.domains.process.thermodynamics.model_selection import select_thermo_model
+    from chemeascode.domains.process.thermodynamics.rules import InsufficientFactsError
+
+    package = sim.property_package
+    entry = IDAES_PACKAGES.get(package)
+    if entry is None:
+        add(
+            "error",
+            "sim-property-package",
+            f"property package {package!r} is not one the IDAES backend runs",
+            ["property_package"],
+            "use one of " + ", ".join(IDAES_PACKAGES) + " (simulation/backends.py), or "
+            "simulator: dwsim",
+        )
+        return
+    add(
+        "info",
+        "sim-method-unbenchmarked",
+        f"property package {package!r} (IDAES backend; {entry['note']}) is not benchmarked by "
+        "cheme-as-code: its results are not predictive",
+        ["property_package"],
+        "compare a run with a reference (a benchmarked package, measured data) before relying "
+        "on it",
+    )
+    selection = sim.method_selection
+    if selection is None:
+        if require_selection:
+            add(
+                "info",
+                "sim-method-unrecorded",
+                f"no method_selection recorded for property package {package!r}",
+                ["property_package"],
+                "record method_selection.facts (thermodynamic-model-selection) so the package "
+                "is checked against the recommendation",
+            )
+        return
+    try:
+        result = select_thermo_model(selection.facts)
+    except (InsufficientFactsError, ValueError) as err:
+        add(
+            "warning",
+            "sim-method-selection",
+            f"method_selection.facts do not give a recommendation: {err}",
+            ["method_selection", "facts"],
+            "add or correct the facts (thermodynamic-model-selection asks for each)",
+        )
+        return
+    recommended = [m.method for m in result.methods]
+    if entry["method"] in recommended:
+        return
+    why = (
+        f"method {entry['method']}, which the recorded selection ({result.selected_outcome}) "
+        f"does not recommend (it recommends {', '.join(result.models)})"
+    )
+    if selection.substitution:
+        add(
+            "info",
+            "sim-method-substituted",
+            f"property package {package!r} is {why}; accepted: {selection.substitution}",
+            ["method_selection", "substitution"],
+            "the substitution stays visible; review it with the property method",
+        )
+    else:
+        add(
+            "warning",
+            "sim-method-not-recommended",
+            f"property package {package!r} is {why}",
+            ["property_package"],
+            "use a recommended method, or record method_selection.substitution with the reason "
+            "the package is accepted",
+        )
+    return
 
 
 def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Translation:
@@ -854,7 +938,8 @@ def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Tra
         add(
             "info",
             "sim-recycle",
-            f"recycle loop torn at stream {sid}: solved iteratively (DWSIM Recycle)"
+            f"recycle loop torn at stream {sid}: solved iteratively "
+            + ("(IDAES tear stream)" if sim.simulator == IDAES else "(DWSIM Recycle)")
             + ("" if sim.tear_streams else ", chosen by cheme-as-code"),
             (FLOWSHEET_FILE, ["streams", index[sid]]),
             [sid],
@@ -1046,6 +1131,13 @@ def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Tra
     if pairs:  # a model without them keeps the fingerprint it had before
         # in a fixed order: reordering the list or a pair changes nothing
         out.model["interaction_parameters"] = sorted(pairs, key=lambda q: q["components"])
+    if sim.simulator == IDAES:  # a DWSIM model keeps the fingerprint it had before
+        out.model["simulator"] = IDAES
+        found = backend_findings(out.model, sim, sim_doc)
+        if found:
+            out.findings += found
+            out.model = None
+            return out
     out.fingerprint = fingerprint(out.model)
     return out
 

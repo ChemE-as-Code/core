@@ -1,10 +1,12 @@
-"""``cheme process simulate --fill/--check``: the flowsheet solved by DWSIM.
+"""``cheme process simulate --fill/--check``: the flowsheet solved by DWSIM, or by the optional
+IDAES backend where ``process/simulation.yaml`` says ``simulator: idaes`` (ADR 0038).
 
 The feeds (temperature, pressure, flow, composition) and the specifications in
 ``process/simulation.yaml`` go to the simulator; every other material stream comes back with its
 temperature, pressure, mass flow and composition, every energy stream attached to a unit with
 its duty. ``--fill`` writes the values a stream lacks with provenance ``calculated``, ``origin:
-simulated``, source ``cheme process simulate: DWSIM <version>, <property package>`` and the
+simulated``, source ``cheme process simulate: DWSIM <version>, <property package>`` (``IDAES
+<version>`` with the IDAES backend) and the
 fingerprint of the simulator model; it rewrites only values it wrote itself, never a given,
 assumed or otherwise calculated one. Where such a value differs from the simulated one beyond
 the tolerance, ``cheme.process-sim-deviation`` says so. ``--check`` writes nothing and reports
@@ -50,6 +52,7 @@ from chemeascode.domains.process.simulation import (
     record,
 )
 from chemeascode.domains.process.simulation import energy as energy_checks
+from chemeascode.domains.process.simulation.backends import IDAES, TITLES
 from chemeascode.domains.process.simulation.translate import (
     _mole_fractions,
     load,
@@ -73,8 +76,8 @@ def run(
     solver: Any = None,
 ) -> PropsResult:
     """Fill (*write*) or check the simulated stream values of *case*. *solver* stands in for
-    ``chemeascode.integrations.dwsim.solve`` (tests)."""
-    from chemeascode.integrations import dwsim
+    the simulator's ``solve`` (``chemeascode.integrations.dwsim`` or ``.idaes``; tests)."""
+    from chemeascode.integrations import dwsim, idaes
 
     result = PropsResult()
     fs = process.flowsheet
@@ -118,26 +121,32 @@ def run(
         result.findings += _record_check(workspace.root, case, found_model.fingerprint)
 
     kinetic = [u["id"] for u in coupling.kinetic_units(model)]
+    backend = idaes if sim.simulator == IDAES else dwsim
     try:
         if kinetic:
-            # fixed beds: solved by cheme-as-code, coupled to DWSIM by an outer loop
+            # fixed beds: solved by cheme-as-code, coupled to DWSIM by an outer loop (the IDAES
+            # backend refuses them at translation, backends.model_findings)
             out = coupling.solve(process, model, case, solver or dwsim.solve, save)
         else:
-            out = (solver or dwsim.solve)(model, save)
-    except dwsim.DwsimUnavailable as failure:
-        add("error", "sim-unavailable", str(failure), [], [], dwsim.HINT)
+            out = (solver or backend.solve)(model, save)
+    except (dwsim.DwsimUnavailable, idaes.IdaesUnavailable) as failure:
+        add("error", "sim-unavailable", str(failure), [], [], backend.HINT)
         return result
-    except dwsim.DwsimFailed as failure:
+    except (dwsim.DwsimFailed, idaes.IdaesFailed) as failure:
         add(
             "error",
             "sim-failed",
             str(failure),
             [],
             [],
-            "check the specs and feeds; --save writes the flowsheet to open in DWSIM",
+            "check the specs and feeds; --save writes the flowsheet to open in DWSIM"
+            if backend is dwsim
+            else "check the specs and feeds, and the first guesses of the tear streams "
+            "(guesses: in process/simulation.yaml)",
         )
         return result
-    source = f"{SOURCE}: DWSIM {out.get('version', '?')}, {sim.property_package}"
+    title = TITLES[sim.simulator]
+    source = f"{SOURCE}: {title} {out.get('version', '?')}, {sim.property_package}"
     if kinetic:
         models = {u["id"]: u["spec"].get("model", "") for u in coupling.kinetic_units(model)}
         source += "; " + ", ".join(

@@ -290,11 +290,18 @@ class Simulation(Strict):
 
     schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
     kind: Literal["simulation"]
-    simulator: Literal["dwsim"] = "dwsim"
+    simulator: Literal["dwsim", "idaes"] = Field(
+        default="dwsim",
+        description="The simulator that solves the flowsheet (ADR 0038): dwsim (the default) or "
+        "idaes, an optional backend run in the Python CHEME_IDAES_PYTHON names (heater, cooler, "
+        "valve, pump, compressor, expander, mixer, splitter, flash, conversion reactor and "
+        "recycles; property packages 'IDAES ideal VLE' and 'IDAES Peng-Robinson').",
+    )
     property_package: str = Field(
         default="Peng-Robinson (PR)",
-        description="The simulator's property package name: one of the packages the DWSIM "
-        "route runs (methods.yml; others are cheme.process-sim-property-package).",
+        description="The simulator's property package name: with dwsim one of the packages the "
+        "DWSIM route runs (methods.yml), with idaes one of the IDAES backend's "
+        "(simulation/backends.py); others are cheme.process-sim-property-package.",
     )
     method_selection: MethodSelection | None = Field(
         default=None,

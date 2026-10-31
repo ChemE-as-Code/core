@@ -530,18 +530,21 @@ def simulate(
     ] = False,
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
     save: Annotated[
-        Path | None, typer.Option(help="Also save the DWSIM flowsheet here (.dwxmz).")
+        Path | None,
+        typer.Option(help="Also save the DWSIM flowsheet here (.dwxmz; DWSIM only)."),
     ] = None,
 ) -> None:
-    """Solve the flowsheet in DWSIM: feeds from process/flowsheet.yaml, property package and
-    step specifications from process/simulation.yaml.
+    """Solve the flowsheet in DWSIM, or in IDAES where process/simulation.yaml says simulator:
+    idaes (optional; CHEME_IDAES_PYTHON names a Python with idaes-pse): feeds from
+    process/flowsheet.yaml, simulator, property package and step specifications from
+    process/simulation.yaml.
 
     --fill writes temperature, pressure, flow and composition of every simulated stream that
     lacks them (and the duty of energy streams) as `calculated` with a fingerprint; given and
     assumed values are never overwritten, a deviation from them is a warning. --fill also
     records the run (convergence, unit results, stream values, input fingerprints) in
     process/simulation-run.json; --check reports a record made from other inputs. Exits 1 on an
-    error (unmapped step, missing spec or feed, no DWSIM) and, with --check, on a warning
+    error (unmapped step, missing spec or feed, no simulator) and, with --check, on a warning
     (stale or deviating values, a stale record); 3 when the simulation did not converge (no
     stream value written, the run recorded)."""
     from chemeascode.domains.process.simulation.run import run
