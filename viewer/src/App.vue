@@ -6,6 +6,7 @@ import SideNav from "@/components/SideNav.vue";
 import { loadRepo, store } from "@/store";
 import { fullViewerHref } from "@/lib/viewerOptions";
 import { pageTitle } from "@/router";
+import { signalEmbed } from "@/lib/embedSignal";
 import { useInPageLink } from "@/lib/inPageLink";
 
 const route = useRoute();
@@ -24,6 +25,7 @@ watchEffect(() => (document.title = pageTitle(route, store.repo?.name || store.r
 // After navigating to another page (not on the first load, not for a new ?rev= or #fragment),
 // the focus moves to the new page's heading, so a keyboard or screen-reader user starts there.
 useRouter().afterEach(async (to, from, failure) => {
+  if (!failure) void nextTick(() => signalEmbed("app"));
   if (failure || from === START_LOCATION || to.path === from.path) return;
   await nextTick();
   const target = main.value?.querySelector<HTMLElement>("h1") ?? main.value;

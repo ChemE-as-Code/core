@@ -9,6 +9,7 @@ import { sanitizeSvg } from "@/lib/sanitize";
 import { createView } from "@/lib/panzoom";
 import { cssString, selectionCss } from "@/lib/highlight";
 import { findTagGroup } from "@/lib/pidTag";
+import { signalEmbed } from "@/lib/embedSignal";
 import { useAsync } from "@/lib/useAsync";
 import { useRev } from "@/lib/useRev";
 import { paramPath, pathSegments, shortRev } from "@/lib/format";
@@ -26,6 +27,15 @@ const picked = ref<Picked | null>(null);
 const pane = ref<InstanceType<typeof SvgPane> | null>(null);
 
 const svg = useAsync(async (signal) => sanitizeSvg(await api.pidSvg(path.value, rev.value, signal)), [path, rev]);
+// The embedding page learns when the drawing is on screen, or that it will not come.
+watch(
+  [svg.data, svg.error],
+  ([data, error]) => {
+    if (data) signalEmbed("visual");
+    else if (error) signalEmbed("error");
+  },
+  { flush: "post" },
+);
 // The picked object (its labels) belongs to the drawing it was picked in; `?select=` picks again.
 watch([path, rev], () => (picked.value = null));
 

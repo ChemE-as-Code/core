@@ -100,6 +100,8 @@ export interface LayoutRenderer {
    * every frame as the current look and detail would (the camera is put back after).
    */
   benchmark(ms?: number): Promise<{ fps: number; frames: number; calls: number; triangles: number }>;
+  /** Resolves when the fine geometry of a large model, added after the first frame, is complete. */
+  whenDetailReady: Promise<void>;
   dispose(): void;
 }
 
@@ -567,6 +569,13 @@ export function rangeOf(ranges: { start: number; count: number }[], vertex: numb
   return -1;
 }
 
+/** From this many meshes a model shows its overview first and adds the fine geometry afterwards. */
+const PROGRESSIVE_MIN = 2000;
+/** How long one slice of detail building may hold the main thread (ms). */
+const DETAIL_SLICE_MS = 12;
+/** How often a frame shows the detail added so far (ms). */
+const DETAIL_FRAME_MS = 500;
+
 export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, options: RendererOptions): LayoutRenderer {
   const width = () => Math.max(container.clientWidth, 1);
   const height = () => Math.max(container.clientHeight, 1);
@@ -670,6 +679,18 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
   // Batches: one merged mesh per layer, material and opacity (detail: also per plan cell), and
   // one instanced mesh per repeated shape among the detail parts and handrails.
   const batches: Batch[] = [];
+  /** Envelope and detail batches, switched by their cell's distance from the camera. */
+  const lodBatches: Batch[] = [];
+  // A large model shows its overview first: detail batches are built afterwards, a slice at a time,
+  // and each plan cell keeps its envelope until its detail is complete.
+  const progressive = spec.meshes.length >= PROGRESSIVE_MIN;
+  const deferred: { cell: string; build: () => void }[] = [];
+  const pendingCells = new Map<string, number>();
+  const later = (lod: number, cell: string, build: () => void) => {
+    if (!progressive || lod !== 2) return build();
+    deferred.push({ cell, build });
+    pendingCells.set(cell, (pendingCells.get(cell) ?? 0) + 1);
+  };
   const cellSpheres = new Map<string, THREE.Sphere>();
   const rangesByItem = new Map<string, { batch: Batch; range: Range }[]>();
   const grating = gratingTexture();
@@ -694,6 +715,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
     mesh.userData = { batch: batches.length };
     if (batch.baseOpacity < 1) mesh.renderOrder = layer === "zones" ? 3 : 2;
     batches.push(batch);
+    if (batch.lod > 0) lodBatches.push(batch);
     group(layer).add(mesh);
     for (const range of batch.ranges) {
       const list = rangesByItem.get(range.spec.item) ?? [];
@@ -738,7 +760,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       const [layer, material, opacityText, lodText, cell] = key.split("|") as [LayerId, string, string, string, string];
       const opacity = Number(opacityText);
       const lod = Number(lodText);
-      for (let c = 0; c < list.length; c += CHUNK) {
+      for (let c = 0; c < list.length; c += CHUNK) later(lod, cell, () => {
         const geometries: THREE.BufferGeometry[] = [];
         const ranges: Range[] = [];
         let vertex = 0;
@@ -751,10 +773,10 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
           vertex += count;
           geometries.push(g);
         }
-        if (!geometries.length) continue;
+        if (!geometries.length) return;
         const merged = mergeGeometries(geometries, false);
         for (const g of geometries) g.dispose();
-        if (!merged) continue;
+        if (!merged) return;
         merged.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(vertex * 3), 3));
         if (material === "grating") planarUv(merged, GRATING_PITCH);
         merged.computeBoundingSphere();
@@ -768,12 +790,13 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
           group(layer).add(edges);
         }
         addBatch({ mesh, layer, material, ranges, baseOpacity: opacity, instanced: false, lod, cell, edges });
-      }
+      });
     }
     for (const [key, list] of instancedBuckets) {
       const [layer, material, opacityText, lodText, cell] = key.split("|") as [LayerId, string, string, string, string];
       const opacity = Number(opacityText);
       const lod = Number(lodText);
+      later(lod, cell, () => {
       const mesh = new THREE.InstancedMesh(list[0]!.geometry(), makeMaterial(material, opacity, false), list.length);
       const ranges: Range[] = [];
       list.forEach((x, i) => {
@@ -787,12 +810,10 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       mesh.name = `${layer}:${material}:instanced${LOD_NAMES[lod]}`;
       track({ dispose: () => mesh.dispose() });
       addBatch({ mesh, layer, material, ranges, baseOpacity: opacity, instanced: true, lod, cell, edges: null });
+      });
     }
     for (const [cell, box] of cellBoxes) cellSpheres.set(cell, box.getBoundingSphere(new THREE.Sphere()));
   }
-  /** Envelope and detail batches, switched by their cell's distance from the camera. */
-  const lodBatches = batches.filter((b) => b.lod > 0);
-  const detailCount = batches.filter((b) => b.lod === 2).length;
 
   // Line sets that are not drawn as members (site outline, north arrow, scale bar) and model edges.
   for (const set of [...spec.lines.filter((l) => !l.members), ...spec.edges.map((e) => ({ ...e, clash: false }))]) {
@@ -975,8 +996,8 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
   function paintItem(item: string | null): void {
     for (const { batch, range } of rangesByItem.get(item ?? "") ?? []) paintRange(batch, range);
   }
-  function paintAll(): void {
-    for (const batch of batches) {
+  function paintAll(list = batches): void {
+    for (const batch of list) {
       if (batch.instanced) {
         for (const range of batch.ranges) paintRange(batch, range);
         continue;
@@ -993,9 +1014,9 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
   let xray = false;
   let dark = options.theme.dark;
   /** Materials, opacity and shadows of every batch for the look, x-ray and theme. */
-  function applyOpacity(): void {
+  function applyOpacity(list = batches): void {
     const real = surfaceLook === "realistic";
-    for (const batch of batches) {
+    for (const batch of list) {
       const mat = batch.mesh.material;
       const surface = real ? REAL_SURFACE[batch.material] : undefined;
       let opacity = batch.baseOpacity;
@@ -1024,6 +1045,45 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       batch.mesh.receiveShadow = real && !ghost && (!transparent || batch.layer === "areas" || batch.layer === "roads");
     }
   }
+
+  // Build the deferred detail in slices, so that the page stays responsive and the camera, the
+  // selection and the colours carry over to what arrives.
+  let detailTimer = 0;
+  let lastDetailFrame = performance.now();
+  let resolveDetail = () => {};
+  const whenDetailReady = new Promise<void>((resolve) => (resolveDetail = resolve));
+  function buildDeferred(budgetMs: number): void {
+    const from = batches.length;
+    const end = performance.now() + budgetMs;
+    while (deferred.length && performance.now() < end) {
+      const task = deferred.shift()!;
+      task.build();
+      const left = pendingCells.get(task.cell)! - 1;
+      if (left) pendingCells.set(task.cell, left);
+      else pendingCells.delete(task.cell);
+    }
+    const added = batches.slice(from);
+    paintAll(added);
+    applyOpacity(added);
+    // Frames between slices would cost more than the slices: a frame now and then, and the last.
+    const now = performance.now();
+    if (added.length && (!deferred.length || now - lastDetailFrame > DETAIL_FRAME_MS)) {
+      lastDetailFrame = now;
+      requestRender();
+    }
+    if (!deferred.length) resolveDetail();
+  }
+  function detailSlice(): void {
+    buildDeferred(DETAIL_SLICE_MS);
+    if (deferred.length) detailTimer = window.setTimeout(detailSlice, 0);
+  }
+  /** Complete the model at once, for what needs all of it (exports, statistics). */
+  function finishDetail(): void {
+    window.clearTimeout(detailTimer);
+    buildDeferred(Infinity);
+  }
+  if (deferred.length) detailTimer = window.setTimeout(detailSlice, 0);
+  else resolveDetail();
 
   // -------------------------------------------------------------------------------------------
   // Views and camera.
@@ -1139,7 +1199,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
     const near = new Map<string, boolean>();
     if (detail === "auto") for (const [cell, s] of cellSpheres) near.set(cell, viewDistance(s.center) - s.radius < DETAIL_DISTANCE);
     for (const batch of lodBatches) {
-      const close = detail === "full" || (detail === "auto" && near.get(batch.cell) === true);
+      const close = !pendingCells.has(batch.cell) && (detail === "full" || (detail === "auto" && near.get(batch.cell) === true));
       batch.mesh.visible = batch.lod === 2 ? close : !close;
       if (batch.lod === 2 && close && batch.mesh.parent?.visible) detailShown++;
     }
@@ -1557,12 +1617,14 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
   }
 
   async function exportGlb(): Promise<ArrayBuffer> {
+    finishDetail();
     const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
     const exporter = new GLTFExporter();
     return exportScene(async () => (await exporter.parseAsync(world, { binary: true, onlyVisible: true })) as ArrayBuffer);
   }
 
   async function exportStl(options: StlOptions): Promise<ArrayBuffer> {
+    finishDetail();
     return exportScene(() => {
       world.updateMatrixWorld(true);
       const meshes: THREE.Mesh[] = [];
@@ -1637,16 +1699,20 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       detail = next;
       requestRender();
     },
-    stats: () => ({
-      batches: batches.length,
-      meshes: spec.meshes.length,
-      instanced: batches.filter((b) => b.instanced).length,
-      instances: batches.reduce((n, b) => n + (b.instanced ? b.ranges.length : 0), 0),
-      detail: detailCount,
-      detailShown,
-      ...stats,
-    }),
+    stats: () => {
+      return {
+        batches: batches.length,
+        meshes: spec.meshes.length,
+        instanced: batches.filter((b) => b.instanced).length,
+        instances: batches.reduce((n, b) => n + (b.instanced ? b.ranges.length : 0), 0),
+        detail: batches.filter((b) => b.lod === 2).length,
+        detailShown,
+        ...stats,
+      };
+    },
+    whenDetailReady,
     benchmark(ms = 2000) {
+      finishDetail();
       const saved = { position: perspective.position.clone(), target: controls.target.clone() };
       const offset = camera.position.clone().sub(controls.target);
       const axis = new THREE.Vector3(0, 0, 1);
@@ -1706,6 +1772,7 @@ export function createLayoutRenderer(container: HTMLElement, spec: SceneSpec, op
       clearOverlay("measure-line");
       clearOverlay("finding-box");
       clearOverlay("route");
+      window.clearTimeout(detailTimer);
       for (const thing of disposables) thing.dispose();
       if (gridHelper) {
         gridHelper.geometry.dispose();

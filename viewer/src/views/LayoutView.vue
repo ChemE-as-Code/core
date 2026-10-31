@@ -4,6 +4,7 @@ import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, ApiError, type Finding, type Layout } from "@/api";
 import LoadState from "@/components/LoadState.vue";
 import SvgPane from "@/components/SvgPane.vue";
+import { signalEmbed } from "@/lib/embedSignal";
 import { useAsync } from "@/lib/useAsync";
 import { FINDINGS_OPEN_MAX, groupFindings } from "@/lib/findings";
 import { useRev } from "@/lib/useRev";
@@ -56,7 +57,13 @@ const layout = useAsync<Layout | null>(async (signal) => {
   }
 }, [rev]);
 
-const scene = computed(() => (layout.data.value ? buildScene(layout.data.value, { sheets: store.repo?.sheets }) : null));
+const scene = computed(() => {
+  if (!layout.data.value) return null;
+  performance.mark("layout:data");
+  const spec = buildScene(layout.data.value, { sheets: store.repo?.sheets });
+  performance.mark("layout:scene");
+  return spec;
+});
 const missing = computed(() => !layout.loading.value && !layout.error.value && layout.data.value === null);
 const model = computed(() => layout.data.value?.model ?? null);
 
@@ -186,6 +193,9 @@ function onGroupToggle(rule: string, event: Event): void {
 const container = ref<HTMLElement | null>(null);
 const renderer = shallowRef<LayoutRenderer | null>(null);
 const renderError = ref<string | null>(null);
+/** How far the 3D model is: named stages for the page, the tests and the embedding page. */
+const modelStage = ref<"idle" | "building" | "overview" | "detail">("idle");
+const nextPaint = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 const nav = ref<NavMode>("orbit");
 const tool = ref<"pick" | "measure">("pick");
 const measured = ref<MeasureResult | null>(null);
@@ -232,12 +242,17 @@ async function mount(): Promise<void> {
   disposeRenderer();
   renderError.value = null;
   nav.value = "orbit";
+  modelStage.value = "idle";
   const spec = scene.value;
   if (!spec || !container.value || state.tab !== "3d") return;
   try {
+    modelStage.value = "building";
     // three.js is only loaded here, on the layout route.
     const { createLayoutRenderer } = await import("@/lib/layoutThree");
+    // The note is on screen before the model takes the main thread.
+    await nextPaint();
     if (current !== generation || !container.value) return;
+    performance.mark("layout:build-start");
     const r = createLayoutRenderer(container.value, spec, {
       theme: theme(),
       onPick: (item) => {
@@ -256,6 +271,7 @@ async function mount(): Promise<void> {
       onNavigation: (mode) => (nav.value = mode),
       onFlySpeed: (speed) => (flySpeed.value = speed),
     });
+    performance.mark("layout:build-end");
     renderer.value = r;
     for (const t of TOGGLES) if (!shown.value.has(t)) r.setLayer(t, false);
     r.setColorMode(state.mode);
@@ -277,8 +293,20 @@ async function mount(): Promise<void> {
     // Only the user's own camera moves go to the URL, not the initial framing.
     window.clearTimeout(cameraTimer);
     applyMarks();
+    await nextPaint();
+    if (current !== generation) return;
+    performance.mark("layout:overview");
+    modelStage.value = "overview";
+    signalEmbed("visual");
+    await r.whenDetailReady;
+    if (current !== generation) return;
+    performance.mark("layout:detail");
+    modelStage.value = "detail";
+    signalEmbed("detail");
   } catch (error) {
+    modelStage.value = "idle";
     renderError.value = `Cannot draw the 3D view: ${error instanceof Error ? error.message : String(error)}`;
+    signalEmbed("error");
   }
 }
 
@@ -755,7 +783,10 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
         <p class="muted">See <code>layout/README.md</code> of a new <code>cheme init</code> repo for their format.</p>
       </div>
       <div v-show="scene && state.tab === '3d'" class="stage-wrap">
-        <div ref="container" class="stage" :class="{ measuring: tool === 'measure', moving: nav !== 'orbit' }" aria-label="3D layout. Drag to orbit, scroll to zoom, right-drag to pan." />
+        <div ref="container" class="stage" :class="{ measuring: tool === 'measure', moving: nav !== 'orbit' }" :data-model-stage="modelStage" aria-label="3D layout. Drag to orbit, scroll to zoom, right-drag to pan." />
+        <p v-if="modelStage === 'building' || modelStage === 'overview'" class="model-stage" role="status" data-testid="model-stage">
+          {{ modelStage === "building" ? "Building the 3D model\u2026" : "Adding fine detail\u2026" }}
+        </p>
         <p v-if="nav !== 'orbit'" class="nav-help">
           <template v-if="nav === 'walk'">Walking at 1.7 m eye height.</template>
           <template v-else>Flying at {{ flySpeed }} m/s (+/- or wheel).</template>
@@ -1152,6 +1183,21 @@ const LAYOUT_FILES = ["layout/site-plan.yaml", "layout/building.yaml", "layout/e
 </template>
 
 <style scoped>
+.model-stage {
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  z-index: 2;
+  margin: 0;
+  padding: 2px 10px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
 .layout {
   display: flex;
   flex-direction: column;
