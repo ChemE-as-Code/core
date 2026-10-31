@@ -1,0 +1,13 @@
+# Toluene hydrodealkylation (schema cheme/reactions/v1). No rate law: the reactor is a conversion
+# reactor with an assumed per-pass toluene conversion.
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: HDA
+    title: Toluene hydrodealkylation
+    equation: C7H8 + H2 -> C6H6 + CH4
+    stoichiometry: {TOL: -1, H2: -1, BZ: 1, CH4: 1}
+    phase: vapor
+    reversible: false
+    conversion: {key: TOL, value: 0.75, provenance: assumed, source: ASSUMED per-pass toluene conversion}
+    sources: ["Douglas, J.M. (1988) Conceptual Design of Chemical Processes, McGraw-Hill (HDA case study)"]

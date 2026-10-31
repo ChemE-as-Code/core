@@ -1,0 +1,14 @@
+# The four components of the reduced toluene hydrodealkylation loop. Molar masses and CAS numbers
+# are those of the IDAES property data the IDAES backend reads (its ideal VLE package).
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: TOL, name: Toluene, formula: C7H8, cas: 108-88-3, molar_mass: 92.1405}
+  - {id: H2, name: Hydrogen, formula: H2, cas: 1333-74-0, molar_mass: 2.016}
+  - {id: BZ, name: Benzene, formula: C6H6, cas: 71-43-2, molar_mass: 78.1136}
+  - {id: CH4, name: Methane, formula: CH4, cas: 74-82-8, molar_mass: 16.043}
+templates:
+  - {id: hda, title: HDA process stream, components: [TOL, H2, BZ, CH4]}
+property_method:
+  adapter: thermo
+  status: placeholder

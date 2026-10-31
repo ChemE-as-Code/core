@@ -1,0 +1,6 @@
+name: process-hda-idaes
+description: Toluene hydrodealkylation loop solved by the optional IDAES backend (cheme process simulate, simulator idaes)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}
