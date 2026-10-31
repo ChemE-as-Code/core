@@ -1180,6 +1180,18 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   double column). See `examples/process-simulation`
   and `examples/process-separation`.
 
+  `simulator: idaes` in `simulation.yaml` (default `dwsim`; ADR 0038) solves the flowsheet in
+  the optional IDAES backend instead: the worker runs in the Python `CHEME_IDAES_PYTHON` names
+  (with idaes-pse and IPOPT; cheme-as-code never imports IDAES or Pyomo). Its scope is heater,
+  cooler, valve, pump, mixer, splitter, flash, conversion reactor and recycles (compressor and
+  expander with Peng-Robinson), property packages `IDAES ideal VLE` and `IDAES Peng-Robinson`
+  for benzene, toluene, hydrogen and methane; anything else is
+  `cheme.process-sim-backend-unsupported` (error) at translation, and neither package is
+  benchmarked (`-sim-method-unbenchmarked`, info). Values carry the source `cheme process
+  simulate: IDAES <version>, <property package>`; the run record also names the solver
+  (IPOPT). See [docs/framework/idaes.md](docs/framework/idaes.md) and
+  `examples/process-hda-idaes`.
+
   `--fill` also records the run in `process/simulation-run.json` (generated, committed with the
   flowsheet; schema `cheme/simulation-run/v1`, one entry per case): simulator and version,
   property package, when, the model fingerprint and the input files' commit and fingerprints,
