@@ -194,6 +194,12 @@ The Process Atlas frames a route of a snapshot this way:
 <iframe src="/viewer/?data=../snapshot/&embed=1&theme=dark#/pid/process/PFD.xml"></iframe>
 ```
 
+An embedded viewer tells its page how far it is (`src/lib/embedSignal.ts`): `postMessage` to the
+same origin, `{ type: "cheme-viewer", version: 1, stage, route }`, where `stage` is `app` (running
+and routed), `visual` (the drawing or the 3D overview is on screen), `detail` (the 3D model is
+complete) or `error`, and `route` is the view it belongs to. The page should check the message's
+`origin` and `source`.
+
 ## Design notes
 
 Architecture decisions are recorded in [docs/adr/](docs/adr/README.md); a pull request that
