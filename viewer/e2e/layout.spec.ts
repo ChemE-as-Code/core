@@ -116,7 +116,9 @@ test.describe("layout", () => {
     await expect(lines).not.toBeChecked();
     await lines.check();
     await expect(page).toHaveURL(/layers=[^&]*lines/);
-    // Line numbers show up close: zoom in on the middle of the plant.
+    // Line numbers show up close: zoom in on the middle of the plant, once the model is complete
+    // (with software rendering on a CI runner, zooming while it builds can outlast the test).
+    await expect(page.locator('.layout .stage[data-model-stage="detail"]')).toBeAttached({ timeout: 60_000 });
     const stage = (await page.locator(".layout .stage").boundingBox())!;
     await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
     for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -400);
