@@ -68,7 +68,7 @@ idaes-pse and `idaes get-extensions` (else `sim-unavailable`). Its scope is boun
 Anything outside it is `sim-backend-unsupported` (error) at translation: switch to DWSIM, do
 not approximate the step. The IDAES packages are not benchmarked (`sim-method-unbenchmarked`,
 info): say that their values are not predictive. Switching `simulator` makes filled values
-`sim-stale`. A run of a small recycle loop takes about a minute. Example:
+`sim-stale`. A run of the small HDA recycle loop took about four minutes locally. Example:
 `examples/process-hda-idaes`; details in the cheme-as-code docs (`docs/framework/idaes.md`).
 
 ## Workflow and tools
