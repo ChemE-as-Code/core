@@ -1,6 +1,6 @@
 # What the IDAES backend needs beyond the flowsheet (`cheme process simulate`; schema
 # `cheme schema process-simulation`). Units as in process/flowsheet.yaml unless given.
-# simulator: idaes runs the flowsheet in IDAES (ADR 0038); it needs CHEME_IDAES_PYTHON, a Python
+# simulator: idaes runs the flowsheet in IDAES (ADR 0039); it needs CHEME_IDAES_PYTHON, a Python
 # with idaes-pse and its solvers (`idaes get-extensions`).
 schema: cheme/simulation/v1
 kind: simulation

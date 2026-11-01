@@ -1,4 +1,4 @@
-"""cheme process simulate with the optional IDAES backend (``simulator: idaes``, ADR 0038).
+"""cheme process simulate with the optional IDAES backend (``simulator: idaes``, ADR 0039).
 
 Without IDAES: the translation of examples/process-hda-idaes, the refusals of what the backend
 does not run, the worker command, and a fill and check from a recorded worker response

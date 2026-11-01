@@ -1,4 +1,4 @@
-# 0038. IDAES as an optional second simulation backend, chosen in simulation.yaml
+# 0039. IDAES as an optional second simulation backend, chosen in simulation.yaml
 
 - **Status:** Proposed
 - **Date:** 2026-10-31

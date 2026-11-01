@@ -2,7 +2,7 @@
 
 The CLI prints the convergence and the unit results of a simulation; the record keeps them, so
 that the viewer (``GET /api/simulation``) and a reviewer see what the last run gave without
-running the simulator (DWSIM or IDAES, ADR 0038) again. It is generated: ``--fill`` rewrites
+running the simulator (DWSIM or IDAES, ADR 0039) again. It is generated: ``--fill`` rewrites
 the entry of its case after every run the simulator finished (converged or not); ``--check``
 writes nothing and reports an entry made from other inputs (``cheme.process-sim-run-stale``)
 or a case without one (``cheme.process-sim-run-missing``, info). Never edit it by hand.

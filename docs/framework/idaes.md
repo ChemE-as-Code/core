@@ -2,7 +2,7 @@
 
 `cheme process simulate` solves a flowsheet in DWSIM by default. A flowsheet within a bounded
 scope can instead be solved by [IDAES](https://idaes.org) (idaes-pse, on Pyomo, solved with
-IPOPT), an optional second backend ([ADR 0038](../adr/0038-idaes-as-an-optional-second-simulation-backend.md)).
+IPOPT), an optional second backend ([ADR 0039](../adr/0039-idaes-as-an-optional-second-simulation-backend.md)).
 Both backends take the same simulator model and write results through the same `--fill` and
 `--check` path, run record and provenance.
 

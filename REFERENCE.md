@@ -1180,7 +1180,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   double column). See `examples/process-simulation`
   and `examples/process-separation`.
 
-  `simulator: idaes` in `simulation.yaml` (default `dwsim`; ADR 0038) solves the flowsheet in
+  `simulator: idaes` in `simulation.yaml` (default `dwsim`; ADR 0039) solves the flowsheet in
   the optional IDAES backend instead: the worker runs in the Python `CHEME_IDAES_PYTHON` names
   (with idaes-pse and IPOPT; cheme-as-code never imports IDAES or Pyomo). Its scope is heater,
   cooler, valve, pump, mixer, splitter, flash, conversion reactor and recycles (compressor and

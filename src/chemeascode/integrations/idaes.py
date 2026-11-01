@@ -1,5 +1,5 @@
 """IDAES, out of process: a simulator model (``domains/process/simulation/translate``) in, the
-solved streams out, as JSON through ``idaes_worker.py`` (ADR 0038).
+solved streams out, as JSON through ``idaes_worker.py`` (ADR 0039).
 
 The worker runs in a separate Python that has idaes-pse, Pyomo and IPOPT (``idaes
 get-extensions``); cheme-as-code never imports IDAES or Pyomo itself. Where it runs:

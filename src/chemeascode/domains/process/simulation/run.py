@@ -1,5 +1,5 @@
 """``cheme process simulate --fill/--check``: the flowsheet solved by DWSIM, or by the optional
-IDAES backend where ``process/simulation.yaml`` says ``simulator: idaes`` (ADR 0038).
+IDAES backend where ``process/simulation.yaml`` says ``simulator: idaes`` (ADR 0039).
 
 The feeds (temperature, pressure, flow, composition) and the specifications in
 ``process/simulation.yaml`` go to the simulator; every other material stream comes back with its

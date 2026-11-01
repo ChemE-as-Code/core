@@ -292,7 +292,7 @@ class Simulation(Strict):
     kind: Literal["simulation"]
     simulator: Literal["dwsim", "idaes"] = Field(
         default="dwsim",
-        description="The simulator that solves the flowsheet (ADR 0038): dwsim (the default) or "
+        description="The simulator that solves the flowsheet (ADR 0039): dwsim (the default) or "
         "idaes, an optional backend run in the Python CHEME_IDAES_PYTHON names (heater, cooler, "
         "valve, pump, compressor, expander, mixer, splitter, flash, conversion reactor and "
         "recycles; property packages 'IDAES ideal VLE' and 'IDAES Peng-Robinson').",
