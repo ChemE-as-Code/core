@@ -4,6 +4,14 @@
 
 ### Changed
 
+- The simulation's energy audit closes the plant with component separators in it (#60, ADR
+  0038). A specified split's imbalance is stated, not judged: `status: stated`, `imbalance_kW`
+  = enthalpy out minus in from the solved streams (positive: heat the unit would have to take
+  in). DWSIM's `EnergyImb` is recorded with the sign each run shows (`simulator_convention`;
+  `indeterminate` when the stated value is at most twice the tolerance) and not relied on. The plant record gains `stated_kW` and `stated`, its residual takes them
+  as stated heat; the plant tolerance counts each stated magnitude. New rule `cheme.process-sim-energy-stated` (info). `predictive.energy-closure`
+  passes such a plant and names the stated values; runs recorded earlier stay unsupported until
+  simulated again, and `cheme process energy` says so.
 - Licence: one statement everywhere. The skills and scripts `cheme init` writes into a plant
   repository are AGPL-3.0-or-later; plant data and models are the user's, and running the tools
   does not put AGPL on what they produce. `REFERENCE.md` said otherwise before.

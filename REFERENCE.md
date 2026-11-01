@@ -1262,7 +1262,13 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   values and missing values are info and recorded limitations, with each component's
   difference in kJ/kmol (ammonia: -45558 kJ/kmol in ATcT, -45898 in DWSIM, 0.74 % of the
   synthesis heat). Another package and units
-  with an unestablished duty sign are `sim-energy-unsupported`, never a number. Every duty
+  with an unestablished duty sign (a column top without condenser) are
+  `sim-energy-unsupported`, never a number. A component separator (a specified split) conserves
+  no energy: its imbalance is stated, not judged (`status: stated`, `imbalance_kW` = enthalpy
+  out minus in from the solved streams, positive: heat the unit would have to take in; DWSIM's
+  `EnergyImb` is recorded with its observed sign, `simulator_convention`, and not relied on),
+  and the plant closes with it as a stated residual (`stated_kW`; `sim-energy-stated`, info,
+  beyond the tolerance; not a utility; ADR 0038). Every duty
   is classified once as hot or cold utility, power, or heat recovered between process streams
   (process-to-process exchangers, condenser-reboilers), which is never also counted as utility.
 - **`cheme process extract [UNIT] [--systems] [--json]`** (extra `props`) solves each extractor
