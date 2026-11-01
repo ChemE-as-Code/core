@@ -25,7 +25,7 @@ examples rebuilt.
 - Negative: installation needs access to a private repository, so cheme-as-code cannot be
   installed by the public until it depends on a public pyDEXPI.
 - Negative: fixes upstream are not picked up automatically.
-- Open: depend on the public pyDEXPI repository (#29).
+- Open: depend on the public pyDEXPI repository (#111).
 
 ## Evidence
 

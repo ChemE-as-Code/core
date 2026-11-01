@@ -5,7 +5,7 @@
 
 ## Context
 
-Process-library cases (salts, fertilizers, pigments, hydrates; ChemE-as-Code/process-library#114)
+Process-library cases (salts, fertilizers, pigments, hydrates; ChemE-as-Code/process-library#306)
 need crystallization and solid-liquid separation. The
 process model had no solid phase: `thermodynamics/methods.yml` declares solid equilibrium
 unsupported in the property routes, the DWSIM translation has fluid outlet roles only, and

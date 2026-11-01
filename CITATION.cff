@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: >-
+  If you use ChemE-as-Code, please cite it as below, and the Process Atlas paper where you use its
+  processes. Both papers are in preparation (2026): their titles are working titles, and they have
+  no DOI yet.
+title: ChemE-as-Code
+type: software
+authors:
+  - family-names: Schweidtmann
+    given-names: Artur M.
+    affiliation: Process Intelligence Research, Delft University of Technology
+license: AGPL-3.0-or-later
+version: 1.3.0
+repository-code: https://github.com/ChemE-as-Code/core
+preferred-citation:
+  type: article
+  title: "ChemE-as-Code: An Open-Source Platform for AI-Accelerated Chemical Process Engineering"
+  status: in-preparation
+  year: 2026
+  authors:
+    - family-names: Schweidtmann
+      given-names: Artur M.
+      affiliation: Process Intelligence Research, Delft University of Technology

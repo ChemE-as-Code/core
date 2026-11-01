@@ -10,7 +10,7 @@ it onto the machine, so the branch's last horizontal run lay over the machine's 
 lifting study's crane lane covers that footprint (the item's width across the direction of
 travel plus `lane_margin_m` each side, above its top plus `lift_clearance_m`). It left out
 only the branch's last vertical run, so the horizontal run blocked the lane. In the ammonia-1
-run (process-library#86, cheme 1.0.1) this blocked the lanes of the compressors K-101, K-102,
+run (process-library#304, cheme 1.0.1) this blocked the lanes of the compressors K-101, K-102,
 K-103 and K-701, and gate `lifting-study` failed (core#73). A project had no way to say where a
 motor's cable comes in, so the route could not be steered off the machine.
 
