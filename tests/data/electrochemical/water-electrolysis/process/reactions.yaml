@@ -1,4 +1,4 @@
-# Water splitting with liquid water fed (core#366). dH = -dfH(H2O, l) = 285.830 +- 0.040 kJ/mol
+# Water splitting with liquid water fed. dH = -dfH(H2O, l) = 285.830 +- 0.040 kJ/mol
 # (H2 and O2 are reference states): CODATA Key Values for Thermodynamics (Cox, Wagman,
 # Medvedev, Hemisphere, New York, 1989).
 schema: cheme/reactions/v1

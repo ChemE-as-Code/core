@@ -1,5 +1,4 @@
-"""Conversion reactors: the conversion DWSIM reached against the declared one
-(pre-release issue 371).
+"""Conversion reactors: the conversion DWSIM reached against the declared one.
 
 DWSIM 9.0.5's conversion reactor applies a reaction's conversion to its key component in the
 reaction's phase of the reactor inlet only: ``phase: liquid`` converts the key in the inlet's

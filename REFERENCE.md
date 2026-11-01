@@ -14,8 +14,7 @@ Coding agents are very good with text files and git, and getting better. cheme-a
 validator with `file:line` findings, a formatter that keeps diffs small, a renderer, a visual
 diff, and engineering-step gates.
 
-> Status: research prototype of the Process Intelligence Research group. Private until the first
-> release.
+> Status: research prototype of the Process Intelligence Research group.
 
 > **Renamed from plantcode.** Since 0.7.0 the package is `cheme-as-code`, the import name
 > `chemeascode` and the command `cheme`; finding ids start with `cheme.` and schema ids with
@@ -69,12 +68,11 @@ see the plant's `.github/workflows/validate.yml`).
 uv tool install git+https://github.com/ChemE-as-Code/core.git
 ```
 
-Needs Python 3.12+ and read access to pyDEXPI. pyDEXPI 2.x is not on PyPI yet: cheme-as-code pins it
+Needs Python 3.12+. pyDEXPI 2.x is not on PyPI yet: cheme-as-code pins it
 to a commit of its git repository (`[tool.uv.sources]` in `pyproject.toml`), so `uv` clones it
 during the install. With `uv` this needs nothing else; with `pip`, install it from git first
 (`pip install "pydexpi @ git+https://github.com/process-intelligence-research/pyDEXPI-dev.git@<rev>"`,
-the `rev` of `pyproject.toml`), then cheme-as-code. A private repository needs git credentials that
-can read it (an SSH key or a credential helper); `cheme --version` prints the pyDEXPI that
+the `rev` of `pyproject.toml`), then cheme-as-code. `cheme --version` prints the pyDEXPI that
 was installed. For PNG output
 (`cheme render --png`) install the `png` extra, which adds resvg:
 `uv tool install 'cheme-as-code[png] @ git+https://github.com/ChemE-as-Code/core.git'`.
@@ -86,7 +84,7 @@ SMILES checks in `chemeascode.domains.chemistry` the `chemistry` extra (RDKit). 
 `cheme-as-code[png,props,serve]`.
 
 The ChemSep SRK interaction parameters (`kij`) of the Redlich-Kwong-Soave phase calculation are
-not shipped, as their licence is not yet confirmed (pre-release issue 55). `cheme data fetch chemsep-srk`
+not shipped, as their licence is not yet confirmed. `cheme data fetch chemsep-srk`
 downloads ChemSep-LITE (http://www.chemsep.org, plain HTTP; the archive's sha256 is checked), or
 reads a downloaded copy with `--zip lite.zip`, and installs the converted `srk.json` in the user
 data directory (`$CHEME_DATA_DIR` if set; `cheme data status` shows where). Without it every
@@ -1042,7 +1040,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (`domains/chemistry/liquid.py`). `reactor: equilibrium` solves a liquid equilibrium and
   `process reactors` reports ln(Q/K) and the rate on that basis; `validate` warns when a basis
   does not fit the phase (`cheme.reaction-phase-basis`).
-- **Solids, crystallizers and filters** (pre-release issue 365): a component with `phase: solid` in
+- **Solids, crystallizers and filters**: a component with `phase: solid` in
   `process/materials.yaml` is a solid (a crystal, or a hydrate with its water in the formula,
   `Na2CO3(H2O)10`), a separate component from the same substance dissolved; every stream then
   divides into dry solid and liquid (mother liquor or moisture) with their compositions
@@ -1531,7 +1529,8 @@ with the bundled ones: each file is `current`, `outdated` (an earlier bundled ve
 the package's `templates/skills-manifest.json`), `modified` (changed in this repository) or
 `missing`. `cheme skills update [NAME...]` installs missing and outdated files and keeps a
 modified one, reporting `cheme.skill-modified` (exit 1); `--force` replaces it and still
-reports it. `cheme init` reports a modified skill it kept, or replaced under `--force`.
+reports it. `cheme init` reports a modified skill it kept, or replaced under `--force`. The licence
+notice `.claude/skills/NOTICE.md` is tracked the same way; an update naming skills leaves it alone.
 
 ### git diff
 
@@ -1646,7 +1645,7 @@ Agents edit the XML files directly. There is deliberately no MCP server and no e
 API: the experiment is how far direct file editing with validation goes. `copy` and `fragment`
 are text helpers in that spirit: they write XML for the agent to place, and the file stays the
 only state. The builder library `chemeascode.domains.piping.authoring` for generator scripts fits the same
-principle (decided in 0.4, pre-release issue 13): it loads a file, inserts XML built by the same functions as
+principle (decided in 0.4): it loads a file, inserts XML built by the same functions as
 `fragment`, writes the file and formats it; it holds no state between runs, and its output is
 validated like any hand edit.
 
@@ -1752,8 +1751,11 @@ The same text is in `NOTICE`. Which licence applies where:
   `domains/assessment/lca/data/backgrounds/` each state theirs in `sources:` (Ember: CC BY 4.0;
   EEA: CC BY; DESNZ: Open Government Licence v3.0; UBA: UBA data terms; US EPA eGRID: public
   domain in the US). The ChemSep SRK data is not shipped (`data/chemsep/SOURCE.md`).
-- **Your plant repository is yours.** The template and skills `cheme init` writes into a plant
-  repository are yours to use under any terms; `cheme init` adds no license, and its README says
-  the content of the plant repository is the user's to license. The
-  ChemE-as-Code/project-template repository generated from it ships without a license too.
+- **The tools stay AGPL; your plant data is yours.** The skills `cheme init` writes into a plant
+  repository (`.claude/skills/`) and the scripts it writes there (`scripts/`) are
+  AGPL-3.0-or-later, like the rest of the tools. Plant data and models you create (P&IDs, YAML,
+  reports, generated drawings and results) are yours, under terms you choose; running the tools
+  does not put AGPL on what they produce. `.claude/skills/NOTICE.md` and the plant README say so
+  in the repository. `cheme init` adds no `LICENSE` file for the plant content, and neither does
+  the ChemE-as-Code/project-template repository generated from it.
 - pyDEXPI and the other dependencies keep their own licenses.

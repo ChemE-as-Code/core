@@ -676,8 +676,8 @@ def create_app(
             return False
 
     def _has_control(snapshot: Snapshot) -> bool:
-        """Loops, sequences, or a narrative or philosophy changed from its template
-        (pre-release issue 140): ``GET /api/control`` has something to show."""
+        """Loops, sequences, or a narrative or philosophy changed from its template:
+        ``GET /api/control`` has something to show."""
         from chemeascode.domains.control.report import CONTROL_FILES, has_control_texts
 
         texts = {}

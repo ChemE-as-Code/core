@@ -1,4 +1,4 @@
-"""Follow-ups of pre-release issue 66: the independent checks of the cited tables, the public pump
+"""Follow-ups: the independent checks of the cited tables, the public pump
 sizing, the datasheet markers ``supplier`` / ``not_applicable`` and what ``fill`` adds or keeps.
 
 The expected pump numbers are the hand calculation of ``test_datasheet_fill`` (same layout)."""

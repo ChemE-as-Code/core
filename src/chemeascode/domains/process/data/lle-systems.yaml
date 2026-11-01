@@ -1,5 +1,5 @@
 # Liquid-liquid equilibrium systems shipped with core for `cheme process extract`
-# (chemeascode.domains.process.separations.extraction, core#369): components, NRTL interaction
+# (chemeascode.domains.process.separations.extraction): components, NRTL interaction
 # parameters with their source and fitted temperature range, and, where a core test benchmarks
 # the system against measured tie lines, the benchmark (`qualification`).
 #

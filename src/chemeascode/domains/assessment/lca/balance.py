@@ -1,13 +1,13 @@
-"""Balance checks of an LCI dataset (pre-release issue 174): mass, element and energy closure over
+"""Balance checks of an LCI dataset: mass, element and energy closure over
 its exchanges, and the carbon split by origin.
 
 Two interfaces:
 
-- :func:`element_balance`, the minimal check tiered generation requires (pre-release issue 182): the
+- :func:`element_balance`, the minimal check tiered generation requires: the
   formula of each exchange's component from ``generation.formulas``; the balance is closed when
   every element's in and out agree within ``tolerance`` (the rounding of written amounts).
-- :func:`dataset_balance`, the balance gates of
-  pre-release issue 174 over any dataset, flowsheet-derived or written by hand. Inputs and resources
+- :func:`dataset_balance`, the balance gates over any dataset, flowsheet-derived or written by hand.
+  Inputs and resources
   (free ones such as air and water included) count in, products, outputs (wastes, by-products) and
   emissions out, per the dataset's basis.
 
@@ -37,8 +37,8 @@ steam in, and fuels at their lower heating value, against the heat rejected (``c
 the energy exported and the energy content of the products (``properties.energy``); the
 sensible and latent enthalpy of the material streams is not in the dataset and not counted.
 
-**Tolerances** (:func:`tolerance`): the defaults
-pre-release issue 174 sets, relative to the larger side, 1 % for a dataset derived from a simulated
+**Tolerances** (:func:`tolerance`): the defaults,
+relative to the larger side, 1 % for a dataset derived from a simulated
 flowsheet and 5 % for a sourced screening dataset (a Tier 0 or 1 estimate, one written by hand, or a
 design of maturity concept or screening). A breach is a warning of ``cheme assess lca`` and fails
 the gate requirements ``lci-mass-balance``, ``lci-element-balance`` and ``lci-carbon-origin``
@@ -130,9 +130,9 @@ def element_balance(
     )
 
 
-# -- the balance gates of pre-release issue 174 ----------------------------------------------------
+# -- the balance gates -----------------------------------------------------------------------------
 
-#: Default tolerances (relative, of the larger side), the design choice of pre-release issue 174: a
+#: Default tolerances (relative, of the larger side), a design choice: a
 #: dataset derived from a simulated flowsheet closes within 1 %, a sourced screening dataset within
 #: 5 %.
 SIMULATED_TOLERANCE = 0.01
@@ -678,7 +678,7 @@ def dataset_balance(
     path: str = "",
     tolerance_: float | None = None,
 ) -> DatasetBalance:
-    """The mass, element, carbon-origin and energy balance of *dataset* (pre-release issue 174), at
+    """The mass, element, carbon-origin and energy balance of *dataset*, at
     the default :func:`tolerance` for a design of *maturity* (process.yaml) unless *tolerance_* is
     given. *accounting* and *load* are passed to :func:`.carbon.trace` (the CCU rule, datasets
     that inputs reference)."""

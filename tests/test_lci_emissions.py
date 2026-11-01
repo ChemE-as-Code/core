@@ -1,5 +1,5 @@
 """Emissions the flowsheet does not carry: combustion, equipment leaks, storage tanks, flares,
-effluent and non-routine operation (``emission_estimates:``, pre-release issue 176).
+effluent and non-routine operation (``emission_estimates:``).
 
 The plant is ``examples/process-blocks`` (see ``test_lca.py``): 1000 kg/h feed and 350 kW of
 steam make 400 kg/h of product PROD (S3: ethanol 0.95, water 0.05 by mass) and 600 kg/h of
@@ -643,7 +643,7 @@ def test_the_gate_requirement_is_a_lca_check() -> None:
     assert check.require == ["lci-emissions-complete"]
 
 
-# -- review fixes (pre-release issue 176) ----------------------------------------------------------
+# -- review fixes ----------------------------------------------------------------------------------
 
 
 def test_a_flare_needs_its_combustibles(blocks: Path) -> None:

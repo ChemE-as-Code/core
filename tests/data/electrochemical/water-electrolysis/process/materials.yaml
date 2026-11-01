@@ -1,4 +1,4 @@
-# Water electrolysis reference case (core#366): the components of H2O(l) -> H2 + 1/2 O2.
+# Water electrolysis reference case: the components of H2O(l) -> H2 + 1/2 O2.
 # Molar masses follow from the formulas (IUPAC standard atomic weights as in
 # domains/chemistry/formulas.py).
 schema: cheme/process/v1

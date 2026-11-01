@@ -2,8 +2,8 @@
 
 A database "for all industrial processes" needs datasets for processes that have no flowsheet
 yet. `cheme assess lci-estimate` builds a screening LCI dataset (`kind: lci_dataset`) from the
-reaction stoichiometry, a yield and a set of sourced defaults, and labels it with its tier
-(pre-release issue 182). The established screening approaches are the reference: Hischier et al. (2005, Int J
+reaction stoichiometry, a yield and a set of sourced defaults, and labels it with its tier.
+The established screening approaches are the reference: Hischier et al. (2005, Int J
 LCA 10:59) and the ecoinvent chemicals report (Althaus et al. 2007, ecoinvent report No. 8);
 Parvatker and Eckelman (2019, ACS Sustain. Chem. Eng. 7:350) compare such methods.
 
@@ -227,7 +227,7 @@ designs (ammonia, methanol) with a reference background.
 - `domains/process/screening_balance.py`: the stoichiometric balance per kg of product and
   the element masses (a balance belongs to `process`).
 - `domains/assessment/lca/balance.py`: the element balance of a dataset, the minimal check
-  behind an interface (`element_balance(dataset) -> ElementBalance`) that the balance gates of
-  pre-release issue 174 replace.
+  behind an interface (`element_balance(dataset) -> ElementBalance`) that the balance gates
+  replace.
 - `domains/assessment/lca/estimate.py`: the estimate, the defaults, the tier checks and the
   comparison; `cheme assess lci-estimate` is its CLI.

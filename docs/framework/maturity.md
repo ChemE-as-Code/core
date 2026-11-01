@@ -76,7 +76,7 @@ Schema validity alone (`sourced.flowsheet`) is necessary, never sufficient.
 | `predictive.exchangers` | no exchanger in the audit is `crossed` or `below-min-approach`, and no utility level is `infeasible` for its duty (physical-validity findings, not convergence) |
 | `predictive.formation-data` | the reaction heat the simulator applies (DWSIM's database formation enthalpies) agrees, reactor by reactor, with the formation enthalpies declared in `process/materials.yaml` within the data tolerance, 1 % of the reaction heat and at least 0.1 kW, independent of the reactor's duty or mode (`cheme.process-sim-formation-data`; recomputed from the run's recorded DWSIM values and component changes against `materials.yaml` as it is now, since the declared values are not in the run's fingerprint). Declared values that differ beyond it fail; a smaller nonzero difference, chemicals' fallback values or a reacting component without a value pass with a recorded limitation; a reactor whose closure is unsupported is unsupported. No reactor: passes |
 
-Electrolytes (pre-release issue 364, ADR 0027): the simulation route has no electrolyte package. A
+Electrolytes (ADR 0027): the simulation route has no electrolyte package. A
 `simulation.yaml` whose compounds put a salt, acid or base of `electrolytes.yml` (listed, or any compound of an
 alkali or alkaline-earth metal) together with
 water does not translate (`cheme.process-sim-electrolyte`, error), so `predictive.simulation-spec`
@@ -85,7 +85,7 @@ fails instead of the electrolyte passing as a neutral molecule. The electrolyte 
 `electrolytes.yml`) is a point calculation of one liquid phase; it is evidence for a design
 note or a specified split, and does not satisfy any `predictive.*` requirement.
 
-Petroleum pseudocomponents (`process/assays.yaml`, [assays](assay.md), pre-release issue 367) do not count
+Petroleum pseudocomponents (`process/assays.yaml`, [assays](assay.md)) do not count
 towards `predictive`: the simulation route does not take them, so a flowsheet with a petroleum
 fraction has no run to qualify. Their characterisation and flash are reported by `cheme process
 assay` (refusals, the record's staleness, and per state whether it lies inside
@@ -266,7 +266,7 @@ fixed bed. A kinetic reactor without reactions is not sourced ("no reactions").
 
 A **liquid-liquid extractor** stays a `component-split` in the flowsheet and the simulation (a
 component separator with given recoveries): the equilibrium stages of `process/extraction.yaml`
-(`cheme process extract`, pre-release issue 369, ADR 0019) are solved by core outside the simulation, so
+(`cheme process extract`, ADR 0019) are solved by core outside the simulation, so
 they are evidence for the separator's `basis_source` (cite the unit's `split_to_extract`), not
 a predictive unit of the simulated plant. The extraction result carries its own
 `qualification`: `qualified` only for a bundled LLE system with a benchmark, inside the

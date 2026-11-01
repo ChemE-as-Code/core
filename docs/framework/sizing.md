@@ -60,7 +60,7 @@ layout model state; `--dimensions` fills only those, final datasheets included
   with the new fingerprint; a final sheet is not refilled, so check each value there. A value
   without a fingerprint (filled by an earlier release, or given) is never reported stale; a
   value is compared on the inputs it names, so one filled before parameters and tables were
-  covered (pre-release issue 302) stays current until those inputs change, and a refill names the rest.
+  covered stays current until those inputs change, and a refill names the rest.
 - **Case and streams.** A fill that calculated values from the streams writes `operating.case`
   (the case it filled from) and `operating.streams` (the streams at the linked nodes, those
   the fingerprint covers); a refill replaces them. `cheme validate` reports a case or stream
@@ -139,7 +139,7 @@ them left `TBD` is `cheme.datasheet-open` like any other.
 | fitting resistance K | Perry's Chemical Engineers' Handbook, 7th ed. (1997), Table 6-4, p. 6-18 | bends, tees, valves of the routed path |
 | outside diameter, wall thickness | ASME B36.10M (schedule 40), ASME B36.19M (schedule 10S) | inside diameter = ASME OD - 2 wall (the layout model's ISO 4200 ODs differ at DN 20, 25, 32, 65 and 125; the result names them) |
 
-**Verification (pre-release issue 66).** None of the tables has been checked against the printed source
+**Verification.** None of the tables has been checked against the printed source
 (`print_checked: false` in each file). Each row's `check` names the independent public
 reproductions of the same table that agree with it (the file's `checks`: a reproduction is not
 the print):

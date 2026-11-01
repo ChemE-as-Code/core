@@ -1,4 +1,4 @@
-"""Carbon accounting of LCI datasets (pre-release issue 181): carbon content, fossil and biogenic
+"""Carbon accounting of LCI datasets: carbon content, fossil and biogenic
 carbon traced through the inputs, CCU and CCS, and the product carbon footprint breakdown.
 
 A study that declares ``carbon_accounting:`` in ``lca/lca.yaml`` is a product carbon footprint
@@ -37,7 +37,7 @@ part (``emission:<component>`` and ``emission:<component>.biogenic``), so that t
 method characterises each by its origin. :func:`findings` checks the carbon balance (inputs
 against products, outputs, emissions and storage), the declared biogenic contents against the
 traced pool, CCU double counting and the declared origins. The interface to the element
-balances of pre-release issue 174 is :class:`CarbonFlow`: kg of carbon and of biogenic carbon per
+balances is :class:`CarbonFlow`: kg of carbon and of biogenic carbon per
 exchange.
 
 **PCF** (:func:`pcf`), per functional unit, following the WBCSD PACT data model v2 and the TfS
@@ -91,7 +91,7 @@ ELEMENTARY_CARBON: dict[str, tuple[str, float]] = {
 }
 CO2_CAS = "124-38-9"
 #: Relative tolerance of the carbon balance by maturity (process.yaml): the defaults
-#: pre-release issue 174 proposes for its balance gates (<= 1 % for simulated designs, <= 5 % for
+#: of the balance gates (<= 1 % for simulated designs, <= 5 % for
 #: screening).
 TOLERANCE = {"concept": 0.05, "screening": 0.05}
 DEFAULT_TOLERANCE = 0.01
@@ -190,7 +190,7 @@ def carbon_fractions(formulas: dict[str, str]) -> dict[str, float | None]:
 def _counted(exchange: DatasetExchange) -> bool:
     """Exchanges of the operation that carry matter: not the construction, energy or a vent
     counted by its emissions (its components are exchanges of their own), nor an ``avoided:``
-    credit (pre-release issue 180: a negative input standing for production avoided outside the
+    credit (a negative input standing for production avoided outside the
     plant; no carbon enters through it, and its output is already counted). A dataset counts mass in
     kg only (``INVENTORY_UNITS``), so t and g do not occur."""
     from chemeascode.domains.assessment.lca.allocation import _released

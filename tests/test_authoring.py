@@ -519,8 +519,7 @@ def test_fragment_rejects_bad_input(sheet: Path):
     ],
 )
 def test_fragment_refuses_non_finite_numbers(options: dict):
-    """--scale, --rotation and --dn refuse nan and inf instead of writing them
-    (pre-release issue 214)."""
+    """--scale, --rotation and --dn refuse nan and inf instead of writing them."""
     with pytest.raises(FragmentError):
         make_fragment("valve", "VX1", **{"dn": "50", "at": "10,10", **options})
     if "dn" not in options:  # equipment takes no DN

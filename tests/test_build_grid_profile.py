@@ -1,4 +1,4 @@
-"""scripts/build_grid_profile.py (pre-release issue 306 step 4): one declared basis from the user's
+"""scripts/build_grid_profile.py: one declared basis from the user's
 own copy of Ember's long-format CSV. The CSV here is synthetic; its numbers are test values."""
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Uncertainty through reactors (pre-release issue 157 item 7): draws of the shared distributions,
+"""Uncertainty through reactors: draws of the shared distributions,
 Monte Carlo of a stirred tank and a fixed bed from their reactions' uncertainties, and that an
 uncertainty never makes a calculated outlet stale."""
 
@@ -195,7 +195,7 @@ HEAT = {
 
 
 def test_a_gas_bed_never_samples_a_heat_of_reaction_it_does_not_use(tmp_path):
-    """A gas-phase bed's heat of reaction is the ideal-gas data's (pre-release issue 221): its
+    """A gas-phase bed's heat of reaction is the ideal-gas data's: its
     uncertainty is reported as not used, never as sampled with a zero spread."""
     root, bed = _shift_bed(tmp_path, heat_of_reaction=HEAT)
     with pytest.raises(SamplingError, match=r"nothing to sample.*heat_of_reaction \(a fixed bed"):
@@ -355,7 +355,7 @@ def _selectivity_plant(tmp_path, uncertainty="", reactions=SERIES):
 
 
 def test_a_selectivity_reactor_is_sampled_as_propagate_evaluates_it(tmp_path):
-    """pre-release issue 300: the key's conversion and the selectivity are sampled and the outlet is
+    """The key's conversion and the selectivity are sampled and the outlet is
     evaluated from them as propagate does; the deterministic sample is propagate's outlet."""
     from chemeascode.domains.process.model import stream_flows
 

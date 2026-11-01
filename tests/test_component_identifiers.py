@@ -1,4 +1,4 @@
-"""Component identifiers (pre-release issue 114): CAS check digit, SMILES against InChIKey and
+"""Component identifiers: CAS check digit, SMILES against InChIKey and
 formula, and the reaction SMILES ``GET /api/reactions`` derives from the stoichiometry."""
 
 from __future__ import annotations

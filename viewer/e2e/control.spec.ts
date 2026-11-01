@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { controlSeparation, mockApi } from "./fixtures";
 
 /**
- * The control page: core's examples/process-separation (`/api/control`, pre-release issue 140): five loops,
+ * The control page: core's examples/process-separation (`/api/control`): five loops,
  * two sequences, a narrative and a control philosophy, every file drafted (no review record).
  */
 test.describe("control records", () => {

@@ -1,4 +1,4 @@
-"""Reactor datasheets of stirred tanks and batches (pre-release issue 157 item 9): the working
+"""Reactor datasheets of stirred tanks and batches: the working
 volume and duty of a CSTR series from its solved model; a batch's left to its size and cycle."""
 
 from pathlib import Path

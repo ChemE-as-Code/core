@@ -98,7 +98,7 @@ scenarios.
 ## Wastes, by-products and end of life
 
 Outputs that are neither a product nor an emission (spent catalysts and adsorbents, waste oil,
-sludges, off-spec product, scrap) are material outputs of the dataset with a `treatment` (pre-release issue 180),
+sludges, off-spec product, scrap) are material outputs of the dataset with a `treatment`,
 classified after ecoinvent's logic (by-product or waste by economic value):
 
 | kind | what | `cutoff`, `apos` | `substitution`, `consequential` |
@@ -202,7 +202,7 @@ fails on the warnings among these findings, a credit in a non-crediting model (a
 substitution in a non-crediting study included, `cheme.lca-system-model`), and a replaced
 consumable without a disposal. Infos do not fail it.
 
-**What a library build must regenerate.** A dataset written before pre-release issue 180 has no
+**What a library build must regenerate.** A dataset written before these fields existed has no
 `treatment`, `disposal:` outputs or `cutoff:` list. Its end-of-life outputs (without `kind`)
 are read as before. To export a cut-off build without credits, a library regenerates each
 dataset from its study after (1) adding `disposal:` to every replaced consumable (spent
@@ -388,7 +388,7 @@ More impact categories:
 A steady-state flowsheet gives the emissions of the streams that leave as `emission: true`
 products. NOx from a fired heater, VOC leaking from valves and flanges, tank breathing losses,
 the slip of a flare or the COD of an effluent are not in it. `emission_estimates:` in
-`lca/lca.yaml` (pre-release issue 176) adds them. The engine (`domains/assessment/lca/emissions.py`) computes
+`lca/lca.yaml` adds them. The engine (`domains/assessment/lca/emissions.py`) computes
 each estimate per hour of operation and writes `emission:<substance>` exchanges into
 `lca/dataset.yaml` with provenance **`estimated`**, the method, the estimate's id and every
 factor's source in `source`, and `emission_estimates.<id>` (and the stream) in `streams`.
@@ -539,7 +539,7 @@ the factor's `year` field gives the publication year, which the sidecar
 declares `data_year: 2025` for the electricity factors only; the other factors' data years are not
 checked and stay undeclared ([lci-comparison-basis.md](lci-comparison-basis.md), decision 6).
 
-**Grid electricity profiles** (pre-release issue 268). Each one is generated from the publisher's file,
+**Grid electricity profiles**. Each one is generated from the publisher's file,
 names the cell or line of every value, and records the file's checksum and terms. They differ
 in scope, so read the table before you compare scenarios built on different ones:
 
@@ -564,7 +564,7 @@ in scope, so read the table before you compare scenarios built on different ones
 - Umweltbundesamt (DE): only the three figures stated on UBA's summary page are packaged, under
   the website's data terms (§12a EGovG); the March 2026 report PDF, marked "all rights reserved",
   is not, until UBA Fachgebiet V 1.5 clarifies in writing that its tables (CO2e, with upstream)
-  may be republished (pre-release issues 268, 306).
+  may be republished.
 - Not packaged: CO2emissiefactoren.nl (no licence stated) and ADEME Base Carbone (open licence,
   but a four-year smoothed consumption factor that fits none of the profiles above).
 
@@ -575,7 +575,7 @@ packaged.
 related flow) or `ESTIMATE` (derived by the project); a proxy and an estimate state their
 `basis` and `validity`. A mapping's `proxy:` marks a published factor used for a related flow.
 
-**Factor status per exchange (pre-release issue 322).** Every exchange gets the weakest status of its
+**Factor status per exchange.** Every exchange gets the weakest status of its
 contributions over the categories, weakest first: `gap` (no burden in a category; an
 elementary flow outside a method is none), `example` (`example: true` in `lca/factors.yaml`;
 packaged characterisation methods are not affected), `ASSUMED`, `PROXY` (also a `proxy:`
@@ -777,7 +777,7 @@ ecoinvent v2 factors, Frischknecht et al. 2007): energy, materials, wastes and r
 transport 2.0; construction and maintenance (infrastructure) 3.0; land occupation 1.5,
 transformation 2.0; emissions to air CO2 and SO2 1.05, CH4, NOx, N2O, NH3 and NMVOC 1.5,
 PM2.5 3.0, CO 5.0 (combustion and process values; the table gives 1.2 for agricultural CH4 and
-NH3); another emission 1.5 (ASSUMED). **Not verified yet** (pre-release issue 313): these values were
+NH3); another emission 1.5 (ASSUMED). **Not verified yet**: these values were
 entered without the guideline at hand and are still to be checked against its table of default
 basic uncertainties, which will then be cited here; until then they are working defaults.
 
@@ -801,7 +801,7 @@ Products, free exchanges and the vents or feeds counted by their components are 
 ## Carbon accounting and product carbon footprints
 
 A study that declares `carbon_accounting:` in `lca/lca.yaml` is a product carbon footprint
-(PCF) after ISO 14067 and the TfS PCF Guideline v3 (pre-release issue 181). Without it nothing below
+(PCF) after ISO 14067 and the TfS PCF Guideline v3. Without it nothing below
 applies and no output changes.
 
 ```yaml
@@ -863,12 +863,12 @@ flowsheet's units is not done yet.
 
 **Checks.** `cheme.lca-carbon-balance` (warning): carbon in against products, outputs,
 emissions and storage, within 1 % (5 % for `concept` and `screening` designs, the tolerances
-pre-release issue 174 proposes); `cheme.lca-carbon-biogenic`: the declared biogenic contents cannot come from
+of the balance gates); `cheme.lca-carbon-biogenic`: the declared biogenic contents cannot come from
 the inputs; `cheme.lca-carbon-origin` (a mapped emission origin against the traced fraction) uses
 the same design-maturity tolerance as the balance; `cheme.lca-carbon-unknown` (info): material exchanges without a carbon content,
 left out; `cheme.lca-ccu-double-count`: a captured CO2 whose background already claims a
-removal (negative) under `ccu_rule: cut-off`; `cheme.lca-ccs-emitted` (info). The balance
-interface for pre-release issue 174 is `carbon.CarbonFlow` (kg C and biogenic kg C per exchange).
+removal (negative) under `ccu_rule: cut-off`; `cheme.lca-ccs-emitted` (info). The interface
+to the balance gates is `carbon.CarbonFlow` (kg C and biogenic kg C per exchange).
 
 **CCS.** CO2 to geological storage is a technosphere output (`storage:` on a product mapping,
 with its `permanence`), linked to transport and storage. Stored fossil CO2 is simply not
@@ -984,7 +984,7 @@ balance closed. See [Tiered LCI estimates](lci-estimate.md).
 
 ### Version and migration
 
-`schema: cheme/lci_dataset/v2` (pre-release issue 179). A v1 dataset (`schema: cheme/lca/v1`, the LCA
+`schema: cheme/lci_dataset/v2`. A v1 dataset (`schema: cheme/lca/v1`, the LCA
 files' id it shared) still loads: every field v2 adds is optional, the per-exchange data
 quality is defaulted by rule (see [Data quality](#data-quality)), and `cheme assess lca` warns
 `cheme.lca-dataset-v1` and lists what it lacks (`cheme.lca-dataset-undocumented`, info).
@@ -994,7 +994,7 @@ quality is defaulted by rule (see [Data quality](#data-quality)), and `cheme ass
 
 ### Mass, element and energy balances
 
-Every dataset is checked for closure over its exchanges (pre-release issue 174, `assessment.lca.balance`):
+Every dataset is checked for closure over its exchanges (`assessment.lca.balance`):
 the plant's `lca/dataset.yaml` by `cheme assess lca`, and each dataset a study references
 (`dataset:` backgrounds, hand-written ones included). Inputs and resources (free ones such as
 air and water included) count in; products, outputs (wastes, by-products, CO2 to storage) and
@@ -1084,7 +1084,7 @@ the converters (process-library#51) are checked against the format specification
 | `title` | name | `dataSetInformation/name/baseName` | `activity/activityName` |
 | `location` | ISO 3166-1 alpha-2, GLO, RER or RoW | `geography/locationOfOperationSupplyOrProduction/@location` | `geography/shortname` |
 | `geography.description` | representativeness of the location | `.../descriptionOfRestrictions` | `geography/comment` |
-| `geography.site`, `.applicable` | the facility's place; where it may also be applied (pre-release issue 172) | `descriptionOfRestrictions` (text) | `geography/comment` |
+| `geography.site`, `.applicable` | the facility's place; where it may also be applied | `descriptionOfRestrictions` (text) | `geography/comment` |
 | `year`, `time.start` | the data's reference year; first valid year | `time/common:referenceYear` | `timePeriod/@startDate` |
 | `valid_until` | last year of use | `time/common:dataSetValidUntil` | `timePeriod/@endDate` |
 | `time.description` | temporal representativeness | `time/common:timeRepresentativenessDescription` | `timePeriod/comment` |
@@ -1225,7 +1225,7 @@ written, when a candidate is a biosphere flow or per another kind of unit, or wh
 would not parse to exactly that change or validate. Emissions, resources and disposals are
 mapped by hand. Review the diff, then run `cheme assess lca --write`.
 
-**Provider profiles (pre-release issue 168).** A study's flows are named in the flowsheet's own terms: a
+**Provider profiles.** A study's flows are named in the flowsheet's own terms: a
 feed's or product's key, and a feed's `utility.kind`. That is the provider-independent part of the
 exchange contract. A provider profile (`kind: lca_mapping_profile`, e.g.
 `lca/mapping-profiles/ecoinvent-3.11-cutoff.yaml`) says how one background provider names the

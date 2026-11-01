@@ -37,10 +37,8 @@ exact, reviewed state of the files.
 ## Evidence
 
 - Review gate, stable review finding ids, sign-off with provenance refusing a self-signed review,
-  branch and merge policy: pre-release commit 2df834e, pre-release commit 467a816,
-  pre-release commit d060778, pre-release commit c224cc3 in pre-release PR 34
-  (pre-release issues 12, 25, 26, 32).
-- Fail closed: pre-release PR 281 (pre-release commit f45d2c6).
+  branch and merge policy.
+- Fail closed.
 - `src/chemeascode/project/signoff.py`, `project/checks.py`, `foundation/reviews.py`, the
   template's `STAGES.md` and `AGENTS.md`, `REFERENCE.md` ("check"),
   [stages and gates](../concepts/stages-and-gates.md).

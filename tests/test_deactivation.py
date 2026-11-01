@@ -1,4 +1,4 @@
-"""Catalyst deactivation (pre-release issue 157 item 6): the activity laws, a bed and a stirred tank
+"""Catalyst deactivation: the activity laws, a bed and a stirred tank
 solved at a time on stream (the end of run), and what they refuse."""
 
 import math

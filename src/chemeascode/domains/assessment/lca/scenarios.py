@@ -161,7 +161,7 @@ def _links(
             if first and report.factors is not None
             else None
         )
-        # the data year only where declared (pre-release issue 306): it decides the year compared,
+        # the data year only where declared: it decides the year compared,
         # so it belongs in the record; the publication year is metadata of the factor file, and
         # records without a data year keep their bytes
         if own is not None and own.data_year is not None:
@@ -469,7 +469,7 @@ def compare_cases(root, cases: list[str] | None = None) -> tuple[list[dict[str, 
     """The flowsheet cases of the plant at *root* side by side (all when *cases* is None): each
     case's declared capacity and provenance, and each exchange per unit of the functional
     unit's product (``per_unit``: per kg, or per kWh for an energy product, each value with its
-    unit; pre-release issue 313, formerly ``per_kg``). Only cases the flowsheet holds; an exchange a
+    unit; formerly ``per_kg``). Only cases the flowsheet holds; an exchange a
     case lacks is None, never 0 or a value scaled from another case."""
     from pathlib import Path
 

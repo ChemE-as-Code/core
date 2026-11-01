@@ -1,6 +1,6 @@
 # HAZOP studies
 
-The foundation for HAZOP in cheme-as-code (pre-release issue 136): a versioned study file, a versioned risk
+The foundation for HAZOP in cheme-as-code: a versioned study file, a versioned risk
 matrix, one deterministic band lookup, validation against the plant, staleness, a report, a
 review record and a stage gate. Everything else a HAZOP tool may do (node selection, scenario
 propagation, frequency estimation, safeguard credits, consequence modelling, LLM

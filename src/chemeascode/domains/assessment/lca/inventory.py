@@ -324,7 +324,7 @@ def inventory(
     formulas = process.formulas()
 
     def composition(components: dict[str, float], streams: list[str]) -> Composition | None:
-        """What a material flow is made of by mass, from the stream table (pre-release issue 174):
+        """What a material flow is made of by mass, from the stream table:
         every component with its formula ('' where materials.yaml gives none, so that the element
         balance names it rather than reading the id as a formula)."""
         mass = sum(components.values())
@@ -718,8 +718,7 @@ def _bar_abs(quantity, default_unit: str) -> float | None:
 
 def _carrier(process: Process, node) -> Carrier | None:
     """The carrier of an energy terminal from its utility kind, level, supply temperature and
-    (steam) pressure (the migration of v1's bare kWh, pre-release issue 177; levels
-    pre-release issue 313); None where the flowsheet does not say."""
+    (steam) pressure (the migration of v1's bare kWh); None where the flowsheet does not say."""
     utility = getattr(node, "utility", None)
     kind = UTILITY_CARRIERS.get(getattr(utility, "kind", None) or "")
     if kind is None:
@@ -817,7 +816,7 @@ def _molar_mass(process: Process, terminal) -> float | None:
 def functional_amount(
     fu, product: DatasetExchange | None, allocation, molar_mass: float | None
 ) -> tuple[float | None, str]:
-    """The functional unit *fu* in *product*'s inventory unit (pre-release issue 177), or ``(None,
+    """The functional unit *fu* in *product*'s inventory unit, or ``(None,
     why)``: the same kind directly; a material product per gas volume through *molar_mass* (ideal
     gas at the unit's reference state), per energy through its energy content (kJ/kg, e.g. LHV), or
     per item through ``kg_per_unit``."""
@@ -863,7 +862,7 @@ def _origin_free(cas: str | None, spec: Elementary) -> bool:
 
 def _flow_findings(problem, exchanges, unspecified, unidentified) -> None:
     """The elementary flows' identities: a sub-compartment left unspecified, a flow the
-    crosswalk does not hold, and identities without their EF 3.1 UUID (pre-release issue 175)."""
+    crosswalk does not hold, and identities without their EF 3.1 UUID."""
     if unspecified:
         problem(
             "info",
@@ -904,7 +903,7 @@ def _flow_findings(problem, exchanges, unspecified, unidentified) -> None:
 def _water_findings(problem, process, terminals, mapping, exchanges) -> None:
     """A water feed (water its main component by mass) taken free or unmapped, or a
     cooling-water duty mapped free or unmapped, without a water resource flow: the withdrawal
-    is invisible (pre-release issue 175). The moisture of an air intake is not a withdrawal."""
+    is invisible. The moisture of an air intake is not a withdrawal."""
     if any(e.type == "resource" and normalise_cas(e.cas or "") == WATER_CAS for e in exchanges):
         return
     nodes = {n.id: n for n in [*process.flowsheet.feeds, *process.flowsheet.products]}
@@ -955,7 +954,7 @@ def _estimated(
     unspecified: list[str],
     unidentified: list[tuple[str, str]],
 ) -> set[str]:
-    """Add the emissions of ``emission_estimates:`` (pre-release issue 176) to *exchanges*: one
+    """Add the emissions of ``emission_estimates:`` to *exchanges*: one
     ``emission:<substance>`` exchange per substance (``.non-routine`` apart), of provenance
     ``estimated``, the methods in its ``source``. A substance the flowsheet emits too is never
     overwritten: an estimate is left out with a warning, or added to it (``add: true``) with an
@@ -1285,7 +1284,7 @@ def _treated(
     exchange: DatasetExchange, treatment: Treatment | None, model: str, problem=None
 ) -> list[DatasetExchange]:
     """*exchange* (an output) as the system model *model* links it, with its *treatment*, and
-    the production it avoids (pre-release issue 180). A waste keeps its treatment's background. A
+    the production it avoids. A waste keeps its treatment's background. A
     recyclable or a by-product is free under a non-crediting model (cut-off: the recycler carries
     the treatment). Under substitution and consequential the ``credit`` of any kind (a recycled
     material, or the heat of an incineration) becomes an ``avoided:`` input of negative amount;
@@ -1472,7 +1471,7 @@ def _supplies(
 ) -> list[DatasetExchange]:
     """Consumables, maintenance, transport and end of life: exchanges per hour of operation,
     the last three derived from *exchanges* (construction and the flows already counted), and
-    the disposal outputs of consumables and construction materials (pre-release issue 180);
+    the disposal outputs of consumables and construction materials;
     disposals cut off by the study's criteria go to *cutoff*."""
     found: list[DatasetExchange] = []
     operation = scope.operation
@@ -1671,8 +1670,8 @@ def _supplies(
 
 
 def _undisposed(item, problem) -> None:
-    """A consumable whose mass leaves the plant again without a disposal: a finding
-    (pre-release issue 180). Replaced or charged material (spent adsorbent or catalyst) always comes
+    """A consumable whose mass leaves the plant again without a disposal: a finding.
+    Replaced or charged material (spent adsorbent or catalyst) always comes
     out again; what is bought per year may be used up (a warning only for the first)."""
     if item.finite:
         problem(
@@ -1727,7 +1726,7 @@ def _construction_disposals(
 
 
 def _system_model_findings(scope, problem) -> None:
-    """A credit the study's system model does not allow (pre-release issue 180)."""
+    """A credit the study's system model does not allow."""
     model = scope.model
     if scope.allocation.method == "substitution" and model not in CREDITING_MODELS:
         problem(

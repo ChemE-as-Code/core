@@ -29,7 +29,7 @@ GitHub's own issue forms (the "New ..." links on the issues page), not by the vi
 
 ## Evidence
 
-- pre-release viewer commit 76e15e3 "Milestone 2 scope": "Read-only. Editing stays with people and agents working on
+- "Milestone 2 scope": "Read-only. Editing stays with people and agents working on
   the files."
-- pre-release viewer commit 642a723 (pre-release viewer PR 1) "Read-only viewer over a plant repository".
-- pre-release viewer commit 2d2a3a1 token POST for check runs; README, routes `/checks` and `/issues`.
+- "Read-only viewer over a plant repository".
+- Token POST for check runs; README, routes `/checks` and `/issues`.

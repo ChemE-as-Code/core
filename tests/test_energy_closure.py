@@ -928,7 +928,7 @@ def test_flowsheet_energy_imbalance_is_a_warning(tmp_path):
 
 
 def test_flowsheet_energy_imbalance_in_another_case(tmp_path):
-    """A second case is balanced too (pre-release issue 185): design closes (W1 50 kW), turndown has
+    """A second case is balanced too: design closes (W1 50 kW), turndown has
     W1 60 kW against the same 50 kW of enthalpy rise."""
     ws = _copy(tmp_path, "process-simulation")
 
@@ -947,7 +947,7 @@ def test_flowsheet_energy_imbalance_in_another_case(tmp_path):
 
 
 def test_enthalpy_in_another_unit_is_not_read_as_kj_per_kmol(tmp_path):
-    """S2's enthalpy per mass (pre-release issue 215): 180 kJ/kg is the same 50 kW at 1000 kg/h, but
+    """S2's enthalpy per mass: 180 kJ/kg is the same 50 kW at 1000 kg/h, but
     read as kJ/kmol it would be 1.39 kW and K1 would seem 48.6 kW off. Never converted: K1 is not
     evaluable and the unit is an error; likewise a molar mass not in kg/kmol."""
     ws = _copy(tmp_path, "process-simulation")
@@ -985,7 +985,7 @@ def test_enthalpy_in_another_unit_is_not_read_as_kj_per_kmol(tmp_path):
 
 
 def test_unsupported_reference_is_not_repeated_per_case(tmp_path):
-    """The info findings come from the default case only (pre-release issue 185): a reactive COMP is
+    """The info findings come from the default case only: a reactive COMP is
     unsupported in design and turndown, reported once."""
     ws = _copy(tmp_path, "process-simulation")
 
@@ -1012,7 +1012,7 @@ def test_unsupported_reference_is_not_repeated_per_case(tmp_path):
     ],
 )
 def test_calculated_unit_rule(tmp_path, name, unit, want):
-    """Every calculated property read as a number has one unit (pre-release issue 215)."""
+    """Every calculated property read as a number has one unit."""
     ws = _copy(tmp_path, "process-simulation")
 
     def other_unit(d):
@@ -1055,8 +1055,7 @@ def test_block_with_an_unevaluable_step_without_energy_stream(tmp_path):
 
 
 def test_exergy_in_another_unit_is_not_summed(tmp_path):
-    """A terminal's exergy flow reads exergy as kJ/kmol and molar mass as kg/kmol only
-    (pre-release issue 215)."""
+    """A terminal's exergy flow reads exergy as kJ/kmol and molar mass as kg/kmol only."""
     ws = _copy(tmp_path, "process-simulation")
 
     def exergy(d, unit):

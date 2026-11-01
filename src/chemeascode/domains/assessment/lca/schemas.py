@@ -30,7 +30,7 @@ from chemeascode.foundation.uncertainty import Uncertainty as Uncertainty  # the
 from chemeascode.foundation.units import LCI_BASE_UNITS, LCI_UNITS
 
 SCHEMA = "cheme/lca/v1"
-#: The LCI dataset (``kind: lci_dataset``) has its own version since v2 (pre-release issue 179). A
+#: The LCI dataset (``kind: lci_dataset``) has its own version since v2. A
 #: v1 dataset declared the LCA files' id, :data:`DATASET_SCHEMA_V1`: it is still read, with v2's
 #: defaults, and ``cheme migrate`` rewrites its ``schema:`` line.
 DATASET_SCHEMA = "cheme/lci_dataset/v2"
@@ -65,13 +65,13 @@ UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 #: The system model a dataset is built under (EcoSpold2 system models; the library's default
 #: build is attributional cut-off, a substitution/APOS build a labelled variant). It decides what
-#: a recyclable or a by-product output carries (pre-release issue 180): under ``cutoff`` and
+#: a recyclable or a by-product output carries: under ``cutoff`` and
 #: ``apos`` it leaves burden-free and earns no credit; only ``substitution`` and ``consequential``
 #: credit the production it avoids.
 SystemModel = Literal["cutoff", "apos", "substitution", "consequential"]
 #: The system models that credit avoided production (``avoided:`` exchanges).
 CREDITING_MODELS: tuple[str, ...] = ("substitution", "consequential")
-#: What an output that is neither a product nor an emission is (pre-release issue 180), after
+#: What an output that is neither a product nor an emission is, after
 #: ecoinvent's classification by economic value: ``waste`` (sent to a treatment the producer pays
 #: for: its burden is in the producer's system; this includes incineration with energy recovery,
 #: where only the recovered energy leaves burden-free), ``recyclable`` (material for recycling or
@@ -177,7 +177,7 @@ class StudyUncertainty(Strict):
 #: Compartments of an elementary flow: emissions to air, water or soil; ``resource`` a flow
 #: taken from nature.
 Compartment = Literal["air", "water", "soil", "resource"]
-#: Sub-compartments by compartment, after EF 3.1 (pre-release issue 175): characterisation of
+#: Sub-compartments by compartment, after EF 3.1: characterisation of
 #: particulates, NOx, NH3 or metals differs between a ground-level and a high-stack release.
 SUBCOMPARTMENTS: dict[str, tuple[str, ...]] = {
     "air": ("unspecified", "urban-close-to-ground", "non-urban-high-stack", "lower-stratosphere"),
@@ -472,7 +472,7 @@ class Background(Strict):
 
 
 class Treatment(Strict):
-    """What becomes of an output that is neither a product nor an emission (pre-release issue 180):
+    """What becomes of an output that is neither a product nor an emission:
     its kind, the treatment route, and for a recyclable or a by-product the production it displaces.
 
     The output's own background (``factor``, ``activity``, ``dataset``: e.g. landfill of spent
@@ -550,8 +550,8 @@ def _fractions(metals: dict[str, float], name: str) -> None:
 
 
 class Disposal(Background):
-    """What leaves the plant of a consumable or a construction material at the end of its use
-    (pre-release issue 180), so that what goes in also comes out: a ``fraction`` of its mass to a
+    """What leaves the plant of a consumable or a construction material at the end of its use,
+    so that what goes in also comes out: a ``fraction`` of its mass to a
     treatment ``route``. The engine writes the output exchange ``disposal:<what>.<id>``.
 
     A ``waste`` gives its treatment background (or ``missing:``); incineration with energy
@@ -634,7 +634,7 @@ class FlowMap(Background):
     treatment: Treatment | None = Field(
         default=None,
         description="product:<id> only, not a co-product or an emission: a waste, recyclable or "
-        "by-product output and its route (pre-release issue 180). Its background is the treatment; "
+        "by-product output and its route. Its background is the treatment; "
         "a recyclable or by-product may be free (burden-free under cut-off).",
     )
     co2_source: Co2Source | None = Field(
@@ -690,7 +690,7 @@ class Consumable(Background):
 
     ``disposal:`` says what leaves the plant of it (spent adsorbent to landfill, waste oil to
     incineration, spent catalyst to metal recovery): the matching output exchange, so that what
-    goes in also comes out (pre-release issue 180). A catalyst names its ``metals`` (mass
+    goes in also comes out. A catalyst names its ``metals`` (mass
     fractions)."""
 
     id: str = Field(pattern=r"^[A-Za-z0-9_.\-]+$")
@@ -769,7 +769,7 @@ class Transport(Background):
 class EndOfLife(Background):
     """What happens to materials at their end of life: a ``fraction`` of the mass of the exchanges
     ``applies_to`` matches (construction, maintenance, consumables such as a spent adsorbent)
-    leaves as a material output ``end-of-life:<id>``, per kg (pre-release issue 180).
+    leaves as a material output ``end-of-life:<id>``, per kg.
 
     ``kind`` classifies it: ``waste`` (its background is the treatment, counted under every system
     model; incineration with energy recovery is a waste) or ``recyclable`` (scrap for material
@@ -786,7 +786,7 @@ class EndOfLife(Background):
     fraction: FiniteFloat = Field(default=1.0, ge=0, le=1)
     kind: Literal["waste", "recyclable"] | None = Field(
         default=None,
-        description="waste or recyclable; unset: an entry from before pre-release issue 180.",
+        description="waste or recyclable; unset: an entry from before this field existed.",
     )
     route: str = Field(default="", description="e.g. steel scrap to an electric arc furnace.")
     credit: Background | None = Field(
@@ -826,7 +826,7 @@ class EndOfLife(Background):
 
 class CutoffEntry(Strict):
     """A flow the study leaves out by its cut-off criteria, recorded with its amount so that the
-    criteria can be checked (pre-release issue 180). ISO 14044 4.2.3.3 names the types of criteria
+    criteria can be checked. ISO 14044 4.2.3.3 names the types of criteria
     (mass, energy, environmental significance) but no number; the Atlas choice (process-library
     docs/system-model.md) is a flow below 1 % of the process's input mass, all cut flows
     together below 1 %, and never a precious or critical metal or a flow with a high
@@ -859,9 +859,9 @@ class CutoffEntry(Strict):
         return self
 
 
-# -- emission estimates (pre-release issue 176) ----------------------------------------------------
+# -- emission estimates ----------------------------------------------------------------------------
 
-#: The methods of ``emission_estimates:`` (pre-release issue 176): emissions a steady-state
+#: The methods of ``emission_estimates:``: emissions a steady-state
 #: flowsheet does not carry. ``combustion`` (fired heaters, boilers, gas turbines, thermal
 #: oxidisers): fuel x factor per substance; ``equipment-leaks``: component count x average factor
 #: per component type x the hours under pressure, less an LDAR reduction, speciated by the stream's
@@ -960,7 +960,7 @@ class EmissionActivity(Strict):
 
 
 class EmissionEstimate(Strict):
-    """One emission estimate of ``lca/lca.yaml`` (pre-release issue 176): what the flowsheet does
+    """One emission estimate of ``lca/lca.yaml``: what the flowsheet does
     not carry.
 
     The scope is what it covers: ``equipment`` (tag globs: the fired heater, the tanks, the
@@ -1177,7 +1177,7 @@ class Construction(Background):
         default=None,
         description="What becomes of the material at the plant's end of life (and of its "
         "maintenance replacements): disposal:construction.<id> and disposal:maintenance.<id> "
-        "outputs, in kg (pre-release issue 180).",
+        "outputs, in kg.",
     )
 
     @model_validator(mode="after")
@@ -1257,7 +1257,7 @@ class ProfileEntry(Strict):
 
 
 class MappingProfile(Versioned):
-    """A provider profile (``kind: lca_mapping_profile``, pre-release issue 168): how one background
+    """A provider profile (``kind: lca_mapping_profile``): how one background
     provider (an ecoinvent release and system model, an open database) names the activities for
     the flows a study takes, matched by the flowsheet's own terms (a key, a utility kind), so a
     study changes provider by selecting another profile. Names only: never a factor or a result
@@ -1577,7 +1577,7 @@ class LcaFile(Versioned):
     end_of_life: list[EndOfLife] = Field(default_factory=list)
     system_model: SystemModel | None = Field(
         default=None,
-        description="The study's system model (pre-release issue 180): what recyclable and "
+        description="The study's system model: what recyclable and "
         "by-product outputs carry and whether avoided production is credited. Unset: cutoff (the "
         "Atlas default), and the dataset records none unless dataset.system_model gives it.",
     )
@@ -1589,7 +1589,7 @@ class LcaFile(Versioned):
     )
     emission_estimates: list[EmissionEstimate] = Field(
         default_factory=list,
-        description="Emissions the flowsheet does not carry (pre-release issue 176): combustion, "
+        description="Emissions the flowsheet does not carry: combustion, "
         "equipment leaks, storage tanks, flares, effluent and non-routine operation, each with its "
         "method, scope, parameters and sourced factors; written as emission:<substance> "
         "exchanges of provenance estimated.",
@@ -1711,7 +1711,7 @@ ScopeAccounting = Literal["generation", "consumption"]
 
 
 class FactorScope(Strict):
-    """What a factor measures, as data (pre-release issue 306): the structured scope the method-mix
+    """What a factor measures, as data: the structured scope the method-mix
     check and the scenario comparability verdict read instead of parsing free text. Every field is
     optional; an unset field is *not declared* (never assumed), so two factors that leave a
     dimension unset cannot be called like-for-like on it. A factor's own ``scope`` overrides its
@@ -1801,8 +1801,7 @@ class Factor(Strict):
         ge=1900,
         le=2200,
         description="The year the data describe, where it differs from or refines `year` (e.g. "
-        "a factor set dated by its publication); unset: not declared. `year` keeps its meaning "
-        "(pre-release issue 306).",
+        "a factor set dated by its publication); unset: not declared. `year` keeps its meaning.",
     )
     publication_year: int | None = Field(
         default=None,
@@ -1908,7 +1907,7 @@ class FactorFile(Versioned):
         return next((s for s in self.sources if s.id == factor.source_id), None)
 
 
-# -- emission factor sets (pre-release issue 176) --------------------------------------------------
+# -- emission factor sets --------------------------------------------------------------------------
 
 
 class SetFactor(Strict):
@@ -2006,8 +2005,7 @@ class DatasetGeography(Strict):
     )
     applicable: list[str] = Field(
         default_factory=list,
-        description="Geography codes the dataset may be applied to beyond its own "
-        "(pre-release issue 172).",
+        description="Geography codes the dataset may be applied to beyond its own.",
     )
 
 
@@ -2183,7 +2181,7 @@ def evaluate(formula: str, parameters: dict[str, float]) -> float:
         raise ValueError(f"formula {formula!r}: {failure}") from failure
 
 
-#: What an energy exchange carries (pre-release issue 177): its burden and its background depend on
+#: What an energy exchange carries: its burden and its background depend on
 #: it.
 CarrierKind = Literal["electricity", "heat", "steam", "fuel", "cold"]
 
@@ -2251,7 +2249,7 @@ ASH = "ash"
 
 class Composition(Strict):
     """What a material exchange is made of, by mass: the input of the dataset's mass and
-    element balances (pre-release issue 174, :mod:`.balance`). Either ``fractions`` (component ->
+    element balances (:mod:`.balance`). Either ``fractions`` (component ->
     mass fraction; a component is read as a molecular formula unless ``formulas`` gives its
     formula) or ``elements`` (element symbol -> mass fraction, e.g. a fuel's ultimate
     analysis). Filled from the stream table for a flowsheet-derived dataset; a composition
@@ -2298,7 +2296,7 @@ def _identities(value: object) -> object:
 
 #: Where an exchange's amount comes from: the provenance classes of the flowsheet
 #: (``given``, ``calculated``, ``assumed``) and ``estimated``, an emission computed from
-#: activity data and sourced emission factors (``emission_estimates:``, pre-release issue 176). In a
+#: activity data and sourced emission factors (``emission_estimates:``). In a
 #: row made of several values the weakest counts: given, calculated, estimated, assumed.
 ExchangeProvenance = Literal["given", "calculated", "estimated", "assumed"]
 EXCHANGE_PROVENANCE: tuple[str, ...] = ("given", "calculated", "estimated", "assumed")
@@ -2330,7 +2328,7 @@ class DatasetExchange(Strict):
     provenance: ExchangeProvenance = Field(
         default="assumed",
         description="given, calculated, estimated (an emission-factor estimate of "
-        "emission_estimates:, pre-release issue 176) or assumed.",
+        "emission_estimates:) or assumed.",
     )
     origin: Origin | None = Field(
         default=None, description="The origin every value it is derived from gives, if one."
@@ -2394,7 +2392,7 @@ class DatasetExchange(Strict):
     treatment: Treatment | None = Field(
         default=None,
         description="An output that is neither product nor emission: waste, recyclable or "
-        "by-product, its route and the product it displaces (pre-release issue 180). The exchange "
+        "by-product, its route and the product it displaces. The exchange "
         "is linked as the dataset's system_model decides: a recyclable or by-product is free "
         "under cutoff and apos.",
     )
@@ -2405,13 +2403,13 @@ class DatasetExchange(Strict):
     composition: Composition | None = Field(
         default=None,
         description="Material exchanges (kg, Nm3): what it is made of by mass, for the mass "
-        "and element balances (pre-release issue 174); filled from the stream table for a "
+        "and element balances; filled from the stream table for a "
         "flowsheet-derived dataset.",
     )
     balance_exclusion: str = Field(
         default="",
         description="Why it is left out of the mass and element balances, e.g. a catalyst "
-        "charge counted over its life (stated, never silent; pre-release issue 174).",
+        "charge counted over its life (stated, never silent).",
     )
 
     @model_validator(mode="after")
@@ -2461,7 +2459,7 @@ class DatasetExchange(Strict):
 
 
 class CutoffFlow(Strict):
-    """A flow left out by the cut-off criteria, recorded in the dataset (pre-release issue 180) so
+    """A flow left out by the cut-off criteria, recorded in the dataset so
     that the criteria can be checked where it is built and where it is used (:mod:`.cutoff`): its
     amount in the dataset's basis, why, and what the never-cut rule looks at."""
 
@@ -2503,7 +2501,7 @@ class DatasetProvenance(Strict):
 #: first: a generated dataset's ``maturity_cap`` is one of them.
 MaturityLevel = Literal["sourced", "balanced", "predictive", "engineering"]
 MATURITY_LEVELS: tuple[str, ...] = ("sourced", "balanced", "predictive", "engineering")
-#: What each tier may claim at most (pre-release issue 182): a dataset estimated without a flowsheet
+#: What each tier may claim at most: a dataset estimated without a flowsheet
 #: is never "balanced" (that level needs a balanced conceptual PFD, the flowsheet path of Tier 2).
 TIER_MATURITY_CAP: dict[int, str] = {0: "sourced", 1: "sourced"}
 
@@ -2524,7 +2522,7 @@ class ElementBalanceRecord(Strict):
 
 
 class Generation(Strict):
-    """How a dataset was generated (pre-release issue 182): its tier, the method, the versioned
+    """How a dataset was generated: its tier, the method, the versioned
     defaults it used and the caps the tier sets.
 
     Tier 0 is stoichiometric (reactions, a yield and defaults), Tier 1 sourced conceptual
@@ -2622,8 +2620,7 @@ class LciDataset(DatasetDocumentation):
     exchanges: list[DatasetExchange] = Field(min_length=1)
     cutoff: list[CutoffFlow] = Field(
         default_factory=list,
-        description="Flows left out by the cut-off criteria, with amount and reason "
-        "(pre-release issue 180).",
+        description="Flows left out by the cut-off criteria, with amount and reason.",
     )
     allocation: Allocation | None = Field(
         default=None, description="The default allocation when a study names none."
@@ -2692,7 +2689,7 @@ class LciDataset(DatasetDocumentation):
 
 # -- lca/estimate.yaml (kind lci_estimate) -------------------------------------------------------
 
-#: The schema of an LCI estimate (pre-release issue 182): the input of ``cheme assess
+#: The schema of an LCI estimate: the input of ``cheme assess
 #: lci-estimate``.
 ESTIMATE_SCHEMA = "cheme/lci_estimate/v1"
 #: Where a by-product or a lost component goes: a co-product (a product exchange), an emission
@@ -2779,7 +2776,7 @@ class EstimateExchange(Strict):
 
 class LciEstimate(Strict):
     """An LCI estimate (``kind: lci_estimate``, ``lca/estimate.yaml``): what ``cheme assess
-    lci-estimate`` builds a Tier 0 or Tier 1 dataset from (pre-release issue 182).
+    lci-estimate`` builds a Tier 0 or Tier 1 dataset from.
 
     The reactions of ``process/reactions.yaml`` named in ``reactions`` form the reference
     ``product`` (a component of ``process/materials.yaml``); ``yield`` is the efficiency over

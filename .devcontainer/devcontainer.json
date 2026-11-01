@@ -1,0 +1,17 @@
+{
+  "name": "ChemE-as-Code",
+  "image": "mcr.microsoft.com/devcontainers/python:1.2.8-3.12-bookworm",
+  "features": {
+    // The Viewer's build (viewer/package.json names the versions it accepts).
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" }
+  },
+  // Installs uv and the toolkit, and creates demo-plant/ (ignored by git).
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  // Where uv puts itself and the `cheme` command.
+  "remoteEnv": { "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin" },
+  // `bash .devcontainer/serve.sh` starts `cheme serve` with the Viewer on this port.
+  "forwardPorts": [8765],
+  "portsAttributes": {
+    "8765": { "label": "cheme serve", "onAutoForward": "notify" }
+  }
+}

@@ -25,6 +25,9 @@ from chemeascode.foundation.findings import Finding
 
 #: Where an installed skill goes, relative to the template (``dot-`` becomes ``.``).
 SKILLS_DIR = PurePosixPath("dot-claude/skills")
+#: The licence notice of the installed skills, in the skills directory itself and shipped with the
+#: template. It belongs to no one skill: its key in the manifest and in ``SkillFile.skill`` is "".
+SKILLS_NOTICE = "NOTICE.md"
 
 
 def template_dir():
@@ -53,7 +56,8 @@ def bundled_skills() -> dict[str, Traversable]:
 
 
 def bundled_files() -> dict[str, dict[str, Path]]:
-    """Each bundled skill's files by their path inside the skill (POSIX), by skill name."""
+    """Each bundled skill's files by their path inside the skill (POSIX), by skill name; the
+    notice of the skills directory under the name ""."""
     found: dict[str, dict[str, Path]] = {}
     for name, skill in bundled_skills().items():
         root = Path(str(skill))
@@ -62,6 +66,7 @@ def bundled_files() -> dict[str, dict[str, Path]]:
             for path in sorted(root.rglob("*"))
             if path.is_file() and "__pycache__" not in path.parts
         }
+    found[""] = {SKILLS_NOTICE: Path(str(template_dir())) / SKILLS_DIR / SKILLS_NOTICE}
     return found
 
 
@@ -90,6 +95,7 @@ def skills_manifest() -> dict:
 class SkillFile:
     """One file of one bundled skill, as installed in a plant repository."""
 
+    #: The skill; "" for the notice of the skills directory.
     skill: str
     #: Its path inside the skill directory.
     name: str
@@ -127,13 +133,14 @@ def skill_status(target: Path, names: list[str] | None = None) -> list[SkillFile
 def modified_finding(item: SkillFile, replaced: bool = False) -> Finding:
     """``cheme.skill-modified`` for an installed skill file changed locally."""
     action = "replaced by the bundled version (--force)" if replaced else "kept"
+    owner = f"skill {item.skill}" if item.skill else "skills directory"
     return Finding(
         item.path,
         "warning",
         "cheme.skill-modified",
-        f"skill {item.skill}: {item.name} was changed locally and differs from every bundled "
+        f"{owner}: {item.name} was changed locally and differs from every bundled "
         f"version; {action}",
-        ids=[item.skill],
+        ids=[item.skill] if item.skill else [],
         hint="compare it with the bundled skill in the cheme-as-code package and merge by hand"
         if not replaced
         else "the local version is in git history if it was committed",

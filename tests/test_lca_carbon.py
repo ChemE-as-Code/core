@@ -1,4 +1,4 @@
-"""Carbon accounting (pre-release issue 181): carbon content, fossil and biogenic carbon traced
+"""Carbon accounting: carbon content, fossil and biogenic carbon traced
 through the inputs, CCU and CCS, the PCF breakdown and the PACT export.
 
 Two plants:
@@ -808,7 +808,7 @@ def test_cli_pact_failure_exits_1(methanol: Path, monkeypatch: pytest.MonkeyPatc
     assert not out.exists() and "cheme.lca-pact" in result.output
 
 
-# -- post-merge review of pre-release PR 312 -------------------------------------------------------
+# -- post-merge review -----------------------------------------------------------------------------
 
 
 def _bio_inventory(dataset: LciDataset, rows: list, backgrounds: dict | None = None):
@@ -970,11 +970,11 @@ def test_pact_o_star_properties_are_required_from_2025(methanol: Path) -> None:
     assert validate(copy) != []
 
 
-# -- post-merge review of pre-release PR 312 (pre-release PR 334) ----------------------------------
+# -- post-merge review -----------------------------------------------------------------------------
 
 
 def test_an_avoided_credit_carries_no_carbon() -> None:
-    # substitution (pre-release issue 180): the credit of a recycled output is a negative avoided:
+    # substitution: the credit of a recycled output is a negative avoided:
     # input. It stands for production outside the plant; the carbon left with the output already.
     # Here 50 kg C biogenic and 50 fossil enter, 60 leave in the product and 40 in the recyclable.
     pet = _dataset("pet", [{"key": "product:PET", "type": "product", "amount": 1, "unit": "kg",

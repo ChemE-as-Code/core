@@ -274,7 +274,7 @@ def test_export_static_leaves_out_excluded_kinetic_data(tmp_path):
 
 
 def test_export_static_withholds_kinetics_built_from_excluded_reactions(tmp_path):
-    """pre-release issue 230: the fits use the plant's reactions, so excluding them withholds the
+    """The fits use the plant's reactions, so excluding them withholds the
     answer."""
     root = _repo(tmp_path, "process-shift")
     _kinetic_data(root)

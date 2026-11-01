@@ -1,4 +1,4 @@
-"""Reactor choice (pre-release issue 157 item 11): yield and selectivity against conversion for an
+"""Reactor choice: yield and selectivity against conversion for an
 ideal PFR, one CSTR and CSTRs in series, against the analytical results of Levenspiel (Chemical
 Reaction Engineering, 3rd ed., ch. 7 and 8)."""
 

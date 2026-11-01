@@ -11,7 +11,7 @@
   `scripts/build_snippets.py`; rerun it, do not edit them.
 - Use pyDEXPI's loaders, serializers, validation, diff, projection and SVG export. **Do not use
   or expose pyDEXPI's editor commands (`pydexpi.editor`), patches or MCP server**, and do not
-  import DigiCo code (`pi_schemas`, `pydexpi_pro`, `digico_*`) or dexpi-js. The platform is about
+  import code from private projects or dexpi-js. The platform is about
   agents editing the files directly.
 - Every finding a command prints names a file, a line where known, a rule id and a hint.
 - `cheme serve` (`serve.py`) is read-only: it never writes to the plant repository. New

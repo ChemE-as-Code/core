@@ -159,7 +159,7 @@ gate `lca` fails.
    publication minimum. A v1 dataset (`schema: cheme/lca/v1`) still loads with a warning:
    `cheme migrate --write` rewrites a hand-written one.
 
-11. **Wastes and end of life** (pre-release issue 180). What goes in also comes out: give every replaced or
+11. **Wastes and end of life**. What goes in also comes out: give every replaced or
    charged consumable (adsorbent, catalyst) and the construction materials a `disposal:`
    (`kind: waste | recyclable`, `route`, its treatment background or `missing:`), classify
    waste outputs of the flowsheet with `treatment:`, and give `end_of_life:` entries `kind`
@@ -174,7 +174,7 @@ gate `lca` fails.
    `cheme.lca-disposal` and `cheme.lca-cutoff-*`; the gate requirement `cutoff-criteria` checks
    them.
 
-12. **Balances** (pre-release issue 174). Run `cheme assess lca --balance`: the dataset must close in mass,
+12. **Balances**. Run `cheme assess lca --balance`: the dataset must close in mass,
    in each element and in carbon by origin (1 % for a simulated flowsheet, 5 % for a sourced
    screening dataset). An open balance means a missing purge, waste, by-product or free
    resource, or a wrong composition or origin: fix the flowsheet or the dataset, never widen
@@ -183,7 +183,7 @@ gate `lca` fails.
    `balance_exclusion:` with the reason. Read `cheme.lci-mass-balance`,
    `cheme.lci-element-balance`, `cheme.lci-carbon-origin`; the gate requirements of the same
    names check them.
-13. **Emissions the flowsheet does not carry** (pre-release issue 176). A fired heater, a flare, storage
+13. **Emissions the flowsheet does not carry**. A fired heater, a flare, storage
    tanks, a wastewater outlet and equipment leaks emit what no stream holds (NOx, CO, PM,
    CH4/N2O, VOC, COD, N, P). Add `emission_estimates:` (method `combustion`,
    `equipment-leaks`, `storage-tank`, `flare`, `effluent` or `non-routine`; scope `equipment`,

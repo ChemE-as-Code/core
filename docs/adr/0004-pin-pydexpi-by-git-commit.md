@@ -1,6 +1,6 @@
 # 0004. Pin pyDEXPI as a git dependency by commit
 
-- **Status:** Accepted (a follow-up move to the public pyDEXPI repository is open, pre-release issue 321)
+- **Status:** Accepted (a follow-up move to the public pyDEXPI repository is open)
 - **Date:** 2026-10-22
 
 ## Context
@@ -25,11 +25,10 @@ examples rebuilt.
 - Negative: installation needs access to a private repository, so cheme-as-code cannot be
   installed by the public until it depends on a public pyDEXPI.
 - Negative: fixes upstream are not picked up automatically.
-- Open: pre-release issue 321 "Before going public: depend on the public pyDEXPI repository".
+- Open: depend on the public pyDEXPI repository (#111).
 
 ## Evidence
 
-- pre-release PR 76 (pre-release commit dc85bcb) "Pin pyDEXPI to the re-initialised
-  pyDEXPI-dev"; earlier, CI access through deploy keys in pre-release commit d192377
-  (2026-10-17) and a fine-grained token in pre-release commit f31295a.
+- "Pin pyDEXPI to the re-initialised pyDEXPI-dev"; earlier, CI access through deploy keys
+  (2026-10-17) and a fine-grained token.
 - `pyproject.toml` (`[tool.uv.sources]`), `.github/workflows/ci.yml`.

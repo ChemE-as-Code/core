@@ -100,7 +100,7 @@ Every finding names `process/cells.yaml`, the line, a rule id and a hint.
 - Electrolyte properties (activities, heats of dilution, conductivity) are not modelled. The
   heats of reaction are those of `process/reactions.yaml` on their standard states; for brine
   and caustic at process concentrations they differ by the heats of dilution. Electrolyte
-  thermodynamics is a linked dependency (pre-release issue 364).
+  thermodynamics is a linked dependency.
 - No adiabatic boundary, temperature rise or stream enthalpies (v1).
 - One current efficiency for the overall reaction: below 1 it reduces every product alike, and
   the current lost becomes heat, not chemistry. In a chlor-alkali cell the cathode forms H2 at

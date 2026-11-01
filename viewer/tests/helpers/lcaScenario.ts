@@ -48,7 +48,7 @@ export function withLowGrid<T extends Report>(
 export const NO_GRID = "de-grid";
 
 /**
- * *report* with a synthetic regional scenario `de-grid` (pre-release issue 172) whose electricity is declared
+ * *report* with a synthetic regional scenario `de-grid` whose electricity is declared
  * missing: the baseline without its `feed:POWER` contributions, which become gaps. Its total is the
  * rest, so a page must not compare it with the baseline as a lower footprint.
  */

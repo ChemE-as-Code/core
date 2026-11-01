@@ -1,5 +1,5 @@
 /**
- * The fixed beds of `GET /api/reactions` (pre-release viewer issue 32): each `reactor: pfr` row of `cheme process
+ * The fixed beds of `GET /api/reactions`: each `reactor: pfr` row of `cheme process
  * reactors` with the bed core solved (core: `domains/process/fixed_bed.py`, `reactors.reactor_entry`:
  * catalyst mass, outlet, `hot_spot_K` and the temperature and pressure along the catalyst mass)
  * or why it could not, the bed as the flowsheet declares it (calculation mode, coolant) and its
@@ -145,7 +145,7 @@ export function profileCsv(bed: Pick<ReactorBed, "profile">): string {
   return ["catalyst_mass_kg,temperature_K,pressure_kPa", ...rows].join("\n") + "\n";
 }
 
-/** A bed's row of the recorded simulation run (a kinetic reactor coupled as an external unit, pre-release PR 151). */
+/** A bed's row of the recorded simulation run (a kinetic reactor coupled as an external unit). */
 export interface BedRunRecord {
   /** `failed`: the run (or its outer loop around the bed) did not converge, no converged bed result; `stale`: the inputs changed since the run; `unknown`: core cannot tell (`stale: null`). */
   state: "current" | "stale" | "failed" | "unknown";

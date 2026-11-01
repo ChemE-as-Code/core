@@ -234,7 +234,7 @@ def test_monte_carlo_keeps_supplies_with_their_sources(plant: Path) -> None:
     _write(plant, scope)
     mc = lca_report(plant).uncertainty
     # maintenance, transport and end of life follow the steel: never inputs of their own; the
-    # other exchanges vary by their pedigree (pre-release issue 178)
+    # other exchanges vary by their pedigree
     assert "amount:construction:steel" in mc.varied
     assert mc.bases["amount:construction:steel"] == "given"
     assert not [

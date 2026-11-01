@@ -33,8 +33,7 @@ def test_empty_sheet_snippet_validates_clean(tmp_path: Path, monkeypatch):
     snippet = root / ".claude/skills/dexpi-xml/snippets/empty-sheet.xml"
     (root / "pid" / "P-01.xml").write_bytes(snippet.read_bytes())
     monkeypatch.chdir(root)
-    # A raw copy is clean but for its placeholders, which cheme sheet new replaces
-    # (pre-release issue 19).
+    # A raw copy is clean but for its placeholders, which cheme sheet new replaces.
     result = runner.invoke(app, ["validate", "--json"])
     findings = json.loads(result.stdout)["findings"]
     assert {(f["rule"], f["ids"][0]) for f in findings if f["level"] != "info"} == {
@@ -237,8 +236,7 @@ def test_diff_list_marks_added_sheet(plant: Path, monkeypatch):
 
 
 def test_diff_reports_a_broken_sheet_and_compares_the_others(plant: Path, monkeypatch):
-    """A truncated sheet is named with one line; the others are still compared
-    (pre-release issue 209)."""
+    """A truncated sheet is named with one line; the others are still compared."""
     monkeypatch.chdir(plant)
     sheet = _commit_formatted(plant)
     content = sheet.read_bytes()
@@ -259,8 +257,7 @@ def test_diff_reports_a_broken_sheet_and_compares_the_others(plant: Path, monkey
 
 
 def test_diff_and_render_survive_a_sheet_that_does_not_draw(plant: Path, monkeypatch):
-    """A dangling Shape reference: diff lists the changes, render goes on to the next
-    (pre-release issue 209)."""
+    """A dangling Shape reference: diff lists the changes, render goes on to the next."""
     from tests.test_diffview import _dangling_shape
 
     monkeypatch.chdir(plant)
@@ -513,8 +510,7 @@ def test_template_settings_record_each_session(tmp_path: Path):
 
 def test_a_control_character_in_a_list_is_a_finding_not_a_crash(plant: Path, monkeypatch):
     """A character YAML does not allow (here BEL, pasted from a spreadsheet) is a yaml.syntax
-    error on its line; the other files are still checked, and status does not crash
-    (pre-release issue 223)."""
+    error on its line; the other files are still checked, and status does not crash."""
     (plant / "equipment" / "equipment-list.yaml").write_text(
         'equipment:\n  - tag: T4750\n    service: "Feed\x07vessel"\n', encoding="utf-8"
     )
@@ -545,7 +541,7 @@ def test_a_control_character_in_a_list_is_a_finding_not_a_crash(plant: Path, mon
 )
 def test_a_control_character_in_a_process_file_is_a_finding(tmp_path, monkeypatch, example, name):
     """The process, simulation and evidence loaders report a character YAML does not allow as
-    yaml.syntax on its line; status, maturity and impact still run (pre-release issue 223)."""
+    yaml.syntax on its line; status, maturity and impact still run."""
     root = tmp_path / example
     shutil.copytree(Path(__file__).resolve().parents[1] / "examples" / example, root)
     path = root / name
@@ -585,7 +581,7 @@ def test_the_syntax_line_counts_every_yaml_line_break():
 @pytest.mark.parametrize("command", ["status", "impact", "maturity"])
 def test_an_unparsable_plant_yaml_stops_with_one_line(plant: Path, monkeypatch, command):
     """validate reports a plant.yaml that does not parse; the commands that need it whole stop
-    with one line and exit 2, without a traceback (pre-release issue 223)."""
+    with one line and exit 2, without a traceback."""
     (plant / "plant.yaml").write_text("name: [x\n", encoding="utf-8")
     monkeypatch.chdir(plant)
     validated = runner.invoke(app, ["validate"])
@@ -600,8 +596,7 @@ def test_an_unparsable_plant_yaml_stops_with_one_line(plant: Path, monkeypatch, 
 
 @pytest.mark.parametrize("value", ["warnings", "warn", "Error"])
 def test_validate_fail_on_refuses_an_unknown_level(plant: Path, monkeypatch, value):
-    """A misspelt --fail-on is a usage error naming the levels, also on a clean tree
-    (pre-release issue 243)."""
+    """A misspelt --fail-on is a usage error naming the levels, also on a clean tree."""
     monkeypatch.chdir(plant)
     result = runner.invoke(app, ["validate", "--fail-on", value])
     assert result.exit_code == 2
@@ -625,8 +620,7 @@ def test_validate_fail_on_refuses_an_unknown_level(plant: Path, monkeypatch, val
     ],
 )
 def test_init_writes_the_plant_name_exactly(tmp_path: Path, monkeypatch, name):
-    """The name is written as a YAML string, whatever characters it holds
-    (pre-release issue 227)."""
+    """The name is written as a YAML string, whatever characters it holds."""
     root = tmp_path / "p"
     assert runner.invoke(app, ["init", str(root), "--name", name]).exit_code == 0
     assert yaml.safe_load((root / "plant.yaml").read_text(encoding="utf-8"))["name"] == name

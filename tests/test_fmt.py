@@ -60,7 +60,7 @@ def test_format_refuses_what_it_would_drop():
 
 
 def test_format_keeps_the_model_name_and_uri(tmp_path: Path):
-    """#9: fmt used to write name="example" uri="http://www.example.org" back on every run."""
+    """fmt used to write name="example" uri="http://www.example.org" back on every run."""
     path = tmp_path / "P-02.xml"
     path.write_bytes(REFERENCE.read_bytes())
     format_file(path)
@@ -93,8 +93,7 @@ def _with(tmp_path: Path, inside_tank: bytes, before_tank: bytes = b"") -> Path:
 
 
 def test_format_refuses_a_data_property_pydexpi_would_ignore(tmp_path: Path, monkeypatch):
-    """An unknown Data property is a loader warning ('will be ignored'), not an error
-    (pre-release issue 212)."""
+    """An unknown Data property is a loader warning ('will be ignored'), not an error."""
     from typer.testing import CliRunner
 
     from chemeascode.interfaces.cli import app
@@ -110,8 +109,7 @@ def test_format_refuses_a_data_property_pydexpi_would_ignore(tmp_path: Path, mon
 
 
 def test_format_reports_the_comments_it_drops(tmp_path: Path):
-    """Comments and processing instructions do not survive; each one is reported
-    (pre-release issue 212)."""
+    """Comments and processing instructions do not survive; each one is reported."""
     from typer.testing import CliRunner
 
     from chemeascode.interfaces.cli import app
@@ -143,7 +141,7 @@ def _top(path: Path) -> list[bytes]:
 
 
 def test_format_keeps_cheme_provenance_comments_and_reports_the_rest(tmp_path: Path):
-    """#303: a ``cheme-`` comment survives, after the XML declaration, in document order."""
+    """A ``cheme-`` comment survives, after the XML declaration, in document order."""
     from typer.testing import CliRunner
 
     from chemeascode.domains.piping.fmt import kept_comments

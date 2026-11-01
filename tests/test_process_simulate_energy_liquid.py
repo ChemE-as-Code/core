@@ -1,4 +1,4 @@
-"""The energy audit's reacting closure on a liquid-phase reactor (pre-release issue 315):
+"""The energy audit's reacting closure on a liquid-phase reactor:
 liquid-phase methyl tert-butyl ether (MTBE) synthesis, isobutene + methanol = MTBE, at 298.15 K and
 2000 kPa(a), every stream liquid.
 
@@ -47,7 +47,7 @@ kJ/mol lies at the low-magnitude end, about 17 % from :data:`ARNTZ_GOTTLIEB`, ou
 
 Two DWSIM behaviours found on the way, kept out of the reference case: a liquid-phase
 reaction in DWSIM's conversion reactor converts the key component of the inlet's liquid phase
-only (pre-release issue 371: simulate now reports the conversion reached and an error,
+only (simulate now reports the conversion reached and an error,
 ``cheme.process-sim-conversion-mismatch``, when it falls short, asserted here per package);
 and Peng-Robinson and SRK split the isobutene-methanol mixture at 278-298 K and 2000 kPa into a
 "vapour" (not a real vapour, likely a second liquid: both pure components' vapour
@@ -97,7 +97,7 @@ DEPARTURE_TOLERANCE = 0.015
 DUTY_TOLERANCE_KW = 1e-2
 PACKAGES = ["Peng-Robinson (PR)", "Peng-Robinson 1978 (PR78)", "Soave-Redlich-Kwong (SRK)"]
 #: Whether the package splits the reactor inlet at 298.15 K and so falls short of the declared
-#: conversion (pre-release issue 371): PR78 converts 99.85 %, SRK about 81 %, Peng-Robinson all of
+#: conversion: PR78 converts 99.85 %, SRK about 81 %, Peng-Robinson all of
 #: it.
 SPLITS = {
     "Peng-Robinson (PR)": False,
@@ -304,7 +304,7 @@ def _run(ws) -> tuple[dict, dict, list]:
 
     process, _ = load_process(ws.root)
     result = run(ws, process, "design", write=True, solver=solver)
-    # a conversion short of the declared one is an error (pre-release issue 371), asserted per
+    # a conversion short of the declared one is an error, asserted per
     # package
     assert not [f for f in result.findings if f.level == "error" and f.rule != SHORT], [
         f.format() for f in result.findings
@@ -469,7 +469,6 @@ def test_dwsim_liquid_phase_reactor_closes_on_the_formation_basis(tmp_path, pack
     assert out["streams"]["S6"]["mass_flow_kg_s"] < 1e-9  # all liquid: the vapour outlet empty
     assert extent > 0.5 * fed
     # the conversion reached is reported, and a shortfall is an error naming R1
-    # (pre-release issue 371)
     entry = json.loads((ws.root / "process/simulation-run.json").read_text())["cases"]["design"]
     results = next(u for u in entry["units"] if u["id"] == "R1")["results"]
     assert results["conversions"]["ETH"] == pytest.approx(extent / fed, abs=1e-6)

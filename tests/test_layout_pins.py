@@ -1,6 +1,5 @@
 """``cheme layout pin`` edits the layout files as text: block style, flow style and comments
-stay, the entry lands in the list it belongs to, and nothing invalid is written
-(pre-release issue 193)."""
+stay, the entry lands in the list it belongs to, and nothing invalid is written."""
 
 from pathlib import Path
 
@@ -273,7 +272,7 @@ structures:
     ["reached from C:\\tank\\new walkway", "first line\nsecond line\n", 'a "quoted" word', "yes"],
 )
 def test_a_pinned_platform_keeps_free_text_notes_exactly(tmp_path, notes):
-    """Review 2 of pre-release PR 284: the other keys of a declared access are copied with every
+    """The other keys of a declared access are copied with every
     escape."""
     import json
 
@@ -304,7 +303,7 @@ def test_a_pinned_platform_keeps_free_text_notes_exactly(tmp_path, notes):
 
 @pytest.mark.parametrize("style", ["|", ">-"])
 def test_a_platform_pins_over_an_access_ending_in_a_block_note(tmp_path, style):
-    """Review 3 of pre-release PR 284: a block scalar as the last key of the access keeps its
+    """A block scalar as the last key of the access keeps its
     newline."""
     text = PLACEMENT_BLOCK.replace(
         "    position: [0, 0, 0]\n",
@@ -353,7 +352,7 @@ _PLATFORM_MODEL = {
 
 @pytest.mark.parametrize("style", ["|+", ">+", "|", ">"])
 def test_a_platform_pins_after_an_item_ending_in_a_note_with_kept_blank_lines(tmp_path, style):
-    """Round 4 of pre-release PR 284: an item without access whose last key is a block note followed
+    """An item without access whose last key is a block note followed
     by a blank line (kept by ``|+``/``>+``) gets its access after the note, which stays as it
     was."""
     text = PLACEMENT_BLOCK.replace(
@@ -376,7 +375,7 @@ def test_a_platform_pins_after_an_item_ending_in_a_note_with_kept_blank_lines(tm
 
 @pytest.mark.parametrize("style", ["|+", ">+"])
 def test_a_stair_pins_after_a_structure_ending_in_a_note_with_kept_blank_lines(tmp_path, style):
-    """Round 4 of pre-release PR 284: the same for a structure whose last key is such a note."""
+    """The same for a structure whose last key is such a note."""
     text = MISSING.replace("    stairs: []\n", "").replace(
         "        extent: [0, 0, 6, 5]   # the whole frame\n",
         "        extent: [0, 0, 6, 5]   # the whole frame\n"
@@ -400,7 +399,7 @@ def test_a_stair_pins_after_a_structure_ending_in_a_note_with_kept_blank_lines(t
 def test_a_rack_ladder_pins_after_a_rack_ending_in_a_block_title_with_kept_blank_lines(
     tmp_path, style
 ):
-    """Round 4 of pre-release PR 284: the same for a rack mapping in the site plan (its title)."""
+    """The same for a rack mapping in the site plan (its title)."""
     text = (
         "site: {width: 100, depth: 80}\n"
         "racks:\n"
@@ -448,7 +447,7 @@ def _routing(root: Path, text: str) -> Path:
 
 
 def test_a_pinned_route_keeps_the_entrys_gravity_and_notes(tmp_path):
-    """Round 4 of pre-release PR 284: a replaced routing entry keeps what the route does not
+    """A replaced routing entry keeps what the route does not
     replace."""
     path = _routing(
         tmp_path,
@@ -470,7 +469,7 @@ def test_a_pinned_route_keeps_the_entrys_gravity_and_notes(tmp_path):
 
 
 def test_a_route_pin_that_would_not_change_the_data_is_refused(tmp_path):
-    """Round 4 of pre-release PR 284: with ``lines`` given twice the text edit lands in the list the
+    """With ``lines`` given twice the text edit lands in the list the
     loader drops; the data check refuses instead of reporting a pin that changed nothing."""
     text = "lines:\n  - {line: L-9, rack: PR}\nlines:\n  - {line: L-8, rack: PR}\n"
     path = _routing(tmp_path, text)
@@ -480,7 +479,7 @@ def test_a_route_pin_that_would_not_change_the_data_is_refused(tmp_path):
 
 
 def test_a_valve_platform_is_not_written_when_its_routes_cannot_be(tmp_path):
-    """Round 4 of pre-release PR 284: pinning a valve platform checks the structures and the routing
+    """Pinning a valve platform checks the structures and the routing
     file before writing either, so a refusal leaves both as they were."""
     routing = _routing(tmp_path, "typo: 1\n")
     model = _PIPES | {
@@ -511,7 +510,7 @@ def test_a_valve_platform_is_not_written_when_its_routes_cannot_be(tmp_path):
 
 @pytest.mark.parametrize("intent", ["{line: L-1, rack: PR}", "{line: L-1, skip: later}"])
 def test_a_route_pin_leaves_a_line_wide_entry_alone(tmp_path, intent):
-    """Round 5 of pre-release PR 284: an entry without a segment is the line's intent, not this
+    """An entry without a segment is the line's intent, not this
     segment's: a segment without a number appends its route and the line-wide entry stays."""
     path = _routing(tmp_path, f"lines:\n  - {intent}\n")
     pin(tmp_path, _PIPES, "L-1")

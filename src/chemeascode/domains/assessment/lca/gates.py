@@ -9,7 +9,7 @@ Each item of the gate's ``require`` is one test:
 - ``no-gaps``: no exchange lacks a burden in a category, in the baseline or a scenario
   (``lca/gaps.csv`` lists none but flows outside a method's scope): the result is not partial;
 - ``factors-published``: every exchange of the baseline and every scenario rests on published
-  data (pre-release issue 322): its factor status (:func:`.report.factor_status`) is ``PUBLISHED``,
+  data: its factor status (:func:`.report.factor_status`) is ``PUBLISHED``,
   ``EPD``, a background database's (``database``) or no burden by declaration (``none``); an example
   factor, an ``ASSUMED``, ``PROXY`` or ``ESTIMATE`` one, or a gap fails it and is named;
 - ``publishable``: the results may be published: every source they draw on is ``public``, or
@@ -20,17 +20,17 @@ Each item of the gate's ``require`` is one test:
   boundary, ISIC and CPC, modelling principle and multi-functionality, a review record, possibly
   ``type: none``, rights and data generator);
 - ``cutoff-criteria``: the plant's LCI dataset meets the cut-off criteria and its system model
-  (:mod:`.cutoff`, pre-release issue 180): every recorded cut flow below 1 % of the input mass, all
+  (:mod:`.cutoff`): every recorded cut flow below 1 % of the input mass, all
   of them together below 1 %, none on the never-cut list, no avoided-burden credit in a
   non-crediting system model (an ``avoided:`` input, a negative end-of-life or recyclable output, or
   allocation by substitution), and every consumable replaced or charged with a disposal output or a
   recorded cut-off (infos, such as a cut flow with no amount in kg, do not fail it);
 - ``lci-emissions-complete``: no emission source the flowsheet does not carry is left without
-  an estimate or a declared exclusion (pre-release issue 176, :mod:`.emissions`): a combustion unit
+  an estimate or a declared exclusion (:mod:`.emissions`): a combustion unit
   or fuel feed, a flare, a storage tank or a wastewater outlet not sent to a treatment background
   (the warning ``cheme.lci-emissions-incomplete``);
 - ``lci-mass-balance``, ``lci-element-balance``, ``lci-carbon-origin``: the plant's LCI
-  dataset closes (:mod:`.balance`, pre-release issue 174) in total mass (free resources such as air
+  dataset closes (:mod:`.balance`) in total mass (free resources such as air
   and water included), in each element (C, H, O, N, S, Cl, ... from the exchanges' compositions),
   and in carbon by origin (the fossil, biogenic and atmospheric carbon of the inputs against the
   products, emissions and wastes; no output declared fossil or biogenic carrying more carbon of

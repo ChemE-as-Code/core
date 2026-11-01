@@ -1,4 +1,4 @@
-"""The supported-method contract (methods.yml, pre-release issue 137): recommendation, phase.py and
+"""The supported-method contract (methods.yml): recommendation, phase.py and
 the DWSIM route agree on which methods run; substitutions are explicit; binary parameter coverage
 tells missing from accepted zeros; electrolytes, solids and pseudocomponents are refused or limited
 as the table says."""
@@ -93,8 +93,7 @@ def test_routes_claim_no_application_range():
 
 
 def test_every_claimed_range_names_a_benchmark_test_that_exists():
-    """A package's claim is only as good as its benchmark: the test it names exists
-    (pre-release issue 256)."""
+    """A package's claim is only as good as its benchmark: the test it names exists."""
     root = Path(__file__).resolve().parents[1]
     for package in methods.simulation_packages():
         claim = methods.simulation_claim(package)
@@ -147,8 +146,7 @@ def test_the_nrtl_claim_holds_one_isobar_of_ethanol_and_water():
 
 
 def test_one_claim_schema_and_one_property_regime_check():
-    """After pre-release PR 279 (on pre-release PR 298's claim structure) and pre-release PR 331
-    (SRK), pre-release issue 315: every simulation package's claim, PR's and SRK's alike, is one
+    """Every simulation package's claim, PR's and SRK's alike, is one
     schema (:class:`methods.SimulationClaim`, at ``methods[].simulation.application_range``) read by
     one check, ``predictive.property-regime`` (``maturity._property_regime``, through
     ``simulation_claim`` and ``outside_claim``). A second claim model, rule id or claim reader is a
@@ -254,7 +252,7 @@ def test_electrolyte_recommendation_has_no_route_and_no_substitution():
     assert all(m.phase.substitution is None for m in result.methods)
     assert all(m.simulation.substitution is None for m in result.methods)
     assert len(result.notes) == 3 and all("unsupported" in n for n in result.notes)
-    # Pitzer runs on the electrolyte route, for its qualified systems only (pre-release issue 364)
+    # Pitzer runs on the electrolyte route, for its qualified systems only
     assert "electrolyte route runs its liquid model for NaCl-H2O only" in result.notes[2]
 
 

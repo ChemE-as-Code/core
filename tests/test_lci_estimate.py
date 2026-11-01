@@ -1,4 +1,4 @@
-"""Tiered LCI generation (pre-release issue 182): ``cheme assess lci-estimate`` builds a Tier 0
+"""Tiered LCI generation: ``cheme assess lci-estimate`` builds a Tier 0
 (stoichiometric) or Tier 1 (sourced conceptual) dataset from the reactions, a yield and the
 versioned defaults, with the element balance mandatory and the tier capping maturity and DQR.
 

@@ -300,7 +300,7 @@ def test_review_gate_not_an_ancestor(plant: Path):
 
 
 def test_review_gate_reads_a_scope_with_a_leading_slash(plant: Path, monkeypatch):
-    """#190: '/pid/P-01.xml' made git fail, and the failure read as 'unchanged'."""
+    """'/pid/P-01.xml' made git fail, and the failure read as 'unchanged'."""
     monkeypatch.chdir(plant)
     set_checks(plant, review_gate())
     commit_all(plant)
@@ -595,7 +595,7 @@ def test_sign_off_refuses_open_high_findings(plant: Path, monkeypatch):
 
 
 def test_a_high_finding_carried_forward_without_severity_still_blocks(plant: Path, monkeypatch):
-    """#225: the latest row's empty severity cleared the 'high' of the first record."""
+    """The latest row's empty severity cleared the 'high' of the first record."""
     from chemeascode.foundation.reviews import (
         blocking_ids,
         coverage,
@@ -659,7 +659,7 @@ def test_a_high_finding_carried_forward_without_severity_still_blocks(plant: Pat
 
 
 def test_a_blocking_finding_with_a_malformed_id_refuses_and_is_shown(plant: Path, monkeypatch):
-    """Review of pre-release PR 281: a row whose id is not <record>#<n> blocks the sign-off on its
+    """A row whose id is not <record>#<n> blocks the sign-off on its
     own, and cheme status and /api/status list it."""
     from chemeascode.project.signoff import SignOffRefused, sign_off
     from chemeascode.project.status import plant_status
@@ -682,7 +682,7 @@ def test_a_blocking_finding_with_a_malformed_id_refuses_and_is_shown(plant: Path
 
 
 def test_a_high_finding_closed_without_severity_needs_a_real_commit(plant: Path, monkeypatch):
-    """Review of pre-release PR 281: 'closed <sha not in history>' without a severity cell still
+    """'closed <sha not in history>' without a severity cell still
     refuses."""
     from chemeascode.project.signoff import SignOffRefused, sign_off
 
@@ -750,7 +750,7 @@ def test_sign_off_on_a_branch_says_merge(plant: Path, monkeypatch):
 
 
 def test_a_gate_naming_an_unknown_stage_is_not_dropped(plant: Path, monkeypatch):
-    """#222: 'stage: Concept' dropped the gate from check --stage concept and the sign-off."""
+    """'stage: Concept' dropped the gate from check --stage concept and the sign-off."""
     monkeypatch.chdir(plant)
     command = {"title": "HAZOP done", "kind": "command", "command": "true"}
     set_checks(

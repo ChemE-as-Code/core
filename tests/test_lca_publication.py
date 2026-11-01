@@ -1,4 +1,4 @@
-"""Publication policy, the run manifest and public snapshots of an LCA (pre-release issue 138).
+"""Publication policy, the run manifest and public snapshots of an LCA.
 
 The plant is ``examples/process-blocks`` with the factors of ``test_lca_coverage``.
 """
@@ -256,7 +256,7 @@ def test_a_restricted_lca_is_withheld_from_the_snapshot(blocks: Path, tmp_path: 
     assert set(LCA_RESULT_FILES) <= set(data["excluded"])
     keys = set(data["entries"])
     assert not any(k.startswith(("file?path=lca/results", "file?path=lca/gaps")) for k in keys)
-    # the per-scenario records hold the scores too (pre-release issue 172)
+    # the per-scenario records hold the scores too
     assert not any("lca/scenarios/" in k for k in keys)
     # the foreground stays publishable
     assert "file?path=lca/dataset.yaml" in keys or "yaml?path=lca/dataset.yaml" in keys
@@ -381,7 +381,7 @@ def test_excluding_the_factors_withholds_the_lca(blocks: Path, tmp_path: Path) -
 
 
 def test_an_lca_built_from_an_excluded_file_is_withheld(blocks: Path, tmp_path: Path) -> None:
-    """pre-release issue 230: not an LCA input of LCA_INPUTS, but the LCA reads the flowsheet."""
+    """Not an LCA input of LCA_INPUTS, but the LCA reads the flowsheet."""
     from chemeascode.interfaces.api.export_static import LCA_RESULT_FILES
 
     data = export_static(

@@ -1,4 +1,4 @@
-"""Whether an LCI dataset may stand in for a background (pre-release issue 168).
+"""Whether an LCI dataset may stand in for a background.
 
 When a flow's background is another LCI dataset (``dataset:``, e.g. an Atlas process instead of
 a market activity), the dataset's product must be the thing the plant takes, counted the same

@@ -8,7 +8,7 @@
 Naphtha and heavier petroleum fractions are mixtures no database identifies compound by
 compound. Both execution routes of cheme-as-code, the thermo flash of `cheme process phase` and
 the DWSIM simulation, need identified compounds and refuse a petroleum fraction
-(`thermodynamics/methods.yml`, regime `petroleum_pseudocomponents`, pre-release issue 137). Process-library
+(`thermodynamics/methods.yml`, regime `petroleum_pseudocomponents`). Process-library
 case studies on naphtha and heavy fractions (process-library#176, #181) need at least a
 characterisation of the fraction with known provenance, and a flash whose accuracy is known.
 
@@ -74,7 +74,6 @@ cheme-as-code with named correlations and flash through thermo.
 
 ## Evidence
 
-- pre-release issue 367.
 - `src/chemeascode/domains/process/thermodynamics/assay.py`, `methods.yml` (regime
   `petroleum_pseudocomponents`), `interfaces/cli/process.py` (`cheme process assay`),
   `project/validate.py`.

@@ -1,4 +1,4 @@
-"""The control files ``cheme init`` writes (pre-release issue 140): templates that cost a plant
+"""The control files ``cheme init`` writes: templates that cost a plant
 nothing until it changes them, the detail-stage gate on them, and the bundled control skills."""
 
 import json

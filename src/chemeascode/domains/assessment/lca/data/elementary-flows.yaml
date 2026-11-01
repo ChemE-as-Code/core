@@ -1,4 +1,4 @@
-# Curated elementary-flow crosswalk (core#175): the identity of the elementary flows cheme's
+# Curated elementary-flow crosswalk: the identity of the elementary flows cheme's
 # packaged methods, examples and tests use, in reference flow lists. Not a flow list: only these
 # flows, extended one at a time with a verified identifier. CAS is an attribute here, never the
 # identity: a flow is a substance in a compartment and sub-compartment, with an origin.
@@ -8,7 +8,7 @@
 #   attribution), the primary list. No EF 3.1 UUID is recorded yet: none could be verified
 #   offline against the reference package when this file was made, and none is guessed. Every
 #   flow's EF 3.1 identity is therefore {list: ef-3.1, uuid: null}, and cheme assess lca
-#   reports it (cheme.lca-flow-uuid, info). TODO(core#313): add the EF 3.1 UUIDs from the
+#   reports it (cheme.lca-flow-uuid, info). TODO(#26): add the EF 3.1 UUIDs from the
 #   reference package, with its version: scripts/fill_ef31_uuids.py reads them from a downloaded
 #   copy of the package (a flow gets an `ef-3.1: {name, unit, uuid, categories}` block by
 #   sub-compartment, as biosphere3's), and remove the finding's cause.

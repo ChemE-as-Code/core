@@ -105,8 +105,7 @@ def test_repository_accept_list_makes_findings_info(plant: Path, monkeypatch):
 
 def test_accept_never_silences_an_error(plant: Path, monkeypatch):
     # A schema error plus a catch-all accept: the error stays an error, validate and the
-    # default pids-valid gate still fail, and the entry is reported (review of
-    # pre-release issue 18).
+    # default pids-valid gate still fail, and the entry is reported.
     lists = plant / "equipment" / "equipment-list.yaml"
     lists.write_text("equipment: []\nbogus: 1\n", encoding="utf-8")
     (plant / "checks" / "checks.yaml").write_text(
@@ -163,7 +162,7 @@ def test_text_output_prints_the_id_of_every_acceptable_finding():
 
 
 def test_template_and_init_say_how_to_keep_the_reference_sheet(plant: Path, tmp_path: Path):
-    """pre-release issue 43: the reference sheet fails drawing-clean by design; the template's
+    """The reference sheet fails drawing-clean by design; the template's
     comment and the init output give the accept line, and that line makes the template's gate
     pass."""
     import re

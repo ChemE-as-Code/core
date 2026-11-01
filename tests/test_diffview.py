@@ -119,8 +119,7 @@ def _dangling_shape(content: bytes) -> bytes:
 
 
 def test_a_side_that_does_not_load_is_reported_not_raised(plant):
-    """A truncated sheet gives an error, the loaded side's drawing and no changes
-    (pre-release issue 209)."""
+    """A truncated sheet gives an error, the loaded side's drawing and no changes."""
     content = (plant / "pid" / "P-01.xml").read_bytes()
     result = diff_sheet(content, content[:5000], "pid/P-01.xml", "HEAD", "working tree")
     assert result.error.startswith("cannot compare: working tree does not load: XMLSyntaxError")
@@ -132,8 +131,7 @@ def test_a_side_that_does_not_load_is_reported_not_raised(plant):
 
 
 def test_a_side_that_does_not_draw_still_lists_the_changes(plant):
-    """A dangling Shape reference loads but breaks the SVG export: the diff is still made
-    (pre-release issue 209)."""
+    """A dangling Shape reference loads but breaks the SVG export: the diff is still made."""
     content = (plant / "pid" / "P-01.xml").read_bytes()
     result = diff_sheet(content, _dangling_shape(content), "pid/P-01.xml", "HEAD", "b")
     assert result.error.startswith("cannot draw b: AttributeError")

@@ -10,7 +10,7 @@ electrolyte, but neither execution route ran either (`methods.yml`, regime `elec
 the phase route (thermo) refused charged species, and the DWSIM route has no electrolyte
 package. A salt given as an apparent component (sodium chloride in water) was not refused at all:
 thermo and DWSIM would have computed it as a neutral molecule. Process-library entries with
-brines, acids and bases (chlor-alkali, soda ash, sulfuric acid; pre-release issue 364) need at least one
+brines, acids and bases (chlor-alkali, soda ash, sulfuric acid) need at least one
 qualified electrolyte capability, and a loud refusal everywhere else.
 
 Options considered: writing Pitzer's or eNRTL equations into a domain module; a new dependency
@@ -66,12 +66,10 @@ equations (Harvie-Moller-Weare formulation) in a library already behind the opti
   is not claimed below 313.15 K. The refusal by the phase and simulation routes is a list
   (`apparent_electrolytes`) plus a formula rule (`ionic_elements`: any compound of an alkali or
   alkaline-earth metal); an acid, ammonium salt or other electrolyte without such a metal that
-  the list does not name, or a component without a known formula, is not refused. Follow-ups
-  under pre-release issues 81 and 137.
+  the list does not name, or a component without a known formula, is not refused.
 
 ## Evidence
 
-- pre-release issue 364; the pull request that introduced the route.
 - `src/chemeascode/domains/process/thermodynamics/electrolytes.yml`, `electrolytes.py`,
   `src/chemeascode/integrations/cantera.py`, `coverage.py` (phase-route refusal),
   `simulation/translate.py` (`cheme.process-sim-electrolyte`), `methods.yml`.

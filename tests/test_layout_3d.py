@@ -729,8 +729,7 @@ def test_pipe_sizes_and_insulation():
     "text", ["none", "None", "no", "N/A", "-", "bare", "uninsulated", "Not  insulated", "0"]
 )
 def test_no_insulation_text_is_zero(text):
-    """A line list that says the line is bare gets no insulation, not the 50 mm default
-    (pre-release issue 208)."""
+    """A line list that says the line is bare gets no insulation, not the 50 mm default."""
     found = insulation(text, 80)
     assert found.thickness == 0 and "no insulation" in found.basis
 

@@ -719,7 +719,7 @@ describe("real API responses use only fields the viewer's types know", () => {
     const envelopes = model.equipment.flatMap((e) => e.envelopes);
     expectKnown(nozzles, NOZZLE_KEYS, "nozzle");
     expectKnown(envelopes, ENVELOPE_KEYS, "envelope");
-    // Declared operators (pre-release issue 61): on in-line valves and on transmitter tappings, of the four kinds.
+    // Declared operators: on in-line valves and on transmitter tappings, of the four kinds.
     const operators = [...model.inline, ...nozzles].flatMap((o) => (o.operator ? [o.operator] : []));
     expectKnown(operators, OPERATOR_KEYS, "operator");
     expect(new Set(operators.map((o) => o.kind))).toEqual(new Set(["chainwheel", "extension_spindle", "remote_operator", "remote_mount"]));

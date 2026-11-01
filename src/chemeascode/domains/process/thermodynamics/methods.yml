@@ -1,4 +1,4 @@
-# The supported-method contract (pre-release issue 137): every thermodynamic model the selection tree
+# The supported-method contract: every thermodynamic model the selection tree
 # (model_selection_rules.yml) can recommend, and whether each execution route of cheme-as-code
 # runs it.
 #
@@ -69,7 +69,7 @@ regimes:
     selection: "the tree recommends Braun K-10, ideal, Chao-Seader or Grayson-Streed; no route executes them and nothing is substituted"
     phase: {status: unsupported, evidence: "a component thermo does not identify (e.g. a C7+ fraction) is refused (ValueError)"}
     simulation: {status: unsupported, evidence: "the worker looks every compound up in DWSIM's database and fails for one it does not find; no pseudocomponent input in simulation.yaml"}
-    # pre-release issue 367: assays characterised into pseudocomponents (thermodynamics/assay.py, `cheme
+    # assays characterised into pseudocomponents (thermodynamics/assay.py, `cheme
     # process assay`), flashed with Peng-Robinson (kij = 0) through thermo; neither route above
     # takes them, so a flowsheet with a petroleum fraction is still not simulated.
     elsewhere:
@@ -200,7 +200,7 @@ methods:
     recommended_as: ["Redlich-Kwong-Soave"]
     phase:
       model: {eos_model: Redlich-Kwong-Soave}
-      interaction_parameters: "kij: ChemSep SRK, user-installed with `cheme data fetch chemsep-srk` (not shipped, pre-release issue 55)"
+      interaction_parameters: "kij: ChemSep SRK, user-installed with `cheme data fetch chemsep-srk` (not shipped)"
     simulation:
       package: "Soave-Redlich-Kwong (SRK)"
       interaction_parameters: "kij: DWSIM's database; simulation.yaml interaction_parameters override"

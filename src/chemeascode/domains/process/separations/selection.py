@@ -195,7 +195,7 @@ def _compute_cop(
     with the reboiler side T_hot = Tb_heavy + dT_min and the condenser side
     T_cold = Tb_light - dT_min (the normal boiling points of the split's heavy and light key,
     K): the lift is delta_Tb + 2 dT_min and the level is the column's own, so a cryogenic
-    split gets a far lower COP than one near 100 deg C at the same delta_Tb (pre-release issue 216). The
+    split gets a far lower COP than one near 100 deg C at the same delta_Tb. The
     callers compare it with the screening's threshold of 3 (favourable at or above). The
     form, eta = 0.7, dT_min = 5 K and the threshold are core's convention for this screening,
     not equations taken from Li et al. (2025).
@@ -1118,7 +1118,7 @@ def select_separation_methods_core(
     (component_names, heat_of_vaporization, viscosity, diffusion_coefficient,
     molar_fractions) are in the order of boiling_points_K, which need not be
     ascending: they are sorted by boiling point together, so that each sub-separation gets its own
-    components' properties (pre-release issue 220). relative_volatilities are per adjacent
+    components' properties. relative_volatilities are per adjacent
     pair in boiling order.
     """
 
@@ -1913,7 +1913,7 @@ def select_multicomponent_separation_methods(
     n = len(component_names)
     errors = []
     # exactly n values: a list of another length cannot be sorted with the boiling points and
-    # would be paired with the wrong sub-separation (pre-release issue 220)
+    # would be paired with the wrong sub-separation
     if not boiling_points_K or len(boiling_points_K) != n:
         errors.append(
             f"boiling_points_K must have {n} values for {n}-component separation, "

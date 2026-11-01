@@ -1,5 +1,4 @@
-"""The furnace energy basis (domains/process/furnace.py, ``cheme process furnace``,
-pre-release issue 370).
+"""The furnace energy basis (domains/process/furnace.py, ``cheme process furnace``).
 
 Reference data, all independent of the NASA polynomials the model uses:
 

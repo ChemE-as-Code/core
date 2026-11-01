@@ -397,7 +397,7 @@ def test_large_files_are_not_parsed(committed: Path, monkeypatch):
         response = api.get(endpoint, params={"path": path})
         assert response.status_code == 400, endpoint
         assert "larger than" in response.json()["error"]
-    # the recorded check results too (pre-release issue 257)
+    # the recorded check results too
     (committed / "checks" / "status.json").write_text(json.dumps({"checks": [], "pad": "x" * 200}))
     response = api.get("/api/checks")
     assert response.status_code == 400 and "larger than" in response.json()["error"]
@@ -588,7 +588,7 @@ def test_spa_fallback(committed: Path, tmp_path: Path):
 
 
 def test_the_viewer_may_be_framed_only_by_itself(committed: Path, tmp_path: Path):
-    """pre-release issue 258: another site cannot frame the viewer and trick a click on "Run
+    """Another site cannot frame the viewer and trick a click on "Run
     now"."""
     ui = tmp_path / "dist"
     (ui / "assets").mkdir(parents=True)
@@ -634,7 +634,7 @@ def test_plant_in_a_subdirectory_of_the_git_repository(tmp_path: Path):
     assert [e["subject"] for e in api.get("/api/log").json()] == ["nested"]
 
 
-# -- binding to the network (pre-release issue 191) ------------------------------------------------
+# -- binding to the network ------------------------------------------------------------------------
 
 
 def test_accepted_hosts():

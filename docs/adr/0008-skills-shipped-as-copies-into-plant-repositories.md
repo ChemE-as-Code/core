@@ -31,9 +31,6 @@ the installed package. Plant teams may also adapt a skill locally.
 
 ## Evidence
 
-- pre-release commit 62c29e1 (template with skills `dexpi-xml`, `pid-edit`, `pid-draft`,
-  `lists-sync`, `review`).
-- pre-release commit 03211e3, pre-release commit 40ecc6c, pre-release commit 0466390
-  in pre-release PR 58.
+- 0.1.0: template with skills `dexpi-xml`, `pid-edit`, `pid-draft`, `lists-sync`, `review`.
 - `src/chemeascode/templates/install.py`, `REFERENCE.md` ("How the pieces fit together"),
   [contributing.md](../framework/contributing.md) ("Adding or changing a skill").

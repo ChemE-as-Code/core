@@ -303,7 +303,7 @@ needs_brightway = pytest.mark.skipif(
 
 @needs_brightway
 def test_brightway_calls_close_their_sqlite_connections(monkeypatch):
-    """pre-release issue 93: bw2data opens its SQLite connections per thread and never closes them;
+    """bw2data opens its SQLite connections per thread and never closes them;
     a call from a worker thread (cheme serve) left them to the garbage collector, an
     unclosed-database ResourceWarning in whichever test collected them. Each call closes them
     now."""

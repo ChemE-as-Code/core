@@ -717,7 +717,7 @@ def draft_datasheet(
     return header + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=100)
 
 
-# -- main dimensions, nozzle schedule, drawing (pre-release issue 62) ------------------------------
+# -- main dimensions, nozzle schedule, drawing -----------------------------------------------------
 
 
 def _sheet_findings(name: str, document: Any, sheet: Datasheet) -> list[Finding]:
