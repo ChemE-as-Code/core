@@ -8,7 +8,7 @@
 Liquid-liquid extraction was covered only as a `component_separator` with given recoveries (a
 specified split): the flash and the columns of `process/simulation.yaml` take vapour and liquid
 roles only, and nothing in core solved a liquid-liquid stage (from
-process-library#114). thermo's multiphase flash (`thermodynamics.phase`) can find two liquids,
+process-library#306). thermo's multiphase flash (`thermodynamics.phase`) can find two liquids,
 but it also searches for a vapour, needs vapour-pressure and volume correlations for every
 component, reads interaction parameters only from its own databases, and has no stage or
 cascade.

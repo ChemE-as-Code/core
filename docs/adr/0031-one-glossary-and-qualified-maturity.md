@@ -41,7 +41,7 @@ and its findings "maturity screening claimed". A reader could not tell which axi
 - Positive: no migration, since the JSON report, the schemas and the rule ids are unchanged.
 - Negative: finding messages and the text output changed wording; scripts that parsed the old
   text (`level: ...`, `maturity ... below ...`) need to read `--json` instead, as they should.
-- Follow-ups: ChemE-as-Code/process-library#87 and ChemE-as-Code/website#71 adopt the
+- Follow-ups: ChemE-as-Code/process-library#305 and ChemE-as-Code/website#150 adopt the
   glossary; the viewer shows stage and calculation maturity apart.
 
 ## Evidence

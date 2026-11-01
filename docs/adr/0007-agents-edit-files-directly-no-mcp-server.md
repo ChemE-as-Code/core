@@ -16,7 +16,7 @@ files.
 - Agents (and people) change a plant by editing its files and run `cheme` commands to validate,
   format, render, diff and generate. There is deliberately no MCP server and no edit-operation API.
 - cheme-as-code does not use or expose pyDEXPI's editor commands (`pydexpi.editor`), its patches
-  or its MCP server, and does not import DigiCo code (`pi_schemas`, `pydexpi_pro`, `digico_*`)
+  or its MCP server, and does not import code from private projects
   or dexpi-js.
 - Helpers stay stateless text tools: `copy`, `fragment`, `move`, `rename`, `set` and the
   generator-script library `domains.piping.authoring` write XML into the file, format it, and the

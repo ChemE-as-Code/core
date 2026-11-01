@@ -13,7 +13,7 @@ finding ids it shows are `cheme.<rule>`, and the dev proxy reads `CHEME_API` (wa
   lists with schema-aware tables, other YAML documents and CSV files readable; the engineering-step
   check page from `checks/status.json`; history and branches; the raw repository files.
 - Read-only. Editing stays with people and agents working on the files.
-- Rendering is SVG only: no dexpi-js and no DigiCo viewer components.
+- Rendering is SVG only: no dexpi-js and no viewer components from other projects.
 
 Status: in use; against a server (`cheme serve`) or on a static snapshot (below).
 
