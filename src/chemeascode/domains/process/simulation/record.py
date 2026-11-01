@@ -2,10 +2,10 @@
 
 The CLI prints the convergence and the unit results of a simulation; the record keeps them, so
 that the viewer (``GET /api/simulation``) and a reviewer see what the last run gave without
-running DWSIM again. It is generated: ``--fill`` rewrites the entry of its case after every run
-the simulator finished (converged or not); ``--check`` writes nothing and reports an entry made
-from other inputs (``cheme.process-sim-run-stale``) or a case without one
-(``cheme.process-sim-run-missing``, info). Never edit it by hand.
+running the simulator (DWSIM or IDAES, ADR 0039) again. It is generated: ``--fill`` rewrites
+the entry of its case after every run the simulator finished (converged or not); ``--check``
+writes nothing and reports an entry made from other inputs (``cheme.process-sim-run-stale``)
+or a case without one (``cheme.process-sim-run-missing``, info). Never edit it by hand.
 
 Format (schema ``cheme/simulation-run/v1``), one entry per case::
 
@@ -42,8 +42,10 @@ Each entry is an adapter result (``cheme/adapter-result/v1``,
 :mod:`chemeascode.foundation.schemas.run`) in this file's keys: ``simulator`` is its
 ``solver`` (``method`` the property package), ``status`` follows ``converged``. Entries written
 before both were added lack them and read the same. ``iterations`` is the number of flowsheet
-passes DWSIM made (:func:`chemeascode.integrations.dwsim.solve`); null where the worker does
-not report it.
+passes DWSIM made (:func:`chemeascode.integrations.dwsim.solve`), with ``simulator: idaes``
+the IPOPT iterations of the final simultaneous solve
+(:func:`chemeascode.integrations.idaes.solve`; ``simulator.solver`` then names IPOPT and its
+version, ``notes`` an initialization that did not finish); null where the worker does not report it.
 """
 
 from __future__ import annotations
@@ -250,6 +252,10 @@ def make_entry(
         "streams": streams,
         "findings": [finding_dict(f) for f in findings],
     }
+    if out.get("solver"):  # the IDAES backend: its numerical solver (IPOPT and version)
+        entry["simulator"]["solver"] = out["solver"]
+    if out.get("notes"):  # the IDAES backend: an initialization that did not finish
+        entry["notes"] = list(out["notes"])
     if energy is not None:
         entry["energy"] = energy
     AdapterResult.model_validate(entry)  # the shared shape; the file keeps its own keys

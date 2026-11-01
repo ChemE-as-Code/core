@@ -1,0 +1,186 @@
+# A reduced toluene hydrodealkylation loop for the optional IDAES backend (`simulator: idaes` in
+# process/simulation.yaml): mixer, fired heater, adiabatic conversion reactor, cooler, flash,
+# purge split and gas recycle; no columns (the IDAES backend has none yet). The feeds S1 and S2
+# are the only given streams; `cheme process simulate --fill` writes every other one. All feed
+# values are ASSUMED illustration values, not a design basis.
+# Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Toluene hydrodealkylation loop (IDAES backend example)
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 0.01, rel: 0.005}
+
+feeds:
+  - id: TOLF
+    title: Fresh toluene
+    ports: [{id: out, direction: out}]
+  - id: H2F
+    title: Make-up hydrogen
+    ports: [{id: out, direction: out}]
+  - id: FUEL
+    title: Fuel (fired heater duty)
+    ports: [{id: q, direction: out, kind: energy}]
+products:
+  - id: CRUDE
+    title: Crude benzene (to distillation, not modelled)
+    ports: [{id: in, direction: in}]
+  - id: PURGE
+    title: Purge gas
+    ports: [{id: in, direction: in}]
+  - id: CW
+    title: Cooling water
+    ports: [{id: q, direction: in, kind: energy}]
+
+blocks:
+  - id: RXN
+    title: Reaction
+    class: ReactingChemicals
+    ports:
+      - {id: tol, direction: in}
+      - {id: h2, direction: in}
+      - {id: recycle, direction: in}
+      - {id: fuel, direction: in, kind: energy}
+      - {id: out, direction: out}
+  - id: SEP
+    title: Separation and recycle
+    class: SeparatingByFlash
+    ports:
+      - {id: in, direction: in}
+      - {id: cw, direction: out, kind: energy}
+      - {id: liquid, direction: out}
+      - {id: purge, direction: out}
+      - {id: recycle, direction: out}
+
+steps:
+  - id: M1
+    block: RXN
+    title: Feed mixer
+    class: Mixing
+    ports:
+      - {id: tol, direction: in, delegates: tol}
+      - {id: h2, direction: in, delegates: h2}
+      - {id: recycle, direction: in, delegates: recycle}
+      - {id: out, direction: out}
+  - id: H1
+    block: RXN
+    title: Reactor feed heater
+    class: ExchangingThermalEnergy
+    ports:
+      - {id: in, direction: in}
+      - {id: fuel, direction: in, kind: energy, delegates: fuel}
+      - {id: out, direction: out}
+  - id: R1
+    block: RXN
+    title: HDA reactor (adiabatic)
+    class: ReactingChemicals
+    reactions: [HDA]
+    reactor: conversion
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out, delegates: out}
+  - id: E1
+    block: SEP
+    title: Reactor effluent cooler
+    class: Cooling
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: cw, direction: out, kind: energy, delegates: cw}
+      - {id: out, direction: out}
+  - id: F1
+    block: SEP
+    title: Flash drum
+    class: SeparatingByFlash
+    ports:
+      - {id: in, direction: in}
+      - {id: vapor, direction: out}
+      - {id: liquid, direction: out, delegates: liquid}
+  - id: X1
+    block: SEP
+    title: Purge split
+    class: SplittingMaterial
+    split: {purge: 0.2}
+    ports:
+      - {id: in, direction: in}
+      - {id: purge, direction: out, delegates: purge}
+      - {id: recycle, direction: out, delegates: recycle}
+
+streams:
+  - id: S1
+    title: Fresh toluene
+    from: TOLF.out
+    to: M1.tol
+    template: hda
+    state:
+      design:
+        temperature: {value: 303.15, provenance: assumed, source: ASSUMED illustration value}
+        pressure: {value: 350, provenance: assumed, source: ASSUMED illustration value}
+        flow: {value: 100, provenance: assumed, source: ASSUMED illustration value}
+        composition: {basis: mole_fraction, values: {TOL: 1.0, H2: 0.0, BZ: 0.0, CH4: 0.0}, provenance: assumed, source: ASSUMED pure toluene}
+  - id: S2
+    title: Make-up hydrogen
+    from: H2F.out
+    to: M1.h2
+    template: hda
+    state:
+      design:
+        temperature: {value: 303.15, provenance: assumed, source: ASSUMED illustration value}
+        pressure: {value: 350, provenance: assumed, source: ASSUMED illustration value}
+        flow: {value: 3.4, provenance: assumed, source: ASSUMED illustration value}
+        composition: {basis: mole_fraction, values: {TOL: 0.0, H2: 0.95, BZ: 0.0, CH4: 0.05}, provenance: assumed, source: ASSUMED illustration value}
+  - id: S3
+    title: Reactor feed, cold
+    from: M1.out
+    to: H1.in
+    template: hda
+  - id: S4
+    title: Reactor feed, hot
+    from: H1.out
+    to: R1.in
+    template: hda
+  - id: S5
+    title: Reactor effluent
+    from: R1.out
+    to: E1.in
+    template: hda
+  - id: S6
+    title: Cooled effluent
+    from: E1.out
+    to: F1.in
+    template: hda
+  - id: S7
+    title: Flash vapour
+    from: F1.vapor
+    to: X1.in
+    template: hda
+  - id: S8
+    title: Crude benzene
+    from: F1.liquid
+    to: CRUDE.in
+    template: hda
+  - id: S9
+    title: Purge
+    from: X1.purge
+    to: PURGE.in
+    template: hda
+  - id: S10
+    title: Recycle gas
+    from: X1.recycle
+    to: M1.recycle
+    template: hda
+  - id: Q1
+    title: Heater duty
+    kind: energy
+    from: FUEL.q
+    to: H1.fuel
+  - id: Q2
+    title: Cooler duty
+    kind: energy
+    from: E1.cw
+    to: CW.q

@@ -1,6 +1,6 @@
 ---
 name: process-simulation
-description: Solve the flowsheet in DWSIM (heat and material balance) with cheme process simulate - write process/simulation.yaml (property package, step specs), check the deviations from the given and assumed values, and fill the missing stream values. Use when outlet temperatures, pressures, flows or compositions of compressors, exchangers, flash drums, columns or recycle loops are needed, or when assumed stream values should be checked against a rigorous calculation.
+description: Solve the flowsheet in DWSIM, or for a bounded scope in the optional IDAES backend (heat and material balance), with cheme process simulate - write process/simulation.yaml (simulator, property package, step specs), check the deviations from the given and assumed values, and fill the missing stream values. Use when outlet temperatures, pressures, flows or compositions of compressors, exchangers, flash drums, columns or recycle loops are needed, or when assumed stream values should be checked against a rigorous calculation.
 ---
 
 # Process simulation
@@ -49,6 +49,27 @@ pass-through, mixer and splitter balances; simulate covers the energy balance an
 - DWSIM: the Docker image (`docker build --platform linux/amd64 -t cheme-dwsim:9.0.5 -f
   docker/dwsim/Dockerfile .` in the cheme-as-code repository) or `CHEME_DWSIM_PATH`. Without
   it, `sim-unavailable`: report it, do not estimate the values instead.
+
+## The optional IDAES backend
+
+`simulator: idaes` in `process/simulation.yaml` solves the flowsheet in IDAES (idaes-pse with
+IPOPT) instead of DWSIM; the choice lives in the file, not on the command line, because it is
+an input of every simulated value. It needs `CHEME_IDAES_PYTHON`, a separate Python with
+idaes-pse and `idaes get-extensions` (else `sim-unavailable`). Its scope is bounded:
+
+- units: heater, cooler, valve, pump, mixer, splitter, flash (one inlet), conversion reactor
+  (one outlet, vapour- or liquid-phase conversion reactions), recycles; compressor and expander
+  with `IDAES Peng-Robinson` only;
+- `property_package`: `IDAES ideal VLE` or `IDAES Peng-Robinson` (every kij 0), for benzene,
+  toluene, hydrogen and methane only (hydrogen and methane vapour only);
+- not: columns, two-sided exchangers, component separators, equilibrium, Gibbs and kinetic
+  reactors, intercooled compressors, saturation feeds, interaction parameters, `--save`.
+
+Anything outside it is `sim-backend-unsupported` (error) at translation: switch to DWSIM, do
+not approximate the step. The IDAES packages are not benchmarked (`sim-method-unbenchmarked`,
+info): say that their values are not predictive. Switching `simulator` makes filled values
+`sim-stale`. A run of the small HDA recycle loop took about four minutes locally. Example:
+`examples/process-hda-idaes`; details in the cheme-as-code docs (`docs/framework/idaes.md`).
 
 ## Workflow and tools
 
@@ -246,7 +267,7 @@ power stays a given or assumed value.
 
 Simulated streams get `temperature`, `pressure`, `flow` and `composition` (energy streams
 their `duty`) with `provenance: calculated`, source `cheme process simulate: DWSIM
-<version>, <property package>` and a fingerprint of the simulator model. Given and assumed values
+<version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model. Given and assumed values
 stay; `--save` writes the DWSIM flowsheet (`.dwxmz`, a generated file: commit it only if the
 project wants it). The specs and their provenance in `simulation.yaml` are the record of what
 was assumed.

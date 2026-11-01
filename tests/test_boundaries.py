@@ -48,6 +48,9 @@ LAZY_ONLY = {
     "bw2data",
     "bw2calc",
     "cantera",
+    # the IDAES worker's (integrations/idaes_worker.py), which runs in its own Python (ADR 0039)
+    "idaes",
+    "pyomo",
 }
 
 #: (importing module, imported module or library) -> why the rule is broken for now.

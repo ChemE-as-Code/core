@@ -1,0 +1,23 @@
+# What the IDAES backend needs beyond the flowsheet (`cheme process simulate`; schema
+# `cheme schema process-simulation`). Units as in process/flowsheet.yaml unless given.
+# simulator: idaes runs the flowsheet in IDAES (ADR 0039); it needs CHEME_IDAES_PYTHON, a Python
+# with idaes-pse and its solvers (`idaes get-extensions`).
+schema: cheme/simulation/v1
+kind: simulation
+simulator: idaes
+# IDAES's ideal VLE (Raoult's law, ideal gas; hydrogen and methane in the vapour only), built
+# from the component data IDAES ships. Not benchmarked by cheme-as-code: not predictive.
+property_package: IDAES ideal VLE
+specs:
+  H1:
+    outlet_temperature: {value: 600, provenance: assumed, source: ASSUMED reactor inlet temperature}
+    pressure_drop: {value: 0, unit: kPa, provenance: assumed, source: ASSUMED no pressure drop}
+  R1:
+    mode: adiabatic
+    pressure_drop: {value: 0, unit: kPa, provenance: assumed, source: ASSUMED no pressure drop}
+  E1:
+    outlet_temperature: {value: 325, provenance: assumed, source: ASSUMED flash temperature}
+    pressure_drop: {value: 0, unit: kPa, provenance: assumed, source: ASSUMED no pressure drop}
+  F1:
+    temperature: {value: 325, provenance: assumed, source: ASSUMED flash temperature}
+  # X1 splits by its `split:` on the step in the flowsheet.

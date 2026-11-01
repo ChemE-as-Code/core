@@ -99,6 +99,7 @@ nav:
       - "Process: BFD, PFD and streams": guides/process.md
       - "Furnace energy basis (lime calcination)": framework/furnace.md
       - Petroleum assays and pseudocomponents: framework/assay.md
+      - "IDAES simulation backend": framework/idaes.md
       - 3D layout: guides/layout.md
       - Layout model: framework/layout-model.md
       - Electrical and cable trays: framework/electrical.md
@@ -174,4 +175,5 @@ nav:
       - "0036 Buried lines in the routing intent": adr/0036-buried-lines-in-the-routing-intent.md
       - "0037 Several power trays per rack, by voltage class and fill": adr/0037-several-power-trays-per-rack.md
       - "0038 A specified split's energy imbalance is stated": adr/0038-stated-imbalance-of-specified-splits.md
+      - "0039 IDAES as an optional second simulation backend": adr/0039-idaes-as-an-optional-second-simulation-backend.md
       - Template: adr/template.md

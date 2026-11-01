@@ -100,6 +100,7 @@ from chemeascode.domains.process.heat_integration.pinch import (
     minimum_approach,
 )
 from chemeascode.domains.process.simulation import SIMULATION_FILE
+from chemeascode.domains.process.simulation.backends import IDAES_PACKAGES
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.units import to_kelvin
 from chemeascode.foundation.yamlsource import _yaml_line
@@ -821,6 +822,12 @@ def _reactor_problem(formation: dict[str, Any] | None) -> str:
             "was prepared"
         )
     if not formation["reference_verified"]:
+        if formation["property_package"] in IDAES_PACKAGES:
+            return (
+                "a reacting unit needs enthalpies on a heat-of-formation basis; the closure is "
+                f"not verified for the IDAES backend's {formation['property_package']!r} (it "
+                "reports no formation enthalpies; its enthalpies include them)"
+            )
         return (
             "a reacting unit needs enthalpies on a heat-of-formation basis; DWSIM's enthalpy "
             f"reference for {formation['property_package']!r} is not verified (verified: "
