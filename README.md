@@ -71,6 +71,12 @@ cheme serve                             # the read-only API the Viewer reads
 To open the Viewer on it, see [viewer/README.md](viewer/README.md). Other extras (PNG drawings,
 stream properties and more): see the [install section](REFERENCE.md#install).
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ChemE-as-Code/core)
+
+The button opens this repository in a cloud container that installs the toolkit and creates a
+`demo-plant/`; run `bash .devcontainer/serve.sh` there to build the Viewer and open the plant on
+the forwarded port 8765.
+
 ## Documentation
 
 - [Technical documentation](https://docs.cheme-as-code.org) (and the [Viewer docs](https://docs.cheme-as-code.org/viewer/))
