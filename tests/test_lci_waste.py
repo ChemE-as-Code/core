@@ -1,5 +1,5 @@
 """Wastes, by-products, recycling and end of life consistent with the system model, and the
-cut-off flows recorded in the dataset (pre-release issue 180).
+cut-off flows recorded in the dataset.
 
 The plant is ``examples/process-blocks`` (see ``test_lca.py``): 1000 kg/h feed and 350 kW of
 steam make 400 kg/h of product PROD and 600 kg/h of WATER, 8000 h/a over 20 a. 1 t of PROD is
@@ -362,7 +362,7 @@ def test_substitution_allocation_in_a_cut_off_study_is_a_finding(blocks: Path) -
     )
     _write(blocks, scope)
     assert "cheme.lca-system-model" in _rules(lca_report(blocks))
-    # co-product credits in a cut-off study fail the gate (pre-release PR 311 review)
+    # co-product credits in a cut-off study fail the gate
     assert any("allocation substitution" in p for p in lca_gate(blocks, ["cutoff-criteria"]))
     _write(blocks, scope | {"system_model": "substitution"})
     assert not any("allocation substitution" in p for p in lca_gate(blocks, ["cutoff-criteria"]))
@@ -664,7 +664,7 @@ def test_a_hazardous_recyclable_without_a_background_is_flagged(blocks: Path) ->
 
 
 def test_a_hazardous_recyclable_with_a_background_counts_it_under_cut_off(blocks: Path) -> None:
-    # pre-release PR 311 review: linking the treatment (the remedy of
+    # linking the treatment (the remedy of
     # cheme.lca-hazardous-recyclable) must count it; the producer pays for the treatment of a
     # hazardous recyclable
     linked = _treatment_flow(kind="recyclable", route="solvent recovery", hazardous=True)
@@ -798,7 +798,7 @@ def test_a_partial_disposal_says_what_happens_to_the_rest(blocks: Path) -> None:
     assert lca_gate(blocks, ["cutoff-criteria"]) == []
 
 
-# -- post-merge review of pre-release PR 311 -------------------------------------------------------
+# -- post-merge review -----------------------------------------------------------------------------
 
 
 def test_a_free_by_product_is_a_finding_under_cut_off(blocks: Path) -> None:

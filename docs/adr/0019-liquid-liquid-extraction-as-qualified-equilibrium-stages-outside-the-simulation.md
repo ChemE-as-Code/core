@@ -7,7 +7,7 @@
 
 Liquid-liquid extraction was covered only as a `component_separator` with given recoveries (a
 specified split): the flash and the columns of `process/simulation.yaml` take vapour and liquid
-roles only, and nothing in core solved a liquid-liquid stage (pre-release issue 369, from pre-release issue 137 and
+roles only, and nothing in core solved a liquid-liquid stage (from
 process-library#114). thermo's multiphase flash (`thermodynamics.phase`) can find two liquids,
 but it also searches for a vapour, needs vapour-pressure and volume correlations for every
 component, reads interaction parameters only from its own databases, and has no stage or
@@ -66,7 +66,7 @@ for recoveries from the literature.
 
 ## Evidence
 
-- pre-release issue 369; `src/chemeascode/domains/process/separations/extraction.py`, `lle.py`,
+- `src/chemeascode/domains/process/separations/extraction.py`, `lle.py`,
   `domains/process/data/lle-systems.yaml`, `integrations/thermo.py` (`nrtl_ln_gammas`),
   `interfaces/cli/process.py` (`process extract`).
 - `tests/test_extraction.py`, `tests/test_extraction_lle.py`.

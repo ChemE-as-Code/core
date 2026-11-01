@@ -1,4 +1,4 @@
-"""Transport in fixed beds (pre-release issue 157 item 4): the effectiveness factor of an intrinsic
+"""Transport in fixed beds: the effectiveness factor of an intrinsic
 rate law, the Weisz-Prater and Mears criteria, and what the bed and catalyst must give for them."""
 
 import math

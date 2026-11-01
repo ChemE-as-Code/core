@@ -1,4 +1,4 @@
-"""The solid/slurry contract and the crystallizer + filter adapter (pre-release issue 365).
+"""The solid/slurry contract and the crystallizer + filter adapter.
 
 Reference cases, each an independently published worked example (the textbook's own answer,
 not a value computed with this code):

@@ -58,7 +58,7 @@ class FlowRef:
     """A biosphere flow to find: database, name and compartments; or, with *cas*, the flow of
     that CAS number in the compartment ``categories[0]`` (the sub-compartment ``categories``
     names first, else the unspecified one), fossil, non-fossil or from land-use change by
-    *origin*. With *uuid* (the flow's biosphere3 identity, pre-release issue 175) the flow whose
+    *origin*. With *uuid* (the flow's biosphere3 identity) the flow whose
     code is that UUID is taken first; CAS and name are the fallback for databases with other
     codes."""
 

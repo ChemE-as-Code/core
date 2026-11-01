@@ -1025,7 +1025,7 @@ def set_values(
         change = assign(target, prop, value, f"{prop}={value}")
         result.changes.append(f"{label} {prop}: {change}")
     if instrument and {p for p, _ in assignments} & {_PIF_CATEGORY, _PIF_NUMBER}:
-        # The sensor and actuator numbers carry the category and number (pre-release issue 8):
+        # The sensor and actuator numbers carry the category and number:
         # AT3104 -> FT4150.
         parts = retag_instrument_parts(
             target,

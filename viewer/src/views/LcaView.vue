@@ -68,7 +68,7 @@ const sankey = computed(() =>
   data.value && category.value ? contributionSankey(data.value, scenario.value, category.value, { width: 520, height: Math.max(240, parts.value.length * 40 + 120), nodeWidth: 12, gap: 6, slot: 30 }) : null,
 );
 const bars = computed(() => (data.value && category.value ? scenarioBars(data.value, category.value) : null));
-// data the baseline has that this scenario lacks (pre-release issue 172): its total is no lower footprint
+// data the baseline has that this scenario lacks: its total is no lower footprint
 const dropped = computed(() => (data.value && category.value ? droppedIn(data.value, scenario.value, category.value) : []));
 const verdict = computed(() => (data.value ? verdictOf(data.value, scenario.value, category.value || undefined) : undefined));
 const details = computed(() => data.value?.scenario_details ?? []);

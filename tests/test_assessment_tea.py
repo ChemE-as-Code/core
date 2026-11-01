@@ -383,7 +383,7 @@ def test_catalyst_fills_keep_their_price_year(blocks: Path, monkeypatch):
 
 def test_a_catalyst_fill_in_the_teas_currency_counts_as_it_is(blocks: Path, monkeypatch):
     # a fill priced in EUR is in none of the estimate's USD totals; a EUR TEA of the price's
-    # year counts it unconverted, a USD TEA leaves it out with a warning (pre-release issue 194)
+    # year counts it unconverted, a USD TEA leaves it out with a warning
     from chemeascode.domains.assessment import equipment_cost
     from chemeascode.domains.assessment.equipment_cost import CostLine, EquipmentEstimate
 
@@ -426,7 +426,7 @@ def _takeoff(monkeypatch, *lines):
 
 def test_mto_isbl_reports_the_take_off_rows_without_a_rate(blocks: Path, monkeypatch):
     # an unpriced row counts 0 in the estimate's totals: the TEA says so, and the allowance
-    # stands for it as for the equipment source (pre-release issue 184)
+    # stands for it as for the equipment source
     from chemeascode.domains.assessment.estimate import EstimateLine
 
     _takeoff(

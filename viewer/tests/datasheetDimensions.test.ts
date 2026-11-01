@@ -1,5 +1,5 @@
 /**
- * The datasheet fields of pre-release PR 95 (main dimensions, weights, structured materials, the nozzle
+ * The datasheet fields (main dimensions, weights, structured materials, the nozzle
  * schedule) and the `/api/datasheets` path with its fallback, against the ASU's real answers
  * (scripts/regen-fixtures.py --asu-datasheets) and small hand-made cases.
  */
@@ -260,7 +260,7 @@ describe("choosing the source", () => {
     expect(keys.some((k) => k.includes("generated"))).toBe(false);
   });
 
-  it("opens a datasheet and its drawing from a snapshot when the tag has a space (pre-release viewer issue 46)", async () => {
+  it("opens a datasheet and its drawing from a snapshot when the tag has a space", async () => {
     // The keys cheme export-static writes for the tag "E 101": the raw tag, not URL-encoded.
     const manifest = {
       schema: "cheme/viewer-snapshot/v1",

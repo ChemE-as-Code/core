@@ -1,5 +1,4 @@
-"""Declared steel sections: their real sizes, and a name the model does not know
-(pre-release issue 261)."""
+"""Declared steel sections: their real sizes, and a name the model does not know."""
 
 from __future__ import annotations
 

@@ -51,7 +51,7 @@ is used).
   `lca/` with construction and a scenario, example factors), committed once in a fresh git
   repository; `lca-asu.csv` what `cheme assess lca --csv` prints for it.
 - `tests/fixtures/api/control-separation.json`: `/api/control` of core's
-  `examples/process-separation` (pre-release issue 140), committed once in a fresh git repository
+  `examples/process-separation`, committed once in a fresh git repository
   (`--only-control` writes only it).
 - `tests/fixtures/api/issues-separation.json`: `/api/issues` of the same example with
   `issues: {repository: ChemE-as-Code/process-library, label: "process:separation", forms}` in
@@ -60,7 +60,7 @@ is used).
   writes them: every type, gate, status and waiting state, one closed, one untyped, one with
   two gates, one with a mistyped gate `Basic`); and
   `issues-unavailable.json`, the 503 (status and body) of core's GitHub reader without a
-  token; `repo-issues.json`, its `/api/repo` (`has_issues: true`). Core with `GET /api/issues` (pre-release issue 140 issues). `--only-issues` writes only these.
+  token; `repo-issues.json`, its `/api/repo` (`has_issues: true`). Core with `GET /api/issues`. `--only-issues` writes only these.
 - `tests/fixtures/api/tea-asu.json`: `/api/tea` of the ASU plant folder (`--asu`: its
   `estimate/tea.yaml`, an LCOP decision with scenarios and a Monte Carlo), committed once in a
   fresh git repository. `tea-blocks.json`: `/api/tea` of core's `examples/process-blocks` (one
@@ -677,7 +677,7 @@ SHIFT_BEDS = {
 
 
 def bed_fixtures(core: Path, tmp: Path) -> None:
-    """The fixed-bed results (pre-release viewer issue 32): `/api/reactions` of core's `examples/process-shift` with
+    """The fixed-bed results: `/api/reactions` of core's `examples/process-shift` with
     R1's bed replaced by each of `SHIFT_BEDS` (the cooled one with FE_CR's window narrowed to
     640 K, below its hot spot); and core's kinetic coupling test plant (`tests/
     test_process_simulate_kinetic.py`: an adiabatic ammonia bed, no pressure drop) with its run
@@ -840,7 +840,7 @@ def git(root: Path, *args: str) -> None:
 
 
 def control_fixtures(core: Path, tmp: Path) -> None:
-    """`/api/control` and `/api/repo` of core's `examples/process-separation` (pre-release issue 140: a
+    """`/api/control` and `/api/repo` of core's `examples/process-separation` (a
     narrative, a control philosophy, five loops, two sequences, one trip), committed once in a
     fresh git repository: every file drafted, PIC-104 a deliberate draft with open points."""
     root = copy_plant(core / "examples" / "process-separation", tmp / "process-separation")
@@ -852,7 +852,7 @@ def control_fixtures(core: Path, tmp: Path) -> None:
     write(out / "control-separation.json", get(client, "/api/control"))
     repo = get(client, "/api/repo")
     if not isinstance(repo, dict) or not repo.get("has_control"):
-        raise SystemExit("process-separation: /api/repo has no has_control (core older than pre-release issue 140 part 2)")
+        raise SystemExit("process-separation: /api/repo has no has_control (core older than the control records)")
 
 
 def issue_item(number: int, title: str, labels: list[str], state: str = "open", closed: str | None = None) -> dict:
@@ -966,8 +966,8 @@ def main() -> None:
     parser.add_argument("--asu-files", type=Path, help="ASU plant folder (or process-library checkout): lifting study, datasheet entries, a penetration case, the review status, the simulation")
     parser.add_argument("--asu-datasheets", type=Path, help="ASU plant folder (or process-library checkout): the datasheet endpoints after fill --dimensions and drawing --write (core with /api/datasheets)")
     parser.add_argument("--only-reactions", action="store_true", help="write only the reactions fixtures (with the microkinetics, kinetic data and library ones)")
-    parser.add_argument("--only-beds", action="store_true", help="write only the fixed-bed fixtures (pre-release viewer issue 32)")
-    parser.add_argument("--only-control", action="store_true", help="write only the control fixture (pre-release issue 140)")
+    parser.add_argument("--only-beds", action="store_true", help="write only the fixed-bed fixtures")
+    parser.add_argument("--only-control", action="store_true", help="write only the control fixture")
     parser.add_argument("--only-issues", action="store_true", help="write only the issues fixtures (core with GET /api/issues)")
     parser.add_argument("--only-tea", action="store_true", help="with --asu: write only the TEA fixtures (tea-asu.json, tea-blocks.json)")
     parser.add_argument("--only-datasheets", action="store_true", help="with --asu-datasheets: write only the datasheet endpoint fixtures")

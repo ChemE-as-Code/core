@@ -1,6 +1,6 @@
 """``cheme data``: optional datasets that cheme-as-code does not ship and a user installs into
 the user data directory (foundation/userdata.py). Today the ChemSep SRK interaction
-parameters (domains/process/thermodynamics/chemsep_srk.py, pre-release issue 55)."""
+parameters (domains/process/thermodynamics/chemsep_srk.py)."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def fetch(
     chemsep-srk: ChemSep-LITE from http://www.chemsep.org/downloads/data/lite.zip (plain HTTP;
     the sha256 recorded for ChemSep-LITE 8.50 is checked), its ipd/srk.ipd converted to
     srk.json for the Redlich-Kwong-Soave flash. Its licence is not confirmed for
-    redistribution (pre-release issue 55), so cheme-as-code does not ship it. Exits 2 on a failed
+    redistribution, so cheme-as-code does not ship it. Exits 2 on a failed
     check.
     """
     from chemeascode.domains.process.thermodynamics.chemsep_srk import (

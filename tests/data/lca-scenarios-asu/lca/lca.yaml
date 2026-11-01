@@ -1,4 +1,4 @@
-# SYNTHETIC test fixture (core#172): one foreground, several regional background scenarios.
+# SYNTHETIC test fixture: one foreground, several regional background scenarios.
 schema: cheme/lca/v1
 kind: lca
 functional_unit: {product: GOXP, amount: 1, unit: t}

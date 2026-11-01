@@ -181,7 +181,7 @@ def test_datasheet_nozzle_locations_are_checked_against_the_layout_model(plant: 
 
 
 def test_a_planned_sheet_does_not_hold_back_the_nozzle_checks(plant: Path):
-    # pre-release issue 203: a sheet plant.yaml plans (no file yet) draws nothing; the drafts and
+    # a sheet plant.yaml plans (no file yet) draws nothing; the drafts and
     # the viewer's datasheet report still compare the nozzles with the sheets that are drawn
     from chemeascode.project.datasheets import datasheet_report
 

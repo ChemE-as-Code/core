@@ -970,8 +970,7 @@ def _line_endpoint_findings(
     entries: list[_Entry],
 ) -> list[Finding]:
     """``cheme.line-endpoint-mismatch``: a listed ``from``/``to`` tag the drawn line does not
-    reach, while the line ends at a nozzle of equipment the list does not name
-    (pre-release issue 38).
+    reach, while the line ends at a nozzle of equipment the list does not name.
 
     The ends of a line are the ends of its segments on every loaded sheet: nozzles (their
     equipment's tag) and the tagged piping items a segment ends at. A listed end that is not a
@@ -1401,7 +1400,7 @@ def validate_workspace(
         "equipment": _cross_check_equipment,
         "lines": _cross_check_lines,
         "instruments": _cross_check_instruments,
-        "piping_items": cross_check_piping_items,  # optional list (pre-release issue 20)
+        "piping_items": cross_check_piping_items,  # optional list
     }
     optional = {"piping_items"}
     for kind, cross_check in cross_checks.items():
@@ -1432,7 +1431,7 @@ def validate_workspace(
     else:
         report.compared["skipped"].append("tags named in texts (only the files given)")
 
-    # Cause and effect (pre-release issue 23); without the file, trip instruments still ask for it.
+    # Cause and effect; without the file, trip instruments still ask for it.
     has_file = workspace.list_file("interlocks") is not None
     if targets is None and sheets and ("interlocks" in parsed or not has_file):
         from chemeascode.domains.control.interlocks import cross_check_interlocks
@@ -1441,7 +1440,7 @@ def validate_workspace(
         report.findings += cross_check_interlocks(workspace, sheets, parsed, partial)
         report.compared["cross_checks"].append("interlocks vs lists and P&IDs")
 
-    # Loops, sequences, the narrative and the control philosophy (pre-release issue 140).
+    # Loops, sequences, the narrative and the control philosophy.
     if targets is None:
         from chemeascode.domains.control.documents import load_documents
         from chemeascode.domains.control.register import control_findings, has_records
@@ -1467,8 +1466,7 @@ def validate_workspace(
         report.findings += cross_check_electrical(workspace, parsed)
         report.compared["cross_checks"].append("electrical list vs equipment list")
 
-    # HAZOP studies: against themselves, their matrix and (all files) the plant
-    # (pre-release issue 136).
+    # HAZOP studies: against themselves, their matrix and (all files) the plant.
     from chemeascode.domains.safety.hazop import hazop_findings
 
     found, files = hazop_findings(workspace, sheets, parsed, targets)
@@ -1489,7 +1487,7 @@ def validate_workspace(
 
     _validate_layout(workspace, report, targets, parsed, sheets)
 
-    if targets is None:  # equipment datasheets against the equipment list (pre-release issue 33)
+    if targets is None:  # equipment datasheets against the equipment list
         from chemeascode.domains.equipment.datasheets import (
             check_datasheets,
             datasheet_paths,
@@ -1509,7 +1507,7 @@ def validate_workspace(
             report.findings += _datasheet_nozzles(workspace, report)
             report.findings += _datasheet_schedule(workspace, report, parsed, sheets)
 
-    # Reaction evidence: sources, observations, routes and the model basis (pre-release issue 142).
+    # Reaction evidence: sources, observations, routes and the model basis.
     from chemeascode.domains.chemistry.evidence import EVIDENCE_FILE
     from chemeascode.project.evidence import evidence_findings
 
@@ -1518,8 +1516,7 @@ def validate_workspace(
     if present and (targets is None or (workspace.root / EVIDENCE_FILE).resolve() in targets):
         report.files.append(EVIDENCE_FILE)
 
-    # Electrochemical cells: Faraday balance, refusals and the flowsheet link
-    # (pre-release issue 366).
+    # Electrochemical cells: Faraday balance, refusals and the flowsheet link.
     from chemeascode.domains.process.electrochemical_cell import CELLS_FILE, cell_report
 
     cells_path = workspace.root / CELLS_FILE
@@ -1527,8 +1524,7 @@ def validate_workspace(
         report.findings += cell_report(workspace.root).findings
         report.files.append(CELLS_FILE)
 
-    # Liquid-liquid extractors: the schema only; `cheme process extract` solves them
-    # (pre-release issue 369).
+    # Liquid-liquid extractors: the schema only; `cheme process extract` solves them.
     from chemeascode.domains.process.separations import extraction
 
     extraction_path = workspace.root / extraction.EXTRACTION_FILE
@@ -1541,7 +1537,7 @@ def validate_workspace(
 
     report.findings += decision_findings(workspace, targets)
 
-    # review records: front matter, finding ids and statuses (pre-release issues 25, 26)
+    # review records: front matter, finding ids and statuses
     if targets is None:
         from chemeascode.foundation.reviews import load_records, review_rules
 
@@ -1551,7 +1547,7 @@ def validate_workspace(
             report.files += [r.name for r in records]
             report.compared["cross_checks"].append("review records")
 
-    # gates naming no plant.yaml stage, duplicate gate ids (pre-release issue 222)
+    # gates naming no plant.yaml stage, duplicate gate ids
     if "checks" in parsed:
         from chemeascode.project.checks import checklist_findings
 

@@ -51,7 +51,7 @@ describe("the /api/layout response", () => {
     }
   });
 
-  it("draws raised horizontal equipment at its height without a model (pre-release viewer issue 45)", () => {
+  it("draws raised horizontal equipment at its height without a model", () => {
     // The ASU's exchangers and the V-2101 vessels sit on saddles: size[2] (the axis height plus
     // the radius) is more than the diameter. Without layout/plant-model.yaml the placement draws them.
     const { model: _model, ...placement } = asu;

@@ -57,9 +57,7 @@ decisions.
 
 ## Quick start
 
-Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/). While the repositories are private, you
-need read access to this repository and to
-[pyDEXPI-dev](https://github.com/process-intelligence-research/pyDEXPI-dev) (pyDEXPI 2.x, not yet on PyPI).
+Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv tool install 'cheme-as-code[serve] @ git+https://github.com/ChemE-as-Code/core.git'

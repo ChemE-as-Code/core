@@ -1,4 +1,4 @@
-"""A screening balance of a process that has no flowsheet yet (pre-release issue 182): the reactants
+"""A screening balance of a process that has no flowsheet yet: the reactants
 a reaction scheme consumes and the products it forms per kg of the main product, from the
 stoichiometry of ``process/reactions.yaml`` and the formulas of ``process/materials.yaml``.
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The LCI readiness of the plant's dataset (pre-release viewer issue 36): whether `lca/dataset.yaml` balances,
+ * The LCI readiness of the plant's dataset: whether `lca/dataset.yaml` balances,
  * how good its data is, which documentation it lacks and which emission sources and consumables
  * are not yet covered, each linked to the file and line core names. Core computes all of it
  * (`/api/lca`: `balance`, `data_quality`, `water`, the findings); the pedigree per exchange is
@@ -142,7 +142,7 @@ function findingLink(f: Finding) {
       </span>
     </h3>
     <p v-if="balance === undefined" class="muted" data-balance-not-assessed>
-      Not assessed: this server's core predates the balance gates (pre-release issue 174) and does not report the dataset's balance. A current core reports the closure here, and
+      Not assessed: this server's core predates the balance gates and does not report the dataset's balance. A current core reports the closure here, and
       <code>cheme assess lca --write</code> records it in <RouterLink :to="fileLink('lca/manifest.json')">lca/manifest.json</RouterLink> (<code>balance</code>).
     </p>
     <p v-else-if="balance === null" class="muted">No LCI dataset to balance.</p>
@@ -253,7 +253,7 @@ function findingLink(f: Finding) {
     </template>
     <p v-else class="muted">Not rated: no exchange of the dataset carries a pedigree.</p>
 
-    <h3>Documentation <span class="muted">the publication minimum (pre-release issue 179)</span></h3>
+    <h3>Documentation <span class="muted">the publication minimum</span></h3>
     <p v-if="metadata.fields.length" data-missing-metadata>
       Missing:
       <span v-for="field in metadata.fields" :key="field" class="badge warning" :data-missing="field">{{ field }}</span>
@@ -277,7 +277,7 @@ function findingLink(f: Finding) {
     </template>
 
     <template v-if="water">
-      <h3>Water <span class="muted">m3 per {{ water.basis }} (pre-release issue 175)</span></h3>
+      <h3>Water <span class="muted">m3 per {{ water.basis }}</span></h3>
       <dl class="meta" data-water>
         <dt>withdrawal</dt>
         <dd>{{ impactText(water.withdrawal) }} {{ water.unit }}</dd>

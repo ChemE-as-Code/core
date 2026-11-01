@@ -361,7 +361,7 @@ def test_a_block_catalyst_checks_the_block_boundary_in_every_case(ammonia):
     assert any("stream S1 at 313.15 K" in f.message for f in found)
 
 
-# -- catalyst references (pre-release issue 118) ---------------------------------------------------
+# -- catalyst references ---------------------------------------------------------------------------
 
 MECHANISM = (
     "    mechanism:\n"

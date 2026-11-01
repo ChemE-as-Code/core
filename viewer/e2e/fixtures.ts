@@ -58,7 +58,7 @@ import reactionsShiftJson from "../tests/fixtures/api/reactions-shift.json" with
 import reactionsCooxJson from "../tests/fixtures/api/reactions-coox.json" with { type: "json" };
 import kineticsShiftJson from "../tests/fixtures/api/kinetics-shift.json" with { type: "json" };
 import libraryShiftJson from "../tests/fixtures/api/library-shift.json" with { type: "json" };
-// Real fixed beds (pre-release viewer issue 32): the shift's R1 cooled (an interior hot spot) and not solvable; a coupled kinetic bed with its run stale.
+// Real fixed beds: the shift's R1 cooled (an interior hot spot) and not solvable; a coupled kinetic bed with its run stale.
 import reactionsBedCooledJson from "../tests/fixtures/api/reactions-bed-cooled.json" with { type: "json" };
 import reactionsBedFailedJson from "../tests/fixtures/api/reactions-bed-failed.json" with { type: "json" };
 import reactionsBedSimJson from "../tests/fixtures/api/reactions-bed-sim.json" with { type: "json" };
@@ -85,12 +85,12 @@ export const layout = layoutJson;
 export const mepLayout = mepJson;
 export const mtoAsu = mtoAsuJson;
 export const lcaAsu = lcaAsuJson;
-/** `/api/lca` of the ASU with core main (the balance of pre-release issue 174, the emission estimates of pre-release issue 176); its `lca/dataset.yaml` as `/api/yaml` serves it. */
+/** `/api/lca` of the ASU with core main (the balance, the emission estimates); its `lca/dataset.yaml` as `/api/yaml` serves it. */
 export const lcaReadiness = lcaReadinessJson;
 export const teaAsu = teaAsuJson;
 export const teaBlocks = teaBlocksJson;
 export const interlocksAsu = interlocksAsuJson;
-/** `/api/control` of core's examples/process-separation (pre-release issue 140). */
+/** `/api/control` of core's examples/process-separation. */
 export const controlSeparation = controlSeparationJson;
 /** `/api/issues` of examples/process-separation with `issues:` (stage basic; #1-#9, #4 closed, #8 with two gates, #9 a mistyped gate:Basic). */
 export const issuesSeparation = issuesSeparationJson;

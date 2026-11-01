@@ -557,7 +557,7 @@ export interface SimRunUnit {
   reason?: string;
   /** How the unit's outlet follows from its inlets. Older servers leave it out. */
   basis?: "predictive" | "shortcut" | "specified";
-  /** A kinetic reactor coupled as an external unit (pre-release PR 151): `external-unit`. */
+  /** A kinetic reactor coupled as an external unit: `external-unit`. */
   coupling?: string;
   /** Its outer loop around the DWSIM solves. */
   outer_loop?: { iterations?: number; max_iterations?: number; converged?: boolean };
@@ -867,7 +867,7 @@ export interface ReactionsView {
   reactors: ReactorRow[];
   /** The balances of the reactive blocks and steps (`cheme validate`'s, without a title) and the findings on reactions, reactors and those balances. */
   balance: { balances: (Omit<ProcessBalance, "title"> & { title?: string })[]; findings: Finding[] };
-  /** The catalysts (null from a core before pre-release viewer issue 23). */
+  /** The catalysts (null from an older core). */
   kinetics: ReactionsKinetics | null;
 }
 
@@ -2243,14 +2243,14 @@ export interface LcaReport {
   sources?: LcaSource[];
   /** Every scenario's gaps, and the flows outside a method's scope. */
   gaps?: LcaGap[];
-  /** Totals that do not stand (pre-release issue 172; older servers: absent): per scenario and category, the
+  /** Totals that do not stand (older servers: absent): per scenario and category, the
    * exchanges the baseline characterises that are gaps there, or null when every contribution is
    * a gap. */
   not_comparable?: Record<string, Record<string, string[] | null>>;
-  /** Core's comparison verdict of each scenario against the baseline (pre-release issue 306; older servers:
+  /** Core's comparison verdict of each scenario against the baseline (older servers:
    * absent): `like-for-like`, `proxy`, `not comparable` or `baseline`, with the reasons. */
   comparability?: Record<string, { verdict: string; reasons: string[]; compared?: unknown[] }>;
-  /** What each scenario is (pre-release issue 172; older servers: absent): the geography and year of its
+  /** What each scenario is (older servers: absent): the geography and year of its
    * background (applicability, not a plant site), its electricity procurement, and its own
    * flowsheet case when it changes the foreground. */
   scenario_details?: {
@@ -2264,11 +2264,11 @@ export interface LcaReport {
   }[];
   /** The most restrictive policy of the sources, whether the results may be published, and which sources restrict them. */
   publication?: { policy: string; publishable: boolean; restricted_by: string[] };
-  /** The data quality rating of the plant's dataset (pre-release issue 178); null when no exchange is rated, absent from older servers. */
+  /** The data quality rating of the plant's dataset; null when no exchange is rated, absent from older servers. */
   data_quality?: LcaDataQuality | null;
-  /** The water of the plant's dataset (pre-release issue 175), m3 per its basis; null without a water flow, absent from older servers. */
+  /** The water of the plant's dataset, m3 per its basis; null without a water flow, absent from older servers. */
   water?: LcaWater | null;
-  /** The mass, element, carbon-origin and energy balance of the plant's dataset (pre-release issue 174, as `lca/manifest.json` `balance`); absent from older servers. */
+  /** The mass, element, carbon-origin and energy balance of the plant's dataset (as `lca/manifest.json` `balance`); absent from older servers. */
   balance?: LcaBalance | null;
 }
 
@@ -2315,7 +2315,7 @@ export interface LcaClosure {
   closed: boolean;
 }
 
-/** `balance` of `/api/lca` and `lca/manifest.json` (core `balance.DatasetBalance.as_dict`, pre-release issue 174). */
+/** `balance` of `/api/lca` and `lca/manifest.json` (core `balance.DatasetBalance.as_dict`). */
 export interface LcaBalance {
   dataset: string;
   basis: string;
@@ -2773,7 +2773,7 @@ export interface Interlock {
   sheet: string | null;
   /** SIL from the screening, if done. */
   sil: string | number | null;
-  /** The trip condition when it is more than the cause (pre-release issue 140): all/any/vote of conditions. */
+  /** The trip condition when it is more than the cause: all/any/vote of conditions. */
   logic?: ControlCondition | null;
   delay?: { value: number; unit: string } | null;
   /** True: the trip stays until reset; null: not stated. */
@@ -2900,7 +2900,7 @@ export interface ControlDocument {
   headings: string[];
 }
 
-/** `GET /api/control` (`cheme control report --json`, pre-release issue 140): the working tree's control records. */
+/** `GET /api/control` (`cheme control report --json`): the working tree's control records. */
 export interface ControlReport {
   present: boolean;
   files: ControlFile[];
@@ -2922,7 +2922,7 @@ export interface InterlockRow {
   /**
    * Aligned with {@link InterlockMatrix.columns}: the cell's action, "" for none, or several
    * actions joined by " + " in the order given (`close + alarm`) when one interlock has more than
-   * one effect on the tag (pre-release PR 269). See `cellActions` in `lib/causeEffect.ts`.
+   * one effect on the tag. See `cellActions` in `lib/causeEffect.ts`.
    */
   cells: string[];
 }

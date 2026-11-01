@@ -1,5 +1,4 @@
-"""``cheme process extract``: liquid-liquid extraction as equilibrium stages
-(pre-release issue 369).
+"""``cheme process extract``: liquid-liquid extraction as equilibrium stages.
 
 A unit of ``process/extraction.yaml`` (schema ``cheme/extraction/v1``) is one extractor: a feed
 (the carrier with the solute) and a solvent feed enter a countercurrent cascade of ``stages``

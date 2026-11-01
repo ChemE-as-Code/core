@@ -1,4 +1,4 @@
-"""Stirred tanks and batches (pre-release issue 157 item 2): textbook cases of the CSTR (in series)
+"""Stirred tanks and batches: textbook cases of the CSTR (in series)
 and the batch, isothermal and adiabatic, liquid and gas, and their place in cheme process propagate,
 cheme validate and cheme process reactors."""
 
@@ -474,7 +474,7 @@ def test_more_tank_rules(tmp_path):
     assert any("without liquid_heat_capacity of A, B" in m for m in messages)
 
 
-# -- model basis (pre-release issue 189) -----------------------------------------------------------
+# -- model basis -----------------------------------------------------------------------------------
 
 BATCH_FLOWSHEET = FLOWSHEET.replace("reactor: cstr", "reactor: batch").replace(
     "tank: {residence_time: 500, count: 2, provenance: assumed}",

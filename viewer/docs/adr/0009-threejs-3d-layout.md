@@ -30,7 +30,6 @@ built on first use. The scene uses the site frame directly (x east, y north, z u
 
 ## Evidence
 
-- pre-release viewer commit 1727f51 (pre-release viewer PR 4) "three.js scene ... loaded only on /layout", exact pin.
-- pre-release viewer commit ca4b025 (pre-release viewer PR 8) merged meshes; pre-release viewer commit e68b45c, pre-release viewer commit e53c01d (pre-release viewer PR 9) levels
-  of detail, realistic look, frame-rate budget.
+- "three.js scene ... loaded only on /layout", exact pin.
+- Merged meshes; levels of detail, realistic look, frame-rate budget.
 - REFERENCE.md (formerly the README), "Design notes".

@@ -153,7 +153,7 @@ def test_what_a_bed_needs():
 
 
 def test_a_bed_with_an_empty_feed_is_refused_not_divided_by_zero():
-    """With Ergun data, a zero flow has no gas density to divide by (pre-release issue 251)."""
+    """With Ergun data, a zero flow has no gas density to divide by."""
     bed = Bed(
         catalyst_mass=1000, diameter=1.0, heat="isothermal", viscosity=2e-5, provenance="assumed"
     )
@@ -421,7 +421,7 @@ def test_the_viewer_estimate_has_the_catalyst_fill_too(plant: Path):
 
 
 def test_a_plain_number_vessel_volume_is_kept_and_compared(plant: Path):
-    # pre-release issue 206: volume_m3 written as a plain number (no unit, no source) is a
+    # volume_m3 written as a plain number (no unit, no source) is a
     # hand-written value: the fill keeps it and compares it with the bed (40000 kg / 1130 kg/m3 =
     # 35.4 m3)
     _reactor_plant(plant, {"tag": "R-1", "type": "PressureVessel"})
@@ -442,7 +442,7 @@ def test_a_plain_number_vessel_volume_is_kept_and_compared(plant: Path):
 
 
 def test_space_velocity_sizing_on_the_catalysts_gas_basis(plant: Path):
-    # pre-release issue 248: FE_CR's GHSV is quoted on dry gas (gas: dry). The feed S1 is 1000
+    # FE_CR's GHSV is quoted on dry gas (gas: dry). The feed S1 is 1000
     # kmol/h with
     # 35 % H2O: dry 650 kmol/h x 22.414 Nm3/kmol (273.15 K, 101.325 kPa) = 14569 Nm3/h, at the
     # middle GHSV 4000 1/h a bed of 3.642 m3; wet (the water counted) 22414 / 4000 = 5.603 m3
@@ -478,7 +478,7 @@ def test_a_dry_basis_is_for_a_ghsv_only():
 
 
 def test_a_changed_catalyst_makes_its_bed_stale(plant: Path):
-    # pre-release issue 204: a bed sized from the catalyst's space velocity and bulk density names
+    # a bed sized from the catalyst's space velocity and bulk density names
     # the catalyst as an input: changing either is cheme.datasheet-stale until a refill
     from chemeascode.domains.equipment.fill import stale_findings
     from chemeascode.foundation.workspace import Workspace
@@ -517,7 +517,7 @@ def test_a_changed_catalyst_makes_its_bed_stale(plant: Path):
 
 
 def test_a_changed_catalyst_makes_a_pfr_bed_stale(plant: Path):
-    # pre-release issue 204: the pfr bed's volume and pressure drop read the catalyst's densities
+    # the pfr bed's volume and pressure drop read the catalyst's densities
     from chemeascode.domains.equipment.fill import stale_findings
     from chemeascode.foundation.workspace import Workspace
 

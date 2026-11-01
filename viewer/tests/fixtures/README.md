@@ -41,7 +41,7 @@
   cheme serve has no lifting, cable schedule or datasheet endpoint: the layout and datasheet views read these files.
 - `api/datasheets-index-asu.json`, `api/datasheet-details-asu.json`, `api/datasheet-drawings-asu.json`
   and `api/datasheets-snapshot-keys.json` (`scripts/regen-fixtures.py --asu-datasheets`, core
-  with `GET /api/datasheets`, core#95): a copy of the ASU after `cheme datasheets fill
+  with `GET /api/datasheets`): a copy of the ASU after `cheme datasheets fill
   --dimensions` and `cheme datasheets drawing --write`, then edited so every case shows:
   V-2101A with structured materials (`material_class`, `standard`), weights (empty, operating
   and a `supplier` test weight), a full nozzle schedule (mark, service, rating, facing, flange
@@ -75,8 +75,7 @@
   with K1's efficiency changed to 0.7 (the run stale, `process/simulation.yaml` changed), and a
   fresh copy whose run did not converge (`E1: not calculated`, no stream values). `run_at` and
   `tool` are those of the regeneration.
-- `api/reactions-bed-cooled.json`, `-inlet`, `-isothermal`, `-failed` (`scripts/regen-fixtures.py --only-beds`,
-  viewer#32): `/api/reactions` of core's `examples/process-shift` with R1's bed replaced: cooled tubes
+- `api/reactions-bed-cooled.json`, `-inlet`, `-isothermal`, `-failed` (`scripts/regen-fixtures.py --only-beds`): `/api/reactions` of core's `examples/process-shift` with R1's bed replaced: cooled tubes
   (800 x 0.1 m, coolant 620 K, U 30 W/(m2 K); an interior hot spot of 648.15 K at the sampled point
   12800 kg) with FE_CR's window narrowed to 583.15-640 K; cooled harder (the inlet hottest);
   isothermal; cooled without a coolant (not solved: `missing` names why). `api/reactions-bed-sim.json`
@@ -102,17 +101,17 @@
 - `api/mto-asu.json`: `/api/mto` of the frozen ASU model with the template's example rates;
   `api/mto-asu.csv` and `api/estimate-asu.csv` what `cheme assess mto --csv` and
   `assess estimate --csv` print for it (the viewer's downloads must equal them).
-- `api/control-separation.json`: `/api/control` of core's `examples/process-separation` (core#140: a narrative, a control philosophy, five loops of which PIC-104 is a deliberate draft, two sequences, the low-low level trip I-01), committed once in a fresh git repository, so every file is drafted (`scripts/regen-fixtures.py --only-control`).
+- `api/control-separation.json`: `/api/control` of core's `examples/process-separation` (a narrative, a control philosophy, five loops of which PIC-104 is a deliberate draft, two sequences, the low-low level trip I-01), committed once in a fresh git repository, so every file is drafted (`scripts/regen-fixtures.py --only-control`).
 - `api/issues-separation.json`, `api/issues-unavailable.json` and `api/repo-issues.json` (`scripts/regen-fixtures.py --only-issues`, core with `GET /api/issues`): the same example with `issues:` (repository, label `process:separation`, four forms) in `plant.yaml` and the stage set to `basic`, committed once in a fresh git repository, `chemeascode.integrations.github.list_issues` stubbed with nine GitHub API items (every type, gate, status and waiting state; #4 closed, #7 untyped, #8 with two gates, #9 with a mistyped `gate:Basic` that blocks every gate): its `/api/issues`, the 503 of core's GitHub reader without a token (status and body), and its `/api/repo` (`has_issues: true`).
 - `api/interlocks-asu.json`: `/api/interlocks` of the ASU plant folder (its
   `control/cause-effect.yaml`: I-01 / I-02, the low-low level trips of the LOX and LIN product
   pumps), committed once in a fresh git repository (`--asu`).
 - `api/lca-asu-readiness-main.json` and `api/lca-asu-readiness.json`: `/api/lca` of the ASU,
   core's `lca_report(root).payload()` with the findings and `rev: null`, as cheme serve answers
-  it, for the LCI readiness (viewer#36). `lca-asu-readiness.json`: core main cec7e81 (with the
-  balance gates of core#174 and the emission estimates of core#176 merged) on the process
+  it, for the LCI readiness. `lca-asu-readiness.json`: core main cec7e81 (with the
+  balance gates and the emission estimates merged) on the process
   library's `processes/asu-1` at main 09dcab8. `lca-asu-readiness-main.json` stands for a core
-  before core#174 (core main bead66e on `processes/asu-1` at b15be15: the data quality rating,
+  before the balance gates (core main bead66e on `processes/asu-1` at b15be15: the data quality rating,
   the publication minimum, the disposal findings; no `balance`, no emission findings).
   `api/dataset-asu.yaml` is the ASU's committed `lca/dataset.yaml` at 09dcab8 as `/api/file`
   serves it, `api/yaml-dataset-asu.json` the same as `/api/yaml` (`kind` and `schema` null).

@@ -1,4 +1,4 @@
-# SYNTHETIC test fixture (core#172): an ASU-like flowsheet, two computed cases. Not a design.
+# SYNTHETIC test fixture: an ASU-like flowsheet, two computed cases. Not a design.
 schema: cheme/process/v1
 kind: flowsheet
 title: Synthetic ASU (scenario fixture)

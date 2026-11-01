@@ -169,7 +169,7 @@ def emphasise_inline(
     factor: float = INLINE_EMPHASIS,
     stroke: float = INLINE_STROKE,
 ) -> etree._Element:
-    """Draw inline items larger and bolder, for reading a full-sheet render (pre-release issue 41).
+    """Draw inline items larger and bolder, for reading a full-sheet render.
 
     Each symbol of an item :func:`inline_ids` names is scaled by *factor* about its insertion
     point (the valve's centre, where an actuator also starts) and its strokes are *stroke* times

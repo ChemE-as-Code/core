@@ -4,8 +4,7 @@ This page states what a value, an id and a reference mean in every cheme-as-code
 owns each convention and what `cheme validate` checks. It extends
 [Identity, relationships, provenance](architecture.md#identity-relationships-provenance): it
 adds no universal object model, and files keep their own schemas. Each table lists the known
-gaps; the follow-ups at the end are the work of
-pre-release issue 81.
+gaps; the history at the end lists the follow-up work.
 
 ## Identity
 
@@ -262,19 +261,18 @@ skills and MCP tools call it and hold no algorithm of their own.
 
 ## History
 
-Contract work for pre-release issue 81:
+The contract work so far:
 
-| Topic | Issue | Change |
-|---|---|---|
-| This contract, id, decision and run-record checks | — | pre-release PR 119 |
-| Catalyst references | pre-release issue 118 | pre-release PR 122 |
-| One value fingerprint, stale datasheet values | pre-release issue 117 | pre-release PR 123 |
-| Adapter result record, DWSIM iterations | pre-release issue 116 | pre-release PR 124 |
-| `schema:` on every file, `cheme migrate` | pre-release issue 113 | pre-release PR 125 |
-| Component InChIKey and SMILES, reaction SMILES | pre-release issue 114 | pre-release PR 126 |
-| Case and stream references | pre-release issue 115 | pre-release PR 128 |
-| Uncertainty on process quantities | pre-release issue 112 | pre-release PR 129 |
-| Provenance `origin` | pre-release issue 111 | pre-release PR 130 |
-| HAZOP study and risk matrix ids, references, bands | pre-release issue 136 | this change ([hazop.md](hazop.md)) |
+- This contract, id, decision and run-record checks
+- Catalyst references
+- One value fingerprint, stale datasheet values
+- Adapter result record, DWSIM iterations
+- `schema:` on every file, `cheme migrate`
+- Component InChIKey and SMILES, reaction SMILES
+- Case and stream references
+- Uncertainty on process quantities
+- Provenance `origin`
+- HAZOP study and risk matrix ids, references, bands ([hazop.md](hazop.md))
 
-What is still missing is in each section's **Gaps** line; line from/to is pre-release issue 38.
+What is still missing is in each section's **Gaps** line; line from/to is checked by
+`cheme.line-endpoint-mismatch`.

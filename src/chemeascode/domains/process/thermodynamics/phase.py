@@ -5,7 +5,7 @@
 activity-coefficient model for the liquid and an equation of state or the ideal gas for the
 vapour. Interaction parameters come from thermo's ChemSep databases (PR, NRTL, Wilson) and, for
 Redlich-Kwong-Soave, from the ChemSep SRK file a user installs with ``cheme data fetch
-chemsep-srk`` (``thermodynamics.chemsep_srk``; not shipped, pre-release issue 55); a missing binary
+chemsep-srk`` (``thermodynamics.chemsep_srk``; not shipped); a missing binary
 parameter counts as zero, as in thermo. Without the installed file every SRK ``kij`` is zero, as for
 Redlich-Kwong: the result's ``notes`` say so and a :class:`MissingInteractionParametersWarning`
 is issued. The result's ``interaction_parameters``

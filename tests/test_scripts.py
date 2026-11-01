@@ -1,5 +1,5 @@
-"""cheme run (pre-release issue 6), the authoring API (pre-release issue 13), generated sheets and
-regen (pre-release issue 16)."""
+"""cheme run, the authoring API, generated sheets and
+regen."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def invoke(*args: str):
     return runner.invoke(app, list(args))
 
 
-# -- cheme run (pre-release issue 6) ---------------------------------------------------------------
+# -- cheme run -------------------------------------------------------------------------------------
 
 
 def test_run_loads_and_saves_the_empty_sheet_with_pydexpi(fresh: Path):
@@ -143,7 +143,7 @@ def test_template_permissions_and_skills_name_cheme_run():
     assert "own XML" in draft
 
 
-# -- the authoring API (pre-release issue 13) ------------------------------------------------------
+# -- the authoring API -----------------------------------------------------------------------------
 
 
 def _example(fresh: Path) -> Path:
@@ -430,7 +430,7 @@ def test_line_labels_keep_clear_of_symbols_and_other_lines(fresh: Path):
             assert not any(segment_hits_box(p, q, box) for p, q in legs), box
 
 
-# -- generated sheets (pre-release issue 16) -------------------------------------------------------
+# -- generated sheets ------------------------------------------------------------------------------
 
 GENERATOR = """\
 import sys
@@ -514,7 +514,7 @@ def test_validate_reports_drift_for_the_drifting_sheet_only(generated: Path):
 
 
 def test_a_validate_gate_sees_generator_drift(generated: Path, monkeypatch):
-    """#228: the gates validated without the generators, so drift never failed one."""
+    """The gates validated without the generators, so drift never failed one."""
     gate = "{id: no-drift, title: generated sheets reproduce, stage: concept, kind: validate"
     (generated / "checks" / "checks.yaml").write_text(
         "schema: cheme/checks/v1\nchecks:\n"
@@ -547,7 +547,7 @@ def test_a_validate_gate_sees_generator_drift(generated: Path, monkeypatch):
 
 
 def test_a_validate_gate_fails_on_a_generator_that_raises(generated: Path):
-    """#305: cheme.generated-* did not match cheme.generator-failed, so a generator that crashed
+    """cheme.generated-* did not match cheme.generator-failed, so a generator that crashed
     (the sheet not reproduced at all) passed the gate that drift fails."""
     (generated / "checks" / "checks.yaml").write_text(
         "schema: cheme/checks/v1\nchecks:\n"
@@ -703,8 +703,7 @@ def test_asu_p04_reproduces_at_s5_and_refuses_at_head(tmp_path: Path, monkeypatc
     )
     # both revisions are pinned: 48d4e4c is the S5 state (the committed sheet equals the script's
     # output), d6f7e5f the last revision before D-095/D-096 changed P-04 by hand (LOX-4004 and
-    # FI-4148 were still tags there). A moving HEAD made this test fail as the sheet evolved
-    # (pre-release issue 314).
+    # FI-4148 were still tags there). A moving HEAD made this test fail as the sheet evolved.
     for rev, expect in (("48d4e4c", 0), ("d6f7e5f", 1)):
         top = tmp_path / rev
         subprocess.run(["git", "clone", "-q", str(ASU), str(top)], check=True)

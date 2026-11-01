@@ -9,9 +9,9 @@ Process-library entries for hydrogen by electrolysis and for chlor-alkali (proce
 #121) need a cell that links current, products, electricity and heat. The flowsheet's reactors
 (`reactor: conversion | equilibrium | gibbs | pfr | cstr | batch`) and the DWSIM translation
 have no current, electron count, Faradaic efficiency or voltage, and a conversion reactor can
-prescribe the chemistry but not the electricity or the heat it releases (pre-release issue 366). Predictive
+prescribe the chemistry but not the electricity or the heat it releases. Predictive
 electrochemistry (polarisation curves, electrolyte activities) needs electrolyte
-thermodynamics that core does not have yet (pre-release issue 364). The options were a new `reactor:` kind
+thermodynamics that core does not have yet. The options were a new `reactor:` kind
 inside `process/flowsheet.yaml`, which changes the generator fingerprint of every sheet and
 mixes cell data into the flowsheet, or a separate file that refers to the flowsheet.
 
@@ -47,13 +47,12 @@ mixes cell data into the flowsheet, or a separate file that refers to the flowsh
   (`performance:`) and in the maturity report.
 - Negative: a cell is not a DWSIM unit; the linked step's streams must be written from the
   cell's result (the link checks them, it does not fill them).
-- Known limitations: no electrolyte properties (heats of dilution, activities; pre-release issue 364), no
+- Known limitations: no electrolyte properties (heats of dilution, activities), no
   adiabatic boundary or temperature rise, no polarisation model; the qualification covers
   water electrolysis at 1.6-1.9 V and a chlor-alkali membrane cell at 3.0 V and 6 kA/m2
   (docs/framework/electrochemical-cells.md).
 
 ## Evidence
 
-- pre-release issue 366 and its pull request.
 - `src/chemeascode/domains/process/electrochemical_cell.py`, `tests/test_electrochemical_cell.py`,
   `tests/data/electrochemical/`, `docs/framework/electrochemical-cells.md`.

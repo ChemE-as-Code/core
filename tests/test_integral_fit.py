@@ -1,4 +1,4 @@
-"""Rate laws fitted to integral data (pre-release issue 157 item 5): conversions measured in batch,
+"""Rate laws fitted to integral data: conversions measured in batch,
 plug-flow and stirred-tank reactors, recovered parameters and intervals, and cheme
 experiments fit-rate on such a file."""
 
@@ -117,7 +117,7 @@ def test_what_integral_data_need():
 
 
 def test_one_temperature_is_refused_not_fitted_with_ea_zero():
-    """pre-release issue 196: isothermal conversions gave a law with Ea = 0 and no temperature
+    """Isothermal conversions gave a law with Ea = 0 and no temperature
     range, which covered (and was used at) every temperature with an Arrhenius factor of 1."""
     k = 0.01
     points = [

@@ -1,7 +1,7 @@
 """The ChemSep SRK binary interaction parameters (``kij``): an optional, user-fetched dataset.
 
 cheme-as-code does not ship ChemSep's ``srk.ipd`` ("DECHEMA Soave-Redlich-Kwong Parameters")
-while its licence is unconfirmed (pre-release issue 55; ``data/chemsep/SOURCE.md``). ``cheme data
+while its licence is unconfirmed (``data/chemsep/SOURCE.md``). ``cheme data
 fetch chemsep-srk`` downloads ChemSep-LITE (or reads a local copy of the archive), checks its
 sha256, takes ``ipd/srk.ipd`` and converts it with :func:`parse_srk_ipd` into ``srk.json`` in the
 user data directory (:func:`chemeascode.foundation.userdata.user_data_dir`, ``chemsep/``). The flash
@@ -90,7 +90,7 @@ def parse_srk_ipd(text: str, eos_type: str = "SRK") -> dict[str, Any]:
     One change: the key is the CAS pair in thermo's sorted order (by the CAS number as an
     integer), because the table is marked symmetric and thermo looks a symmetric pair up by its
     sorted key; about half of ChemSep's rows list the larger CAS number first. (The ``srk.json``
-    bundled before pre-release issue 55 was marked asymmetric instead, so its ``kij`` depended on
+    cheme-as-code used to bundle was marked asymmetric instead, so its ``kij`` depended on
     the order of the components.)
     """
     data: dict[str, dict[str, Any]] = {}
@@ -233,7 +233,7 @@ def install_srk(
         "converter": "chemeascode.domains.process.thermodynamics.chemsep_srk.parse_srk_ipd",
         "note": (
             "srk.json is a modified version of ChemSep's srk.ipd (converted to JSON). "
-            "Licence: see cheme-as-code data/chemsep/SOURCE.md (pre-release issue 55)."
+            "Licence: see cheme-as-code data/chemsep/SOURCE.md."
         ),
     }
     _write(target / "SOURCE.json", (json.dumps(record, indent=2) + "\n").encode("utf-8"))

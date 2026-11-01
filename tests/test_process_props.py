@@ -326,7 +326,7 @@ def test_a_given_two_phase_the_flash_contradicts_writes_nothing(plant):
     assert found and "S2" in found[0].ids and "nothing written" in found[0].message
 
 
-# -- phase-constrained flash (pre-release issue 97) ------------------------------------------------
+# -- phase-constrained flash -----------------------------------------------------------------------
 
 N2 = {"N2": 1.0}
 LOX = {"O2": 0.995, "AR": 0.005}

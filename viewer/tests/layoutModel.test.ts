@@ -252,7 +252,7 @@ describe("the ASU model", () => {
     expect(scene.proposals.get("stair") ?? []).toEqual([]); // the ASU's own stairs are declared
     expect(scene.proposals.get("penetration") ?? []).toHaveLength((model.penetrations ?? []).length);
     expect(buildScene(withPenetration, { sheets }).proposals.get("penetration")).toEqual(["penetration:CB-1/AIR-2002"]);
-    // A wall penetration says how to keep it; a roof penetration (pre-release PR 270) cannot be pinned, so
+    // A wall penetration says how to keep it; a roof penetration cannot be pinned, so
     // it says why with core's refusal, and gives its opening in the building's plan frame.
     const wall = buildScene(withPenetration, { sheets }).items.get("penetration:CB-1/AIR-2002")!;
     expect(Object.fromEntries(wall.details)).toMatchObject({
@@ -334,7 +334,7 @@ describe("the ASU model", () => {
     expect(kindsOf(like("escape-travel", [model.structures[0]!.id]))).toEqual(["structure"]);
     expect(kindsOf(like("escape-ways", [platform]))).toEqual(["platform"]);
     expect(kindsOf(like("spacing", ["P-1101A", "P-1101B"]))).toEqual(["equipment", "equipment"]);
-    // The access rules of pre-release issue 61 (none left in the ASU), with the ids core gives: headroom over
+    // The access rules (none left in the ASU), with the ids core gives: headroom over
     // a frame's stair or level, or an item's stair or roof as a whole (its item); stacked stairs and
     // their frame; a ladder's head in a zone; a declared operator naming nothing (no object).
     expect(kindsOf(like("headroom", ["P-03/Line_AIR3005_S1", "CB-1/ST1"]))).toEqual(["pipe", "structure"]);

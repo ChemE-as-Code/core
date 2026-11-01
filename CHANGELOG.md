@@ -147,9 +147,8 @@ version. No breaking change since 0.8.0.
 ## 0.8.0 (2026-10-28): initial public release
 
 The first public version of cheme-as-code: the `cheme` toolkit, the viewer and the agent runner
-in one repository, under AGPL-3.0-or-later. Earlier, pre-release development is not part of this
-repository's history; references to it read "pre-release issue 123", "pre-release viewer PR 49",
-"pre-release commit 4e3f477" and the like ([docs/framework/monorepo-baseline.md](docs/framework/monorepo-baseline.md)).
+in one repository, under AGPL-3.0-or-later. Earlier development is not part of this repository's
+history ([docs/framework/monorepo-baseline.md](docs/framework/monorepo-baseline.md)).
 
 ### Toolkit (`cheme`, package `cheme-as-code`, import `chemeascode`)
 

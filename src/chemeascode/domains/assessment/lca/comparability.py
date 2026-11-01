@@ -1,5 +1,5 @@
 """Comparability of a scenario with the baseline, read from the factors' structured scope
-(docs/framework/lci-comparison-basis.md, pre-release issue 306).
+(docs/framework/lci-comparison-basis.md).
 
 For each background a scenario replaces, the baseline factor and the scenario factor are compared
 on the declared dimensions (:class:`.schemas.FactorScope` and the reference year):
@@ -39,8 +39,8 @@ DIMENSIONS = (*HARD, *SOFT)
 
 def effective_scope(factors: FactorFile | None, factor_id: str) -> tuple[FactorScope, int | None]:
     """The scope of *factor_id* (its source's, overridden by its own) and the year it is
-    compared on: its declared ``data_year``, else its ``year`` as given (pre-release issue 306:
-    ``year`` is never reinterpreted); an empty scope when the factor or its scope is unknown."""
+    compared on: its declared ``data_year``, else its ``year`` as given
+    (``year`` is never reinterpreted); an empty scope when the factor or its scope is unknown."""
     if factors is None:
         return FactorScope(), None
     factor: Factor | None = next((f for f in factors.factors if f.id == factor_id), None)

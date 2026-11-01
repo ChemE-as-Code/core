@@ -33,8 +33,6 @@ server at all.
 
 ## Evidence
 
-- pre-release PR 2 (pre-release commit 015b536), hardening pre-release commit 6c2982c,
-  pre-release commit 93c7a9e.
-- Static snapshots pre-release PR 79 (pre-release commit 288d9ea), `--exclude` pre-release PR 88.
+- `cheme serve` and its hardening; static snapshots, then `--exclude`.
 - `AGENTS.md`, `src/chemeascode/interfaces/api/serve.py`,
   [static-snapshot.md](../framework/static-snapshot.md).

@@ -36,10 +36,9 @@ reorders attributes or regenerates ids, and `git diff` of XML is hard to review.
 
 ## Evidence
 
-- pre-release commit 62c29e1 (0.1.0: lossless DEXPI 2.0.1 load, `fmt`, `git-setup`
-  textconv driver and pre-commit hook); readable textconv in pre-release PR 3
-  (pre-release commit e766a66).
-- One load/export path: pre-release commit ba149e7 in pre-release PR 58; enforced by
+- 0.1.0: lossless DEXPI 2.0.1 load, `fmt`, `git-setup` textconv driver and pre-commit hook;
+  readable textconv later.
+- One load/export path, enforced by
   `test_dexpi_models_load_and_export_through_one_module` in `tests/test_boundaries.py`.
 - `src/chemeascode/domains/piping/fmt.py`, `dexpi_io.py`, `src/chemeascode/integrations/git.py`,
   [architecture.md](../framework/architecture.md).

@@ -1,4 +1,4 @@
-"""The bounded reference case of the equilibrium TSA calculation (pre-release issue 368): CO2
+"""The bounded reference case of the equilibrium TSA calculation: CO2
 removal from dry compressed air on zeolite 13X, the CO2 layer of an air separation unit's front-end
 purification, from published measurements.
 

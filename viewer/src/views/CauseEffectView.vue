@@ -334,7 +334,7 @@ function downloadCsv(): void {
 .matrix td.tone-alarm {
   background: var(--warn-soft);
 }
-/* Several actions on one tag (pre-release PR 269): stacked chips, each in its own tone, on the cell's most severe tone. */
+/* Several actions on one tag: stacked chips, each in its own tone, on the cell's most severe tone. */
 .cell.multi {
   padding: 4px 6px;
 }

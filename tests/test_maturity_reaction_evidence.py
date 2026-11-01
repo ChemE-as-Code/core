@@ -1,6 +1,6 @@
 """cheme maturity: a conversion reactor's specified conversion or selectivity counts as sourced
-when the decided model basis of process/reaction-evidence.yaml covers it with read observations
-(pre-release issue 137), and not when the value is outside them, the source was not read or the file
+when the decided model basis of process/reaction-evidence.yaml covers it with read observations,
+and not when the value is outside them, the source was not read or the file
 flags a conflict.
 
 Every number in the evidence fixtures below is FIXTURE DATA made up for the test: the sources,

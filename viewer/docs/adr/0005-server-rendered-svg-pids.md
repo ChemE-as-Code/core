@@ -36,9 +36,8 @@ as text through Vue's escaping, Markdown parsed to a tree and rendered with `h()
 
 ## Evidence
 
-- pre-release viewer commit 76e15e3 "Milestone 2 scope": "Rendering is SVG only: no dexpi-js and no DigiCo viewer
+- "Milestone 2 scope": "Rendering is SVG only: no dexpi-js and no DigiCo viewer
   components."
-- pre-release viewer commit 642a723 (pre-release viewer PR 1) "sanitized inline SVG"; pre-release viewer commit cb87683 (pre-release viewer PR 3) title-block
-  ids.
-- pre-release viewer commit b15cac3 (pre-release viewer PR 51, from pre-release viewer issue 40) "Rebuild SVG CSS from an allow-list and scope
+- "sanitized inline SVG"; title-block ids.
+- "Rebuild SVG CSS from an allow-list and scope
   <style> rules to the drawing".

@@ -1,4 +1,4 @@
-"""The electrolyte route (pre-release issue 364): the NaCl-H2O claim of electrolytes.yml against
+"""The electrolyte route: the NaCl-H2O claim of electrolytes.yml against
 independent reference data, its refusals, and the refusal of electrolytes by the phase and
 simulation routes.
 

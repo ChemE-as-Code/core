@@ -1,4 +1,4 @@
-"""Selectivity as a design input (pre-release issue 157 item 3): a conversion reactor given by the
+"""Selectivity as a design input: a conversion reactor given by the
 key's per-pass conversion and the molar selectivities to its products; the extents of parallel and
 series reactions follow."""
 

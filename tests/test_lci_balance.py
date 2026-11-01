@@ -1,5 +1,4 @@
-"""Mass, element and energy balance gates of LCI datasets, with fossil and biogenic carbon
-(pre-release issue 174).
+"""Mass, element and energy balance gates of LCI datasets, with fossil and biogenic carbon.
 
 Four cases:
 
@@ -250,7 +249,7 @@ def test_a_reactive_plant_closes_in_every_element(tmp_path: Path) -> None:
 
 
 def test_carbon_that_does_not_match_fails_the_publication_gate(tmp_path: Path) -> None:
-    """The acceptance criterion of pre-release issue 174: CO2 out of step with the carbon fed fails
+    """The acceptance criterion of the balance gates: CO2 out of step with the carbon fed fails
     the gate, naming the residual."""
     root = _methanol(tmp_path, broken=True)
     report = _report(root)
@@ -410,7 +409,7 @@ def test_composition_contract() -> None:
     assert "covers 90" in elements_per_kg(partial)[2]
 
 
-# -- review fixes (pre-release issue 174) ----------------------------------------------------------
+# -- review fixes ----------------------------------------------------------------------------------
 
 
 def test_a_gaseous_fuel_in_nm3_counts_at_its_lhv() -> None:

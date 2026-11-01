@@ -1,4 +1,4 @@
-"""Liquid-phase reactions (pre-release issue 157 item 1): equilibrium constants and rate laws on
+"""Liquid-phase reactions: equilibrium constants and rate laws on
 mole fractions, activities or concentrations, the liquid equilibrium reactor of cheme process
 propagate, ln(Q/K) and rates in cheme process reactors, and the phase-basis rule.
 

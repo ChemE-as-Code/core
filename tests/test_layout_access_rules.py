@@ -1,5 +1,5 @@
-"""Access rules that see what the fifth independent layout review found invisible
-(pre-release issue 61): headroom over stairs and platforms, stairs in the standing space in front of
+"""Access rules that see what the fifth independent layout review found invisible:
+headroom over stairs and platforms, stairs in the standing space in front of
 valves and hatches, the open end of a pinned vent route, the clear width beside a stacked stair's
 next flight, ladder heads in vent zones, the tray hint for inert zones; and the operators declared
 for valves and transmitters out of reach."""
@@ -435,7 +435,7 @@ structures:
 
 
 def test_ladders_are_found_where_they_are_not_by_their_name():
-    """#238: a ladder named ACC2 and a rack ladder named west are ladders; a stair named LDS
+    """A ladder named ACC2 and a rack ladder named west are ladders; a stair named LDS
     is not."""
     from chemeascode.domains.spatial.access_rules import _ladder_parts
     from chemeascode.domains.spatial.schemas import Rack

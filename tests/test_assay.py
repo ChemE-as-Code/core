@@ -1,4 +1,4 @@
-"""Petroleum assays and pseudocomponents (thermodynamics/assay.py, pre-release issue 367).
+"""Petroleum assays and pseudocomponents (thermodynamics/assay.py).
 
 Reference data, all independent of the code under test:
 

@@ -11,8 +11,8 @@ YAML, builds a 3D layout model, and derives a material take-off, an estimate and
 committed files.
 
 !!! note "Status"
-    Research prototype of the Process Intelligence Research group, private until the first
-    release. Since 0.7.0 the package is `cheme-as-code`, the import name `chemeascode` and the
+    Research prototype of the Process Intelligence Research group. Since 0.7.0 the package is
+    `cheme-as-code`, the import name `chemeascode` and the
     command `cheme` (formerly `plantcode`); plant repositories migrate once, see
     [Rename](framework/rename.md).
 

@@ -276,7 +276,7 @@ def test_a_component_split_counts_as_sourced_only_with_a_given_basis(tmp_path):
     unit = c1()
     assert (unit.basis, unit.predictive, unit.sourced) == ("component-split", False, True)
     assert "test fixture conditions" in unit.detail
-    # the translation's basis (pre-release issue 137, Translation.bases) is the one used
+    # the translation's basis (Translation.bases) is the one used
     process, _ = load(root)
     sim, doc, _ = load_sim(root)
     found = translate(process, sim, doc, process.flowsheet.default_case())
@@ -486,7 +486,7 @@ def test_the_regime_needs_dwsims_parameters_and_a_claim(tmp_path):
 
 def test_a_state_the_claim_cannot_judge_fails_the_regime(tmp_path):
     """A gauge pressure (no ambient pressure stated) or a stream without a simulated
-    temperature is reported, never counted as inside the claim (pre-release issue 256)."""
+    temperature is reported, never counted as inside the claim."""
     root = _copy(tmp_path, "process-double-column")
     others = [_stream(s, 96.0, 5.2, {"N2": 1.0}) for s in OUTLETS[1:]]
     gauge = _stream("S2", 96.0, 4.2, {"N2": 1.0})
@@ -509,8 +509,8 @@ def test_a_state_the_claim_cannot_judge_fails_the_regime(tmp_path):
     [("Peng-Robinson (PR)", "pass"), ("Soave-Redlich-Kwong (SRK)", "fail")],
 )
 def test_one_regime_check_reads_each_package_claim(tmp_path, package, status):
-    """PR and SRK go through the same requirement, once, with their own claim
-    (pre-release issue 315): the air feeds S1 and S6 are inside PR's mixture claim, and outside
+    """PR and SRK go through the same requirement, once, with their own claim:
+    the air feeds S1 and S6 are inside PR's mixture claim, and outside
     SRK's, which holds each component alone."""
     from chemeascode.domains.process.thermodynamics.methods import simulation_claim
 
@@ -535,8 +535,7 @@ def test_one_regime_check_reads_each_package_claim(tmp_path, package, status):
 
 
 def test_a_claim_limited_to_some_phases_cannot_pass_without_a_recorded_phase(tmp_path, monkeypatch):
-    """The run record holds no phase: a vapour-only claim is reported, never passed
-    (pre-release issue 256)."""
+    """The run record holds no phase: a vapour-only claim is reported, never passed."""
     from chemeascode.domains.process.thermodynamics import methods
 
     claim = methods.simulation_claim("Peng-Robinson (PR)").model_copy(update={"phases": ["vapor"]})
@@ -556,7 +555,7 @@ def _requirement(report, rid: str):
 
 def test_engineering_pid_needs_a_drawn_sheet_and_links_need_a_flowsheet(tmp_path):
     """A P&ID declared in plant.yaml but absent or planned is no P&ID, and without
-    process/flowsheet.yaml no link is checked (pre-release issue 224)."""
+    process/flowsheet.yaml no link is checked."""
     root = _copy(tmp_path, "safety-hazop")
     report = maturity_report(root)
     assert _status(report, "engineering.pid") == "pass"
@@ -660,8 +659,7 @@ def test_the_command_prints_the_report_and_writes_only_on_request(tmp_path, monk
 
 
 def _audit(plant: dict, exchangers=(), levels=()) -> dict:
-    """An energy audit as the run record keeps it (synthetic, pre-release issue 137
-    simulation.energy)."""
+    """An energy audit as the run record keeps it (synthetic, simulation.energy)."""
     return {
         "closure": {"units": [], "plant": plant},
         "exchangers": list(exchangers),

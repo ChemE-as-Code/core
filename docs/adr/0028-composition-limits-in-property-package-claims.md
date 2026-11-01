@@ -53,11 +53,10 @@ test evidence only; it is never a runtime method.
   `range_problems`.
 - Known limitations: carbon monoxide above 500 K stays unclaimed (no reference equation or
   measured densities found), as does methane above 673.1 K, so the methanol reactor outlet and
-  the hottest ammonia converter gas are refused; pre-release issue 315.
+  the hottest ammonia converter gas are refused.
 
 ## Evidence
 
-- Part of pre-release issue 315 (part C), extending pre-release PR 154.
 - `src/chemeascode/domains/process/schema.py` (`Region`, `ApplicationRange`),
   `property_packages.py` (`limit_gaps`, `region_gaps`, `SYNGAS`), `props.py`
   (`range_problems`, `method_fingerprint`).

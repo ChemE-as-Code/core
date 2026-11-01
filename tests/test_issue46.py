@@ -1,4 +1,4 @@
-"""0.5 follow-up fixes (pre-release issue 46): gates, exit codes, provenance, version check, thermo
+"""0.5 follow-up fixes: gates, exit codes, provenance, version check, thermo
 noise."""
 
 import json

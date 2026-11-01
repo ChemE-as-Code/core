@@ -1,9 +1,9 @@
 """Stairs, ladders and their proposals against the escape rules (code audit 2026-10): the
-proposals follow the rules the escape check applies (pre-release issue 231), stairs and ladders keep
-ISO 14122-3/-4 flights and steps (pre-release issue 232), the ladder of an upper item platform
-stands on the one below (pre-release issue 233), two ways down must be remote from each other
-(pre-release issue 237), and guard rails open where a stair or ladder arrives and between joined
-levels (pre-release issue 259)."""
+proposals follow the rules the escape check applies, stairs and ladders keep
+ISO 14122-3/-4 flights and steps, the ladder of an upper item platform
+stands on the one below, two ways down must be remote from each other,
+and guard rails open where a stair or ladder arrives and between joined
+levels."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def pin_all(tmp_path: Path, text: str) -> dict:
     raise AssertionError(f"still proposing after six rounds: {targets}")
 
 
-# -- pre-release issue 232 flights and steps -------------------------------------------------------
+# -- flights and steps -----------------------------------------------------------------------------
 
 TOWER = """\
 structures:
@@ -122,7 +122,7 @@ def test_a_ladder_over_the_single_flight_limit_gets_staggered_flights_and_rest_l
     assert {p["id"].rsplit("/", 1)[-1] for p in short["parts"]} == {"rail-0", "rail-1", "cage"}
 
 
-# -- pre-release issue 233 the ladder of an upper item platform ------------------------------------
+# -- the ladder of an upper item platform ----------------------------------------------------------
 
 COLUMN = {
     "tag": "C-1",
@@ -209,7 +209,7 @@ def test_a_declared_platform_ladder_on_no_floor_is_a_finding():
     assert not found(base(equipment=[COLUMN], platforms=platforms), "access-unconnected")
 
 
-# -- pre-release issue 237 remote ways -------------------------------------------------------------
+# -- remote ways -----------------------------------------------------------------------------------
 
 REMOTE = """\
 structures:
@@ -232,7 +232,7 @@ def test_two_ladders_side_by_side_are_not_two_ways_down():
     )
     assert "arrive at most 0.6 m apart" in remote.message
     assert "one incident can block both" in remote.message
-    assert "dead end > 7.5 m" in dead.message  # 7.7 m from the far corner (pre-release issue 295)
+    assert "dead end > 7.5 m" in dead.message  # 7.7 m from the far corner
     # the proposal is a ladder at the far end
     (proposed,) = [lad for lad in near["ladders"] if lad["source"] == "generated"]
     assert proposed["at"][0] > 6 and "not remote" in proposed["reason"]
@@ -258,7 +258,7 @@ def test_the_remoteness_is_a_criterion_the_plant_overrides():
     assert not found(base(structures=[near]), "escape-ways", plan=plan)
 
 
-# -- pre-release issue 295 dead ends on every floor ------------------------------------------------
+# -- dead ends on every floor ----------------------------------------------------------------------
 
 LONG = """\
 structures:
@@ -343,7 +343,7 @@ def test_an_open_floor_with_ways_at_two_corners_is_no_dead_end():
     assert dead_end_walk([], floor) is None
 
 
-# -- pre-release issue 231 proposals that the escape check accepts once pinned ---------------------
+# -- proposals that the escape check accepts once pinned -------------------------------------------
 
 CASING_ROOF = """\
 structures:
@@ -453,7 +453,7 @@ structures:
     assert proposed == ["S1/stair-to-L1-2"]
 
 
-# -- pre-release issue 259 guard rails -------------------------------------------------------------
+# -- guard rails -----------------------------------------------------------------------------------
 
 RAILS = """\
 structures:
@@ -517,7 +517,7 @@ def test_no_guard_rail_crosses_a_stair_landing_or_a_joined_edge():
     assert part_rect(grating) == (0.0, 0.0, 3.0, 8.0)
 
 
-# -- review of pre-release PR 284: staggered flights, upper platform ladders, ladder-head openings -
+# -- staggered flights, upper platform ladders, ladder-head openings -------------------------------
 
 CORNER_LADDER = """\
 structures:
@@ -677,7 +677,7 @@ def test_the_guard_rail_opens_on_the_edge_a_ladder_faces(rotation, corner, facin
     assert any(r[0] - 1e-6 <= along <= r[1] + 1e-6 for r in _rails_along(entry, other))
 
 
-# -- review 2 of pre-release PR 284: tall item-platform ladders, a ladder side at an arc end -------
+# -- tall item-platform ladders, a ladder side at an arc end ---------------------------------------
 
 
 def _column(tag: str, diameter: float, groups: dict[float, list[float]], shape="vertical_cylinder"):
@@ -736,7 +736,7 @@ TALL = {
 
 @pytest.mark.parametrize("name", list(TALL))
 def test_a_tall_platform_ladder_keeps_its_lowest_flight_on_the_floor_below(name):
-    """Review 2 of pre-release PR 284: a climb over 10 m between platforms is staggered, and its
+    """A climb over 10 m between platforms is staggered, and its
     lowest flight still stands on (or beside, within CONNECT) the platform below."""
     from chemeascode.domains.spatial.structures import CONNECT
 
@@ -794,7 +794,7 @@ def test_a_tall_platform_ladder_keeps_its_lowest_flight_on_the_floor_below(name)
 @pytest.mark.parametrize("arc", [[5, 355], [10, 350], [181, 179]])
 @pytest.mark.parametrize("side", [90, 180, 270, None])
 def test_a_ladder_inside_a_near_full_arc_stays_outside_the_rings(arc, side):
-    """Review 3 of pre-release PR 284: an arc whose gap is narrower than the ladder covers every
+    """An arc whose gap is narrower than the ladder covers every
     side."""
     access = {"platforms": [{"elevation": 10}, {"elevation": 20, "arc_deg": arc}]}
     if side is not None:

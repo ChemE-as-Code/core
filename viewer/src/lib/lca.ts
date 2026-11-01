@@ -301,8 +301,8 @@ export interface Bar {
   scenario: string;
   total: number;
   segments: BarSegment[];
-  /** Exchanges the baseline characterises in the category that are gaps in this scenario
-   * (pre-release issue 172): its total leaves them out, so no bar is drawn. Empty: comparable. */
+  /** Exchanges the baseline characterises in the category that are gaps in this scenario:
+   * its total leaves them out, so no bar is drawn. Empty: comparable. */
   dropped: string[];
   /** No total at all: data the baseline has is missing, or every contribution is a gap. */
   none: boolean;
@@ -339,7 +339,7 @@ export function droppedIn(report: Standing, scenario: string, category: string):
 }
 
 /**
- * Whether *scenario* has a total in *category* at all (pre-release issue 172): not when it lacks data the
+ * Whether *scenario* has a total in *category* at all: not when it lacks data the
  * baseline has ({@link droppedIn}), nor when every contribution is a gap (no total, never 0).
  */
 export function hasTotal(report: Standing, scenario: string, category: string): boolean {
@@ -692,7 +692,7 @@ const VERDICTS: Record<VerdictKind, Omit<Verdict, "kind" | "reasons">> = {
 };
 
 /**
- * The comparison verdict of *scenario* against the baseline (pre-release issue 306): core's `comparability`,
+ * The comparison verdict of *scenario* against the baseline: core's `comparability`,
  * never more favourable than the data allow. A scenario whose total does not stand (data the
  * baseline has are missing: {@link hasTotal}) is not comparable whatever the factors say, and a
  * report without a verdict (an older core) is "not assessed", never like-for-like.

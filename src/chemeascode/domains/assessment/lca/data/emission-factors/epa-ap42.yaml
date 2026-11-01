@@ -1,4 +1,4 @@
-# Packaged emission factor set epa-ap42: PLACEHOLDER (core#176). It holds no values. A factor of
+# Packaged emission factor set epa-ap42: PLACEHOLDER. It holds no values. A factor of
 # lca/lca.yaml that names it (set: epa-ap42) refuses to run until the set is verified; give the
 # factor in lca/lca.yaml with its value, unit and source meanwhile.
 schema: cheme/lca/v1

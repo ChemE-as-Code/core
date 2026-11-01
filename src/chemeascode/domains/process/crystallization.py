@@ -1,5 +1,4 @@
-"""A crystallizer and a filter or centrifuge: the bounded solid-liquid adapter
-(pre-release issue 365).
+"""A crystallizer and a filter or centrifuge: the bounded solid-liquid adapter.
 
 One solute crystallizes from one solvent, as an anhydrous crystal or a hydrate (the crystal's
 formula is the solute's plus n solvent, e.g. ``Na2CO3(H2O)10`` from ``Na2CO3`` and ``H2O``), in a

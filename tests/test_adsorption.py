@@ -1,5 +1,5 @@
 """process/adsorption.yaml: the equilibrium TSA cycle, external performance records, the
-refusals, and the model basis an adsorber gets from them (pre-release issue 368)."""
+refusals, and the model basis an adsorber gets from them."""
 
 from __future__ import annotations
 

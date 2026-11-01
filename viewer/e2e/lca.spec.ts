@@ -80,7 +80,7 @@ test.describe("life cycle assessment", () => {
     await expect(page.getByRole("region", { name: "Gaps" }).locator("[data-gap]")).toHaveCount(18);
   });
 
-  test("a scenario missing the baseline's electricity gets no bar and no comparison (pre-release issue 172)", async ({ page }) => {
+  test("a scenario missing the baseline's electricity gets no bar and no comparison", async ({ page }) => {
     await mockApi(page, { lca: withMissingGrid(lcaAsu) });
     await page.goto("/lca");
     const bars = page.getByRole("region", { name: "Scenarios" });
@@ -97,7 +97,7 @@ test.describe("life cycle assessment", () => {
     await expect(page.getByRole("region", { name: "Totals" }).locator('[data-card="construction"]')).toHaveCount(0);
   });
 
-  test("the comparison verdict stands beside a scenario's number (pre-release issue 306)", async ({ page }) => {
+  test("the comparison verdict stands beside a scenario's number", async ({ page }) => {
     const verdicts = { baseline: { verdict: "baseline", reasons: [] }, [LOW_GRID]: { verdict: "not comparable", reasons: ["basis differs (direct+upstream / direct)"] } };
     await mockApi(page, { lca: { ...withLowGrid(lcaAsu), comparability: verdicts, scenario_details: [{ id: LOW_GRID, title: "low grid", location: "NL", year: 2026, electricity: null, case: null, source: "synthetic" }] } });
     await page.goto("/lca");
@@ -241,7 +241,7 @@ test("a gap of unknown amount says so", async ({ page }) => {
   await expect(row).toContainText("E-3103 has no dimensions.weight");
 });
 
-test("the LCI readiness of the dataset: closure, DQR, missing metadata, each linked to its source (pre-release viewer issue 36)", async ({ page }) => {
+test("the LCI readiness of the dataset: closure, DQR, missing metadata, each linked to its source", async ({ page }) => {
   await mockApi(page, { lca: lcaReadiness, files: { "lca/dataset.yaml": csv("dataset-asu.yaml") } });
   await page.goto("/lca");
   const section = page.getByRole("region", { name: "LCI readiness" });

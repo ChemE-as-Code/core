@@ -1,5 +1,5 @@
-"""Structured factor scope, the method-mix check and the scenario comparability verdict
-(pre-release issue 306). One test per comparison dimension; no network, no licensed data."""
+"""Structured factor scope, the method-mix check and the scenario comparability verdict.
+One test per comparison dimension; no network, no licensed data."""
 
 import hashlib
 import json
@@ -84,7 +84,7 @@ def test_an_undeclared_dimension_is_never_assumed_equal() -> None:
 
 def test_packaged_profiles_carry_a_scope_without_changing_their_files() -> None:
     # fingerprints of the profile files are what projects' manifests record: the sidecar keeps
-    # them; the checksums below are of the files as merged before pre-release issue 306
+    # them; the checksums below are of the files as merged before the scopes were added
     checksums = {
         "desnz-ghg-2026": "6d7cd7e8f75e2e921a0952c7f815ee78cb4144f447530043c465e83f5b98b3b1",
         "eea-ener038-2024": "7654ee133a8be4d05c9694e06455583f934726b0c8a7bc3e91d639af18af6738",
@@ -416,7 +416,7 @@ def test_method_mix_reads_the_structured_gases(asu: Path) -> None:
 
 
 def test_method_mix_flags_co2_only_beside_an_unscoped_co2e_factor(asu: Path) -> None:
-    # the warning projects had before pre-release issue 306: a project factor without scope (its
+    # the warning projects had before the comparison basis: a project factor without scope (its
     # source's method text says AR5) beside a CO2-only packaged factor
     _edit(
         asu, "lca/factors.yaml", lambda d: d.update(include=["desnz-ghg-2026", "uba-strommix-2026"])
@@ -520,7 +520,7 @@ def test_contractual_electricity_is_a_proxy(asu: Path) -> None:
     assert _verdict(asu, "swap")["verdict"] == "proxy"
 
 
-# -- data year and publication year (pre-release issue 306 step 3) ---------------------------------
+# -- data year and publication year ----------------------------------------------------------------
 
 
 def test_data_year_is_compared_where_declared_and_year_keeps_its_meaning(asu: Path) -> None:

@@ -59,7 +59,7 @@ describe("values", () => {
   });
 });
 
-describe("values cheme datasheets fill calculated (pre-release PR 282)", () => {
+describe("values cheme datasheets fill calculated", () => {
   // A vessel's volume after a fill: origin, the fingerprint of its inputs and the inputs besides the streams.
   const filled = {
     value: 12.4,

@@ -106,7 +106,7 @@ test.describe("equipment datasheets", () => {
   });
 
   test("a value cheme datasheets fill calculated is a row with its origin, inputs and fingerprint", async ({ page }) => {
-    // C-3101 as after a fill (pre-release PR 282): values with origin, fingerprint and inputs in the
+    // C-3101 as after a fill: values with origin, fingerprint and inputs in the
     // type-specific table, the main dimensions and the sizing basis.
     const path = "equipment/datasheets/C-3101.yaml";
     const doc = asuDatasheets[path] as { data: Record<string, unknown> };

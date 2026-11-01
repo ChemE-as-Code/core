@@ -7,7 +7,7 @@
 
 Process-library candidates (silicon carbide by the Acheson process, alumina by the Bayer process
 with its calciner, acetylene through calcium carbide and lime) need the energy of a furnace in
-which solids react at high temperature (pre-release issue 370, under pre-release issues 81 and 137). The execution
+which solids react at high temperature. The execution
 routes cheme-as-code has are fluid-only: the thermo flash of `cheme process phase`/`props` has
 no solid phase and DWSIM's translation has no solid compounds (`methods.yml`, regime
 `solid_equilibrium`: unsupported). A fluid flash of a stream holding CaCO3 or CaO would return
@@ -68,7 +68,7 @@ in `domains/process/furnace.py`, through `cheme process furnace [ID] [--json]`:
 
 ## Evidence
 
-- pre-release issue 370; `src/chemeascode/domains/process/furnace.py`, `src/chemeascode/integrations/cantera.py`,
+- `src/chemeascode/domains/process/furnace.py`, `src/chemeascode/integrations/cantera.py`,
   `cheme process furnace` in `src/chemeascode/interfaces/cli/process.py`,
   `src/chemeascode/domains/process/thermodynamics/methods.yml`,
   `src/chemeascode/project/maturity.py` (`balanced.furnace-energy`).

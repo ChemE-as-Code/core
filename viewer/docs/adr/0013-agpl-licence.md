@@ -21,5 +21,5 @@ copyright and TU Delft's disclaimer of copyright interest.
 
 ## Evidence
 
-- Pre-release viewer pre-release viewer commit 76e15e3: the first `LICENSE.md`, "AGPL-3.0-or-later".
+- The first `LICENSE.md`, "AGPL-3.0-or-later".
 - `LICENSE` and `NOTICE` of this folder.

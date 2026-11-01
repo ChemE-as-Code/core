@@ -1,5 +1,4 @@
-// Keyboard access and navigation (pre-release viewer issue 38) and what a page shows while another revision loads
-// (pre-release viewer issue 43).
+// Keyboard access and navigation and what a page shows while another revision loads.
 import { expect, test } from "@playwright/test";
 import { SHEET, mockApi, streams } from "./fixtures";
 

@@ -1,5 +1,5 @@
 """Liquid-liquid equilibrium of a mixture at a given temperature: a stability test and a
-two-liquid split on an activity-coefficient model (pre-release issue 369).
+two-liquid split on an activity-coefficient model.
 
 The model is a function of the mole fractions that returns ``(ln gamma_i, gE/RT)``, e.g.
 :func:`chemeascode.integrations.thermo.nrtl_ln_gammas` (thermo's NRTL); this module holds no

@@ -39,8 +39,7 @@ logic drifts into commands and modules import each other in cycles.
 
 ## Evidence
 
-- pre-release PR 58 "Initial ChemE-as-Code framework structure (old module paths removed)",
-  starting with pre-release commit 2d4d436.
+- "Initial ChemE-as-Code framework structure (old module paths removed)".
 - `tests/test_boundaries.py`, [architecture.md](../framework/architecture.md),
   [contributing.md](../framework/contributing.md), [SUMMARY.md](../framework/SUMMARY.md),
   [migration-table.md](../framework/migration-table.md).

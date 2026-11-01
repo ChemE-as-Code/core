@@ -1,4 +1,4 @@
-# Packaged emission factor set emep-eea-guidebook: PLACEHOLDER (core#176). It holds no values. A
+# Packaged emission factor set emep-eea-guidebook: PLACEHOLDER. It holds no values. A
 # factor of lca/lca.yaml that names it (set: emep-eea-guidebook) refuses to run until the set is
 # verified; give the factor in lca/lca.yaml with its value, unit and source meanwhile.
 schema: cheme/lca/v1

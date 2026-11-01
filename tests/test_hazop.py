@@ -1,4 +1,4 @@
-"""HAZOP studies (pre-release issue 136): the risk matrix lookup, the study file, validation,
+"""HAZOP studies: the risk matrix lookup, the study file, validation,
 staleness, rating, the report, the review record and the gate. The plant is
 ``examples/safety-hazop``."""
 
@@ -495,7 +495,7 @@ def test_the_domain_needs_neither_typer_nor_an_llm():
     assert out.stdout.strip() == "[]"
 
 
-# -- regressions from the review of pre-release PR 147 ---------------------------------------------
+# -- regressions from the review -------------------------------------------------------------------
 
 BAND = {
     "value": "high",
@@ -593,7 +593,7 @@ def test_only_a_hazop_review_without_open_blocking_findings_counts(example):
 
 
 def test_the_hazop_review_status_blocks_on_the_same_findings_as_sign_off(example):
-    """#225: a finding carried forward without a severity, or with a status outside the
+    """A finding carried forward without a severity, or with a status outside the
     vocabulary, still blocks, as it does for sign-off and coverage."""
     from chemeascode.foundation.reviews import blocking_ids, load_records, open_blocking
 
@@ -620,7 +620,7 @@ def test_the_hazop_review_status_blocks_on_the_same_findings_as_sign_off(example
 
 
 def test_an_open_blocking_finding_with_a_malformed_id_still_blocks(example):
-    """Review of pre-release PR 281: a row whose id is not <record>#<n> cannot be followed, so it
+    """A row whose id is not <record>#<n> cannot be followed, so it
     blocks."""
     _commit(example)
     _record(example, "2026-10-25-hazop.md", "hazop", "| H-1 | S4 not assessed | high | open |\n")

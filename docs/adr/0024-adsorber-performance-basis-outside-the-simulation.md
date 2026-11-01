@@ -10,12 +10,12 @@ states its recoveries and DWSIM closes the balances around them. A converged flo
 nothing about whether the split is attainable, and the model basis reports it as
 `component-split` (specified). Process-library work (the ASU front-end purification, hydrogen
 PSA, gas dehydration) needs a basis that is calculated or at least checked, without making such
-a model a prerequisite for a concept, a BFD or a sourced inventory (pre-release issue 368).
+a model a prerequisite for a concept, a BFD or a sourced inventory.
 
 Options considered: a dynamic PSA/TSA bed model (PDEs for breakthrough and cycles), which needs
 kinetics and heat-transfer data that a design rarely has and a solver core does not ship; a
 DWSIM unit operation, which DWSIM does not provide; coupling an external model as a unit inside
-the DWSIM solve, as the fixed bed is coupled (pre-release issue 137), which needs an outer loop; or a
+the DWSIM solve, as the fixed bed is coupled, which needs an outer loop; or a
 calculation beside the simulation whose recoveries the `component_separator` carries.
 
 ## Decision
@@ -55,12 +55,11 @@ calculation beside the simulation whose recoveries the `component_separator` car
 - Known limitations: no thermal front, breakthrough dynamics, heat losses or PSA cycle; a
   component without an isotherm is treated as not adsorbed. The reference case (CO2 on 13X,
   NASA/TM-2017-219847 isotherm, US 6,506,236 mass transfer zone) is qualified for its
-  equilibrium inputs and the cycle relations, not against a measured TSA cycle (pre-release issue 368).
+  equilibrium inputs and the cycle relations, not against a measured TSA cycle.
   Coupling the calculation into the DWSIM solve, as for the fixed bed, is a possible follow-up.
 
 ## Evidence
 
-- pre-release issue 368.
 - `src/chemeascode/domains/process/separations/{schema,adsorption}.py`,
   `src/chemeascode/domains/process/model_basis.py` (`apply_adsorption`),
   `src/chemeascode/project/maturity.py`, `tests/test_adsorption.py`,

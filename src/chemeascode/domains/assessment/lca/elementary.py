@@ -1,5 +1,4 @@
-"""Elementary-flow identities from the packaged crosswalk (``data/elementary-flows.yaml``,
-pre-release issue 175).
+"""Elementary-flow identities from the packaged crosswalk (``data/elementary-flows.yaml``).
 
 An emission or resource of a dataset is identified by a UUID in a named reference list, not by
 its CAS number: CAS distinguishes neither the compartment nor the origin, and many flows (PM2.5,
@@ -106,7 +105,7 @@ def identities(cas: str | None, spec: Elementary) -> tuple[list[FlowIdentity], s
 
 def _primary(entry: dict, sub: str) -> FlowIdentity:
     """The EF 3.1 identity of *entry* in *sub*: ``uuid: null`` until the crosswalk records the
-    UUID read from the reference package (``scripts/fill_ef31_uuids.py``, pre-release issue 313)."""
+    UUID read from the reference package (``scripts/fill_ef31_uuids.py``)."""
     ef = entry.get(PRIMARY) or {}
     uuid = (ef.get("uuid") or {}).get(sub)
     if uuid is None:

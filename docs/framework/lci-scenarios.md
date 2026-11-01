@@ -1,6 +1,6 @@
 # ADR: design cases and regional LCI scenarios without duplicating plants
 
-Status: accepted (pre-release issue 172). Code: `domains/assessment/lca/scenarios.py`, the `Scenario` model
+Status: accepted. Code: `domains/assessment/lca/scenarios.py`, the `Scenario` model
 of `lca/lca.yaml`, the `Case` model of `process/flowsheet.yaml`. Commands:
 `cheme assess lca-scenarios`, `cheme assess lca-cases`.
 
@@ -111,7 +111,7 @@ scenario; scenarios never overwrite each other. A record holds:
     categories where that is so. `characterised_sum` keeps the sum of what was
     characterised, gaps excluded, for analysis only. `comparable` covers the gaps only; whether
     the backgrounds measure the same thing is `comparability` below;
-- `comparability` (pre-release issue 306, [lci-comparison-basis.md](lci-comparison-basis.md)): `verdict`
+- `comparability` ([lci-comparison-basis.md](lci-comparison-basis.md)): `verdict`
   (`baseline`, `like-for-like`, `proxy`, `not comparable`), `reasons` and `compared` (each
   replaced background pair with its differing or undeclared dimensions), and each linked
   exchange's `scope` (null: not declared). A scenario can be `comparable` (no gap) and still

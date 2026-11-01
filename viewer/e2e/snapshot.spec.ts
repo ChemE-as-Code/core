@@ -119,7 +119,7 @@ async function withEntries(page: import("@playwright/test").Page, extra: Record<
   });
 }
 
-test("a Markdown link to a heading scrolls there and stays on the page (pre-release viewer issue 42)", async ({ page }) => {
+test("a Markdown link to a heading scrolls there and stays on the page", async ({ page }) => {
   const filler = Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1} of the introduction.`).join("\n\n");
   await withEntries(page, {
     "file?path=README.md": { type: "text/plain", body: `# Plant\n\nSee [the design basis](#design-basis).\n\n${filler}\n\n## Design basis\n\nFeed 1000 kg/h.\n` },
@@ -143,7 +143,7 @@ test("a Markdown link to a heading scrolls there and stays on the page (pre-rele
   await expect(page.locator("main")).not.toContainText("Not found");
 });
 
-test("an MTO total card scrolls to its category without leaving /mto (pre-release viewer issue 42)", async ({ page }) => {
+test("an MTO total card scrolls to its category without leaving /mto", async ({ page }) => {
   await withEntries(page, { mto: { type: "application/json", body: readFileSync(join(SNAPSHOT, "../../tests/fixtures/api/mto-asu.json"), "utf-8") } });
   await page.goto("/?data=/e2e-snapshot/#/mto");
   const section = page.locator("section#mto-valve");

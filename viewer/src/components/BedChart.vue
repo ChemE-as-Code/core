@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * One quantity of a fixed bed along its catalyst mass (pre-release viewer issue 32): core's sampled profile, the
+ * One quantity of a fixed bed along its catalyst mass: core's sampled profile, the
  * inlet and outlet marked; for the temperature also core's peak (a marker where it is a sampled
  * point, else a dashed line at its value: core does not report where it is) and reference lines
  * (coolant, catalyst window), each with its own dash pattern and a legend entry. Hovering, or
