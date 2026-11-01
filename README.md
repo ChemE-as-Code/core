@@ -105,6 +105,9 @@ Process Atlas where you use its processes. See also [cheme-as-code.org/about/cit
 | | Name | Role |
 |---|---|---|
 | <img src=".github/readme/schweidtmann.jpg" alt="Artur M. Schweidtmann" width="50"> | [Artur M. Schweidtmann](https://www.pi-research.org/author/artur-schweidtmann/) ([LinkedIn](https://www.linkedin.com/in/schweidtmann/))<br>Process Intelligence Research, Department of Chemical Engineering, Delft University of Technology | ChemE-as-Code and Process Atlas (principal investigator) |
+| <img src=".github/readme/alimin.png" alt="Achmad A. Alimin" width="50"> | [Achmad A. Alimin (Angga)](https://www.pi-research.org/people/achmad-a-alimin/) | Safety and HAZOP; layout STL export |
+| <img src=".github/readme/rupprecht.jpg" alt="Sophia Rupprecht" width="50"> | [Sophia Rupprecht](https://www.pi-research.org/people/sophia-rupprecht/) | Inherited thermodynamic model selection, phase calculations, units and skills; design case study |
+| <img src=".github/readme/evanvoorbergen.png" alt="Elise" width="50"> | [Elise](https://github.com/evanvoorbergen) | Inherited reaction identification, kinetics retrieval, filtering and unit conversion |
 
 Everyone who contributes is credited in the git history: see the
 [contributors of this repository](https://github.com/ChemE-as-Code/core/graphs/contributors).
