@@ -117,6 +117,10 @@ is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-
 next to it ([details](REFERENCE.md#license)). Copyright (C) 2026 Artur Schweidtmann; TU Delft
 disclaims copyright interest.
 
+The skills and scripts `cheme init` copies into a plant repository stay AGPL-3.0-or-later. Your plant
+data and models (P&IDs, YAML, reports, generated drawings and results) are yours, under terms you
+choose: running the tools does not put AGPL on what they produce.
+
 ## Contact
 
 Artur Schweidtmann, [a.schweidtmann@tudelft.nl](mailto:a.schweidtmann@tudelft.nl). For working

@@ -1525,7 +1525,8 @@ with the bundled ones: each file is `current`, `outdated` (an earlier bundled ve
 the package's `templates/skills-manifest.json`), `modified` (changed in this repository) or
 `missing`. `cheme skills update [NAME...]` installs missing and outdated files and keeps a
 modified one, reporting `cheme.skill-modified` (exit 1); `--force` replaces it and still
-reports it. `cheme init` reports a modified skill it kept, or replaced under `--force`.
+reports it. `cheme init` reports a modified skill it kept, or replaced under `--force`. The licence
+notice `.claude/skills/NOTICE.md` is tracked the same way; an update naming skills leaves it alone.
 
 ### git diff
 
@@ -1746,8 +1747,11 @@ The same text is in `NOTICE`. Which licence applies where:
   `domains/assessment/lca/data/backgrounds/` each state theirs in `sources:` (Ember: CC BY 4.0;
   EEA: CC BY; DESNZ: Open Government Licence v3.0; UBA: UBA data terms; US EPA eGRID: public
   domain in the US). The ChemSep SRK data is not shipped (`data/chemsep/SOURCE.md`).
-- **Your plant repository is yours.** The template and skills `cheme init` writes into a plant
-  repository are yours to use under any terms; `cheme init` adds no license, and its README says
-  the content of the plant repository is the user's to license. The
-  ChemE-as-Code/project-template repository generated from it ships without a license too.
+- **The tools stay AGPL; your plant data is yours.** The skills `cheme init` writes into a plant
+  repository (`.claude/skills/`) and the scripts it writes there (`scripts/`) are
+  AGPL-3.0-or-later, like the rest of the tools. Plant data and models you create (P&IDs, YAML,
+  reports, generated drawings and results) are yours, under terms you choose; running the tools
+  does not put AGPL on what they produce. `.claude/skills/NOTICE.md` and the plant README say so
+  in the repository. `cheme init` adds no `LICENSE` file for the plant content, and neither does
+  the ChemE-as-Code/project-template repository generated from it.
 - pyDEXPI and the other dependencies keep their own licenses.

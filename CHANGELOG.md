@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Licence: one statement everywhere. The skills and scripts `cheme init` writes into a plant
+  repository are AGPL-3.0-or-later; plant data and models are the user's, and running the tools
+  does not put AGPL on what they produce. `REFERENCE.md` said otherwise before.
+
+### Added
+
+- `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
+  `cheme skills status` and `update` track it.
+
 ## 1.3.0 (2026-10-31)
 
 Minor release: the Viewer tells an embedding page how far it is and shows large 3D models in stages
