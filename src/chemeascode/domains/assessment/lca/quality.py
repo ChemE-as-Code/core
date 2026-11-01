@@ -1,4 +1,4 @@
-"""Data quality of an LCI dataset (pre-release issue 178): a pedigree per exchange, its gsd2, and
+"""Data quality of an LCI dataset: a pedigree per exchange, its gsd2, and
 the dataset's data quality rating.
 
 **Per exchange.** The ecoinvent pedigree matrix (Weidema, B.P., Bauer, C., Hischier, R., Mutel,
@@ -55,7 +55,7 @@ RELIABILITY = {
     "estimate": 4,
     "given": 3,
     "calculated": 3,
-    # an emission-factor estimate (emission_estimates:, pre-release issue 176): activity data of the
+    # an emission-factor estimate (emission_estimates:): activity data of the
     # design and average factors from a source, not measured at the plant (ASSUMED: cheme's choice)
     "estimated": 3,
     "assumed": 4,
@@ -73,7 +73,7 @@ TECHNOLOGICAL = {"literature": 3, "given": 1, "calculated": 1, "estimated": 3, "
 #: of the design itself score 1.
 TEMPORAL = {"literature": 3, "correlation": 3, "design-rule": 3}
 #: The same by provenance, where the origin gives none: an emission-factor estimate's factors
-#: are secondary data, not of the reference year (pre-release issue 176).
+#: are secondary data, not of the reference year.
 TEMPORAL_PROVENANCE = {"estimated": 3}
 #: The least technological score a design of each maturity (process.yaml) supports: a concept
 #: represents the technology only roughly.
@@ -90,7 +90,7 @@ REGIONS = frozenset(
 #: land occupation 1.5, transformation 2.0; emissions to air by substance (combustion and
 #: process values, not the agricultural ones).
 #:
-#: TODO(pre-release issue 313): UNVERIFIED. The values of BASIC, BASIC_AIR and BASIC_AIR_FLOW were
+#: TODO(#26): UNVERIFIED. The values of BASIC, BASIC_AIR and BASIC_AIR_FLOW were
 #: entered from memory, not read from the guideline. Check each against the table of default basic
 #: uncertainties in Weidema et al. (2013), Data quality guideline for the ecoinvent database
 #: version 3, Ecoinvent Report 1 (v3), section on basic uncertainty, and cite the table (with
@@ -200,7 +200,7 @@ def default_pedigree(
         basis += f", design maturity {maturity}"
     floor = dataset.generation.pedigree_floor if dataset.generation else None
     if floor:
-        # a generated dataset's tier caps its quality (pre-release issue 182): no score better than
+        # a generated dataset's tier caps its quality: no score better than
         # its floor
         scores = [max(s, f) for s, f in zip(scores, floor, strict=True)]
         basis += f", Tier {dataset.generation.tier} floor"

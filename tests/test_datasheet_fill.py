@@ -155,7 +155,7 @@ def test_fenske_underwood_gilliland_by_hand():
         ("CentrifugalPump", "pump"),
         ("PressureVessel", "vessel"),
         ("Furnace", "heater"),
-        # pre-release issue 249: a word inside the name, but no item of that row
+        # a word inside the name, but no item of that row
         ("CoolingTower", None),
         ("WetCoolingTower", None),
         ("CoolingTowerRotor", None),
@@ -523,7 +523,7 @@ def test_filled_values_carry_the_stream_fingerprint_and_go_stale(sized: Path):
     spec = _specific(sized, "K-1")
     fingerprint = spec["number_of_stages"]["fingerprint"]
     assert len(fingerprint) == 16
-    # pre-release issue 302: the stages read the maximum stage ratio; the outlet temperature the
+    # the stages read the maximum stage ratio; the outlet temperature the
     # efficiency too
     assert spec["number_of_stages"]["inputs"] == ["param:max_stage_pressure_ratio"]
     assert "param:isentropic_efficiency" in spec["discharge_temperature_k"]["inputs"]
@@ -584,7 +584,7 @@ def _stale_keys(plant: Path, tag: str) -> str:
 
 
 def test_rerouting_a_pumps_line_makes_its_head_and_npsh_stale(sized: Path):
-    # pre-release issue 204: the head and NPSH read the routed pipes and the nozzle elevations of
+    # the head and NPSH read the routed pipes and the nozzle elevations of
     # the layout model, not the streams alone
     _declare(
         sized,
@@ -656,7 +656,7 @@ PUMP_KEYS = ("flow_m3_h", "differential_head_m", "npsh_available_m", "shaft_powe
 
 
 def test_a_changed_parameter_makes_the_values_that_read_it_stale(sized: Path):
-    # pre-release issue 302: a filled value's fingerprint covers the declared parameters it read
+    # a filled value's fingerprint covers the declared parameters it read
     _fill_pump(sized)
     spec = _specific(sized, "P-1")
     head = spec["differential_head_m"]["inputs"]
@@ -706,7 +706,7 @@ def _patched_table(monkeypatch, module, loader: str, change) -> None:
 
 
 def test_a_changed_table_row_makes_the_values_that_used_it_stale(sized: Path, monkeypatch):
-    # pre-release issue 302: and the rows of the shipped tables it used (pipe sizes, roughness,
+    # and the rows of the shipped tables it used (pipe sizes, roughness,
     # fitting K)
     _fill_pump(sized)
     assert not _stale(sized)
@@ -752,7 +752,7 @@ def test_a_changed_table_row_makes_the_values_that_used_it_stale(sized: Path, mo
 
 
 def test_a_changed_typical_u_row_makes_the_exchanger_area_stale(sized: Path, monkeypatch):
-    # pre-release issue 302: the typical overall coefficient the area used (no adapter: the duty is
+    # the typical overall coefficient the area used (no adapter: the duty is
     # given)
     _declare(
         sized,
@@ -798,7 +798,7 @@ def test_a_changed_typical_u_row_makes_the_exchanger_area_stale(sized: Path, mon
 
 
 def test_values_filled_before_the_parameters_were_covered_stay_current(sized: Path):
-    # pre-release issue 302: a sheet filled before (its inputs name the routed lines only) is
+    # a sheet filled before (its inputs name the routed lines only) is
     # compared on what it names: no stale wave without a cause; a refill names the parameters and
     # tables
     from chemeascode.domains.process.model import load
@@ -812,7 +812,7 @@ def test_values_filled_before_the_parameters_were_covered_stay_current(sized: Pa
     for entry in data["type_specific"].values():
         if not (isinstance(entry, dict) and entry.get("fingerprint")):
             continue
-        # what the fill of pre-release issue 204 wrote
+        # what an earlier fill wrote
         old = [r for r in entry.get("inputs", []) if r.split(":")[0] in ("pipe", "nozzle")]
         if old:
             named = {r: input_data(r, data, process, model, {}) for r in old}
@@ -834,7 +834,7 @@ def test_values_filled_before_the_parameters_were_covered_stay_current(sized: Pa
 
 
 def test_a_volume_from_the_dimensions_follows_them_not_the_streams(sized: Path):
-    # pre-release issue 204: the vessel's volume comes from its dimensions alone: a stream change
+    # the vessel's volume comes from its dimensions alone: a stream change
     # does not make it stale (the residence time, from the outlet flow, is); a dimension change does
     _declare(sized, "V-2", density_kg_m3={"value": 1000, "source": "D-2"})
     fill_datasheets(sized, ["V-2"])
@@ -962,7 +962,7 @@ def test_a_sheet_that_names_a_case_is_filled_from_it(sized: Path):
     assert winter != stream_fingerprint(process, "K-1", "design")
     marked = [e for e in data["type_specific"].values() if isinstance(e, dict)]
     found = {e["fingerprint"] for e in marked if e.get("fingerprint")}
-    # each over the winter streams (and the parameters it read: pre-release issue 302)
+    # each over the winter streams (and the parameters it read)
     expected = {
         inputs_fingerprint(winter, {r: input_data(r, data, process, None, {}) for r in e["inputs"]})
         if e.get("inputs")
@@ -1108,7 +1108,7 @@ def _edit(plant: Path, tag: str, change) -> None:
 
 
 def test_a_filled_volume_follows_changed_dimensions(sized: Path):
-    # pre-release issue 205: the draft's volume (from the list's D 2 m x H 3 m) and a fill's own
+    # the draft's volume (from the list's D 2 m x H 3 m) and a fill's own
     # follow the sheet's typed dimensions; a volume written by hand is kept
     _declare(sized, "V-2", density_kg_m3={"value": 1000, "source": "D-2"})
     assert DRAFT_VOLUME in _specific(sized, "V-2")["volume_m3"]["source"]
@@ -1286,7 +1286,7 @@ def test_column_shortcut_through_the_adapter(sized: Path):
 
 
 def test_column_trays_leave_out_the_reboiler(sized: Path):
-    # pre-release issue 247: the Gilliland count includes the partial reboiler, an equilibrium stage
+    # the Gilliland count includes the partial reboiler, an equilibrium stage
     # that is no tray: trays = ceil((N - 1) / E)
     pytest.importorskip("thermo")
     params = {"reflux_ratio_factor": "1.3", "tray_efficiency": "0.6"}
@@ -1298,9 +1298,9 @@ def test_column_trays_leave_out_the_reboiler(sized: Path):
     assert trays["value"] == math.ceil((n - 1) / 0.6 - 1e-9)
     assert "- 1 for the reboiler" in trays["source"]
     assert trays["assumed"] is True
-    # pre-release issue 301: no condenser type declared, so a total condenser is assumed and said so
+    # no condenser type declared, so a total condenser is assumed and said so
     assert "total condenser (not a stage) ASSUMED" in trays["source"]
-    # no condenser declaration named (pre-release issue 301); pre-release issue 302: the parameters
+    # no condenser declaration named; the parameters
     # it read, the condenser type among them (declaring it later makes the value stale)
     assert all(r.startswith("param:") for r in trays["inputs"])
     assert {"param:tray_efficiency", "param:condenser_type"} <= set(trays["inputs"])
@@ -1323,7 +1323,7 @@ def _column_trays(plant: Path, **params: str) -> tuple[float, dict]:
 
 
 def test_column_trays_with_a_declared_total_condenser(sized: Path):
-    # pre-release issue 301: a total condenser is no stage: trays = ceil((N - 1) / E), its basis
+    # a total condenser is no stage: trays = ceil((N - 1) / E), its basis
     # named
     pytest.importorskip("thermo")
     _declare(sized, "C-1", condenser_type={"value": "total", "source": "D-5"})
@@ -1331,11 +1331,11 @@ def test_column_trays_with_a_declared_total_condenser(sized: Path):
     assert trays["value"] == math.ceil((n - 1) / 0.6 - 1e-9)
     assert trays["source"].endswith("; a total condenser (D-5)")
     assert trays["inputs"][0] == "datasheet:type_specific.condenser_type"
-    assert "param:tray_efficiency" in trays["inputs"]  # pre-release issue 302
+    assert "param:tray_efficiency" in trays["inputs"]
 
 
 def test_column_trays_leave_out_a_partial_condenser(sized: Path):
-    # pre-release issue 301: a partial condenser is an equilibrium stage too: trays = ceil((N - 2) /
+    # a partial condenser is an equilibrium stage too: trays = ceil((N - 2) /
     # E)
     pytest.importorskip("thermo")
     _declare(sized, "C-1", condenser_type={"value": "partial", "source": "D-5"})
@@ -1350,7 +1350,7 @@ def test_column_trays_leave_out_a_partial_condenser(sized: Path):
 
 
 def test_column_condenser_from_the_simulation_spec(sized: Path):
-    # pre-release issue 301: the flowsheet's declaration (the step's condenser in
+    # the flowsheet's declaration (the step's condenser in
     # process/simulation.yaml)
     pytest.importorskip("thermo")
     _simulation(sized, {"CL": {"condenser": "partial"}})
@@ -1358,7 +1358,7 @@ def test_column_condenser_from_the_simulation_spec(sized: Path):
     assert trays["value"] == math.ceil((n - 2) / 0.6 - 1e-9)
     assert "a partial condenser (process/simulation.yaml specs.CL.condenser)" in trays["source"]
     assert trays["inputs"][0] == "condenser:CL"
-    assert "param:tray_efficiency" in trays["inputs"]  # pre-release issue 302
+    assert "param:tray_efficiency" in trays["inputs"]
     assert not _stale(sized)
     _simulation(sized, {"CL": {"condenser": "total"}})
     assert [f.ids for f in _stale(sized)] == [["C-1"]]
@@ -1392,7 +1392,7 @@ def test_column_condenser_type_refusals(sized: Path):
     assert trays["value"] == "TBD"
     assert "not one of total, partial, none" in trays["source"]
     # --param: an assumption, recorded in the sizing basis, where the stale check reads it
-    # (pre-release issue 302: param:condenser_type)
+    # (param:condenser_type)
     _declare(sized, "C-1", condenser_type="TBD")
     n, trays = _column_trays(sized, condenser_type="partial")
     assert trays["value"] == math.ceil((n - 2) / 0.6 - 1e-9)

@@ -82,6 +82,9 @@ cheme process streams           # stream table with provenance, block balances
 
 ## Licence
 
-The ChemE-as-Code tools, including the skill copies in `.claude/skills/`, are licensed under
-AGPL-3.0-or-later (see [cheme-as-code.org/licence](https://cheme-as-code.org/licence/)). Your plant
-data and models are yours, and you can license them however you choose.
+The ChemE-as-Code tools, including the skill copies in `.claude/skills/` and the scripts in
+`scripts/` that `cheme init` wrote, are licensed under AGPL-3.0-or-later (see
+[`.claude/skills/NOTICE.md`](.claude/skills/NOTICE.md) and
+[cheme-as-code.org/licence](https://cheme-as-code.org/licence/)). Your plant data and models (P&IDs,
+YAML, reports, generated drawings and results) are yours, and you can license them however you
+choose. Running the tools does not put AGPL on what they produce.

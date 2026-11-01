@@ -105,7 +105,7 @@ MANIFEST_SCHEMA = "cheme/lca-manifest/v1"
 CLASSIFICATIONS = ("complete", "screening", "partial", "unavailable")
 #: Factor statuses that make a result screening.
 SCREENING_STATUSES = ("ASSUMED", "PROXY", "ESTIMATE")
-#: The factor status of an exchange (:func:`factor_status`, pre-release issue 322), weakest first: a
+#: The factor status of an exchange (:func:`factor_status`), weakest first: a
 #: gap, an example factor, a factor ``ASSUMED``, ``PROXY``, ``ESTIMATE``, ``EPD`` or ``PUBLISHED``,
 #: a background database's activity or biosphere flow (``database``), or no burden by declaration
 #: (``none``: free, a co-product, or an elementary flow outside every method).
@@ -246,7 +246,7 @@ class LcaReport:
     #: study declares carbon_accounting.
     pcf: Any = None
     #: The mass, element, carbon-origin and energy balance of the plant's dataset
-    #: (:class:`.balance.DatasetBalance`, pre-release issue 174).
+    #: (:class:`.balance.DatasetBalance`).
     balance: Any = None
     #: The git commit and the fingerprints of :data:`REPORT_INPUTS` when this was computed.
     source: SourceRevision = field(default_factory=lambda: SourceRevision(None))
@@ -300,7 +300,7 @@ class LcaReport:
 
     @property
     def carbon(self) -> dict[str, Any] | None:
-        """The carbon accounting (pre-release issue 181): the study's choices, the carbon traced
+        """The carbon accounting: the study's choices, the carbon traced
         through the plant's dataset and the PCF breakdown; None when the study declares none."""
         inv = self.inventory
         if inv is None or inv.carbon is None or self.scope is None:
@@ -343,7 +343,7 @@ class LcaReport:
             "reasons": list(self.reasons),
             "climate_only": self.climate_only,
             "limitations": list(self.limitations),
-            # the boundary check (pre-release issue 315), as the TEA's "boundary": additive
+            # the boundary check, as the TEA's "boundary": additive
             "boundary_check": self.boundary_check.payload() if self.boundary_check else None,
             "sources": [
                 s.model_dump(mode="json", exclude=None if s.scope else {"scope"})
@@ -361,7 +361,7 @@ class LcaReport:
             # JSON objects lose their order in JavaScript for ids like 2030: the order as a list
             "scenario_ids": list(self.scenarios),
             "scenarios": {s: self.totals(s) for s in self.scenarios},
-            # totals that do not stand (pre-release issue 172): per scenario and category, the
+            # totals that do not stand: per scenario and category, the
             # exchanges the baseline has that are gaps there, or null when every contribution is a
             # gap
             "not_comparable": {
@@ -369,7 +369,7 @@ class LcaReport:
             },
             # per scenario: like-for-like, proxy or not comparable with the baseline, why, and
             # the compared factors' differing dimensions
-            # (pre-release issue 306, lci-comparison-basis.md)
+            # (lci-comparison-basis.md)
             "comparability": {s: scenario_verdict(self, s) for s in self.scenarios},
             # what each scenario is (geography, year, electricity, case): additive metadata
             "scenario_details": [
@@ -384,7 +384,7 @@ class LcaReport:
             "data_quality": self.data_quality.as_dict() if self.data_quality else None,
             "carbon": self.carbon,
             "balance": self.balance.as_dict() if self.balance is not None else None,
-            # per scenario and exchange: the weakest status of its factors (pre-release issue 322)
+            # per scenario and exchange: the weakest status of its factors
             "factor_status": {s: factor_status(self, s) for s in self.scenarios or [BASELINE]},
             "factors_published": not unpublished(self),
             "impacts": [asdict(i) for i in self.impacts],
@@ -537,7 +537,7 @@ def _lca_report(root: Path, inventory_only: bool) -> LcaReport:
         return report
     if any(f.level == "error" for f in report.findings):
         return report
-    # provider profiles map what flows: leaves unmapped (pre-release issue 168)
+    # provider profiles map what flows: leaves unmapped
     added, report.mapping_files, found = profile_flows(root, scope, process, LCA_FILE, lca_text)
     report.findings += found
     if any(f.level == "error" for f in found):
@@ -564,7 +564,7 @@ def _lca_report(root: Path, inventory_only: bool) -> LcaReport:
         load=lambda path: load_dataset(root, path),
     )
     if report.inventory.dataset is not None:
-        # the balance gates of pre-release issue 174: mass, elements, carbon by origin, energy
+        # the balance gates: mass, elements, carbon by origin, energy
         report.balance = dataset_balance(
             report.inventory.dataset,
             report.maturity,
@@ -945,7 +945,7 @@ def _publication(report: LcaReport, scope: LcaFile, factors: FactorFile | None) 
 
 
 def _system_models(report: LcaReport, scope: LcaFile, loaded: dict) -> list[Finding]:
-    """What mixes system models (pre-release issue 180): a credit (a negative contribution of an
+    """What mixes system models: a credit (a negative contribution of an
     end-of-life or recyclable output) in a study that does not credit, and background datasets of a
     crediting system model in one that does not, or the reverse."""
     model = scope.model
@@ -1370,9 +1370,8 @@ class _Datasets:
                 self.findings += dataset_findings(self.loaded[path], path)
                 self.findings += cutoff_findings(self.loaded[path], path, background=True)
                 # a generated estimate (Tier 0 or 1): its tier, balance and caps
-                # (pre-release issue 182)
                 self.findings += tier_findings(self.loaded[path], path, owner_maturity(self.root))
-                # an open balance of a referenced dataset (pre-release issue 174), at its own
+                # an open balance of a referenced dataset, at its own
                 # tolerance
                 self.findings += [
                     f
@@ -1540,7 +1539,7 @@ def dataset_paths(lca_text: str | None, read: Any) -> list[str]:
     except yaml.YAMLError:
         return found
     todo = refs(data)
-    # the provider profiles it selects (pre-release issue 168), read so a copy holds them too
+    # the provider profiles it selects, read so a copy holds them too
     brightway = data.get("brightway") if isinstance(data, dict) else None
     profiles = brightway.get("mapping_profiles") if isinstance(brightway, dict) else None
     for path in profiles if isinstance(profiles, list) else []:
@@ -1915,7 +1914,7 @@ def _construction_inputs(
     """The take-off rows and equipment items the construction entries and the equipment-leak
     estimates count (None: absent), and the problems reading them. The equipment list is read
     whenever it is valid: the completeness of the emission estimates looks for combustion units
-    and tanks in it (pre-release issue 176)."""
+    and tanks in it."""
     kinds = {entry.takeoff for entry in scope.construction}
     if any(
         e.method == "equipment-leaks" and "mto" in e.count_from for e in scope.emission_estimates
@@ -2008,7 +2007,7 @@ def results_csv(report: LcaReport) -> str:
                 }
             )
     if report.pcf is not None:
-        # the PCF breakdown (pre-release issue 181): one row per line, category pcf, basis its
+        # the PCF breakdown: one row per line, category pcf, basis its
         # climate one
         for key, _, value, unit in report.pcf.lines():
             writer.writerow(

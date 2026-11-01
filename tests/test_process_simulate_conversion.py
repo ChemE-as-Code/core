@@ -1,5 +1,4 @@
-"""Conversion reactors: the conversion DWSIM reached against the declared one
-(pre-release issue 371).
+"""Conversion reactors: the conversion DWSIM reached against the declared one.
 
 DWSIM converts a reaction's key component in the inlet's reaction phase only; a liquid-phase
 reactor whose inlet the package splits falls short of the declared conversion without a message

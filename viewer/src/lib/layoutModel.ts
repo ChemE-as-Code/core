@@ -653,7 +653,7 @@ export interface Floor {
 const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
 const fmtVec = (v: readonly number[]) => `[${v.map(fmt).join(", ")}]`;
 
-/** A roof opening, in the owner's plan frame (pre-release PR 270): `offset` and `width` along its own x
+/** A roof opening, in the owner's plan frame: `offset` and `width` along its own x
  * from its origin corner, `sill` and `height` along its own y. */
 const roofOpening = (o: BuildingOpening, owner: string): string => {
   const y0 = o.sill ?? 0;
@@ -1307,7 +1307,7 @@ export function buildModelScene(model: LayoutModel, options: ModelOptions = {}):
   }
 
   /**
-   * A valve's declared operator (pre-release issue 61): a chain wheel on its handwheel with the chain hanging
+   * A valve's declared operator: a chain wheel on its handwheel with the chain hanging
    * to {@link CHAIN_LOOP_M} above the floor under it, or an extension spindle or remote operator
    * as a rod from the handwheel to a pedestal {@link PEDESTAL_M} above the nearest floor (core's
    * measure). Schematic: core checks the operator but draws no chain, spindle or pedestal.
@@ -1513,7 +1513,7 @@ export function buildModelScene(model: LayoutModel, options: ModelOptions = {}):
         ...(pen.length > 0.05 ? [[roof ? "in the roof slab" : "in the wall's plane", `${fmt(pen.length)} m`] as [string, string]] : []),
         ...(o ? [["opening needed", roof ? roofOpening(o, pen.owner) : `${fmt(o.width)} x ${fmt(o.height)} m, ${o.side} side, ${fmt(o.offset)} m along, sill ${fmt(o.sill ?? 0)} m`] as [string, string]] : []),
         ["why", pen.reason],
-        // core's `cheme layout pin` refuses a roof penetration (pre-release PR 270): its message, not the command.
+        // core's `cheme layout pin` refuses a roof penetration: its message, not the command.
         roof
           ? ["cannot be pinned", `${pen.id} is a roof penetration: a roof opening cannot be declared; route the line into ${pen.owner} through a wall (via points) and pin that opening`]
           : ["to keep it", `cheme layout pin ${pen.id}`],
@@ -2104,7 +2104,7 @@ export function measure(a: Vec3, b: Vec3): { distance: number; dx: number; dy: n
 }
 
 // ---------------------------------------------------------------------------------------------
-// Declared operators, remote transmitters and hatches (pre-release issue 61): the model declares them, the
+// Declared operators, remote transmitters and hatches: the model declares them, the
 // viewer draws them. Heights follow core's rules (`domains/spatial/access_rules.py`).
 
 /** Height of a remote operator's or spindle's pedestal handwheel above its floor, m (core's PEDESTAL_M, ASSUMED there). */

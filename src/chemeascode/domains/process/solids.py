@@ -1,4 +1,4 @@
-"""The solid/slurry material contract of the process model (pre-release issue 365).
+"""The solid/slurry material contract of the process model.
 
 A solid is a component of ``process/materials.yaml`` with ``phase: solid``: a crystal, or a
 hydrate whose formula includes its water of crystallization (``MgSO4(H2O)7``). It is a separate

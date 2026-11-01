@@ -327,7 +327,7 @@ def test_inert_species_take_part_in_no_independent_reaction():
 
 
 def test_gibbs_reactor_with_an_inert_without_formation_data_solves_and_is_sourced(tmp_path):
-    # pre-release issue 299: argon has no ideal_gas data, the reacting species have sourced data
+    # argon has no ideal_gas data, the reacting species have sourced data
     ws = _plant(tmp_path, GIBBS)
     before = _basis(ws)  # the outlet is not calculated yet: the templates name the components
     assert (before.basis, before.sourced) == ("equilibrium", True), before.detail

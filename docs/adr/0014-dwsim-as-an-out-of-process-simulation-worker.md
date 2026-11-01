@@ -39,10 +39,8 @@ selection tree can recommend a method that no route can run.
 
 ## Evidence
 
-- pre-release PR 68 (pre-release commit 58ca01e), CI workflow pre-release PR 71
-  (pre-release commit dc779b0), reactors and columns in later PRs (pre-release PRs 78, 87).
-- Supported-method contract pre-release PR 149 (pre-release commit c180ce5); benchmark
-  pre-release PR 298 (pre-release commit be1d7f4); pre-release issue 137.
+- The worker, then its CI workflow, then reactors and columns.
+- Supported-method contract; benchmark.
 - `src/chemeascode/integrations/dwsim.py`, `dwsim_worker.py`, `docker/dwsim/Dockerfile`,
   `.github/workflows/dwsim.yml`, `src/chemeascode/domains/process/thermodynamics/methods.yml`,
   [architecture.md](../framework/architecture.md) ("Optional dependencies"),

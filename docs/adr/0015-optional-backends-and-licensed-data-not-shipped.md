@@ -29,12 +29,11 @@ public; a plant study must be usable and publishable without a licensed database
   cannot be reproduced by someone without the licence.
 - Negative: features relying on fetched data need an explicit setup step; the code names the
   fetch command (`FETCH_COMMAND` in `thermodynamics/chemsep_srk.py`) when the data is absent.
-- Open: the ChemSep IPD licence is still unconfirmed (pre-release issue 55).
+- Open: the ChemSep IPD licence is still unconfirmed.
 
 ## Evidence
 
-- Brightway backend pre-release PR 64 (pre-release commit 4417451), review fixes
-  pre-release commit 07ac576; `pyproject.toml` extra `lca`.
-- ChemSep: pre-release PR 120 (pre-release commit 17b154c), CHANGELOG "ChemSep SRK data no
+- Brightway backend: `pyproject.toml` extra `lca`.
+- ChemSep: CHANGELOG "ChemSep SRK data no
   longer shipped", `src/chemeascode/domains/process/thermodynamics/data/chemsep/SOURCE.md`.
 - [lca.md](../framework/lca.md) ("Open data, sources and coverage").

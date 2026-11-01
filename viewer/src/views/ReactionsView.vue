@@ -3,10 +3,10 @@
  * The reactions of the plant (`GET /api/reactions`): each reaction of `process/reactions.yaml`
  * with what the flowsheet says about it, the rows of `cheme process reactors` and the reactive
  * balances with their findings; the kinetics: each rate law with its parameters, provenance and
- * k(T), the fixed beds along their catalyst mass (pre-release viewer issue 32: peak, reference temperatures, the
+ * k(T), the fixed beds along their catalyst mass (peak, reference temperatures, the
  * profile as a table, the bed's row of a recorded simulation run, or why core could not solve
  * it), and the catalysts of
- * `process/catalysts.yaml` linked to the reactions they catalyse (pre-release viewer issue 23); each mechanism
+ * `process/catalysts.yaml` linked to the reactions they catalyse; each mechanism
  * analysed at its reactor's outlet (coverages, TOF, degree of rate control) and the kinetic data
  * of `experiments/kinetics/` with their default fits (`GET /api/kinetics`).
  */

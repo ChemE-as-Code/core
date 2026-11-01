@@ -1,4 +1,4 @@
-"""Open grid electricity profiles (pre-release issue 268): every value sourced, the terms recorded.
+"""Open grid electricity profiles: every value sourced, the terms recorded.
 
 The expected values are read from the publishers' files independently of the generator:
 eGRID2023 rev2 US23!X3 (770.884), SRL23 Z6 CAMX (429.983) and Z7 ERCT (736.629), in lb CO2e/MWh

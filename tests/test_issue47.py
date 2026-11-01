@@ -1,4 +1,4 @@
-"""#47: calculated stream values and the phase exported into the generated DEXPI sheets."""
+"""Calculated stream values and the phase exported into the generated DEXPI sheets."""
 
 import shutil
 from pathlib import Path

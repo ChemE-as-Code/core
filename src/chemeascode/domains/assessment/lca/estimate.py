@@ -1,4 +1,4 @@
-"""Tiered LCI generation (pre-release issue 182): a screening dataset for a process without a
+"""Tiered LCI generation: a screening dataset for a process without a
 flowsheet.
 
 :func:`lci_estimate` builds a ``kind: lci_dataset`` per kg of the reference product from an

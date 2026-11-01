@@ -295,7 +295,7 @@ def test_fill_writes_what_streams_lack_and_check_is_then_clean(plant):
 @pytest.mark.parametrize("entering", [True, False])
 def test_duty_is_written_only_in_its_streams_direction(plant, entering):
     """E1 as a heater (either direction) with an energy stream W2: the stand-in solver gives it
-    -81 kW, heat removed (pre-release issue 186). Out of E1 to a cooling water return W2 carries 81
+    -81 kW, heat removed. Out of E1 to a cooling water return W2 carries 81
     kW; into E1 from a steam supply it would say 81 kW added, so nothing is written and a warning
     says so."""
 
@@ -325,7 +325,7 @@ def test_duty_is_written_only_in_its_streams_direction(plant, entering):
 
 def test_wrong_sign_duty_of_an_earlier_simulate_is_reported(plant):
     """A flowsheet filled before the direction was checked holds W2 81 kW into E1, written by
-    simulate and current by its fingerprint (pre-release issue 186): simulate no longer rewrites it,
+    simulate and current by its fingerprint: simulate no longer rewrites it,
     so the warning says it is wrong, with --fill and --check; a given duty is left to its owner."""
 
     def heater_with_w2(d, duty):
@@ -427,7 +427,7 @@ def _duty_of(kind: str, key: str, duty: float, entering: bool):
     ],
 )
 def test_duty_sign_against_the_stream_direction(kind, key, duty, entering, written):
-    """Every result key's sign as energy into the unit (pre-release issue 186): written as a
+    """Every result key's sign as energy into the unit: written as a
     magnitude where it agrees with the stream's direction, refused with sim-energy-direction where
     not."""
     value, added = _duty_of(kind, key, duty, entering)

@@ -18,6 +18,12 @@
 
 ## Overview
 
+<p align="center">
+  <img src=".github/readme/demo.gif" alt="Animation: the brief an AI agent got for an ammonia case study is typed out, then the resulting design appears in the Viewer, including a 3D plant layout built from the same files." width="80%">
+  <br>
+  <em>Ammonia design from the process library, footprint from ASU-1. AI-generated research output, concept stage.</em>
+</p>
+
 ChemE-as-Code (chemical engineering as code) keeps a chemical plant design as plain files in a git
 repository: P&IDs (piping and instrumentation diagrams) in the open DEXPI 2.0.1 format, engineering lists in YAML and design decisions in Markdown. Engineers
 and AI coding agents edit the same files, and every change has a history, a review and a diff, as
@@ -29,6 +35,9 @@ those files; the **Viewer** ([`viewer/`](viewer/README.md)), a web app for brows
 repository; and an **agent runner** ([`agent-cli/`](agent-cli/README.md)) that runs Claude agents
 with a spending cap. The `cheme` package needs neither the Viewer nor an AI provider. This is
 research software in active development: research output, not engineering advice.
+The example designs in the [Process Atlas](https://atlas.cheme-as-code.org) were produced by AI
+agents under human direction and are not approved for construction, operation or safety
+decisions.
 
 <p align="center">
   <img src=".github/readme/pid.png" alt="A DEXPI P&amp;ID rendered in the Viewer" width="80%">
@@ -54,9 +63,7 @@ research software in active development: research output, not engineering advice
 
 ## Quick start
 
-Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/). While the repositories are private, you
-need read access to this repository and to
-[pyDEXPI-dev](https://github.com/process-intelligence-research/pyDEXPI-dev) (pyDEXPI 2.x, not yet on PyPI).
+Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv tool install 'cheme-as-code[serve] @ git+https://github.com/ChemE-as-Code/core.git'
@@ -67,6 +74,12 @@ cheme serve                             # the read-only API the Viewer reads
 
 To open the Viewer on it, see [viewer/README.md](viewer/README.md). Other extras (PNG drawings,
 stream properties and more): see the [install section](REFERENCE.md#install).
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ChemE-as-Code/core)
+
+The button opens this repository in a cloud container that installs the toolkit and creates a
+`demo-plant/`; run `bash .devcontainer/serve.sh` there to build the Viewer and open the plant on
+the forwarded port 8765.
 
 ## Documentation
 
@@ -105,6 +118,9 @@ Process Atlas where you use its processes. See also [cheme-as-code.org/about/cit
 | | Name | Role |
 |---|---|---|
 | <img src=".github/readme/schweidtmann.jpg" alt="Artur M. Schweidtmann" width="50"> | [Artur M. Schweidtmann](https://www.pi-research.org/author/artur-schweidtmann/) ([LinkedIn](https://www.linkedin.com/in/schweidtmann/))<br>Process Intelligence Research, Department of Chemical Engineering, Delft University of Technology | ChemE-as-Code and Process Atlas (principal investigator) |
+| <img src=".github/readme/alimin.png" alt="Achmad A. Alimin" width="50"> | [Achmad A. Alimin (Angga)](https://www.pi-research.org/people/achmad-a-alimin/) | Safety and HAZOP; layout STL export |
+| <img src=".github/readme/rupprecht.jpg" alt="Sophia Rupprecht" width="50"> | [Sophia Rupprecht](https://www.pi-research.org/people/sophia-rupprecht/) | Inherited thermodynamic model selection, phase calculations, units and skills; design case study |
+| <img src=".github/readme/evanvoorbergen.png" alt="Placeholder image for Elise" width="50"> | [Elise](https://github.com/evanvoorbergen) | Inherited reaction identification, kinetics retrieval, filtering and unit conversion |
 
 Everyone who contributes is credited in the git history: see the
 [contributors of this repository](https://github.com/ChemE-as-Code/core/graphs/contributors).
@@ -116,6 +132,10 @@ is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-
 [LICENSE](LICENSE) and [NOTICE](NOTICE). Bundled third-party data keeps its own terms, recorded
 next to it ([details](REFERENCE.md#license)). Copyright (C) 2026 Artur Schweidtmann; TU Delft
 disclaims copyright interest.
+
+The skills and scripts `cheme init` copies into a plant repository stay AGPL-3.0-or-later. Your plant
+data and models (P&IDs, YAML, reports, generated drawings and results) are yours, under terms you
+choose: running the tools does not put AGPL on what they produce.
 
 ## Contact
 

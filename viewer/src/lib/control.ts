@@ -1,5 +1,5 @@
 /**
- * The control records of `GET /api/control` (core: `domains/control/report.py`, pre-release issue 140): how a
+ * The control records of `GET /api/control` (core: `domains/control/report.py`): how a
  * review status and a finding count read, and which findings belong to which file.
  */
 import type { ControlCounts, ControlFile, ControlStatus, Finding } from "@/api";

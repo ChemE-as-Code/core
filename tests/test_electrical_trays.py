@@ -575,7 +575,7 @@ def test_the_point_along_a_rack_skips_repeated_points_and_needs_a_length():
 
     assert _along([(0, 0), (0, 0), (10, 0), (10, 10)], 15.0) == (10.0, 5.0, 0.0, 1.0)
     assert _along([(0, 0), (10, 0)], 10.000001) == (10.0, 0.0, 1.0, 0.0)  # its end
-    assert _along([(5, 5), (5, 5)], 0.0) is None  # no length: no direction (pre-release issue 236)
+    assert _along([(5, 5), (5, 5)], 0.0) is None  # no length: no direction
 
 
 # -- several power trays per rack (power_trays) ---------------------------------------------

@@ -56,7 +56,7 @@ Coverage alone in Python: `thermodynamics.coverage.interaction_parameter_coverag
 model, accepted_zeros)`.
 
 Redlich-Kwong-Soave takes its `kij` from the ChemSep SRK file, which is not shipped (licence
-unconfirmed, pre-release issue 55). `cheme data status` shows whether it is installed; the user installs it
+unconfirmed). `cheme data status` shows whether it is installed; the user installs it
 with `cheme data fetch chemsep-srk` (downloads ChemSep-LITE; `--zip lite.zip` for a copy
 already downloaded). Ask before running the fetch: it downloads third-party data.
 

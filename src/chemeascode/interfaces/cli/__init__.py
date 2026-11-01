@@ -602,7 +602,7 @@ def show(
     """Where an object is: its block, owner, drawing, references and what references it."""
     from chemeascode.domains.piping.show import show as do_show
 
-    if layout:  # plot-plan distances (pre-release issue 22)
+    if layout:  # plot-plan distances
         from chemeascode.domains.spatial.layout_distances import show_layout
 
         lines, found = show_layout(_workspace(), key)
@@ -1582,7 +1582,7 @@ def fragment(
 from chemeascode.interfaces.cli.scripts import register as _register_scripts  # noqa: E402
 
 _register_scripts(app)
-# cheme move / rename / set (pre-release issue 14): their own module, registered here.
+# cheme move / rename / set: their own module, registered here.
 from chemeascode.interfaces.cli.edit import register as _register_edit_commands  # noqa: E402
 
 _register_edit_commands(app)

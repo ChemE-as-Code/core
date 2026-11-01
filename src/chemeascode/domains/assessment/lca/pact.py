@@ -1,4 +1,4 @@
-"""WBCSD PACT (Pathfinder) export of a product carbon footprint (pre-release issue 181).
+"""WBCSD PACT (Pathfinder) export of a product carbon footprint.
 
 :func:`footprint` gives the ``ProductFootprint`` of the study's functional unit product,
 cradle-to-gate, in the PACT data model v2 (Technical Specifications for PCF Data Exchange,

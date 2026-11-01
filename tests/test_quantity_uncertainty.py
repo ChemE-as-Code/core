@@ -1,4 +1,4 @@
-"""Optional ``uncertainty`` on process quantities (pre-release issue 112): the LCA's model, shared.
+"""Optional ``uncertainty`` on process quantities: the LCA's model, shared.
 
 A quantity or composition of ``process/flowsheet.yaml`` (and a spec of
 ``process/simulation.yaml``) may give an ``uncertainty`` of the shape ``lca.yaml`` uses. It

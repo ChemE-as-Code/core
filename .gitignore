@@ -6,3 +6,6 @@ dist/
 .pytest_cache/
 .ruff_cache/
 site/
+
+# The Codespaces demo plant (.devcontainer/post-create.sh).
+/demo-plant/

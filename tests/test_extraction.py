@@ -1,4 +1,4 @@
-"""``cheme process extract``: liquid-liquid extraction stages on NRTL (pre-release issue 369).
+"""``cheme process extract``: liquid-liquid extraction stages on NRTL.
 
 The benchmark compares the bundled system water + 1-propanol + n-butyl acetate (NRTL parameters
 of Hajjar and Enders, Fluid Phase Equilib. 582 (2024) 114104) with the tie lines Costa et al.

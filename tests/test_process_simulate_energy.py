@@ -290,7 +290,7 @@ def test_dwsim_declared_formation_data_that_differ_fail_in_any_mode(tmp_path, mo
 
 @dwsim_tests
 def test_dwsim_ammonia_loop_closes_with_a_coupled_bed(tmp_path):
-    """The kinetic_pfr: its duty is DWSIM's conversion reactor's (pre-release PR 151's coupling),
+    """The kinetic_pfr: its duty is DWSIM's conversion reactor's (the external-unit coupling),
     which closes on the streams DWSIM solved; the bed's own ideal-gas balance is the coupling's."""
     ws = kinetic._plant(tmp_path, kinetic.LOOP, kinetic.LOOP_SIMULATION)
     audit, _ = _run(ws)

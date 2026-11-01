@@ -263,7 +263,7 @@ buildings:
 
 def test_a_rack_line_dropped_into_a_low_building_is_found(vented: Path):
     """A pump in a building lower than the rack: its line drops from the rack through the
-    roof, which the build reports as a penetration (pre-release issue 235)."""
+    roof, which the build reports as a penetration."""
     from chemeascode.domains.spatial.model import build_model
     from chemeascode.foundation.workspace import Workspace
 

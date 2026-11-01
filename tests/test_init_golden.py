@@ -45,6 +45,7 @@ def test_init_writes_the_golden_tree(tmp_path):
 def test_init_installs_skills_under_dot_claude(tmp_path):
     names = {line.split("  ", 1)[1] for line in MANIFEST.read_text(encoding="utf-8").splitlines()}
     skills = {n.split("/")[2] for n in names if n.startswith(".claude/skills/")}
+    skills.remove("NOTICE.md")
     assert skills == {
         "dexpi-xml",
         "layout-yaml",

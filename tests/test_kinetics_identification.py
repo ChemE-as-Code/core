@@ -251,7 +251,7 @@ class TestSmilesChecker:
 
 
 class TestFormulasThatAreAlsoSmiles:
-    """pre-release issue 198: "CO" parses as the SMILES of methanol, "NO" of hydroxylamine, "O" of
+    """The name "CO" parses as the SMILES of methanol, "NO" of hydroxylamine, "O" of
     water, "C" of methane; as entries they may be formulas (carbon monoxide, nitric oxide, atomic
     oxygen and carbon). They are refused without a lookup: PubChem's name search ignores case
     and answers cobalt for "CO"."""

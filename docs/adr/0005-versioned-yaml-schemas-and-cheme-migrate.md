@@ -28,15 +28,12 @@ format change must not silently break them.
 - Positive: old repositories keep working, and the one-time upgrade is a reviewable diff.
 - Negative: optional-only growth accumulates fields; every breaking change costs a transform and
   a test.
-- Example of the mechanism in use: `cheme/lci_dataset/v2` with the v1 transform
-  (pre-release commit 647d655, pre-release issue 179).
+- Example of the mechanism in use: `cheme/lci_dataset/v2` with the v1 transform.
 
 ## Evidence
 
-- Process schema v1: pre-release commit 17ab51f in pre-release PR 45 (0.5.0).
-- Schemas moved to their owners: pre-release commit b4d191e in pre-release PR 58.
-- `schema:` everywhere and `cheme migrate`: pre-release PR 125 (pre-release commit f790f2c,
-  pre-release issue 113).
+- Process schema v1 in 0.5.0; later, schemas moved to their owners, then `schema:` everywhere
+  and `cheme migrate`.
 - `src/chemeascode/foundation/schema_base.py`, `foundation/migrate.py`,
   [contributing.md](../framework/contributing.md) ("Where things go", item 2),
   [contract.md](../framework/contract.md).

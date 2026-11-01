@@ -90,7 +90,7 @@ def test_piping_items_can_be_placed(plant: Path, monkeypatch):
     assert runner.invoke(app, ["schema", "piping_items"]).exit_code == 0
 
 
-# -- the printed tag of a piping component (pre-release issue 210) ---------------------------------
+# -- the printed tag of a piping component ---------------------------------------------------------
 
 
 def test_component_tag_skips_segment_local_numbers():
@@ -103,8 +103,7 @@ def test_component_tag_skips_segment_local_numbers():
     assert component_tag(None, "SV 104.01", None) == "SV 104.01"
     assert component_tag("C1", "TSV-4144", None) == "TSV-4144"
     assert component_tag("V1", None, "Gate valve") == "V1"
-    # A name never overrides a number, even one that looks like a tag (review of
-    # pre-release PR 283).
+    # A name never overrides a number, even one that looks like a tag.
     assert component_tag("V12", None, "Gate-valve") == "V12"
     assert component_tag("HV12", None, "Ball-valve") == "HV12"
     assert component_tag(None, "P7", "Ball-valve") == "P7"

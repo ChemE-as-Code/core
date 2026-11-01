@@ -6,7 +6,7 @@ import { asuFiles } from "./asuFiles";
 import { datasheetDetails, datasheetDrawing, datasheetIndex, datasheetSnapshotKeys, mockApi } from "./fixtures";
 
 /**
- * The datasheets from a server with `GET /api/datasheets` (pre-release PR 95): the index with dimensions,
+ * The datasheets from a server with `GET /api/datasheets`: the index with dimensions,
  * weights, drawing states, findings and the items without a sheet; a sheet's main dimensions,
  * weights, structured materials, nozzle schedule, findings and outline drawing (current, stale,
  * not committed); phone width and dark mode; a static snapshot with and without the endpoints.

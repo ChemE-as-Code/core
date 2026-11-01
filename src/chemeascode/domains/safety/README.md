@@ -16,7 +16,7 @@ Stoessel's criticality class from a given TD24 and MTT, a cooled bed's parametri
 `cheme process reactor-hazards`), screening values a HAZOP study can cite. The bundled skill `skills/area-classification/` says how a plant repository declares
 its zones with it, and what a competent person must still decide.
 
-**HAZOP** (pre-release issue 136, [docs/framework/hazop.md](../../../../docs/framework/hazop.md)).
+**HAZOP** ([docs/framework/hazop.md](../../../../docs/framework/hazop.md)).
 `schemas.py`: the study (`cheme/hazop-study/v1`, `safety/hazop/<study-id>/study.yaml`) and the
 risk matrix (`cheme/risk-matrix/v1`). `risk_matrix.py`: the matrix rules and the one band
 lookup. `hazop.py`: loading, the `cheme.hazop-*` rules against the study, the plant (tags of

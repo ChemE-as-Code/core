@@ -1,5 +1,5 @@
 /**
- * The LCI readiness of the plant's dataset (pre-release viewer issue 36): how far `lca/dataset.yaml` is from
+ * The LCI readiness of the plant's dataset: how far `lca/dataset.yaml` is from
  * publishable quality, from what core reports. Nothing is calculated here: the balance, the data
  * quality rating, the water and the findings are core's (`/api/lca`, `cheme assess lca --json`);
  * these helpers only pick and group them for the page, and read the pedigree scores core wrote
@@ -11,7 +11,7 @@ import { isRecord } from "./guards";
 /** The plant's LCI dataset, as `cheme assess lca --write` writes it (core `DATASET_FILE`). */
 export const DATASET_FILE = "lca/dataset.yaml";
 
-/** The balance gates of pre-release issue 174, in the order core reports them. */
+/** The balance gates, in the order core reports them. */
 export const BALANCE_REQUIREMENTS: { id: string; label: string }[] = [
   { id: "lci-mass-balance", label: "mass" },
   { id: "lci-element-balance", label: "elements" },
@@ -22,13 +22,11 @@ export type ReadinessTopic = "balance" | "documentation" | "emissions" | "consum
 
 /** Which findings belong to which part of the readiness, by core's rule ids. */
 const TOPIC_RULES: Record<ReadinessTopic, (rule: string) => boolean> = {
-  // pre-release issue 174
   balance: (r) => ["cheme.lci-mass-balance", "cheme.lci-element-balance", "cheme.lci-carbon-origin", "cheme.lci-balance-unassessable"].includes(r),
-  // pre-release issue 179 (the publication minimum), pre-release issue 175 (flow identities), the dataset's location
+  // the publication minimum, flow identities, the dataset's location
   documentation: (r) => ["cheme.lca-dataset-undocumented", "cheme.lca-dataset-v1", "cheme.lca-flow-identity", "cheme.lca-flow-uuid", "cheme.lca-unchecked"].includes(r),
-  // pre-release issue 176
   emissions: (r) => r === "cheme.lci-emissions-incomplete",
-  // pre-release issue 180: consumables without a disposal route, the cut-off criteria
+  // consumables without a disposal route, the cut-off criteria
   consumables: (r) => r === "cheme.lca-disposal" || r === "cheme.lca-disposal-fraction" || r.startsWith("cheme.lca-cutoff-"),
 };
 
@@ -59,7 +57,7 @@ export function readinessFindings(report: LcaReport): Record<ReadinessTopic, Fin
 
 /**
  * Whether the server reports the dataset's readiness at all: a core with the data quality
- * rating (pre-release issue 178), the water (pre-release issue 175) or the balance (pre-release issue 174). An older server leaves
+ * rating, the water or the balance. An older server leaves
  * every one of these keys out; the section is then hidden, not shown empty.
  */
 export function hasReadiness(report: LcaReport | null | undefined): boolean {

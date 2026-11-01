@@ -4,7 +4,7 @@
 #   Design", 4th ed., Elsevier Butterworth-Heinemann, 2005, Table 12.1 "Typical overall
 #   coefficients" (p. 637).
 #
-# Verification (issue core#66). The rows have NOT been checked against the printed book, and
+# Verification. The rows have NOT been checked against the printed book, and
 # neither has the page number. Each row's `check` names the independent public reproductions of
 # the same table that agree with it (the keys of `checks` below). A reproduction is not the
 # print: it confirms that the transcription matches what others transcribed, nothing more.

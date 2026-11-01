@@ -293,8 +293,7 @@ def test_line_list_cross_check(plant: Path):
         "  - {number: '99999', from: A, to: B}\n",
         encoding="utf-8",
     )
-    # At the first stage, listed lines without a sheet: are info, one summary line
-    # (pre-release issue 17).
+    # At the first stage, listed lines without a sheet: are info, one summary line.
     concept = [f for f in validate_workspace(Workspace(plant)).findings if "not-on-pid" in f.rule]
     assert [(f.level, sorted(f.ids)) for f in concept] == [("info", ["47124/S99", "99999"])]
     config = plant / "plant.yaml"
@@ -580,7 +579,7 @@ def test_reference_safety_valve_label_dn25_dn50_is_no_warning(tmp_path: Path):
 
 
 def test_line_endpoints_are_compared_with_the_drawing(plant: Path):
-    """pre-release issue 38: a listed from/to the drawn line does not reach, where it reaches
+    """A listed from/to the drawn line does not reach, where it reaches
     another item."""
     (plant / "piping" / "line-list.yaml").write_text(
         "lines:\n"

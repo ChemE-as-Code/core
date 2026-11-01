@@ -58,7 +58,7 @@ def test_status_of_sheets_and_findings(plant: Path, monkeypatch):
 
 def test_not_on_pid_counts_every_item_held_for_a_planned_sheet(plant: Path, monkeypatch):
     """validate folds the items of a planned sheet into one info finding; status counts each
-    of them under its own sheet (pre-release issue 255)."""
+    of them under its own sheet."""
     monkeypatch.chdir(plant)
     (plant / "plant.yaml").write_text(
         (plant / "plant.yaml")
@@ -93,7 +93,7 @@ def test_status_text_gates_git_and_signoff(plant: Path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "next sheet to draw: none" in result.output
     # drawing-clean fails on the reference sheet's crossings, design-review without a record,
-    # process-basic without a PFD (pre-release issue 46); issues-basic is n/a without plant.yaml
+    # process-basic without a PFD; issues-basic is n/a without plant.yaml
     # issues:.
     assert "basic: 3 ok, 3 fail, 5 n/a (process-basic, drawing-clean, design-review)" in (
         result.output

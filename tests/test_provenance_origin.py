@@ -1,4 +1,4 @@
-"""Optional ``origin`` refining the provenance class (pre-release issue 111).
+"""Optional ``origin`` refining the provenance class.
 
 A process quantity or composition (and a spec of ``process/simulation.yaml``), a datasheet
 quantity and an LCA exchange may say what kind of figure the value is: given ``measured``,

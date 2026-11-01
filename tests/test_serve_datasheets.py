@@ -204,7 +204,7 @@ def test_an_excluded_datasheet_is_not_named_in_the_kept_answers(committed: Path,
 
 def test_an_uncommitted_excluded_datasheet_is_not_named_as_dirty(committed: Path, tmp_path: Path):
     """``source.dirty`` lists uncommitted datasheets: an excluded one is left out of it, a kept
-    one stays (pre-release issue 320)."""
+    one stays."""
     write(committed, "equipment/datasheets/V-1.yaml", SHEET)
     commit(committed, "datasheet")
     write(committed, "equipment/datasheets/V-1.yaml", {**SHEET, "service": "Buffer drum"})

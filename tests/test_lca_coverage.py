@@ -1,4 +1,4 @@
-"""Open data and transparent coverage (pre-release issue 138): the source registry, packaged open
+"""Open data and transparent coverage: the source registry, packaged open
 profiles, gaps instead of silent zeros, the result's classification, compatibility warnings and the
 foreground exported without a background.
 

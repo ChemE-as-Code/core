@@ -107,7 +107,7 @@ ASSUMPTIONS = (
 LIMITATIONS = (
     "electrolyte properties (activities, heats of dilution, conductivity) are not modelled: "
     "the heats of reaction are those of process/reactions.yaml, on their own standard states "
-    "(a linked dependency on electrolyte thermodynamics, pre-release issue 364)",
+    "(a linked dependency on electrolyte thermodynamics)",
     "no adiabatic boundary, temperature rise or stream enthalpies (v1)",
     "one current efficiency for the overall reaction: below 1 it reduces every product alike, "
     "and the current lost is heat, not chemistry; in a chlor-alkali cell the cathode forms H2 "

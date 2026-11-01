@@ -20,8 +20,7 @@ for a flow the crosswalk counts in m3). The UUID, name, categories and unit then
 package, never from the mapping. Everything is printed for review (in particular the
 sub-compartment each EF 3.1 category stands for); ``--write`` adds the ``ef-3.1`` blocks and the
 package version to the crosswalk, keeping its comments. A flow without a verified proposal
-stays ``uuid: null`` and is listed: add it by hand from the package, never by guessing
-(pre-release issue 313).
+stays ``uuid: null`` and is listed: add it by hand from the package, never by guessing.
 """
 
 from __future__ import annotations

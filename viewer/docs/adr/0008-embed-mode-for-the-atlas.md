@@ -32,6 +32,6 @@ Both survive in-app navigation, with and without `?data=`.
 
 ## Evidence
 
-- pre-release viewer commit ac41eb3 (pre-release viewer PR 29) "Embed mode and theme override: ?embed=1, ?theme=light|dark|system".
-- pre-release viewer commit d1a43a2 (pre-release viewer PR 30) keep them across in-app navigation against a server.
+- "Embed mode and theme override: ?embed=1, ?theme=light|dark|system".
+- Keep them across in-app navigation against a server.
 - `e2e/embed.spec.ts`, `tests/viewerOptions.test.ts`; REFERENCE.md (formerly the README), "Embedding".

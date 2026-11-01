@@ -33,8 +33,7 @@ def test_tile_boxes_overlap_and_cover_the_sheet():
 
 
 def test_tile_boxes_and_sheet_box_follow_a_viewbox_origin():
-    """A viewBox starting left of and above the sheet: the tiles span it, not 0..width
-    (pre-release issue 211)."""
+    """A viewBox starting left of and above the sheet: the tiles span it, not 0..width."""
     svg = etree.fromstring('<svg viewBox="-41.25 -10 461.25 307" width="461.25" height="307"/>')
     sheet = sheet_box(svg)
     assert sheet == Crop(-41.25, -10, 420, 297)

@@ -1,4 +1,4 @@
-"""#50: cheme process propagate derives compositions and flows through simple steps."""
+"""cheme process propagate derives compositions and flows through simple steps."""
 
 import yaml
 from typer.testing import CliRunner

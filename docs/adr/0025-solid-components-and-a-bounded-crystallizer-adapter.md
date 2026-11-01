@@ -5,8 +5,8 @@
 
 ## Context
 
-Process-library cases (salts, fertilizers, pigments, hydrates; ChemE-as-Code/process-library#114
-and the issues listed in pre-release issue 365) need crystallization and solid-liquid separation. The
+Process-library cases (salts, fertilizers, pigments, hydrates; ChemE-as-Code/process-library#114)
+need crystallization and solid-liquid separation. The
 process model had no solid phase: `thermodynamics/methods.yml` declares solid equilibrium
 unsupported in the property routes, the DWSIM translation has fluid outlet roles only, and
 `separations/coverage.py` listed crystallization and solid-fluid separation as specified splits
@@ -60,7 +60,7 @@ treating a solid as its own component and adding a narrowly scoped crystallizer 
 
 ## Evidence
 
-- pre-release issue 365; `src/chemeascode/domains/process/{solids,crystallization}.py`, `schema.py`
+- `src/chemeascode/domains/process/{solids,crystallization}.py`, `schema.py`
   (`Component.phase`, `Crystallizer`, `SolidSeparation`), `model_basis.solids_basis`,
   `propagate.py`, `interfaces/cli/process.py` (`process crystallizers`).
 - `tests/test_crystallization.py`: Felder & Rousseau (3rd ed.) Example 4.5-2, Geankoplis

@@ -161,7 +161,7 @@ describe("scenario bars", () => {
   });
 });
 
-describe("scenario comparability (pre-release issue 172)", () => {
+describe("scenario comparability", () => {
   const impact = (key: string, scenario: string, value: number) => ({
     category: "gwp", key, basis: "", quantity: 1, unit: "kg", factor: value, value, status: "", source: "", year: null, scenario, phase: "operation",
   });
@@ -429,7 +429,7 @@ describe("statusClass", () => {
   });
 });
 
-describe("comparison verdict (pre-release issue 306)", () => {
+describe("comparison verdict", () => {
   const withVerdicts = (verdicts: Record<string, string>) =>
     ({ ...scenarioReport, comparability: Object.fromEntries(Object.entries(verdicts).map(([s, v]) => [s, { verdict: v, reasons: v === "not comparable" ? ["basis differs (direct+upstream / direct)"] : [] }])) }) as LcaReport;
 

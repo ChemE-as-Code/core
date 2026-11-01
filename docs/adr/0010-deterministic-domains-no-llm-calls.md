@@ -36,7 +36,7 @@ guesses as computed values.
 ## Evidence
 
 - Responsibilities table ("Must not contain ... agent or LLM calls") and the LLM4ChemE port
-  "None of it imports an LLM or agent library": pre-release PR 58,
+  "None of it imports an LLM or agent library":
   [SUMMARY.md](../framework/SUMMARY.md), [llm4cheme-migration.md](../framework/llm4cheme-migration.md).
 - [contributing.md](../framework/contributing.md) ("Agents and LLMs are never a dependency of a
   deterministic function"; "Web databases and prediction services").

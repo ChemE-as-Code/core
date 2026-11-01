@@ -238,7 +238,6 @@ def test_choices_and_materials():
 @pytest.mark.parametrize("cls", ["StirredTankReactor", "TubularReactor", "Reactor", "Converter"])
 def test_a_reactor_is_costed_as_its_vessel_whatever_else_its_class_names(cls):
     # 'tank' and 'tubular' do not make a reactor an API storage tank or an exchanger
-    # (pre-release issue 195)
     corr, why = choose(cls, None)
     assert corr == "vessel_vertical" and "a reactor costed as its pressure vessel" in why
 
@@ -315,7 +314,6 @@ def test_command_and_gate(plant: Path, monkeypatch):
 
 def test_a_catalyst_fill_in_another_currency_is_reported_not_dropped():
     # a fill priced in EUR/kg is not converted: it is in no USD total, and says so
-    # (pre-release issue 194)
     from types import SimpleNamespace as NS
 
     from chemeascode.domains.assessment.equipment_cost import (

@@ -26,5 +26,5 @@ yields text tokens only.
 
 ## Evidence
 
-- pre-release viewer commit 76e15e3, pre-release viewer commit 642a723 (pre-release viewer PR 1): "YAML lists with schema-aware tables".
+- "YAML lists with schema-aware tables".
 - `src/lib/yamlTable.ts`, `tests/yamlTable.test.ts`.

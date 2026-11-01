@@ -6,9 +6,9 @@ import LciReadiness from "@/components/LciReadiness.vue";
 import { exchangeLines, hasReadiness, missingMetadata, pedigreeRows, readinessFindings, stateText, topicOf } from "@/lib/lciReadiness";
 // An older core: no data_quality, water or balance (the section is hidden).
 import oldJson from "./fixtures/api/lca-asu.json";
-// A core before pre-release issue 174 (pre-release issues 178, 179, 180 merged): data quality and documentation, no balance.
+// A core before the balance gates: data quality and documentation, no balance.
 import mainJson from "./fixtures/api/lca-asu-readiness-main.json";
-// core main: with the balance (pre-release issue 174) and the emission estimates (pre-release issue 176).
+// core main: with the balance and the emission estimates.
 import fullJson from "./fixtures/api/lca-asu-readiness.json";
 import datasetDoc from "./fixtures/api/yaml-dataset-asu.json";
 import datasetText from "./fixtures/api/dataset-asu.yaml?raw";
@@ -104,7 +104,7 @@ describe("LciReadiness", () => {
     const { el, unmount } = await mount(main);
     expect(el.querySelector("[data-readiness]")).not.toBeNull();
     expect(el.querySelector("[data-balance-unknown]")?.textContent).toBe("not assessed");
-    expect(el.querySelector("[data-balance-not-assessed]")?.textContent).toMatch(/pre-release issue 174/);
+    expect(el.querySelector("[data-balance-not-assessed]")?.textContent).toMatch(/balance gates/);
     expect(el.querySelector('[data-readiness-card="dqr"] .card-value')?.textContent).toBe("2.67");
     expect(el.querySelector('[data-indicator="GeR"]')?.textContent).toMatch(/weakest/);
     expect(el.querySelector('[data-missing="location"]')).not.toBeNull();

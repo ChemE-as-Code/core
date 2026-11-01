@@ -1,4 +1,4 @@
-# The electrolyte contract (pre-release issue 364): the aqueous electrolyte systems the electrolyte route
+# The electrolyte contract: the aqueous electrolyte systems the electrolyte route
 # (thermodynamics/electrolytes.py, `cheme process electrolyte`) executes. Per system: the
 # apparent components and the species they dissociate into, the composition, speciation and
 # activity basis, the model and its parameters with their source, the claimed range, the

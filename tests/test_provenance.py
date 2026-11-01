@@ -101,12 +101,11 @@ def test_review_record_basis_is_optional_and_typed():
         )
 
 
-# -- value fingerprints and the tool-ownership test (pre-release issue 117) ------------------------
+# -- value fingerprints and the tool-ownership test ------------------------------------------------
 
 
 def _old_fingerprint(data):
     # what props.py, propagate.py and simulation/translate.py each computed before
-    # pre-release issue 117
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
 
 

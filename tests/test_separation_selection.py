@@ -61,7 +61,7 @@ class TestDeltaTbBand:
 
 class TestComputeCOP:
     """Test _compute_cop: eta T_hot / (T_hot - T_cold), T_hot = Tb_heavy + 5 K and
-    T_cold = Tb_light - 5 K (pre-release issue 216)."""
+    T_cold = Tb_light - 5 K."""
 
     def test_missing_or_unordered_input(self):
         assert _compute_cop(None, 373.15) is None
@@ -508,7 +508,7 @@ class TestApplyPIMatrixBinary:
                 assert "COP_recommendation" in m
 
     def test_a_cryogenic_split_is_not_favourable(self):
-        """The COP follows the split's own temperatures (pre-release issue 216): N2/O2 is marginal, and
+        """The COP follows the split's own temperatures: N2/O2 is marginal, and
         without the boiling points the COP is not computed rather than guessed."""
         kwargs = dict(
             relative_volatility=2.0,
@@ -1132,12 +1132,12 @@ class TestEdgeCases:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  Audit regressions (pre-release issues 220, 252, 254)
+#  Audit regressions
 # ═══════════════════════════════════════════════════════════════════════
 
 
 def test_a_ternary_pairs_each_split_with_its_own_components():
-    """The per-component lists follow the boiling order (pre-release issue 220): only A (300 K) is viscous,
+    """The per-component lists follow the boiling order: only A (300 K) is viscous,
     so only A/B gets high_viscosity, in whatever order the components are given."""
 
     def screen(order):
@@ -1162,7 +1162,7 @@ def test_a_ternary_pairs_each_split_with_its_own_components():
 
 
 def test_the_binary_azeotrope_result_is_pinned():
-    """Q6 resolves an azeotrope; the PI matrix is not evaluated (pre-release issue 252). EtOH/H2O (351.4 /
+    """Q6 resolves an azeotrope; the PI matrix is not evaluated. EtOH/H2O (351.4 /
     373.15 K): COP 0.7 * 378.15 / 31.75 = 8.34, favourable."""
     result = select_binary_separation_methods(
         ["ethanol", "water"], [0.5, 0.5], [351.4, 373.15], azeotrope=True, relative_volatility=1.0
@@ -1183,7 +1183,7 @@ def test_the_binary_azeotrope_result_is_pinned():
         relative_volatility=1.0,
     ).result
     ranked = {m["method"]: m["final_score"] for m in sensitive.ranked_methods}
-    # a cryogenic pair (pre-release issue 216): COP 2.92 < 3, HPAD/HIDiC marginal at 0.5
+    # a cryogenic pair: COP 2.92 < 3, HPAD/HIDiC marginal at 0.5
     assert ranked["PSD"] == 1.0 and ranked["HPAD"] == ranked["HIDiC"] == 0.5
 
 
@@ -1193,7 +1193,7 @@ def test_multicomponent_length_errors_are_returned_not_raised():
     )
     assert ret.result is None
     assert ret.errors == ["viscosity must have 3 values for 3-component separation, got 2"]
-    # a list that is too long cannot be sorted with the boiling points either (pre-release issue 220)
+    # a list that is too long cannot be sorted with the boiling points either
     ret = select_multicomponent_separation_methods(
         ["B", "A", "C"], [350.0, 300.0, 400.0], [2.0, 2.0], viscosity=[0.5, 5.0, 0.5, 9.9]
     )

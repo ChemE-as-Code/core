@@ -1,5 +1,5 @@
 """foundation.gitinfo fails closed: a git error is "cannot tell", never "nothing changed", and
-repository paths reach git as literal pathspecs (pre-release issue 304)."""
+repository paths reach git as literal pathspecs."""
 
 import os
 import subprocess

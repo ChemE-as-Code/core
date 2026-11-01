@@ -34,6 +34,5 @@ shims, would double the public surface during a phase of rapid change.
 
 ## Evidence
 
-- Rename pre-release PR 75 (pre-release commit 47d7dc7, audit pre-release commit 3fe1b21).
-- Organisation move pre-release PR 52; no compatibility layer pre-release PR 58.
+- The rename and its audit; the organisation move; no compatibility layer.
 - [rename.md](../framework/rename.md), [SUMMARY.md](../framework/SUMMARY.md), `REFERENCE.md` (formerly the README).

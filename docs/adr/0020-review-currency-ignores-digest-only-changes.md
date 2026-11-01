@@ -11,7 +11,7 @@ the fingerprint of the sources or model they were made from
 ([ADR 0011](0011-per-value-provenance-and-fingerprints.md)), e.g. the model `output_sha256` in
 `layout/lifting-study.md`. When the model was rebuilt and the study regenerated with the same
 lifts, only that line changed, but the review went stale and needed a new independent review
-(process-library asu-1, reviews 14 to 16; pre-release issue 132). Options considered: per-generator
+(process-library asu-1, reviews 14 to 16). Options considered: per-generator
 canonical content hashes (every generator would need one, and the gate would have to know
 them), stripping known provenance lines per file kind (the same, by file name), or masking
 digests in any scoped file.
@@ -44,8 +44,8 @@ digests in any scoped file.
 
 ## Evidence
 
-- pre-release issue 132; pre-release PR 383 (`provenance.digest_only`, `provenance.content_changes`,
-  `gitinfo.show`, `reviews.scope_changes`, `lifting.study_findings`).
+- `provenance.digest_only`, `provenance.content_changes`,
+  `gitinfo.show`, `reviews.scope_changes`, `lifting.study_findings`.
 - Tests: `tests/test_gates.py::test_a_digest_only_regeneration_keeps_a_review_current`,
   `tests/test_layout_model.py::test_validate_and_the_gate_report_an_outdated_lifting_study`.
 - Docs: `docs/framework/layout-model.md`, `docs/framework/architecture.md`, template

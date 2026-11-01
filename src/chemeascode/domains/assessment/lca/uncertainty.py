@@ -155,7 +155,7 @@ class Result:
     varied: list[str] = field(default_factory=list)
     #: Where each varied input's distribution comes from: ``given`` (its own), ``study
     #: default`` (lca.yaml uncertainty.defaults or factors) or ``pedigree`` (the exchange's
-    #: pedigree on its basic uncertainty, pre-release issue 178).
+    #: pedigree on its basic uncertainty).
     bases: dict[str, str] = field(default_factory=dict)
 
 

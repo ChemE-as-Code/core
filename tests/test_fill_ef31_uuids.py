@@ -1,4 +1,4 @@
-"""scripts/fill_ef31_uuids.py (pre-release issue 313): EF 3.1 identities only as the official
+"""scripts/fill_ef31_uuids.py: EF 3.1 identities only as the official
 package holds them. The package and mapping here are synthetic; their UUIDs are test values."""
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def test_only_what_the_package_confirms_is_written(tmp_path: Path) -> None:
     args = [str(package), "--mapping", str(mapping), "--crosswalk", str(crosswalk_path)]
     assert fill.main([*args, "--package-version", "test package 0.0", "--write"]) == 0
     text = crosswalk_path.read_text()
-    assert "TODO(core#313)" in text  # comments kept (the packaged file stays byte-stable)
+    assert "TODO(#26)" in text  # comments kept (the packaged file stays byte-stable)
     data = yaml.safe_load(text)
     assert data["source"]["ef-3.1"] == "test package 0.0"
     flows = {f["id"]: f for f in data["flows"]}

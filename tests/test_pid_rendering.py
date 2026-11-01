@@ -1,7 +1,6 @@
-"""P&ID rendering and default placement: field bubble extent (pre-release issue 35), equipment tag
-labels clear of nozzles (pre-release issue 37), inline items emphasised on full-sheet renders
-(pre-release issue 41) and the shape catalogue covering the ASU sheets' equipment
-(pre-release issue 15)."""
+"""P&ID rendering and default placement: field bubble extent, equipment tag
+labels clear of nozzles, inline items emphasised on full-sheet renders
+and the shape catalogue covering the ASU sheets' equipment."""
 
 from __future__ import annotations
 
@@ -47,7 +46,7 @@ def _texts(xml: str) -> dict[str, tuple[float, float, float, str]]:
     return found
 
 
-# -- pre-release issue 35: the field bubble is as wide as the central one --------------------------
+# -- the field bubble is as wide as the central one ------------------------------------------------
 
 
 def test_field_bubble_extent_counts_its_arcs():
@@ -102,7 +101,7 @@ def test_fragment_instrument_letters_stay_inside_the_bubble(field: bool):
         assert top >= 100 - 3.75 + 0.5, top
 
 
-# -- pre-release issue 37: equipment tag labels avoid the nozzles' pipes ---------------------------
+# -- equipment tag labels avoid the nozzles' pipes -------------------------------------------------
 
 
 def _label_box(x: float, y: float, text: str, size: float) -> tuple[float, float, float, float]:
@@ -185,7 +184,7 @@ def test_fragment_equipment_label_clear_of_a_bottom_nozzle(empty: Path):
     assert any("clear of the nozzles" in n for n in made.notes), made.notes
 
 
-# -- pre-release issue 41: inline items emphasised on a render -------------------------------------
+# -- inline items emphasised on a render -----------------------------------------------------------
 
 _SCALE = re.compile(r"scale\(([-\d.]+),([-\d.]+)\)")
 
@@ -235,7 +234,7 @@ def test_render_emphasise_inline_writes_its_own_file(plant: Path, monkeypatch):
     assert (plant / "build" / "P-01_inline_tile-A1.svg").is_file()
 
 
-# -- pre-release issue 15: the catalogue draws what the ASU sheets needed custom shapes for --------
+# -- the catalogue draws what the ASU sheets needed custom shapes for ------------------------------
 
 #: The classes ASU-1 drew with custom ShapeASU_* symbols (P-01 to P-04, before the catalogue had
 #: them), and the catalogue shape for each that has no class default.

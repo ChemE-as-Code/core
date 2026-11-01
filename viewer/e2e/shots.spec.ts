@@ -44,7 +44,7 @@ test.describe("screenshots", () => {
     await shot(page, `/layout?cam=27,22,8,36.1,29,3.7&layers=${NO_ZONES},buildings&look=realistic`, "asu-penetration-realistic");
   });
 
-  test("operators, the hatch H1 and the lifting study (pre-release issue 61)", async ({ page }) => {
+  test("operators, the hatch H1 and the lifting study", async ({ page }) => {
     await mockApi(page, { files: asuFiles });
     await shot(page, `/layout?cam=143,57,26,138.3,47,20.9&layers=${NO_ZONES}&select=hatch:CB-1/H1`, "asu-hatch-h1");
     await shot(page, `/layout?cam=143,57,26,138.3,47,20.9&layers=${NO_ZONES}&look=realistic`, "asu-hatch-h1-realistic");

@@ -22,7 +22,7 @@ third-party tables/figures/text, facts with sources, estimates marked ASSUMED).
    (`publication.status: internal`, honest maturity/validation, references).
 2. BFD and PFD in `process/flowsheet.yaml` with the main units, recycles/purges and a stream
    table; `cheme process build`; mass/element balances closed with cheme (energy where core
-   supports it; otherwise state the gated step precisely, e.g. pre-release issue 315).
+   supports it; otherwise state the gated step precisely).
 3. Reaction/model evidence in DESIGN.md (sourced conversion/equilibrium models are acceptable,
    labelled as such; no invented kinetics or vendor data).
 4. **Preliminary gate-to-gate LCI** in `lca/` (skills `lca`, `lci-estimate`; follow asu-1's

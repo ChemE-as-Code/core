@@ -78,7 +78,7 @@ describe("sanitizeSvg", () => {
     expect(markup).toContain("click");
   });
 
-  // The audit's payloads (pre-release viewer issue 40): CSS escapes and image-set() load resources, unscoped rules
+  // The audit's payloads: CSS escapes and image-set() load resources, unscoped rules
   // restyle the page.
   const payloads: Record<string, string> = {
     escapedUrlInStyleAttr: '<rect style="fill:u\\72l(https://evil.example/a#p)"/>',

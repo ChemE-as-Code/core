@@ -167,7 +167,7 @@ def _unused(reaction: Any, name: str, model: str, item: Any) -> str:
 
 def _uncertain(reaction: Any, model: str, item: Any) -> tuple[list[str], dict[str, str]]:
     """The uncertain fields of *reaction* that *model* uses (``reaction.field``), and those it
-    does not, each with the reason: their draws would change nothing (pre-release issue 221)."""
+    does not, each with the reason: their draws would change nothing."""
     found: list[str] = []
     if reaction.rate is not None and reaction.rate.uncertainty is not None:
         u = reaction.rate.uncertainty

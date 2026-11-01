@@ -92,7 +92,7 @@ def test_editing_a_reviewed_file_flags_the_latest_record_of_its_topic(plant):
 
 
 def test_records_of_one_topic_split_by_file_are_each_compared(plant):
-    """#226: only the newest record of a topic was compared, missing the earlier one's files."""
+    """Only the newest record of a topic was compared, missing the earlier one's files."""
     _review(plant, "2026-01-01-design.md", "design", ["process/flowsheet.yaml"])
     _review(plant, "2026-01-02-design.md", "design", ["process/materials.yaml"])
     _retitle(plant, "renamed feed")
@@ -108,7 +108,7 @@ def test_records_of_one_topic_split_by_file_are_each_compared(plant):
 
 
 def test_a_scope_with_a_leading_slash_is_compared(plant):
-    """#190: git failed on '/process/flowsheet.yaml' and impact stayed silent."""
+    """Git failed on '/process/flowsheet.yaml' and impact stayed silent."""
     _review(plant, "2026-01-01-design.md", "design", ["/process/flowsheet.yaml"])
     _retitle(plant, "renamed feed")
     found = [f for f in review_needed(plant) if f.file.startswith("reviews/")]

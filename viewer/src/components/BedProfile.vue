@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * One fixed bed of `/api/reactions` (pre-release viewer issue 32): core's solved bed (inlet, outlet, peak, pressure
+ * One fixed bed of `/api/reactions`: core's solved bed (inlet, outlet, peak, pressure
  * drop, catalyst mass, calculation mode), its temperature and pressure along the catalyst mass
  * with the peak and the reference temperatures, the profile as a table and CSV, core's notes, the
  * bed's row of a recorded simulation run (current, stale or not converged), what the result is

@@ -486,8 +486,7 @@ def test_rename_retags_a_valve_with_its_actuation_chain(fresh: Path, instrument_
 
 
 def test_rename_with_ids_leaves_ids_that_only_contain_the_tag(fresh: Path):
-    """Renaming vessel V-101 with --ids keeps the ids of valve FV-101 (FV101)
-    (pre-release issue 213)."""
+    """Renaming vessel V-101 with --ids keeps the ids of valve FV-101 (FV101)."""
     from chemeascode.domains.piping.authoring import Nozzle, Sheet, equipment, line, valve
 
     sheet = Sheet.load(fresh / "pid" / "P-01.xml")
@@ -532,8 +531,7 @@ def test_rename_with_ids_leaves_ids_that_only_contain_the_tag(fresh: Path):
 def test_rename_with_ids_of_a_valve_and_its_chain_keeps_the_instrument_ids(
     tmp_path: Path, monkeypatch
 ):
-    """safety-hazop: FV-104 with --ids renames the FV104* ids, never Inst_FIC104_*
-    (pre-release issue 213)."""
+    """safety-hazop: FV-104 with --ids renames the FV104* ids, never Inst_FIC104_*."""
     from chemeascode.domains.piping.authoring import Sheet
 
     root = tmp_path / "plant"

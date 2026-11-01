@@ -1,4 +1,4 @@
-"""#48: crossing-minimised layout inside blocks; nested blocks drawn inside their parent."""
+"""Crossing-minimised layout inside blocks; nested blocks drawn inside their parent."""
 
 import shutil
 from pathlib import Path

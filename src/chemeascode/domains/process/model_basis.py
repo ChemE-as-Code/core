@@ -412,7 +412,7 @@ def _separator_basis(
         from chemeascode.domains.process.simulation.translate import UNIT_BASIS
 
         package = f"{sim.simulator} {sim.property_package}"
-        # the translation's basis (pre-release issue 137: predictive, shortcut, specified) where it
+        # the translation's basis (predictive, shortcut, specified) where it
         # made one
         given = (bases or {}).get(node.id) or {}
         kind = given.get("basis") or (spec.basis if spec is not None else None)

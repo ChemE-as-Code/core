@@ -1,4 +1,4 @@
-"""The optional ChemSep SRK dataset (pre-release issue 55): conversion, install from a zip, the CLI
+"""The optional ChemSep SRK dataset: conversion, install from a zip, the CLI
 and the kij = 0 fallback of the flash. No test touches the network: archives are built here."""
 
 from __future__ import annotations

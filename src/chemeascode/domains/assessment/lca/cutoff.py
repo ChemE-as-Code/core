@@ -1,4 +1,4 @@
-"""Cut-off criteria and system-model consistency of an LCI dataset (pre-release issue 180).
+"""Cut-off criteria and system-model consistency of an LCI dataset.
 
 A dataset records the flows it leaves out (``cutoff:``, :class:`~.schemas.CutoffFlow`) with their
 amounts, so that the criteria can be checked where the dataset is made (``cheme assess lca``)

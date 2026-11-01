@@ -1,5 +1,5 @@
-"""Sheets and title blocks: sheet new / sheet meta (pre-release issue 10), planned sheets
-(pre-release issue 17), title-block rules (pre-release issue 19)."""
+"""Sheets and title blocks: sheet new / sheet meta, planned sheets,
+title-block rules."""
 
 import json
 from pathlib import Path
@@ -93,7 +93,7 @@ def test_template_defaults_are_in_sync_with_the_reference():
 
 
 def test_template_sheet_has_no_sample_title_block():
-    """#10: no fake approval, people, company, site, project or 2016 dates."""
+    """No fake approval, people, company, site, project or 2016 dates."""
     text = EMPTY_SHEET.read_text(encoding="utf-8")
     for sample in (
         "A. P. Prover",
@@ -120,7 +120,7 @@ def test_template_sheet_has_no_sample_title_block():
 
 
 def test_sample_title_block_gets_template_metadata_warnings(tmp_path, monkeypatch):
-    """#19: a frame with pyDEXPI's sample title block (what the 0.3 snippet was)."""
+    """A frame with pyDEXPI's sample title block (what the 0.3 snippet was)."""
     root = _repo(tmp_path, monkeypatch, project=False)
     formatted = etree.fromstring(format_bytes(REFERENCE.read_bytes())[0])
     frame = build_snippets.skeleton(formatted)
@@ -144,7 +144,7 @@ def test_sample_title_block_gets_template_metadata_warnings(tmp_path, monkeypatc
 
 
 def test_reference_sheet_warns_on_example_model_and_diagram_name(plant: Path):
-    """#19 on the ASU sheets: Model name="example" and DEXPI Example C01 are reported."""
+    """On the ASU sheets: Model name="example" and DEXPI Example C01 are reported."""
     named = {f.ids[0] for f in _findings(plant) if f.rule == "cheme.template-metadata"}
     assert {"ModelName", "ModelUri", "DiagramName"} <= named
 

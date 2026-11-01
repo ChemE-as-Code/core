@@ -1,4 +1,4 @@
-# Chlor-alkali reference case (core#366): 2 NaCl + 2 H2O -> Cl2 + H2 + 2 NaOH. NaCl and NaOH
+# Chlor-alkali reference case: 2 NaCl + 2 H2O -> Cl2 + H2 + 2 NaOH. NaCl and NaOH
 # are the dissolved salts (brine and caustic); their ions are declared in process/cells.yaml.
 schema: cheme/process/v1
 kind: materials

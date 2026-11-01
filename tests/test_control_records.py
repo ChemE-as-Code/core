@@ -1,4 +1,4 @@
-"""Control foundations (pre-release issue 140): the loop register, sequences, narrative and control
+"""Control foundations: the loop register, sequences, narrative and control
 philosophy, validated against the lists, the C&E, the operating cases and each other, and reported.
 
 The plant is ``examples/process-separation`` (a depropanizer): feed flow, flash drum level and

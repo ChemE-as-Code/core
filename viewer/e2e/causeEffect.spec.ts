@@ -74,7 +74,7 @@ test.describe("cause and effect matrix", () => {
   });
 
   test("a cell with several actions shows each in its own tone, the cell in the most severe", async ({ page }) => {
-    // pre-release PR 269: I-01 also alarms on XV-4136, so core joins the two actions in one cell.
+    // I-01 also alarms on XV-4136, so core joins the two actions in one cell.
     const multi = { ...onP01, rows: [{ ...onP01.rows[0]!, cells: ["trip", "trip", "close + alarm", "", "", ""] }, onP01.rows[1]!] };
     const table = await openMatrix(page, { interlocks: multi, interlocksAt: { main: onP01 } });
     const cell = table.locator('[data-cell="I-01|XV-4136"]');

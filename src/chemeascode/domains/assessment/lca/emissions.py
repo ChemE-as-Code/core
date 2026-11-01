@@ -1,6 +1,5 @@
 """Emissions the flowsheet does not carry: combustion, equipment leaks, storage tanks, flares,
-effluent and non-routine operation (``emission_estimates:`` of ``lca/lca.yaml``,
-pre-release issue 176).
+effluent and non-routine operation (``emission_estimates:`` of ``lca/lca.yaml``).
 
 A steady-state flowsheet gives the emissions of the streams that leave as ``emission: true``
 products; NOx from a fired heater, VOC leaking from flanges and valves, tank breathing losses or

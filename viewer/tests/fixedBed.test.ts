@@ -1,5 +1,5 @@
 /**
- * The fixed beds (pre-release viewer issue 32) on core's real answers: `/api/reactions` of the shift example with
+ * The fixed beds on core's real answers: `/api/reactions` of the shift example with
  * R1 adiabatic (the outlet hottest), cooled (an interior hot spot, the catalyst window below
  * it), cooled harder (the inlet hottest), isothermal and not solvable; the ammonia example (an
  * equilibrium reactor, no bed); a coupled kinetic bed with its recorded run current, stale and
