@@ -18,6 +18,12 @@
 
 ## Overview
 
+<p align="center">
+  <img src=".github/readme/demo.gif" alt="Animation: the brief an AI agent got for an ammonia case study is typed out, then the resulting design appears in the Viewer, including a 3D plant layout built from the same files." width="80%">
+  <br>
+  <em>Ammonia design from the process library, footprint from ASU-1. AI-generated research output, concept stage.</em>
+</p>
+
 ChemE-as-Code (chemical engineering as code) keeps a chemical plant design as plain files in a git
 repository: P&IDs (piping and instrumentation diagrams) in the open DEXPI 2.0.1 format, engineering lists in YAML and design decisions in Markdown. Engineers
 and AI coding agents edit the same files, and every change has a history, a review and a diff, as
