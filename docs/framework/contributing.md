@@ -5,6 +5,10 @@ rules keep the package usable from the CLI, the viewer API, agents and downstrea
 alike. Read [architecture.md](architecture.md) for the reasons behind the rules. The repository
 conventions in `AGENTS.md` (Python 3.12+, uv, ruff line length 100, pytest) apply throughout.
 
+## Contribution terms
+
+By submitting a contribution to this repository, you agree to make it available under the public license applicable to that part of the repository. You also grant a non-exclusive, worldwide, perpetual, irrevocable, royalty-free license to use, reproduce, modify, distribute, and sublicense your contribution under other terms. You retain ownership of your contribution.
+
 ## Where things go
 
 Work through this list from the top. The first match is the place.
