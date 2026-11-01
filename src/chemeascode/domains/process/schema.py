@@ -795,7 +795,7 @@ class UtilityLevel(Strict):
     """What a utility terminal supplies: its kind and, for heat, its temperature levels, which
     ``cheme process simulate`` checks against the temperatures of the duty it serves, and, for
     steam, its pressure. ``cheme assess lca`` gives the energy exchange's carrier the level,
-    the supply temperature and the steam pressure."""
+    the supply temperature and the steam pressure (core#313)."""
 
     kind: UtilityKind
     level: str = Field(
