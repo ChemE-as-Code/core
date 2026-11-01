@@ -29,6 +29,9 @@ those files; the **Viewer** ([`viewer/`](viewer/README.md)), a web app for brows
 repository; and an **agent runner** ([`agent-cli/`](agent-cli/README.md)) that runs Claude agents
 with a spending cap. The `cheme` package needs neither the Viewer nor an AI provider. This is
 research software in active development: research output, not engineering advice.
+The example designs in the [Process Atlas](https://atlas.cheme-as-code.org) were produced by AI
+agents under human direction and are not approved for construction, operation or safety
+decisions.
 
 <p align="center">
   <img src=".github/readme/pid.png" alt="A DEXPI P&amp;ID rendered in the Viewer" width="80%">
