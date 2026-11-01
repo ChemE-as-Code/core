@@ -105,7 +105,7 @@ def test_an_error_in_reactions_yaml_does_not_block_the_process_endpoints(recycle
 
 
 def test_a_bfd_sheet_over_the_size_cap_is_skipped(recycle: Path, monkeypatch):
-    """pre-release issue 257: the drawn BFD is read through the size cap like every other file."""
+    """The drawn BFD is read through the size cap like every other file."""
     import chemeascode.interfaces.api.serve as serve_module
 
     assert client(recycle).get("/api/streams").json()["bfd_connections_from"] == "sheet"

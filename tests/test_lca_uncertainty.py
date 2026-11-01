@@ -152,7 +152,7 @@ def test_spearman() -> None:
 
 def test_monte_carlo_of_the_study(blocks: Path) -> None:
     scope = _scope()
-    # the steam taken as exact: without it, its pedigree would vary it (pre-release issue 178)
+    # the steam taken as exact: without it, its pedigree would vary it
     scope["flows"][1]["uncertainty"] = {"gsd2": 1.0}
     _write(blocks, scope)
     report = lca_report(blocks)
@@ -184,8 +184,8 @@ def test_defaults_by_provenance_and_factor_uncertainty(blocks: Path) -> None:
     factors["factors"][1]["uncertainty"] = {"distribution": "uniform", "low": 0.5, "high": 1.5}
     _write(blocks, scope, factors)
     mc = lca_report(blocks).uncertainty
-    # the feed's flow is given (no default for given): its pedigree's lognormal
-    # (pre-release issue 178); the steam's duty is assumed: the study's default
+    # the feed's flow is given (no default for given): its pedigree's lognormal;
+    # the steam's duty is assumed: the study's default
     assert mc.bases["amount:feed:FEED"] == "pedigree"
     assert mc.bases["amount:feed:STEAM"] == "study default"
     assert mc.bases["factor:steam"] == "given"
@@ -284,7 +284,7 @@ def test_cas_normalised_and_origin_ranked() -> None:
     assert factor("ipcc2021-gwp100", "2551-62-4", "air", "fossil") == 25200.0
     fossil = ["Carbon dioxide, fossil", "Carbon dioxide (fossil)"]
     biogenic = ["Carbon dioxide, non-fossil", "carbon dioxide (biogenic)"]
-    luc = "Carbon dioxide, from soil or biomass stock"  # land-use change (pre-release issue 175)
+    luc = "Carbon dioxide, from soil or biomass stock"  # land-use change
     assert all(_origin_rank(n, "fossil") == 0 for n in fossil)
     assert all(_origin_rank(n, "fossil") == 2 for n in [*biogenic, luc])
     assert all(_origin_rank(n, "biogenic") == 0 for n in biogenic)

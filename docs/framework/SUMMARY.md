@@ -69,7 +69,7 @@ The commands and their results are in the session report, outside the repository
   `cheme process build` is run once, because the generator code moved.
 - The chemistry web adapters are tested on recorded response shapes, not against the live sites.
   The ChemSep SRK data is no longer shipped: its licence is unconfirmed for the IPD files
-  (pre-release issue 55, `data/chemsep/SOURCE.md`), and `cheme data fetch chemsep-srk` installs it per user.
+  (`data/chemsep/SOURCE.md`), and `cheme data fetch chemsep-srk` installs it per user.
 - Three layer-rule exceptions remain, each listed with its reason in `tests/test_boundaries.py`.
 
 ## Remaining migration work

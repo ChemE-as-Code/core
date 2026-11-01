@@ -21,7 +21,7 @@ DATA = Path(__file__).with_name("data") / "backgrounds"
 #: The structured scope of a packaged profile (``<id>.yaml``: ``sources:`` id -> scope,
 #: ``factors:`` id glob -> scope, ``years:`` id glob -> ``data_year`` / ``publication_year``),
 #: kept beside the profile so that the profile file, and with it every project's fingerprint of
-#: it, stays byte-stable (pre-release issue 306). What the profile file itself declares wins field
+#: it, stays byte-stable. What the profile file itself declares wins field
 #: by field.
 SCOPES = Path(__file__).with_name("data") / "background_scopes"
 
@@ -74,7 +74,7 @@ def _scoped(found: FactorFile, path: Path) -> FactorFile:
         match = next((s for g, s in by_factor.items() if fnmatchcase(factor.id, g)), None)
         if match is not None:
             factor.scope = match.merged(factor.scope)
-        # declared years (pre-release issue 306): every matching entry counts; two that give one key
+        # declared years: every matching entry counts; two that give one key
         # different values are an error; a value the profile file gives wins
         when: dict[str, int] = {}
         for glob, entry in years.items():

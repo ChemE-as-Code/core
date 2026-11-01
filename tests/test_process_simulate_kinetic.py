@@ -564,7 +564,7 @@ def test_dwsim_synthesis_loop_with_a_coupled_bed(tmp_path):
     assert states["S4"]["temperature"]["value"] == pytest.approx(bed.temperature, abs=0.1)
 
 
-# -- stirred tanks and batches, coupled the same way (pre-release issue 157 item 10) ---------------
+# -- stirred tanks and batches, coupled the same way -----------------------------------------------
 
 #: The single step as an adiabatic stirred tank holding the same catalyst (1000 kg per m3).
 TANK = ONCE.replace(

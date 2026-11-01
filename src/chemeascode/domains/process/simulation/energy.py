@@ -26,8 +26,16 @@
 - ``sim-energy-unsupported`` (info): the closure is not evaluated where the enthalpy reference
   does not allow it: a reactor whose property package's reference is not verified
   (:data:`FORMATION_PACKAGES`) or for which DWSIM's formation enthalpies were not reported, or a
-  unit whose duty sign is not established (the component separator's energy imbalance, a
-  column top without condenser).
+  unit whose duty sign is not established (a column top without condenser).
+- ``sim-energy-stated`` (info): a specified split (:data:`STATED_UNITS`, the component
+  separator) whose streams' enthalpy out minus in exceeds its tolerance. Its recoveries are
+  given, so nothing in it conserves energy: the imbalance is stated, never judged
+  (``status: stated``, ``imbalance_kW`` with :data:`STATED_SIGN`), taken from the solved
+  streams rather than from DWSIM's ``EnergyImb`` (whose sign is recorded per run as
+  ``simulator_convention``, not relied on), and enters the plant closure as a stated residual
+  (``stated_kW``, ``stated``): the plant closes when its boundary enthalpy change equals the
+  units' heat and work plus the stated imbalances. A specified split without stream enthalpies
+  leaves the plant ``not-evaluable``. The stated imbalance is not a utility (ADR 0038).
 - ``sim-energy-not-evaluable`` (info): the simulator returned no stream enthalpies (a record from
   before they were reported).
 - ``sim-formation-data``: the reaction heat DWSIM simulates (its database's formation
@@ -134,6 +142,15 @@ SMALL_VF = 1e-4
 #: Reacting units (a kinetic_pfr is solved by cheme-as-code and seen by DWSIM as a conversion
 #: reactor: it reacts all the same).
 REACTORS = ("conversion_reactor", "equilibrium_reactor", "gibbs_reactor", "kinetic_pfr")
+#: Specified splits whose energy imbalance is stated, not judged (ADR 0038): the recoveries
+#: are given, so nothing in the split conserves energy; the imbalance is the streams' enthalpy
+#: out minus in (:data:`STATED_SIGN`) and enters the plant closure as a stated residual.
+STATED_UNITS = ("component_separator",)
+#: The sign convention of a stated imbalance, as the record states it.
+STATED_SIGN = (
+    "enthalpy out minus enthalpy in (kW): the heat the unit would have to take in for its "
+    "balance to close; positive: its outlets carry more enthalpy than its inlets"
+)
 #: Units whose single duty heats or cools one process stream (inlet 0 to outlet 0).
 HEATED = ("heater", "cooler", "flash", *REACTORS)
 
@@ -239,7 +256,7 @@ def audit(
     if plant["status"] in ("ok", "imbalance"):
         lines.append(
             f"energy closure (plant): {plant['status']}, residual {plant['residual_kW']:.4g} kW "
-            f"(tolerance {plant['tolerance_kW']:.4g} kW)"
+            f"(tolerance {plant['tolerance_kW']:.4g} kW)" + _stated_text(plant)
         )
     else:
         lines.append(f"energy closure (plant): {plant['status']} ({'; '.join(plant['reasons'])})")
@@ -264,6 +281,17 @@ def audit(
         "utilities": utilities,
     }
     return findings, entry, lines
+
+
+def _stated_text(plant: dict[str, Any]) -> str:
+    """'' or the stated imbalances of the specified splits in a plant closure, as a suffix."""
+    if not plant.get("stated"):
+        return ""
+    each = ", ".join(f"{uid} {kw:.4g}" for uid, kw in plant["stated"].items())
+    return (
+        f", with {plant['stated_kW']:.4g} kW stated by specified splits ({each}; enthalpy out "
+        "minus in)"
+    )
 
 
 # -- exchanger temperatures ---------------------------------------------------------------------
@@ -524,9 +552,51 @@ def _exchange(kind: str, got: dict[str, Any]) -> tuple[float, float, str]:
         if abs(got.get("top_residual_kW") or 0.0) > ENERGY_TOLERANCE["abs_kW"]:
             return 0.0, 0.0, "the sign of the column top's residual duty is not established"
         return (got.get("reboiler_kW") or 0.0) - (got.get("condenser_kW") or 0.0), 0.0, ""
-    if kind == "component_separator":
-        return 0.0, 0.0, "the sign of the component separator's energy imbalance is not established"
-    return 0.0, 0.0, ""  # heat_exchanger, valve, mixer, splitter: no external exchange
+    # heat_exchanger, valve, mixer, splitter: no external exchange; a component separator's
+    # imbalance is taken from its streams in _closure (_stated), not from the simulator's sign
+    return 0.0, 0.0, ""
+
+
+def _stated(h_in: float, h_out: float, tol: float, simulator: float | None) -> dict[str, Any]:
+    """The stated imbalance of a specified split (:data:`STATED_UNITS`): ``imbalance_kW`` =
+    enthalpy out minus in (:data:`STATED_SIGN`), counted as heat into the unit in the plant
+    closure, and how the simulator's own imbalance (DWSIM's ``EnergyImb``, reported as
+    ``duty_kW``) relates to it (``simulator_convention``):
+
+    - ``out-minus-in`` / ``in-minus-out``: it equals the imbalance, or its negative, within the
+      unit's tolerance, and the imbalance exceeds twice the tolerance, so the two signs cannot
+      both fit (this run shows DWSIM's sign);
+    - ``negligible``: both are within the tolerance (no sign to tell);
+    - ``indeterminate``: the imbalance is too small (at most twice the tolerance) for the sign
+      to be told apart;
+    - ``differs``: neither (recorded, not judged: the closure takes the streams' value);
+    - ``not-reported``: the simulator gave none."""
+    imbalance = h_out - h_in
+    row: dict[str, Any] = {
+        "status": "stated",
+        "basis": "simulator",
+        "enthalpy_in_kW": h_in,
+        "enthalpy_out_kW": h_out,
+        "imbalance_kW": imbalance,
+        "heat_in_kW": imbalance,
+        "tolerance_kW": tol,
+        "sign_convention": STATED_SIGN,
+        "simulator_imbalance_kW": simulator,
+    }
+    if simulator is None:
+        convention = "not-reported"
+    elif abs(imbalance) <= tol and abs(simulator) <= tol:
+        convention = "negligible"
+    elif abs(imbalance) <= 2 * tol:
+        convention = "indeterminate"
+    elif abs(simulator - imbalance) <= tol:
+        convention = "out-minus-in"
+    elif abs(simulator + imbalance) <= tol:
+        convention = "in-minus-out"
+    else:
+        convention = "differs"
+    row["simulator_convention"] = convention
+    return row
 
 
 def _tolerance(q: float, w: float, h_in: float, h_out: float) -> float:
@@ -915,6 +985,8 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
     )
     total_q = total_w = 0.0
     unsupported: list[str] = []
+    stated: dict[str, float] = {}  # specified split -> its stated imbalance (kW)
+    unknown: list[str] = []  # specified splits whose imbalance is not evaluable
     reacting: set[str] | None = set()
     any_reactor = False
 
@@ -956,10 +1028,44 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
         flows_out = [_enthalpy_flow(out, s) for s in u["outlets"]]
         if not have_enthalpy or None in flows_in or None in flows_out:
             row["status"] = "not-evaluable"
+            if kind in STATED_UNITS:
+                missing = [
+                    s
+                    for s, v in zip(u["inlets"] + u["outlets"], flows_in + flows_out, strict=True)
+                    if v is None
+                ]
+                row["missing"] = missing
+                unknown.append(
+                    f"{uid}: the specified split's imbalance is not evaluable (no enthalpy for "
+                    f"{', '.join(missing)})"
+                )
             rows.append(row)
             continue
         h_in, h_out = sum(flows_in), sum(flows_out)  # type: ignore[arg-type]
         tol = _tolerance(q, w, sum(abs(x) for x in flows_in), sum(abs(x) for x in flows_out))  # type: ignore[arg-type]
+        if kind in STATED_UNITS:
+            got = units.get(uid) or {}
+            row.update(_stated(h_in, h_out, tol, got.get("duty_kW")))
+            imbalance = row["imbalance_kW"]
+            stated[uid] = imbalance
+            if abs(imbalance) > tol:
+                findings.append(
+                    _finding(
+                        "info",
+                        "sim-energy-stated",
+                        f"{uid}: specified split, enthalpy out minus in {imbalance:.4g} kW "
+                        f"(tolerance {tol:.3g} kW; positive: heat the unit would have to take "
+                        "in); stated as a residual of the plant closure, not judged and not a "
+                        "utility",
+                        line(uid),
+                        [uid],
+                        "a specified split conserves no energy: account for the real unit's "
+                        "duties (regenerator reboiler, dryer heating, compression) separately "
+                        "and say so in the review",
+                    )
+                )
+            rows.append(row)
+            continue
         f = 0.0
         term: dict[str, Any] = {}
         row["basis"] = "simulator"
@@ -1018,8 +1124,13 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
         "basis": "formation" if any_reactor else "simulator",
         "reasons": [],
     }
+    if stated or unknown:
+        plant["stated_kW"] = sum(stated.values())
+        plant["stated"] = dict(stated)
     if unsupported:
         plant.update(status="unsupported", reasons=unsupported)
+    elif unknown and have_enthalpy:
+        plant.update(status="not-evaluable", reasons=unknown)
     elif not have_enthalpy:
         plant.update(status="not-evaluable", reasons=["the simulator returned no enthalpies"])
         findings.append(
@@ -1051,9 +1162,10 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
         else:
             h_in, h_out = sum(f_in), sum(f_out)  # type: ignore[arg-type]
             f = term["formation_kW"]
-            residual = h_out - h_in + f - total_q - total_w
+            s_kw = sum(stated.values())
+            residual = h_out - h_in + f - total_q - total_w - s_kw
             tol = _tolerance(
-                total_q,
+                abs(total_q) + sum(abs(v) for v in stated.values()),
                 total_w,
                 sum(abs(x) for x in f_in),  # type: ignore[arg-type]
                 sum(abs(x) for x in f_out),  # type: ignore[arg-type]
@@ -1078,8 +1190,13 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
                         f"plant: boundary enthalpy out minus in ({h_out - h_in + f:.4g} kW"
                         + (", formation basis on DWSIM's data" if any_reactor else "")
                         + f") differs from the heat plus work of the units "
-                        f"({total_q + total_w:.4g} kW) by {residual:.4g} kW (tolerance "
-                        f"{tol:.3g} kW)",
+                        f"({total_q + total_w:.4g} kW"
+                        + (
+                            f", plus {s_kw:.4g} kW stated by specified splits ({', '.join(stated)})"
+                            if stated
+                            else ""
+                        )
+                        + f") by {residual:.4g} kW (tolerance {tol:.3g} kW)",
                         None,
                         [],
                         "find the unit whose closure fails (the record's energy.closure.units); "

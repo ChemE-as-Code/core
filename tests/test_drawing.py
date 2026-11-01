@@ -230,7 +230,7 @@ def _circle(x, y, r) -> str:
 
 
 def test_an_equipment_tag_on_its_own_outline():
-    """pre-release issue 36: 'E-101' written across the E-101 circle; inside the symbol or clear of
+    """'E-101' written across the E-101 circle; inside the symbol or clear of
     it is fine."""
     context = Context(kinds={"E1": TANK}, names={"E1": "E-101"})
     on = _svg(_equipment("E1", _circle(100, 100, 5), _text(100, 95, "E-101", anchor="middle")))
@@ -262,7 +262,7 @@ def test_a_column_tag_over_its_internals_and_its_nozzles():
 
 
 def test_a_line_through_an_equipment_body():
-    """pre-release issue 36: a pipe across a vessel it does not end on; a pipe to a nozzle, or into
+    """A pipe across a vessel it does not end on; a pipe to a nozzle, or into
     the body to an internal, is fine."""
     vessel = _polyline("100,100 130,100 130,160 100,160 100,100")
     context = Context(
@@ -409,7 +409,7 @@ def tag_left_of_the_sheet(directory: Path) -> Path:
 
 def test_viewbox_origin_is_kept_and_crops_contain_their_box():
     """A viewBox that does not start at 0,0: the drawing keeps its origin, and a finding left of
-    the sheet gets a crop that contains it, x0 < x1 (pre-release issue 211)."""
+    the sheet gets a crop that contains it, x0 < x1."""
     svg = etree.fromstring(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-41.25 -5 461.25 302">'
         '<g class="diagram"/></svg>'

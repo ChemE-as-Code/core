@@ -1115,7 +1115,7 @@ def _energy_audit(process: Any, data: Any, cases: list[str]) -> list[Requirement
             req.detail = "no energy audit in the run of case " + ", ".join(older)
             req.hint = "the run was recorded before the audit existed: rerun simulate --fill"
         return [closure, exchangers]
-    failing, unsupported = [], []
+    failing, unsupported, stated = [], [], []
     for case, audit in audits.items():
         plant = (audit.get("closure") or {}).get("plant") or {}
         closure.evidence[case] = plant
@@ -1128,6 +1128,17 @@ def _energy_audit(process: Any, data: Any, cases: list[str]) -> list[Requirement
         elif status != "ok":
             reasons = "; ".join(plant.get("reasons") or []) or "no reason recorded"
             unsupported.append(f"case {case}: {status}: {reasons}")
+        elif plant.get("stated"):
+            stated.append(
+                f"case {case}: {plant.get('stated_kW', 0):.4g} kW stated by specified splits ("
+                + ", ".join(plant["stated"])
+                + ")"
+            )
+    if stated and not failing and not unsupported:
+        closure.detail = (
+            "closes with the specified splits' imbalances stated, not judged (enthalpy out "
+            "minus in): " + "; ".join(stated)
+        )
     if failing:
         closure.status, closure.detail = "fail", "; ".join(failing)
         closure.hint = "find the unit whose closure fails (energy.closure.units in the record)"
@@ -1141,8 +1152,8 @@ def _energy_audit(process: Any, data: Any, cases: list[str]) -> list[Requirement
         )
         closure.hint = (
             "satisfied once every unit's closure is evaluable: reactors on a verified package "
-            "(simulation/energy.py FORMATION_PACKAGES) in a current run; no component "
-            "separator or column top without condenser"
+            "(simulation/energy.py FORMATION_PACKAGES) in a current run; no column top "
+            "without condenser; a component separator recorded before ADR 0038: simulate again"
         )
     bad, open_ = [], []
     for case, audit in audits.items():

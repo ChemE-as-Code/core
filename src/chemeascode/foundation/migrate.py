@@ -12,7 +12,7 @@ Adding an optional field is not a breaking change and needs no transform.
 
 Two transforms edit the text, not a YAML round trip, so comments, key order and spacing stay
 byte for byte: ``v0`` to ``v1`` (:func:`add_schema`) inserts the field as the first key, and the
-LCI dataset's ``v1`` to ``v2`` (:func:`lci_dataset_v2`, pre-release issue 179) rewrites its
+LCI dataset's ``v1`` to ``v2`` (:func:`lci_dataset_v2`) rewrites its
 ``schema:`` line (v1 declared the LCA files' id, ``cheme/lca/v1``; every field v2 adds is optional).
 The hand-written datasets (``lca/datasets/*.yaml``) are inputs; the generated ``lca/dataset.yaml``,
 the layout model, ``checks/status.json`` and review records are not and are left alone. The

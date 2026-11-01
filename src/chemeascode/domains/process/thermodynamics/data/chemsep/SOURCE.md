@@ -1,7 +1,7 @@
 # ChemSep SRK interaction parameters (not shipped)
 
 cheme-as-code no longer ships `srk.ipd` or `srk.json`. Until the ChemSep authors confirm the
-licence of the IPD files (pre-release issue 55), a user installs them with
+licence of the IPD files, a user installs them with
 
     cheme data fetch chemsep-srk            # downloads ChemSep-LITE
     cheme data fetch chemsep-srk --zip lite.zip   # offline, from a downloaded copy
@@ -23,7 +23,7 @@ of `thermodynamics.phase` uses `kij = 0` for every pair and says so in the resul
   `InteractionParameterDB.load_json` reads (the layout of thermo's ChemSep `pr.json`). The
   conversion is a modified version of the ChemSep file.
 
-## Origin of the copy cheme-as-code shipped until pre-release issue 55
+## Origin of the copy cheme-as-code used to ship
 
 - Added to LLM4ChemE in commit 59f77d2 (2026-03-18, "added SRK interaction parameter
   retrieval") with `convert_srk_to_json.py`, moved to `src/data/` in aa82234, and moved to
@@ -58,4 +58,4 @@ of `thermodynamics.phase` uses `kij = 0` for every pair and says so in the resul
   conversion marked as modified.
 
 **Status: awaiting confirmation from the ChemSep authors** that the IPD files, `srk.ipd`
-included, are under the Artistic License 2.0. File their answer here (pre-release issue 55).
+included, are under the Artistic License 2.0. File their answer here.

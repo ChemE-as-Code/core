@@ -1,5 +1,5 @@
 /**
- * What pre-release issue 61 added to the model and the studies beside it: declared operators (chain wheels,
+ * What the operator work added to the model and the studies beside it: declared operators (chain wheels,
  * extension spindles, remote operators, remote-mounted transmitters), the casing hatch, the
  * lifting study and the datasheets, against the real ASU fixtures (core's frozen `/api/layout`,
  * the ASU's committed `layout/lifting-study.csv` and its tree) and small hand-made cases.

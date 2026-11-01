@@ -13,6 +13,7 @@ from chemeascode.templates.install import bundled_files, init, skill_status, ski
 
 runner = CliRunner()
 SKILL = ".claude/skills/review/SKILL.md"
+NOTICE = ".claude/skills/NOTICE.md"
 
 
 def _sha(data: bytes) -> str:
@@ -83,6 +84,32 @@ def test_update_installs_missing_and_outdated_and_keeps_modified(plant, monkeypa
     assert {f.state for f in skill_status(plant)} == {"current"}
 
 
+def test_skills_notice_states_the_licence_and_is_tracked_like_a_skill_file(plant):
+    notice = plant / NOTICE
+    text = notice.read_text(encoding="utf-8")
+    assert "AGPL-3.0-or-later" in text and "are yours" in text
+    # the plant README and the notice tell one story
+    readme = (plant / "README.md").read_text(encoding="utf-8")
+    assert ".claude/skills/NOTICE.md" in readme and "AGPL-3.0-or-later" in readme
+    assert [f.state for f in skill_status(plant) if f.path == NOTICE] == ["current"]
+
+    original = notice.read_bytes()
+    notice.unlink()
+    assert [f.state for f in skill_status(plant) if f.path == NOTICE] == ["missing"]
+    result = _run(plant, "skills", "update")
+    assert result.exit_code == 0 and f"{NOTICE}: installed" in result.stdout
+    assert notice.read_bytes() == original
+
+    notice.write_text("local terms\n")
+    result = _run(plant, "skills", "update")
+    assert result.exit_code == 1
+    assert f"{NOTICE}: warning cheme.skill-modified" in result.stdout
+    assert "skills directory: NOTICE.md" in result.stdout
+    assert notice.read_text() == "local terms\n"
+    assert _run(plant, "skills", "update", "--force").exit_code == 0
+    assert notice.read_bytes() == original
+
+
 def test_update_of_named_skills_only(plant):
     (plant / SKILL).unlink()
     (plant / ".claude/skills/pid-edit/SKILL.md").unlink()
@@ -90,6 +117,9 @@ def test_update_of_named_skills_only(plant):
     assert result.exit_code == 0
     assert (plant / SKILL).is_file()
     assert not (plant / ".claude/skills/pid-edit/SKILL.md").exists()
+    (plant / NOTICE).unlink()
+    assert _run(plant, "skills", "update", "review").exit_code == 0
+    assert not (plant / NOTICE).exists()
 
 
 def test_init_reports_a_modified_skill_and_replaces_it_only_with_force(tmp_path):

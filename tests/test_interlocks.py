@@ -52,8 +52,7 @@ def test_interlock_tags_must_exist(plant: Path, monkeypatch):
     unknown = findings("cheme.interlock-unknown-tag")
     assert len(unknown) == 1 and unknown[0]["ids"] == ["I-07", "XV-9"]
     assert unknown[0]["line"] == 6
-    # The reference numbers valves C1, C2 within each segment: no tag to point an effect at
-    # (pre-release issue 210).
+    # The reference numbers valves C1, C2 within each segment: no tag to point an effect at.
     (plant / "control" / "cause-effect.yaml").write_text(
         INTERLOCK.replace("tag: 66KL21,", "tag: C1,")
     )

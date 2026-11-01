@@ -1,9 +1,8 @@
 # ADR: comparison basis of regional electricity backgrounds
 
-Status: accepted (pre-release issue 306). Code: `domains/assessment/lca/comparability.py`,
+Status: accepted. Code: `domains/assessment/lca/comparability.py`,
 `FactorScope` in `schemas.py`, `backgrounds.py` (packaged scopes), the method-mix check in
-`report.py`. Builds on [lci-scenarios.md](lci-scenarios.md) (pre-release issue 172) and the grid profiles of
-pre-release issue 268.
+`report.py`. Builds on [lci-scenarios.md](lci-scenarios.md) and the grid electricity profiles.
 
 ## Context
 
@@ -98,7 +97,7 @@ so projects on it need no rerun for this.
    --json` and `GET /api/lca` get `comparability` (per scenario) and the sources' `scope`,
    additively; their older `not_comparable` (and a record's `impacts.comparable`) keep their
    meaning: gaps only.
-6. **Data year and publication year (pre-release issue 306 step 3).** `Factor.data_year` and
+6. **Data year and publication year.** `Factor.data_year` and
    `Factor.publication_year` are optional; `year` is never reinterpreted. The year dimension of
    the verdict compares `data_year` where a factor declares it and `year` otherwise, and says
    which (`compared[].years`, and `[data_year / year]` in the reason) whenever a data year takes
@@ -123,7 +122,7 @@ so projects on it need no rerun for this.
   (for example the Ember life-cycle series for all countries, or generation-based factors for
   all with a labelled loss uplift). That decision belongs to the process library.
 - A like-for-like set of grid factors for several countries is built from the user's own copy
-  of Ember's long-format data with `scripts/build_grid_profile.py` (pre-release issue 306 step 4): one basis
+  of Ember's long-format data with `scripts/build_grid_profile.py`: one basis
   for all (`basis: direct`, `gases: co2`, `accounting: generation`, `delivery: generation`,
   `mix: grid-average`), `data_year` set, the release, licence (CC BY 4.0, as Ember's page states),
   attribution and the SHA-256 of the copy recorded. The package does not ship the result: the

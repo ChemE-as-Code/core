@@ -1,10 +1,10 @@
 """Stale and derived stream values are reported and exported honestly: the stream table and the
-generated sheets mark or leave out stale propagated and simulated values
-(pre-release issues 187, 188), molar and normal-volume flows reach the sheets
-(pre-release issue 217), propagated values carry no copied origin or uncertainty
-(pre-release issue 218) and go stale with the molar masses they were converted with
-(pre-release issue 219), and ``props --fill`` rewrites a property_method block at the end of the
-file (pre-release issue 253)."""
+generated sheets mark or leave out stale propagated and simulated values,
+molar and normal-volume flows reach the sheets,
+propagated values carry no copied origin or uncertainty
+and go stale with the molar masses they were converted with,
+and ``props --fill`` rewrites a property_method block at the end of the
+file."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def _state(ws: Workspace, sid: str) -> dict:
     return next(s for s in data["streams"] if s["id"] == sid).get("state", {}).get("design", {})
 
 
-# -- pre-release issue 187: stale propagated values in the stream table and the sheets -------------
+# -- stale propagated values in the stream table and the sheets ------------------------------------
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ def test_sheet_leaves_out_what_it_lists_as_stale(ammonia_stale):
             assert not getattr(conn, prop)
 
 
-# -- pre-release issue 188: values written by cheme process simulate -------------------------------
+# -- values written by cheme process simulate ------------------------------------------------------
 
 
 def test_simulated_values_go_stale_when_the_model_changes(tmp_path):
@@ -206,7 +206,7 @@ def test_api_streams_sees_simulated_values_as_current_and_stale(tmp_path):
     assert s2["composition"]["stale"] and s2["properties"]["temperature"]["stale"]
 
 
-# -- pre-release issue 217: molar and normal-volume flows in the sheets ----------------------------
+# -- molar and normal-volume flows in the sheets ---------------------------------------------------
 
 
 def _sheet_flows(ws: Workspace, sheet: str, sid: str) -> dict[str, list]:
@@ -267,7 +267,7 @@ def test_normal_volume_flow_is_not_exported_as_actual_volume(tmp_path):
     assert "Nm3/h" not in flows["moleFlow"][0].displayText  # it shows the kmol/h
 
 
-# -- pre-release issue 218: propagated values carry no origin or uncertainty -----------------------
+# -- propagated values carry no origin or uncertainty ----------------------------------------------
 
 
 def test_propagate_drops_the_origin_and_uncertainty_of_copied_values(tmp_path):
@@ -290,7 +290,7 @@ def test_propagate_drops_the_origin_and_uncertainty_of_copied_values(tmp_path):
     assert not [f.format() for f in findings if f.rule == "cheme.provenance-origin"]
 
 
-# -- pre-release issue 219: propagated fingerprints include the molar masses they were converted
+# -- propagated fingerprints include the molar masses they were converted
 #    with ------------------------------------------------------------------------------------------
 
 
@@ -306,8 +306,8 @@ def test_molar_mass_change_makes_mixer_outlet_stale(tmp_path):
 
 def test_values_converted_without_molar_masses_keep_their_fingerprints(tmp_path):
     """Pass-through values, split fractions and flows summed from mass flows keep the
-    fingerprints they had before (taken from the code before pre-release issue 219): no stale wave
-    for them."""
+    fingerprints they had before (taken from the code before the molar masses entered them): no
+    stale wave for them."""
     from tests.test_issue50 import _plant, _run
 
     ws = _plant(tmp_path)
@@ -323,7 +323,7 @@ def test_values_converted_without_molar_masses_keep_their_fingerprints(tmp_path)
     assert s4["composition"]["fingerprint"] != "676f15e184bbf3ca"
 
 
-# -- pre-release issue 253: property_method at the end of materials.yaml without a newline ---------
+# -- property_method at the end of materials.yaml without a newline --------------------------------
 
 
 def test_write_method_without_trailing_newline(tmp_path):

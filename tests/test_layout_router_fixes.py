@@ -142,7 +142,6 @@ def test_ends_whose_rack_points_nearly_meet_stay_local():
 def test_a_route_over_crossing_racks_turns_at_the_crossing():
     # PR-B crosses PR-A mid-segment, 50 m from every rack vertex: the route turns from one onto
     # the other there instead of running to a rack end and jumping across open ground
-    # (pre-release issue 192)
     racks = {"PR-A": [[10, 90], [10, 60], [110, 60]], "PR-B": [[60, 10], [60, 110]]}
     plan = SitePlan.model_validate(
         {
@@ -406,7 +405,7 @@ def test_a_pinned_run_segment_ends_its_chain_at_the_tee():
 
 
 def test_router_and_line_route_check_share_one_rack_reach():
-    """pre-release issue 21: the site plan's rack_reach is the one value; routing.yaml's is
+    """The site plan's rack_reach is the one value; routing.yaml's is
     deprecated."""
     from chemeascode.domains.spatial.schemas import RoutingRules, rack_reach
 

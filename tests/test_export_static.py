@@ -329,7 +329,7 @@ def test_status_is_left_out_of_a_snapshot_with_excludes(committed: Path, tmp_pat
     assert "status" not in published["entries"]
 
 
-# -- the output directory (pre-release issue 183) --------------------------------------------------
+# -- the output directory --------------------------------------------------------------------------
 
 
 def _intact(root: Path) -> None:
@@ -417,7 +417,7 @@ def test_a_snapshot_with_foreign_data_is_not_replaced(
     committed: Path, tmp_path: Path, planted: str
 ):
     """data/ of a previous snapshot holds only the files the export names: anything else there
-    is not the export's to delete (pre-release issue 320)."""
+    is not the export's to delete."""
     out = tmp_path / "snap"
     export_static(committed, out)
     target = out / "data" / planted.rstrip("/")
@@ -447,7 +447,7 @@ def test_a_snapshot_with_symlinked_data_is_not_replaced(committed: Path, tmp_pat
 
 @pytest.mark.parametrize("where", ["{ROOT}", "{ROOT}/PID", "{ROOT}/Build", "{ROOT}/docs/Snap"])
 def test_case_variants_of_the_repository_are_refused(committed: Path, where: str):
-    """On a case-insensitive filesystem Plant/PID is plant/pid (pre-release issue 320)."""
+    """On a case-insensitive filesystem Plant/PID is plant/pid."""
     out = Path(where.replace("{ROOT}", str(committed.parent / committed.name.upper())))
     with pytest.raises(ExportError, match="plant repository"):
         check_output(out, committed, ignore_case=True)
@@ -494,7 +494,7 @@ def test_a_failed_export_keeps_the_previous_snapshot(committed: Path, tmp_path: 
     assert [p.name for p in out.parent.iterdir()] == ["snap"]
 
 
-# -- answers built from excluded files are withheld (pre-release issue 230) ------------------------
+# -- answers built from excluded files are withheld ------------------------------------------------
 
 
 def _withheld(manifest: dict) -> dict[str, str]:
@@ -573,7 +573,7 @@ def test_each_answer_is_withheld_with_its_inputs(tmp_path: Path, glob: str, with
 
 def test_excluding_the_flowsheet_withholds_the_bfd_and_pfd_drawings(tmp_path: Path):
     """The BFD and PFD are generated from the flowsheet: their drawings show its blocks and
-    streams, so they are not published when it is excluded (pre-release issue 320)."""
+    streams, so they are not published when it is excluded."""
     root = tmp_path / "separation"
     shutil.copytree(EXAMPLES / "process-separation", root)
     out = tmp_path / "snap"

@@ -38,7 +38,7 @@ describe("snapshotKey (same cases as core's tests/test_export_static.py)", () =>
     expect(snapshotKey("file", { path: "docs/a b&c.md" })).toBe("file?path=docs/a b&c.md");
   });
 
-  it("keys an encoded path segment by its raw value, as core records it (pre-release viewer issue 46)", () => {
+  it("keys an encoded path segment by its raw value, as core records it", () => {
     expect(snapshotKey(`datasheets/${encodeURIComponent("E 101")}`)).toBe("datasheets/E 101");
     expect(snapshotKey(`datasheets/${encodeURIComponent("W-Ü1&2")}.svg`, { generated: undefined })).toBe("datasheets/W-Ü1&2.svg");
     expect(snapshotKey(`datasheets/${encodeURIComponent("A%B")}`)).toBe("datasheets/A%B");

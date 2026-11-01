@@ -2,8 +2,8 @@
 /**
  * One stacked bar per scenario (`scenarioBars` in `src/lib/lca.ts`): each contributor a segment in
  * its colour, credits left of the zero line, the total at the end, a legend below. Plain HTML, so
- * it reflows with the page. A scenario lacking data the baseline has gets no bar and no total
- * (pre-release issue 172): a shorter bar would read as a lower footprint.
+ * it reflows with the page. A scenario lacking data the baseline has gets no bar and no total:
+ * a shorter bar would read as a lower footprint.
  */
 import { colourOf, impactText, labelOf, type Bars } from "@/lib/lca";
 import type { LcaReport } from "@/api";

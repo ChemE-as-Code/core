@@ -7,7 +7,7 @@
 
 `cheme layout build` ran one power tray along each rack, at `lane_fraction` of the rack width
 left of its centreline, as wide as its cables needed up to the largest of `widths_mm`. In the
-ammonia-1 run (process-library#86, cheme 1.0.1) the 10 kV cables of the compressors K-101,
+ammonia-1 run (process-library#304, cheme 1.0.1) the 10 kV cables of the compressors K-101,
 K-501 and K-701 filled the main-rack power tray to 53-54 % against a 30 % limit. The trays on
 PR-10, PR-7, the switchgear room leg and two links were also over the limit. The `tray-fill`
 finding said to run a second tray, but `electrical/tray-rules.yaml` could not declare one: a

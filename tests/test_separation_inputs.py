@@ -151,7 +151,7 @@ GIVEN_TERNARY = {
 
 
 def test_binary_only_flags_do_not_crash_a_ternary():
-    """The same flags for any number of components (pre-release issue 254): azeotrope=False is left
+    """The same flags for any number of components: azeotrope=False is left
     out with a note, azeotrope=True is refused, never a TypeError."""
     ret = select_with_retrieved_properties(
         ["a", "b", "c"],
@@ -171,7 +171,7 @@ def test_binary_only_flags_do_not_crash_a_ternary():
 
 def test_a_misspelt_flag_is_an_error_and_a_multicomponent_flag_is_left_out_for_a_binary():
     """Only the other screening's own keywords are left out; a misspelt flag never runs on the
-    function's default (pre-release issue 254)."""
+    function's default."""
     given = {k: v[:2] for k, v in GIVEN_TERNARY.items() if k != "relative_volatilities"}
     given["relative_volatilities"] = [2]
     ret = select_with_retrieved_properties(

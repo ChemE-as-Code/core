@@ -1,6 +1,11 @@
 {
  "schema": "cheme/skills-manifest/v1",
  "skills": {
+  "": {
+   "NOTICE.md": [
+    "e2911e77e20866790695999322a50029637107d7ab85e9bc4f30a669c1a2b96a"
+   ]
+  },
   "area-classification": {
    "SKILL.md": [
     "263621badb5a066205fb217ee32e90f1d6f1a75285857670f15b7a439c33ae7f",
@@ -293,6 +298,7 @@
   },
   "lca": {
    "SKILL.md": [
+    "4e6fd3cfaf6faa490c8fbe2710c6f4b7d1afdc80b0f6421c5511ddd05bad9817",
     "5a86aaad0699e37e15d89741f7396fd02b6bb3473f73c089827feb1eeb1a3c63",
     "52f7e1279b40ef55e1313b7b3d49729bc1f60e9e321bf9a01150ea3b6d37cf8d",
     "6b3725fd3a194e0f938b05a5d9e55874e683122a9004767aab04caaa1752a1e8",
@@ -384,6 +390,7 @@
   },
   "phase-calculation": {
    "SKILL.md": [
+    "7c4d852b913a3c20f513637728339d54554f8f47a7a4beb4a682dd65b88fb1b1",
     "cd1b329f3e7721babaaf7431ebe4bdb8e6d9c7226e4740c48c8e2edd12bdeea1",
     "328f372e010426516bd1f7782303a5a3b28b576c5e291c8ff9ddaf709dfd220d",
     "8ad2a1038dc2b9c3b38369e2f1145ce0e5f483cb44a340394b0f679b5a9c578a",
@@ -561,8 +568,10 @@
   },
   "process-simulation": {
    "SKILL.md": [
+    "cca9e5f6861564f7ebacf813aa78e9f23adf32684b3c74ff11e04826aa7734fb",
     "e8646eb59b17d589fe380dfffe6c03a465493f91c22bced141c0ce18bbea10dc",
     "0c5c98c65b6d49c7cdd6220c499a4355f85d2bda1f9ef34d28b6dfc2cf073f6d",
+    "6230c2a119091e16dc892479853b41a273ea83c4e4fdda6f094ea0ba7007fdcc",
     "4eb15a89121d205bc9ff6ebb92f981d4d39095fabf5ba2a902f6bdf99907ec12",
     "865edcf370b652ee51611a9325ec0a2995e14114bacd24f0470c9ecbb5e1bcb1",
     "a29b41870b85e183ccbe2409aebdaedd61c2645190207f683b746fa3d30cb75c",

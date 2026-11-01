@@ -1,4 +1,4 @@
-"""The electrochemical cell contract (``process/cells.yaml``, pre-release issue 366) and its Faraday
+"""The electrochemical cell contract (``process/cells.yaml``) and its Faraday
 balance (domains/process/electrochemical_cell.py), qualified against published data.
 
 Reference data (independent of the code; see docs/framework/electrochemical-cells.md):

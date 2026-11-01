@@ -197,7 +197,7 @@ ETHANOL_DETAIL = DETAIL.replace("ACETONE", "ETHANOL").replace("67-64-1", "64-17-
 
 
 def test_osha_refuses_a_name_without_walking_the_pages():
-    """pre-release issue 207: a name never matches the CAS column, so retrieve walked all 100
+    """A name never matches the CAS column, so retrieve walked all 100
     pages."""
     seen = []
     with pytest.raises(ValueError, match="by CAS number"):
@@ -215,7 +215,7 @@ def test_osha_403_is_reported_once_and_plainly():
 
 
 def test_hazard_data_by_name_go_to_osha_by_the_pubchem_cas_number():
-    """pre-release issue 207: the name is resolved to its CAS number (PubChem) and OSHA is asked for
+    """The name is resolved to its CAS number (PubChem) and OSHA is asked for
     that."""
     seen = []
     routes = {
@@ -234,7 +234,7 @@ def test_hazard_data_by_name_go_to_osha_by_the_pubchem_cas_number():
 
 
 def test_a_refused_osha_request_is_not_repeated_for_each_property():
-    """Review of pre-release PR 266: get_many over the hazard fields sent one 403 request per
+    """get_many over the hazard fields sent one 403 request per
     field."""
     seen = []
     r = PropertyRetriever(

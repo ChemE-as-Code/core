@@ -14,8 +14,8 @@ synthesis (isobutene + methanol, stoichiometric liquid feeds, 2000 kPa(a), decla
 conversion; `tests/test_process_simulate_energy_liquid.py`) Peng-Robinson splits off 0.5 %
 "vapour" at 277.5 K (conversion 0.9943), PR78 0.15 % at 298.15 K (0.9985) and SRK 17.6 %
 (0.8146); the "vapour" is most likely a second liquid labelled vapour. The worker returned no
-extents for a conversion reactor and nothing compared the outcome with the declaration
-(pre-release issue 371). DWSIM's behaviour is not ours to change; the run has to make it visible.
+extents for a conversion reactor and nothing compared the outcome with the declaration.
+DWSIM's behaviour is not ours to change; the run has to make it visible.
 
 Options considered: a warning (the issue's suggestion), an error, or refusing liquid-phase
 reactions on two-phase inlets before the solve (the phase split is only known after it).
@@ -62,7 +62,6 @@ recorded so the shortfall can be inspected.
 
 ## Evidence
 
-- pre-release issue 371.
 - `src/chemeascode/domains/process/simulation/conversion.py`, wired in
   `src/chemeascode/domains/process/simulation/run.py`.
 - `tests/test_process_simulate_conversion.py` (replayed DWSIM results: one liquid, SRK's split,

@@ -6,7 +6,7 @@
 ## Context
 
 The viewer is only as correct as its reading of core's API. Running a `cheme serve` in CI would
-need core, pyDEXPI (private) and a plant repository. Hand-written fixtures drift from what the
+need core, pyDEXPI and a plant repository. Hand-written fixtures drift from what the
 server really sends.
 
 ## Decision
@@ -30,9 +30,9 @@ server really sends.
 
 ## Evidence
 
-- pre-release viewer commit cb87683 (pre-release viewer PR 3) "Playwright (1.63.0, Chromium) against dist/ ... with /api
-  answered from fixtures by route interception"; pre-release viewer commit 93d12bf CI.
-- pre-release viewer commit c7f2b63 (pre-release viewer PR 7) "Regenerate the API fixtures from plantcode and type every
+- "Playwright (1.63.0, Chromium) against dist/ ... with /api
+  answered from fixtures by route interception"; CI.
+- "Regenerate the API fixtures from plantcode and type every
   field it sends".
-- pre-release viewer commit ddf620e (pre-release viewer PR 34) "route.fetch reached a real server: none on CI".
+- "route.fetch reached a real server: none on CI".
 - `.github/workflows/ci.yml`, `playwright.config.ts`.

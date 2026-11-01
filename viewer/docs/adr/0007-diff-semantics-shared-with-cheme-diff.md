@@ -26,7 +26,6 @@ views share pan and zoom.
 
 ## Evidence
 
-- pre-release viewer commit 76e15e3: "changed items highlighted, as plantcode diff does".
-- pre-release viewer commit 642a723 (pre-release viewer PR 1) "highlight CSS in plantcode diff colours, change table and
-  projection diff"; pre-release viewer commit cb87683 (pre-release viewer PR 3) title-block highlight; pre-release viewer commit 7e2a1da
-  (pre-release viewer PR 7) plant item of each changed object.
+- "changed items highlighted, as plantcode diff does".
+- "highlight CSS in plantcode diff colours, change table and
+  projection diff"; title-block highlight; plant item of each changed object.

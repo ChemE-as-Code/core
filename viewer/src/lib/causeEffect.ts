@@ -25,7 +25,7 @@ export function actionTone(action: InterlockAction | (string & {})): ActionTone 
 
 /**
  * The actions of a matrix cell, in order: none for "", several where one interlock has more than
- * one effect on the tag and core joined them with " + " (`close + alarm`, pre-release PR 269). The words are
+ * one effect on the tag and core joined them with " + " (`close + alarm`). The words are
  * core's {@link InterlockAction}s as the matrix spells them, not checked against that list.
  */
 export function cellActions(cell: string): string[] {

@@ -16,7 +16,7 @@ and its findings "maturity screening claimed". A reader could not tell which axi
 
 ## Decision
 
-- `docs/concepts/glossary.md` is the one vocabulary of ChemE-as-Code (pre-release issue 323). The other
+- `docs/concepts/glossary.md` is the one vocabulary of ChemE-as-Code. The other
   ChemE-as-Code repositories (process library, viewer, website, papers) follow it. A change to it
   is a change to a contract between repositories and needs an ADR.
 - The project is **ChemE-as-Code**. Engineering-as-Code, Plant-as-Code and Design-Ops are
@@ -41,11 +41,11 @@ and its findings "maturity screening claimed". A reader could not tell which axi
 - Positive: no migration, since the JSON report, the schemas and the rule ids are unchanged.
 - Negative: finding messages and the text output changed wording; scripts that parsed the old
   text (`level: ...`, `maturity ... below ...`) need to read `--json` instead, as they should.
-- Follow-ups: ChemE-as-Code/process-library#87 and ChemE-as-Code/website#71 adopt the
-  glossary; pre-release viewer issue 35 shows stage and calculation maturity apart.
+- Follow-ups: ChemE-as-Code/process-library#305 and ChemE-as-Code/website#150 adopt the
+  glossary; the viewer shows stage and calculation maturity apart.
 
 ## Evidence
 
-- pre-release issue 323; `docs/concepts/glossary.md`, `docs/framework/maturity.md`,
+- `docs/concepts/glossary.md`, `docs/framework/maturity.md`,
   `src/chemeascode/project/maturity.py` (`report_lines`, the `cheme.maturity-claim-exceeds`
   message, the gate detail), `tests/test_maturity.py`, `tests/test_maturity_gate.py`.

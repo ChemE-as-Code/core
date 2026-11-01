@@ -1,7 +1,7 @@
 # Package data of cheme-as-code's line-loss calculation (domains/process/hydraulics.py). Every value
 # names its source; check the rows against the printed tables before a contractual use.
 #
-# Verification (issue core#66). No table here has been checked against the printed source
+# Verification. No table here has been checked against the printed source
 # (`print_checked: false`). Each row's `check` names the independent public reproductions that
 # agree with it (keys of `checks`); a reproduction is not the print. Rows that remain without
 # any independent confirmation: none in roughness and fittings; walls: schedule 40 DN 350, 500

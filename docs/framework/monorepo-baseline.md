@@ -6,7 +6,7 @@ baseline itself is never rewritten.
 
 ## Sources
 
-| folder | from (pre-release repository, kept private) | commit |
+| folder | from (earlier repository, kept private) | commit |
 |---|---|---|
 | `/` (the `cheme-as-code` package, docs, examples) | core | `ed538265ee4a950d32d757190eb1c8556708eb10` |
 | `viewer/` | viewer | `c1d7663eff89ddc6d7b8f3efc734e153fe87d4c1` |
@@ -22,19 +22,11 @@ runner writes at run time (logs, `runs.jsonl`, transcripts). They are project-sp
 outside this repository; `agent-cli/jobs/examples/` and `agent-cli/tasks/templates/` are the
 reusable parts.
 
-## References to the pre-release repositories
-
-Issue, pull request and commit references into the pre-release repositories are plain text
-without links: "pre-release issue 123", "pre-release PR 340" or "pre-release commit 4e3f477"
-for core, "pre-release viewer PR 49" or "pre-release viewer commit 76e15e3" for the viewer, and
-so on for agent-cli. The identifiers are kept for traceability inside the
-project; they do not resolve in this repository. References to repositories that continue (for
-example `process-library`) are unchanged.
-
 ## Run records
 
 Run records written before the baseline (`runs/<run-id>/run.yaml` in plant repositories) are
-unchanged: their `core_commit` and runner commit name pre-release commits of core and agent-cli.
+unchanged: their `core_commit` and runner commit name commits of the earlier core and
+agent-cli repositories.
 Records written from the baseline on name commits of this repository. The toolkit and the runner
 are recorded independently, each from the source that was installed or run; `same_revision:
 true` means both were the same clean commit of this repository ([run records](../agent-design-run.md)).

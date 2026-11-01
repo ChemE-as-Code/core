@@ -638,7 +638,7 @@ def _drawing_findings(root: Path) -> list[tuple[str, str]]:
 
 
 def test_router_output_is_drawing_clean(empty: Path):
-    """pre-release issue 44: the section drawn from fragments only comes out clean for the drawing
+    """The section drawn from fragments only comes out clean for the drawing
     lint.
 
     Before, LIC-4107's signal to LV-4107 ran down through the LSLL-4108 bubble and its

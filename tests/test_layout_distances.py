@@ -193,7 +193,7 @@ def rack(id_, *points, width=4.0):
 
 
 def test_racks_crossing_mid_segment_join_at_the_crossing():
-    # pre-release issue 192: no vertex of either rack is near the crossing
+    # no vertex of either rack is near the crossing
     network = RackNetwork([rack("PR-A", (0, 20), (40, 20)), rack("PR-B", (20, 0), (20, 40))])
     assert network.joints == [("PR-A", 20.0, "PR-B", 20.0, 0.0)]
     assert network.path_length("PR-A", 20.0, "PR-B", 20.0) == pytest.approx(0.0)
@@ -249,7 +249,6 @@ equipment:
 
 
 def test_a_zero_length_rack_or_road_is_a_schema_error_not_a_crash():
-    # pre-release issue 236
     for kind in ("racks", "roads"):
         extra = ", levels: [6]" if kind == "racks" else ""
         site = (

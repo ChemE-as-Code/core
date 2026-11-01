@@ -1,5 +1,5 @@
-"""Datasheet main dimensions, weights, nozzle schedule and the generated outline drawing
-(pre-release issue 62): the schema stays compatible with existing datasheets, the drawing is
+"""Datasheet main dimensions, weights, nozzle schedule and the generated outline drawing:
+the schema stays compatible with existing datasheets, the drawing is
 deterministic and drift-checked, the checks against the equipment list, the layout model, the
 P&IDs and the line list, the ``kind: datasheets`` gate options, ``draft``/``fill`` and the
 ``cheme datasheets drawing`` command."""
@@ -513,7 +513,7 @@ def test_drawing_of_a_copied_plant_matches(plant: Path, tmp_path: Path):
     assert [s.state for s in drawings(copy).states] == ["current"]
 
 
-# -- pre-release issue 96: stacked and housed items, schedule service, saddles clear of bottom
+# -- stacked and housed items, schedule service, saddles clear of bottom
 #    nozzles ---------------------------------------------------------------------------------------
 
 

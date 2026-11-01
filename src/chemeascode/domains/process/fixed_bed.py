@@ -138,7 +138,7 @@ def solve_bed(
         raise BedError("no rate law for reaction " + ", ".join(lacking))
     if not reactions:
         raise BedError("the bed has no reactions")
-    # as solve_cstr: no flow, no gas density for Ergun (pre-release issue 251)
+    # as solve_cstr: no flow, no gas density for Ergun
     if sum(feed.values()) <= 0:
         raise BedError("the feed is empty")
     mass, volume = bed_mass(bed, catalyst)

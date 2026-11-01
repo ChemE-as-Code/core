@@ -1,5 +1,5 @@
-"""The factor status of every exchange, ``--strict`` and the gate's ``factors-published``
-(pre-release issue 322): a result computed with example, assumed, proxy or estimated factors, or
+"""The factor status of every exchange, ``--strict`` and the gate's ``factors-published``:
+a result computed with example, assumed, proxy or estimated factors, or
 with a gap, is never passed as a published one.
 
 The plant is ``examples/process-blocks`` with the study of ``test_lca_coverage``.

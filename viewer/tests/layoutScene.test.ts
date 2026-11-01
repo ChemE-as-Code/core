@@ -57,7 +57,7 @@ describe("equipmentGeometry", () => {
     expect(equipmentGeometry("horizontal_cylinder", [6, 1.5, 1.5]).size).toEqual([6, 1.5, 1.5]);
   });
 
-  it("raises a horizontal cylinder whose overall height exceeds its diameter (pre-release viewer issue 45)", () => {
+  it("raises a horizontal cylinder whose overall height exceeds its diameter", () => {
     // cheme-as-code's extent for a vessel on saddles: length, diameter, axis height + radius.
     const geometry = equipmentGeometry("horizontal_cylinder", [5, 1.5, 2.5]);
     expect(geometry).toEqual({ shape: "cylinder", axis: "x", size: [5, 1.5, 1.5], base: 1 });

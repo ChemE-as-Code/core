@@ -1,4 +1,4 @@
-"""The candidate attainable region (pre-release issue 157 item 11): the convex hull of PFR, CSTR and
+"""The candidate attainable region: the convex hull of PFR, CSTR and
 CSTR-then-PFR paths, checked on the textbook cases: first-order series reactions, where plug
 flow is best, and Van de Vusse kinetics, where a CSTR followed by a PFR beats both."""
 

@@ -108,7 +108,7 @@ def _set_double(element: etree._Element, path: str, value: float) -> None:
 
 
 def clean_title_block(root: etree._Element) -> etree._Element:
-    """The skeleton without pyDEXPI's sample title block (pre-release issue 10).
+    """The skeleton without pyDEXPI's sample title block.
 
     Every MetaData text is emptied (the sheet format stays), the status reads "for review",
     the Model and diagram get the placeholders ``cheme sheet new`` replaces, and the title

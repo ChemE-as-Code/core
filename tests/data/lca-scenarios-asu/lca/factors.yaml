@@ -1,4 +1,4 @@
-# SYNTHETIC test factors (core#172): the regional electricity values are invented for the tests
+# SYNTHETIC test factors: the regional electricity values are invented for the tests
 # and demonstrate the scenario contract only. The baseline uses the packaged DESNZ UK profile as
 # a proxy, like the process library's ASU.
 schema: cheme/lca/v1

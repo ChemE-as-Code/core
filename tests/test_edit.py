@@ -1,5 +1,5 @@
-"""cheme move / rename / set (pre-release issue 14), the copy options that adapt a copy
-(pre-release issue 8), and cheme.duplicate-tag."""
+"""cheme move / rename / set, the copy options that adapt a copy,
+and cheme.duplicate-tag."""
 
 from collections import Counter
 from pathlib import Path
@@ -70,7 +70,7 @@ def _points(root: etree._Element) -> list[tuple[str, str]]:
     ]
 
 
-# -- copy (pre-release issue 8) --------------------------------------------------------------------
+# -- copy ------------------------------------------------------------------------------------------
 
 
 def test_copy_instrument_with_another_measured_variable_retags_sensor_and_actuator(sheet: Path):
@@ -245,7 +245,7 @@ def test_validate_reports_duplicate_tags_across_sheets(sheet: Path):
     assert any(f.file == "pid/P-02.xml" and "pid/P-01.xml" in f.message for f in found), found
 
 
-# -- move (pre-release issue 14) -------------------------------------------------------------------
+# -- move ------------------------------------------------------------------------------------------
 
 
 def test_move_shifts_symbol_nodes_and_labels_only(sheet: Path):
@@ -298,7 +298,7 @@ def test_move_and_rename_refuse_unknown_ids(sheet: Path, monkeypatch):
     assert out.exit_code == 2
 
 
-# -- rename (pre-release issue 14) -----------------------------------------------------------------
+# -- rename ----------------------------------------------------------------------------------------
 
 
 def test_rename_with_children_leaves_no_dangling_reference(sheet: Path):
@@ -348,7 +348,7 @@ def test_rename_an_instrument_tag_follows_its_functions(sheet: Path):
     assert "FI" in _label_texts(root, "ProcessInstrumentationFunction1")
 
 
-# -- set (pre-release issue 14) --------------------------------------------------------------------
+# -- set -------------------------------------------------------------------------------------------
 
 
 def test_set_fluid_code_updates_data_and_every_label_showing_it(sheet: Path, monkeypatch):
@@ -406,8 +406,7 @@ def test_set_refuses_unknown_properties_and_bad_values(sheet: Path):
 
 
 def test_set_keeps_every_significant_digit_and_refuses_non_finite_values(sheet: Path):
-    """Doubles are not rounded to six decimals; a signed exponent parses; nan/inf refused
-    (pre-release issue 214)."""
+    """Doubles are not rounded to six decimals; a signed exponent parses; nan/inf refused."""
     result = set_values(
         sheet,
         "Tank1",
@@ -502,8 +501,7 @@ def test_move_a_single_label_text(sheet: Path):
 
 
 def test_a_duplicated_instrument_is_retagged_by_its_id(sheet: Path, monkeypatch):
-    """The duplicate-tag hint leads to a command that also retags the sensor
-    (pre-release issue 8)."""
+    """The duplicate-tag hint leads to a command that also retags the sensor."""
     copy_object(sheet, "ProcessInstrumentationFunction1", "PIF_DUP", offset=(20, 0))
     found = [
         f

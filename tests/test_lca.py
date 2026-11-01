@@ -399,7 +399,7 @@ def test_duty_unit_and_sign(blocks: Path) -> None:
 def test_boundary_gaps_are_reported_and_leave_the_inventory_alone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The boundary check of the TEA (pre-release PR 288), in the LCA (pre-release issue 315):
+    """The boundary check of the TEA, in the LCA:
     reported beside the scope's boundary, never added to the inventory or the classification."""
     # process-recycle: the blocks' terminals, its cooler E1 with no energy stream, no categories
     root = tmp_path / "recycle"

@@ -1,4 +1,4 @@
-"""#49: parallel boundary streams between the same BFD nodes drawn as one connection
+"""Parallel boundary streams between the same BFD nodes drawn as one connection
 (``bfd.aggregate``), listing the streams it represents; balances unchanged."""
 
 import shutil

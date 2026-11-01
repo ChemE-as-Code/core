@@ -1,4 +1,4 @@
-"""Regional LCI scenarios and design cases without duplicating plants (pre-release issue 172).
+"""Regional LCI scenarios and design cases without duplicating plants.
 
 The plant is ``tests/data/lca-scenarios-asu``: a SYNTHETIC ASU-like flowsheet (GOX, GAN, LOX,
 LIN, 10,000 kW of electric power, 9,000 kW to cooling water; a separately computed ``hot`` case
@@ -368,7 +368,7 @@ def test_coproducts_stay_unallocated_and_the_gox_unit_is_explicit(asu: Path) -> 
         "amount": 1,
         "unit": "t",
         "kg": 1000,
-        # pre-release issue 177: any reference unit
+        # any reference unit
         "reference_amount": {"value": 1000, "unit": "kg"},
     }
     assert impacts["allocation"]["method"] == "mass"

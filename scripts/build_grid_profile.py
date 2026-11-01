@@ -13,7 +13,7 @@ project, to be used as its ``lca/factors.yaml`` or merged into it. It records th
 release you name, the licence, the attribution and the SHA-256 of your copy, so the numbers can
 be traced to the exact download.
 
-One basis for every country (pre-release issue 306 step 4). Only the rows ``Power sector emissions``
+One basis for every country. Only the rows ``Power sector emissions``
 / ``CO2 intensity`` in ``gCO2/kWh`` of an economy are read. Their scope, declared on the source
 and so on every factor: ``basis: direct`` (emissions at the power plants, no upstream),
 ``gases: co2`` (CO2 only, no CH4 or N2O), ``accounting: generation`` (the economy's own

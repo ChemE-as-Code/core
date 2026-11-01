@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The simulation's energy audit closes the plant with component separators in it (#60, ADR
+  0038). A specified split's imbalance is stated, not judged: `status: stated`, `imbalance_kW`
+  = enthalpy out minus in from the solved streams (positive: heat the unit would have to take
+  in). DWSIM's `EnergyImb` is recorded with the sign each run shows (`simulator_convention`;
+  `indeterminate` when the stated value is at most twice the tolerance) and not relied on. The plant record gains `stated_kW` and `stated`, its residual takes them
+  as stated heat; the plant tolerance counts each stated magnitude. New rule `cheme.process-sim-energy-stated` (info). `predictive.energy-closure`
+  passes such a plant and names the stated values; runs recorded earlier stay unsupported until
+  simulated again, and `cheme process energy` says so.
+- Licence: one statement everywhere. The skills and scripts `cheme init` writes into a plant
+  repository are AGPL-3.0-or-later; plant data and models are the user's, and running the tools
+  does not put AGPL on what they produce. `REFERENCE.md` said otherwise before.
+
+### Added
+
+- `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
+  `cheme skills status` and `update` track it.
+
 ## 1.3.0 (2026-10-31)
 
 Minor release: the Viewer tells an embedding page how far it is and shows large 3D models in stages
@@ -134,9 +155,8 @@ version. No breaking change since 0.8.0.
 ## 0.8.0 (2026-10-28): initial public release
 
 The first public version of cheme-as-code: the `cheme` toolkit, the viewer and the agent runner
-in one repository, under AGPL-3.0-or-later. Earlier, pre-release development is not part of this
-repository's history; references to it read "pre-release issue 123", "pre-release viewer PR 49",
-"pre-release commit 4e3f477" and the like ([docs/framework/monorepo-baseline.md](docs/framework/monorepo-baseline.md)).
+in one repository, under AGPL-3.0-or-later. Earlier development is not part of this repository's
+history ([docs/framework/monorepo-baseline.md](docs/framework/monorepo-baseline.md)).
 
 ### Toolkit (`cheme`, package `cheme-as-code`, import `chemeascode`)
 

@@ -866,8 +866,7 @@ class SheetObstacles:
 
 def sheet_obstacles(info: _SheetInfo | None) -> SheetObstacles:
     """The obstacles of *info*'s sheet as ``cheme render`` draws it (none when it does not
-    render), so that the router's lines come out clean for the drawing lint
-    (pre-release issue 44)."""
+    render), so that the router's lines come out clean for the drawing lint."""
     found = SheetObstacles()
     if info is None or not Path(info.path).is_file():
         return found

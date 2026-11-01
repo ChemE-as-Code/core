@@ -1,4 +1,4 @@
-"""The documentation of an LCI dataset (pre-release issue 179): what ``cheme assess lca`` fills in,
+"""The documentation of an LCI dataset: what ``cheme assess lca`` fills in,
 and the publication minimum the gate ``lci-documented`` requires.
 
 :func:`document` completes the header of the plant's derived dataset from what the study
@@ -71,7 +71,7 @@ PUBLICATION_MINIMUM: tuple[tuple[str, Callable[[LciDataset], bool], str], ...] =
         lambda d: all(
             any(f.uuid for f in e.flow) for e in d.exchanges if e.type in ("emission", "resource")
         ),
-        "every emission and resource identified in a reference list (pre-release issue 175)",
+        "every emission and resource identified in a reference list",
     ),
     ("rights", lambda d: _given(d.rights), "the terms of its own data"),
     ("data_generator", lambda d: _given(d.data_generator), "who modelled the data"),

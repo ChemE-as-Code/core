@@ -381,7 +381,7 @@ def test_in_temperature_range():
 
 
 def test_a_one_sided_temperature_query_must_lie_in_the_record_range():
-    """pre-release issue 197: --tmin alone kept a record valid only below it (and --tmax alone one
+    """--tmin alone kept a record valid only below it (and --tmax alone one
     only above it)."""
     assert not in_temperature_range(200.0, 400.0, 600.0, None)
     assert not in_temperature_range(1000.0, 2000.0, None, 300.0)

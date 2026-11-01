@@ -40,7 +40,7 @@ describe("actionTone", () => {
   });
 });
 
-describe("cells with several actions (pre-release PR 269)", () => {
+describe("cells with several actions", () => {
   it("splits a cell on ' + ' in core's order", () => {
     expect(cellActions("close + alarm")).toEqual(["close", "alarm"]);
     expect(cellActions("trip")).toEqual(["trip"]);

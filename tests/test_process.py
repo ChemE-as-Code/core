@@ -468,7 +468,7 @@ def test_unsupported_scope_and_internal_streams_cancel(recycle):
 
 
 def test_balance_of_every_case(blocks):
-    """A second case is balanced too (pre-release issue 185): its imbalance names it, the default
+    """A second case is balanced too: its imbalance names it, the default
     case stays clean, and the info findings are not repeated per case."""
     infos = sorted(f.message for f in _rules(blocks) if f.level == "info")
 

@@ -201,8 +201,8 @@ def run(
             values["shaft_kW"] = shaft
             values["duty_kW"] = shaft * eta if kind == "expander" else shaft / eta
         solved[unit] = values
-    # conversion reactors: the conversion DWSIM reached against the declared one
-    # (pre-release issue 371); one whose liquid left by a missing outlet (the worker's message) is
+    # conversion reactors: the conversion DWSIM reached against the declared one;
+    # one whose liquid left by a missing outlet (the worker's message) is
     # not comparable
     named = {m.split(":")[0] for m in out.get("messages") or []}
     reached = conversion.achieved(model, out, skip=named)

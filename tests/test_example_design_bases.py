@@ -1,4 +1,4 @@
-"""The examples' design bases (process/design-basis.yaml, pre-release issue 315): they load, name
+"""The examples' design bases (process/design-basis.yaml): they load, name
 the flowsheet terminals they describe, cite a source for the capacity and agree with the flowsheet
 values they restate."""
 
@@ -12,7 +12,7 @@ from chemeascode.foundation.workspace import Workspace
 from chemeascode.project.validate import validate_workspace
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
-#: examples with a cited design basis; the others have none (see the PR of pre-release issue 315)
+#: examples with a cited design basis; the others have none
 WITH_BASIS = ["process-ammonia", "process-double-column"]
 
 

@@ -1,4 +1,4 @@
-"""Thermal screening of reactors (pre-release issue 157 item 8): adiabatic rise, MTSR, Stoessel's
+"""Thermal screening of reactors: adiabatic rise, MTSR, Stoessel's
 class and the hot spot's sensitivity of a cooled bed, with their findings and cheme process
 reactor-hazards."""
 

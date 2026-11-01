@@ -1,4 +1,4 @@
-"""Provider profiles (``brightway.mapping_profiles``, pre-release issue 168): the study's own
+"""Provider profiles (``brightway.mapping_profiles``): the study's own
 mappings first, then each selected profile's, by the flowsheet's terms.
 
 The exchange contract is provider-independent: a feed or product is named by its key and, for

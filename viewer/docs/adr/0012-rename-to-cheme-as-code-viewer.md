@@ -26,6 +26,6 @@ prefix); schema ids `cheme/<kind>/v1`; `CHEME_API` / `VITE_CHEME_API` for the AP
 
 ## Evidence
 
-- pre-release viewer commit bfd88ce (pre-release viewer PR 14) "Rename plantcode to cheme-as-code: command cheme, ids
+- "Rename plantcode to cheme-as-code: command cheme, ids
   cheme.<rule>".
-- pre-release viewer commit 76e15e3 (README titled `plantcode-viewer`); README intro.
+- The first README, titled `plantcode-viewer`; README intro.

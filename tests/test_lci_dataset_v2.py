@@ -1,6 +1,6 @@
-"""The LCI dataset contract v2 (``cheme/lci_dataset/v2``): documentation (pre-release issue 179),
-elementary flow identities and resources (pre-release issue 175), units and energy carriers
-(pre-release issue 177) and data quality per exchange (pre-release issue 178), and the migration of
+"""The LCI dataset contract v2 (``cheme/lci_dataset/v2``): documentation,
+elementary flow identities and resources, units and energy carriers
+and data quality per exchange, and the migration of
 v1 datasets.
 
 The plant is ``examples/process-blocks`` (see ``test_lca.py``): 1000 kg/h feed and 350 kW of
@@ -105,7 +105,7 @@ def _write(root: Path, scope: dict, factors: dict | None = None) -> None:
     (root / "lca" / "factors.yaml").write_text(yaml.safe_dump(factors or FACTORS))
 
 
-# -- pre-release issue 179: documentation, version, migration --------------------------------------
+# -- documentation, version, migration -------------------------------------------------------------
 
 
 def test_a_v1_dataset_loads_with_defaults_and_findings(blocks: Path) -> None:
@@ -229,7 +229,7 @@ def test_formulas_must_give_the_amount() -> None:
         LciDataset.model_validate(dataset)
 
 
-# -- pre-release issue 175: elementary flow identities, sub-compartments, resources ----------------
+# -- elementary flow identities, sub-compartments, resources ---------------------------------------
 
 
 def _resource_scope() -> dict:
@@ -395,7 +395,7 @@ def test_the_crosswalk_records_its_sources_and_only_well_formed_uuids() -> None:
 
 
 def test_an_ef31_identity_is_used_once_the_crosswalk_records_it(monkeypatch) -> None:
-    """pre-release issue 313: identities() gives the EF 3.1 identity where the crosswalk has its
+    """identities() gives the EF 3.1 identity where the crosswalk has its
     UUID, and uuid: null (reported) where it has not. The UUID here is a test value, not EF
     3.1's."""
     from chemeascode.domains.assessment.lca import elementary
@@ -417,7 +417,7 @@ def test_an_ef31_identity_is_used_once_the_crosswalk_records_it(monkeypatch) -> 
     assert high[0].uuid is None and elementary.unverified(high)
 
 
-# -- pre-release issue 177: units, energy carriers, functional units, product state ----------------
+# -- units, energy carriers, functional units, product state ---------------------------------------
 
 
 def test_the_lci_units_live_in_foundation_units() -> None:
@@ -492,7 +492,7 @@ def _with_utility(root: Path, utility: str) -> None:
 
 
 def test_steam_carriers_get_their_pressure_and_level_from_the_utility(blocks: Path) -> None:
-    """pre-release issue 313: the flowsheet's utility level gives the carrier its level, temperature
+    """The flowsheet's utility level gives the carrier its level, temperature
     and pressure (bar(a); a gauge pressure read against 101.325 kPa)."""
     _write(blocks, SCOPE)
     _with_utility(
@@ -596,7 +596,7 @@ def test_a_functional_unit_that_cannot_be_converted_is_an_error(blocks: Path) ->
         LcaFile.model_validate({**SCOPE, "functional_unit": {"product": "P", "unit": "lb"}})
 
 
-# -- pre-release issue 178: pedigree per exchange, gsd2, data quality rating -----------------------
+# -- pedigree per exchange, gsd2, data quality rating ----------------------------------------------
 
 
 def _exchange(report, key: str):

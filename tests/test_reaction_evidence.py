@@ -1,6 +1,5 @@
 """Reaction evidence (process/reaction-evidence.yaml): the schema, the cheme.evidence-* rules,
-the route comparison of cheme chemistry evidence and the findings in cheme validate
-(pre-release issue 142).
+the route comparison of cheme chemistry evidence and the findings in cheme validate.
 
 The worked example is ``examples/reaction-evidence-ethyl-acetate``: three routes to ethyl
 acetate from papers and patents read in full, with conflicting kinetics, sources that could

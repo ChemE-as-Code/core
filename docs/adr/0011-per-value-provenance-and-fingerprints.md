@@ -37,10 +37,9 @@ they were generated from.
 
 ## Evidence
 
-- Process schema with per-value provenance and the generated BFD/PFD provenance comment:
-  pre-release commit 17ab51f, pre-release commit 18dc7d5 in pre-release PR 45.
-- `foundation/provenance.py` and review `basis`: pre-release commit 0ac1131 in pre-release PR 58.
-- Engineering contract pre-release PR 119; one value fingerprint pre-release PR 123; `origin`
-  pre-release PR 130; honest staleness for propagated and simulated values pre-release PR 275.
+- Process schema with per-value provenance and the generated BFD/PFD provenance comment.
+- `foundation/provenance.py` and review `basis`.
+- Engineering contract; one value fingerprint; `origin`; honest staleness for propagated and
+  simulated values.
 - [contract.md](../framework/contract.md), [architecture.md](../framework/architecture.md)
   ("Identity, relationships, provenance", "Change impact"), `src/chemeascode/project/impact.py`.

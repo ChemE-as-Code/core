@@ -125,7 +125,7 @@ export function nodePidLink(
 
 // -- kinetics -------------------------------------------------------------------------------
 
-/** `kinetics` of a response, empty when a core before pre-release viewer issue 23 serves null. */
+/** `kinetics` of a response, empty when an older core serves null. */
 export function kineticsOf(view: Pick<ReactionsView, "kinetics"> | null | undefined): ReactionsKinetics {
   return view?.kinetics ?? { file: null, catalysts: [], findings: [] };
 }

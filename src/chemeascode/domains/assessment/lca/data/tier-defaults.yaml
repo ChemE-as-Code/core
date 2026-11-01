@@ -1,4 +1,4 @@
-# The defaults of tiered LCI generation (core#182): what `cheme assess lci-estimate` uses where
+# The defaults of tiered LCI generation: what `cheme assess lci-estimate` uses where
 # an estimate gives no sourced value. Versioned: a change of a value or a rule bumps `version`,
 # and every generated dataset records the version it was built with (generation.defaults).
 #

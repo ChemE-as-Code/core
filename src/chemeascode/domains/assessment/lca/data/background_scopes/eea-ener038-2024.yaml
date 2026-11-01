@@ -1,4 +1,4 @@
-# Structured scope of eea-ener038-2024 (core#306); the profile file stays byte-stable.
+# Structured scope of eea-ener038-2024; the profile file stays byte-stable.
 # From the profile notes: CO2e of inventory category 1A1a per kWh of gross generation, nuclear and
 # renewables at zero, no upstream, no T&D losses, no imports. The GWP basis is not stated by the
 # indicator (AR5 only inferred), so `gwp` is left undeclared.

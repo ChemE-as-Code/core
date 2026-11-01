@@ -1,5 +1,5 @@
 """Petroleum assays (schema ``cheme/assay/v1``, ``process/assays.yaml``): sourced distillation
-curves or cuts characterised into versioned pseudocomponents (pre-release issue 367).
+curves or cuts characterised into versioned pseudocomponents.
 
 An assay states where its data come from (``source``) and either
 

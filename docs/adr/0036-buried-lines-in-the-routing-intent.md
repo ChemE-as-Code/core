@@ -6,7 +6,7 @@
 ## Context
 
 The layout rules on the model treated every routed pipe as a pipe above grade. In the ammonia-1
-run (process-library#86, cheme 1.0.1) the buried DN 1400 cooling-water headers cross roads R-5
+run (process-library#304, cheme 1.0.1) the buried DN 1400 cooling-water headers cross roads R-5
 and R-6 with their centreline 3.0 m below grade. The road headroom rule reported each crossing
 as `cheme.layout-headroom` with "-3.71 m clear", and gates `layout-3d` and `layout-detail`
 failed until the owner accepted the four findings (core#70). The same runs gave 43
@@ -69,7 +69,7 @@ of the headroom rule (it hides what the crossing needs); a declaration on the li
 
 ## Evidence
 
-- core#70; ammonia-1 DESIGN.md D-038 (process-library#86, PR process-library#264).
+- core#70; ammonia-1 DESIGN.md D-038 (process-library#304, PR process-library#264).
 - `src/chemeascode/domains/spatial/schemas.py` (`Buried`, `LineRouting.buried`,
   `RoutingRules.road_cover_m`, `ModelPipe.buried`), `routing.py` (`_pipe`), `model_rules.py`
   (`buried_run`, `buried_cover`, the skips), `engineering_rules.py` (`free_span`),

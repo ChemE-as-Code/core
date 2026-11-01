@@ -1,4 +1,4 @@
-"""``schema: cheme/<kind>/v1`` on every file kind, and ``cheme migrate`` (pre-release issue 113)."""
+"""``schema: cheme/<kind>/v1`` on every file kind, and ``cheme migrate``."""
 
 from __future__ import annotations
 
@@ -65,7 +65,6 @@ def test_the_versioned_kinds_keep_their_ids():
 def test_every_list_and_layout_kind_has_a_v0_to_v1_transform():
     expected = {k for k in OPTIONAL if k not in ("review", "status")}  # a record, generated
     # the LCI dataset requires its schema: and has a v1 -> v2 transform instead
-    # (pre-release issue 179)
     assert set(CURRENT) == expected | {"lci_dataset"}
     assert ("lci_dataset", "v0", "v1") not in MIGRATIONS
     for kind in expected:

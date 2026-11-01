@@ -35,8 +35,6 @@ numbers that were never balanced or simulated. "All gates green" was at risk of 
 
 ## Evidence
 
-- pre-release PR 152 (pre-release commit 1b275fa, pre-release commit 86a83dc,
-  pre-release commit 3cf6301); maturity gate pre-release PR 289 (pre-release commit d7a08d6);
-  pre-release issue 137.
+- The maturity report, then the maturity gate.
 - `src/chemeascode/project/maturity.py`, `domains/process/model_basis.py`,
   [maturity.md](../framework/maturity.md).
