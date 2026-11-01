@@ -39,12 +39,15 @@ cheme-as-code takes option 3.
   and the unit tolerance. It is not judged: no `residual_kW`, never `sim-energy-unbalanced`.
 - The simulator's `EnergyImb` (the worker's `duty_kW`) is recorded as `simulator_imbalance_kW`
   with `simulator_convention`: `out-minus-in` or `in-minus-out` (it equals the stated value
-  or its negative within the tolerance), `negligible`, `differs` or `not-reported`. The
+  or its negative within the tolerance), `negligible`, `indeterminate` (the stated value is at most twice the tolerance, so a
+  sign cannot be told apart), `differs` or `not-reported`. A sign is assigned only when the
+  stated value exceeds twice the tolerance. The
   closure never relies on it.
 - The plant closure adds `stated_kW` (the sum) and `stated` (unit -> kW). Its residual is
   boundary enthalpy out minus in (plus the formation term) minus the units' heat and work
   minus `stated_kW`; `heat_in_kW` stays the units' heat without the stated imbalances. The
-  tolerance counts `|stated_kW|` with the duties.
+  tolerance counts the sum of the stated magnitudes (each `|stated|`, so opposite
+  imbalances do not cancel) with the duties.
 - A specified split whose imbalance exceeds its tolerance gives `cheme.process-sim-energy-stated`
   (info), which names the value and its sign. A specified split without stream enthalpies
   makes the plant `not-evaluable`, with the reason.

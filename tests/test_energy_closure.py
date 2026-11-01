@@ -1176,3 +1176,11 @@ def test_audit_runs_without_flowsheet_terminals():
     sim = SimpleNamespace(specs={}, min_approach=None)
     findings, entry, lines = energy.audit(process, sim, None, {"units": []}, {"streams": {}})
     assert entry["closure"]["plant"]["status"] == "not-evaluable" and lines
+
+
+def test_a_small_imbalance_gets_no_sign_label():
+    # within twice the tolerance either sign could fit: no convention is claimed
+    row = energy._stated(0.0, 0.1, 1.0, 1.05)
+    assert row["simulator_convention"] == "indeterminate"
+    assert energy._stated(0.0, 5.0, 1.0, 5.0)["simulator_convention"] == "out-minus-in"
+    assert energy._stated(0.0, 5.0, 1.0, -5.0)["simulator_convention"] == "in-minus-out"

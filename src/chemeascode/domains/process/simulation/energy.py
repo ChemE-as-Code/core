@@ -563,8 +563,11 @@ def _stated(h_in: float, h_out: float, tol: float, simulator: float | None) -> d
     ``duty_kW``) relates to it (``simulator_convention``):
 
     - ``out-minus-in`` / ``in-minus-out``: it equals the imbalance, or its negative, within the
-      unit's tolerance (this run shows DWSIM's sign);
+      unit's tolerance, and the imbalance exceeds twice the tolerance, so the two signs cannot
+      both fit (this run shows DWSIM's sign);
     - ``negligible``: both are within the tolerance (no sign to tell);
+    - ``indeterminate``: the imbalance is too small (at most twice the tolerance) for the sign
+      to be told apart;
     - ``differs``: neither (recorded, not judged: the closure takes the streams' value);
     - ``not-reported``: the simulator gave none."""
     imbalance = h_out - h_in
@@ -583,6 +586,8 @@ def _stated(h_in: float, h_out: float, tol: float, simulator: float | None) -> d
         convention = "not-reported"
     elif abs(imbalance) <= tol and abs(simulator) <= tol:
         convention = "negligible"
+    elif abs(imbalance) <= 2 * tol:
+        convention = "indeterminate"
     elif abs(simulator - imbalance) <= tol:
         convention = "out-minus-in"
     elif abs(simulator + imbalance) <= tol:
@@ -1153,7 +1158,7 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
             s_kw = sum(stated.values())
             residual = h_out - h_in + f - total_q - total_w - s_kw
             tol = _tolerance(
-                abs(total_q) + abs(s_kw),
+                abs(total_q) + sum(abs(v) for v in stated.values()),
                 total_w,
                 sum(abs(x) for x in f_in),  # type: ignore[arg-type]
                 sum(abs(x) for x in f_out),  # type: ignore[arg-type]
