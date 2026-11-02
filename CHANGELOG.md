@@ -4,6 +4,10 @@
 
 ### Changed
 
+- pyDEXPI comes from PyPI: `pydexpi==2.1.0`, the public release of the version that was pinned
+  from the private `pyDEXPI-dev` (#111, ADR 0004 amended). Installing cheme-as-code no longer
+  needs access to pyDEXPI, and CI and the plant template drop the `DEPLOY_KEY_PYDEXPI` secret;
+  plants keep `PLANTCODE_READ_TOKEN` while this repository is private.
 - The simulation's energy audit closes the plant with component separators in it (#60, ADR
   0038). A specified split's imbalance is stated, not judged: `status: stated`, `imbalance_kW`
   = enthalpy out minus in from the solved streams (positive: heat the unit would have to take
@@ -18,6 +22,10 @@
 
 ### Added
 
+- IDAES as a second simulation backend (#12, #104, ADR 0039): `simulator: idaes` in
+  `process/simulation.yaml` runs the same translated model through an out-of-process IDAES/Pyomo
+  worker (`CHEME_IDAES_PYTHON` or `CHEME_IDAES_COMMAND`); IDAES is never a dependency of
+  cheme-as-code.
 - `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
   `cheme skills status` and `update` track it.
 
