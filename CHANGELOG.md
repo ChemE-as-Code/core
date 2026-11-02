@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.1 (2026-11-02)
+
+Patch release: the IDAES backend converges on near-pure liquids and gives liquids their heat
+capacity (#124).
+
+### Fixed
+
+- IDAES backend, `IDAES ideal VLE`: a subcooled near-pure liquid (a pure toluene feed) did not
+  converge, so neither did any flowsheet with one (#12). The package now takes its phase
+  equilibrium in the complementarity form (Dabadghao et al., doi:10.1002/aic.18029) instead of
+  IDAES's smooth VLE, whose bubble-to-dew smoothing exceeds such a stream's bubble-dew gap. Its
+  liquid heat capacities of benzene and toluene were a thousandth of their value (IDAES's
+  `BT_ideal` labels kJ/kmol/K coefficients J/kmol/K); a liquid mixer or heater had a wrong
+  energy balance. Results of the ideal package change (the HDA example's heater duty 48.84 to
+  48.60 kW).
+
 ## 1.4.0 (2026-11-02)
 
 Minor release: IDAES as an optional second simulation backend, energy closure with component
@@ -34,17 +50,6 @@ until they are simulated again.
   `process/simulation.yaml` runs the same translated model through an out-of-process IDAES/Pyomo
   worker (`CHEME_IDAES_PYTHON` or `CHEME_IDAES_COMMAND`); IDAES is never a dependency of
   cheme-as-code.
-
-### Fixed
-
-- IDAES backend, `IDAES ideal VLE`: a subcooled near-pure liquid (a pure toluene feed) did not
-  converge, so neither did any flowsheet with one (#12). The package now takes its phase
-  equilibrium in the complementarity form (Dabadghao et al., doi:10.1002/aic.18029) instead of
-  IDAES's smooth VLE, whose bubble-to-dew smoothing exceeds such a stream's bubble-dew gap. Its
-  liquid heat capacities of benzene and toluene were a thousandth of their value (IDAES's
-  `BT_ideal` labels kJ/kmol/K coefficients J/kmol/K); a liquid mixer or heater had a wrong
-  energy balance. Results of the ideal package change (the HDA example's heater duty 48.84 to
-  48.60 kW).
 
 ## 1.3.0 (2026-10-31)
 
