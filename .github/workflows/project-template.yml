@@ -2,7 +2,7 @@ name: project-template
 # After ci passed on a push to main, regenerate the project-template repository from `cheme init`
 # of that commit and push it when anything changed. project-template is never edited by hand
 # (AGENTS.md).
-# Secrets: DEPLOY_KEY_PYDEXPI (as in ci.yml) and PROJECT_TEMPLATE_TOKEN, a fine-grained token
+# Secret: PROJECT_TEMPLATE_TOKEN, a fine-grained token
 # with contents: read and write on ChemE-as-Code/project-template only.
 on:
   workflow_run:
@@ -53,17 +53,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ env.SOURCE_SHA }}
-      - uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555  # v0.10.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_KEY_PYDEXPI }}
-      - run: git config --global url."git@github.com:".insteadOf "https://github.com/"
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           python-version: "3.12"
       - run: uv sync --locked
-      # The rewrite above sends every github.com URL over SSH, where only the pyDEXPI key is
-      # loaded; drop it so the next checkout uses PROJECT_TEMPLATE_TOKEN over HTTPS.
-      - run: git config --global --unset-all url."git@github.com:".insteadOf
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: ChemE-as-Code/project-template

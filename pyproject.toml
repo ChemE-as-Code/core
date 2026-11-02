@@ -11,7 +11,8 @@ classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
 ]
 dependencies = [
-    "pydexpi",
+    # pyDEXPI is pinned exactly; bump deliberately (ADR 0004).
+    "pydexpi==2.1.0",
     "typer>=0.26.7",
     "pyyaml>=6.0.2",
     "pydantic>=2.13.4",
@@ -68,10 +69,6 @@ docs = [
     "mkdocs>=1.6.1,<2",  # MkDocs 2 drops plugins and hooks
     "mkdocs-material>=9.6",
 ]
-
-[tool.uv.sources]
-# pyDEXPI 2.x is not on PyPI yet; pinned by commit. Bump deliberately.
-pydexpi = { git = "https://github.com/process-intelligence-research/pyDEXPI-dev.git", rev = "be793a039e8dac4380919c702dfcf81366869cc6" }
 
 [build-system]
 requires = ["hatchling"]

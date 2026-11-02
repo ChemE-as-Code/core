@@ -1,10 +1,7 @@
 # Weekly update pull requests, one per ecosystem and folder: the Python dependencies of uv.lock
 # (the package), viewer/package-lock.json, agent-cli/uv.lock and the commit-pinned GitHub Actions
-# of .github/workflows. pyDEXPI is pinned by commit in
-# pyproject.toml ([tool.uv.sources]) and bumped deliberately, so it is left out.
-# pyDEXPI-dev is private: workflows of Dependabot's pull requests read Dependabot secrets, not
-# Actions secrets, so ci needs DEPLOY_KEY_PYDEXPI as a Dependabot secret too, and resolving
-# uv.lock needs read access to pyDEXPI-dev (a `registries:` git entry with a token).
+# of .github/workflows. pyDEXPI is pinned exactly in pyproject.toml and bumped deliberately
+# (ADR 0004), so it is left out.
 version: 2
 updates:
   - package-ecosystem: uv
