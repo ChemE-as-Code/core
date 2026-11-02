@@ -160,7 +160,8 @@ def _liquid_cp_in_kj(entry: dict[str, Any]) -> None:
 #: ``eps**2 / (4 s)`` mol/s, *s* its temperature slack (K), and a phase that is present shifts
 #: the equilibrium temperature by ``eps**2 / (4 F_p)`` K. At 1e-3 of the feeds both are
 #: negligible: with 62 mol/s of feeds, a liquid 10 K below its bubble point keeps 1e-4 mol/s
-#: as vapour, and a phase of 1 mol/s is off its equilibrium temperature by 4e-3 K.
+#: as vapour, and a phase of 1 mol/s is off its equilibrium temperature by 1e-3 K
+#: (eps^2 / (4 x phase flow)).
 VLE_EPS_FRACTION = 1e-3
 
 

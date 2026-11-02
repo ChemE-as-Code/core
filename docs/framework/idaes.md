@@ -85,7 +85,9 @@ the IDAES installation at run time. Two deviations from that data and IDAES's de
   reliably in idaes-pse 2.13).
 - `BT_ideal`'s Perry's liquid heat-capacity coefficients are read in kJ/kmol/K: IDAES labels
   them J/kmol/K, a thousand times below its own `BTX_activity_coeff_VLE` values for the same
-  correlation, which leaves a liquid's enthalpy almost independent of temperature. Compounds: benzene (71-43-2), toluene
+  correlation, which leaves a liquid's enthalpy almost independent of temperature.
+
+Compounds: benzene (71-43-2), toluene
 (108-88-3), hydrogen (1333-74-0) and methane (74-82-8), hydrogen and methane in the vapour
 only. Enthalpies include the formation enthalpies at 298.15 K, so a reactor needs no separate
 heat of reaction.
