@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 (2026-11-02)
+
+Minor release: IDAES as an optional second simulation backend, energy closure with component
+separators, and pyDEXPI from PyPI, so installing cheme-as-code no longer needs access to a private
+repository. No breaking change: `simulator` defaults to `dwsim`, and DWSIM models keep their
+fingerprints. Simulation runs recorded before this release report energy closure as unsupported
+until they are simulated again.
 
 ### Changed
 
@@ -22,12 +28,12 @@
 
 ### Added
 
+- `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
+  `cheme skills status` and `update` track it.
 - IDAES as a second simulation backend (#12, #104, ADR 0039): `simulator: idaes` in
   `process/simulation.yaml` runs the same translated model through an out-of-process IDAES/Pyomo
   worker (`CHEME_IDAES_PYTHON` or `CHEME_IDAES_COMMAND`); IDAES is never a dependency of
   cheme-as-code.
-- `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
-  `cheme skills status` and `update` track it.
 
 ## 1.3.0 (2026-10-31)
 
