@@ -2,7 +2,8 @@
 (``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``), the failure-mode library
 scenario propagation walks with (``cheme/failure-modes/v1``, ``safety/failure-modes.yaml``) and
 the triage of the walk's outcomes (``cheme/hazop-coverage/v1``,
-``safety/hazop/<study-id>/coverage.yaml``).
+``safety/hazop/<study-id>/coverage.yaml``) and the frequency library ratings may take their
+likelihood from (``cheme/frequencies/v1``, ``safety/frequencies.yaml``).
 
 A study is one nested file in worksheet order: nodes, their deviations (guide word and
 parameter) and the scenarios of each deviation (a cause leading to a consequence), with the
@@ -42,6 +43,7 @@ MATRIX_SCHEMA = "cheme/risk-matrix/v1"
 STUDY_SCHEMA = "cheme/hazop-study/v1"
 FAILURE_MODES_SCHEMA = "cheme/failure-modes/v1"
 COVERAGE_SCHEMA = "cheme/hazop-coverage/v1"
+FREQUENCIES_SCHEMA = "cheme/frequencies/v1"
 
 
 def _stable_id(value: Any) -> Any:
@@ -83,6 +85,13 @@ class Likelihood(Strict):
     code: Code
     title: str = ""
     description: str = Field(default="", description="What the grade means, e.g. a frequency.")
+    max_frequency: float | None = Field(
+        default=None,
+        gt=0,
+        description="Upper bound of the grade in events per year (a frequency below it and at or "
+        "above the previous grade's bound is this grade; the most likely grade has none). Lets "
+        "cheme safety hazop rate derive the code of a rating linked to a frequency record.",
+    )
 
 
 class Severity(Strict):
@@ -141,6 +150,14 @@ class RiskMatrix(Strict):
     def _version(self) -> RiskMatrix:
         if self.schema_ != MATRIX_SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, MATRIX_SCHEMA))
+        bounds = [grade.max_frequency for grade in self.likelihood]
+        if any(b is not None for b in bounds):
+            given = bounds[:-1] if bounds[-1] is None else bounds
+            if None in given or any(a >= b for a, b in zip(given, given[1:], strict=False)):
+                raise ValueError(
+                    "likelihood max_frequency: give every grade's bound, least likely first and "
+                    "increasing (the most likely grade may have none)"
+                )
         return self
 
 
@@ -258,12 +275,34 @@ class CalculatedBand(Strict):
     )
 
 
+class FrequencyRef(Strict):
+    """Where a rating's likelihood comes from: one record of the study's frequency library, or
+    an event type (its screening value: the highest of its records, LOPA initiating-event
+    records first when there are any)."""
+
+    record: str | None = None
+    event_type: str | None = None
+
+    @model_validator(mode="after")
+    def _one(self) -> FrequencyRef:
+        if (self.record is None) == (self.event_type is None):
+            raise ValueError("give a record or an event_type")
+        return self
+
+
 class Rating(Strict):
     """Severity and likelihood of a scenario in one category: authored, with their basis."""
 
     category: str
     severity: Code | None = Field(default=None, description="None: not rated yet.")
-    likelihood: Code | None = Field(default=None, description="None: not rated yet.")
+    likelihood: Code | None = Field(
+        default=None,
+        description="None: not rated yet. With frequency: derived by cheme safety hazop rate "
+        "--write from the study's frequency library and the matrix's max_frequency.",
+    )
+    frequency: FrequencyRef | None = Field(
+        default=None, description="The frequency record or event type the likelihood rests on."
+    )
     basis: str = Field(default="", description="Why these codes: the outcome, the frequency.")
     evidence: list[str] = Field(default_factory=list, description="Files, D-NNN, documents.")
     status: Judgement = "proposed"
@@ -391,6 +430,11 @@ class HazopStudy(Strict):
     risk_matrix: str | None = Field(
         default=None, description="The matrix file from the repository root."
     )
+    frequencies: str | None = Field(
+        default=None,
+        description="The frequency library ratings link to (frequency:), from the repository "
+        "root: project data, e.g. safety/frequencies.yaml (cheme schema frequencies).",
+    )
     assessment_basis: str = Field(
         default="", description="How risk is ranked: initial and residual, what is credited."
     )
@@ -401,11 +445,11 @@ class HazopStudy(Strict):
     notes: str = ""
     extensions: Extensions = Field(default_factory=dict)
 
-    @field_validator("risk_matrix")
+    @field_validator("risk_matrix", "frequencies")
     @classmethod
     def _matrix_path(cls, value: str | None) -> str | None:
         if value is not None and (value.startswith("/") or ".." in value.split("/")):
-            raise ValueError("give the matrix by its path from the repository root")
+            raise ValueError("give the file by its path from the repository root")
         return value
 
     @model_validator(mode="after")
@@ -575,4 +619,99 @@ class FailureModeLibrary(Strict):
     def _version(self) -> FailureModeLibrary:
         if self.schema_ != FAILURE_MODES_SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, FAILURE_MODES_SCHEMA))
+        return self
+
+
+# ---------------------------------------------------------------------------
+# Frequency library (likelihood of a rating's cause)
+# ---------------------------------------------------------------------------
+
+#: ``lopa_ief``: a screening initiating-event frequency from LOPA guidance (conservative, order of
+#: magnitude); ``qra_loc``: a generic loss-of-containment frequency from QRA guidance.
+FrequencyBasis = Literal["lopa_ief", "qra_loc"]
+
+
+class FrequencySource(Strict):
+    """A source the records cite."""
+
+    short: str = Field(min_length=1)
+    citation: str = ""
+    quoted_in: str = Field(default="", description="The secondary source it was read in.")
+    url: str = ""
+    year: int | None = None
+    basis: FrequencyBasis | None = None
+    notes: str = ""
+
+
+class EventType(Strict):
+    """A kind of initiating event the records are grouped by."""
+
+    group: str = ""
+    label: str = ""
+    description: str = ""
+    aliases: list[str] = Field(default_factory=list)
+
+
+class FrequencyRecord(Strict):
+    """One frequency of one event type from one source, as the source gives it."""
+
+    id: StableId
+    event_type: str
+    value: float = Field(gt=0, description="Events per year, per one `per`.")
+    per: str | None = Field(
+        default=None,
+        description="What the value is per when not one item (100 m of pipe, flanged joint): such "
+        "a record gives no likelihood by itself.",
+    )
+    label: str = ""
+    conditions: str = ""
+    source: str = Field(description="A key of sources:.")
+    locator: str = Field(default="", description="Table, row, page in the source.")
+    verified: bool = Field(default=False, description="True once checked against the source.")
+    notes: str = ""
+
+
+class ModeEvent(Strict):
+    """A failure mode of another library mapped to the event type it is an instance of."""
+
+    id: str
+    mode: str = ""
+    applies_to: list[str] = Field(default_factory=list)
+    event_type: str
+
+
+class FrequencyLibrary(Strict):
+    """The project's frequencies of initiating events, the likelihood basis of the ratings that
+    link to them (Rating.frequency). Project data with its sources: cheme-as-code ships none."""
+
+    schema_: str = Field(alias="schema", description=f"Always {FREQUENCIES_SCHEMA}.")
+    kind: Literal["frequencies"]
+    example: bool = Field(default=False, description="True: illustrative data, not a library.")
+    source: str = Field(default="", description="Where the library comes from, and its licence.")
+    sources: dict[str, FrequencySource] = Field(default_factory=dict)
+    event_types: dict[str, EventType] = Field(default_factory=dict)
+    records: list[FrequencyRecord] = Field(default_factory=list)
+    modes: list[ModeEvent] = Field(
+        default_factory=list, description="Failure mode -> event type, a help for choosing one."
+    )
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> FrequencyLibrary:
+        if self.schema_ != FREQUENCIES_SCHEMA:
+            raise ValueError(unsupported_schema(self.schema_, FREQUENCIES_SCHEMA))
+        ids = [r.id for r in self.records]
+        if len(ids) != len(set(ids)):
+            raise ValueError(
+                f"record ids given twice: {sorted({i for i in ids if ids.count(i) > 1})}"
+            )
+        for record in self.records:
+            if record.source not in self.sources:
+                raise ValueError(
+                    f"record {record.id}: source {record.source!r} is not under sources:"
+                )
+            if record.event_type not in self.event_types:
+                raise ValueError(
+                    f"record {record.id}: event_type {record.event_type!r} not under event_types:"
+                )
         return self

@@ -22,8 +22,10 @@ uncertain.
   without the project's own matrix, rate nothing and ask for it.
 - Each scenario's cause, consequence, outcome and path (`notes:`), and the fluid's hazards.
 - For likelihood: what the project holds about how often the cause happens (operating
-  experience, the company's failure data, a LOPA or reliability study). Without it, the
-  likelihood stays open.
+  experience, the company's failure data, a LOPA or reliability study), or its frequency
+  library (`frequencies:` of the study, `cheme schema frequencies`: initiating-event
+  frequencies with their sources, project data written or obtained by the team) with
+  `max_frequency` on the matrix's likelihood codes. Without either, the likelihood stays open.
 - For residual ratings: which safeguards the team credits and why.
 
 ## Workflow and tools
@@ -43,6 +45,16 @@ uncertain.
    project holds, and name that evidence in the basis. With no evidence, write `likelihood:
    null` and say what is needed: an unknown code stays unresolved, it is never filled with a
    default. Do not estimate a frequency, and do not convert a number from another study's scale.
+   **With a frequency library**, choose what the cause is an instance of and link it instead of
+   typing a code: `frequency: {event_type: pump_seal_failure}` (its screening value: the highest
+   of its records, LOPA initiating-event records first) or `frequency: {record: F009}` when a
+   record's `conditions` fit the cause better (a non-routine task rather than an emergency).
+   `cheme safety hazop rate --write` derives the likelihood from the record and the matrix's
+   `max_frequency` (never type it: `hazop-likelihood-derived`). The library's `modes:` map
+   failure modes to event types, its `aliases` help find one. No event type fits, a record is
+   per a length (100 m of pipe) or the event type has no record (`hazop-frequency`, info): no
+   link, `likelihood: null` and what is needed. Name the record and that it is unverified in
+   the basis when the library says so.
 5. **Initial and residual stay apart.** The initial rating ignores the safeguards. A residual
    rating is a separate entry, made only for the safeguards the team credits, and its basis
    names them (skill `safeguard-crediting`). Never lower a code because a safeguard is listed.
@@ -52,6 +64,9 @@ uncertain.
      initial:
        - {category: people, severity: "3", likelihood: null, status: proposed, by: agent,
           basis: "matrix people 3, lost-time injury: hot water at the seal next to the walkway; likelihood: no failure data for P-101 seals yet"}
+       - {category: asset, severity: "2", frequency: {event_type: pump_seal_failure},
+          status: proposed, by: agent,
+          basis: "matrix asset 2, seal and bearing repair; likelihood from the library's pump_seal_failure (unverified)"}
    ```
    Then look the bands up as skill `hazop-assessment` says (`cheme safety hazop rate H-01
    --target S3 --write`); never write a band by hand.

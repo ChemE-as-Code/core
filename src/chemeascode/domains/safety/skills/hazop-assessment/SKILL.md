@@ -49,7 +49,10 @@ changed (`hazop-band-stale`), or before the review.
    ```
    It writes `band: {value, provenance: calculated, source: 'cheme safety hazop rate: <matrix>',
    fingerprint}` into each rating and changes nothing else. A changed rating or matrix makes
-   the band stale until it is rated again.
+   the band stale until it is rated again. A rating linked to the study's frequency library
+   (`frequency:`) first gets its `likelihood` from the record and the matrix's
+   `max_frequency`, then its band; a changed record or bound makes it `hazop-likelihood-derived`
+   until rated again.
 4. **Policy.** `hazop-action-required`: the scenario's band (residual where rated, else
    initial, per category, the worst) is one the matrix says needs an action. Propose one
    (`actions:`, `status: proposed`) for the team, or ask whether they credit more safeguards
@@ -66,7 +69,11 @@ changed (`hazop-band-stale`), or before the review.
 - `hazop-matrix`: no usable matrix; its `cheme.risk-matrix-*` findings say why.
 - `hazop-band-stale`: rate again (`--target`); `hazop-band-edited` (error): a band was edited by
   hand; change the rating, not the band, and rate again.
-- `cheme safety hazop rate` exits 1 while a band is missing, stale or unresolved.
+- `hazop-frequency`: a `frequency:` link that gives no likelihood: no library named, an
+  unknown record or event type, a matrix without `max_frequency` (error); no record per item
+  (info: give the likelihood by hand). `hazop-likelihood-derived`: rate again.
+- `cheme safety hazop rate` exits 1 while a band or a derived likelihood is missing, stale or
+  unresolved.
 
 ## Outputs and provenance
 

@@ -61,6 +61,7 @@ from chemeascode.domains.process.thermodynamics.assay import Assays
 from chemeascode.domains.requirements.schemas import DesignBasis
 from chemeascode.domains.safety.schemas import (
     FailureModeLibrary,
+    FrequencyLibrary,
     HazopCoverage,
     HazopStudy,
     RiskMatrix,
@@ -132,6 +133,7 @@ OTHER_SCHEMAS = {
     "hazop-study": (HazopStudy, "safety/hazop/<id>/study.yaml"),
     "failure-modes": (FailureModeLibrary, "safety/failure-modes.yaml"),
     "hazop-coverage": (HazopCoverage, "safety/hazop/<id>/coverage.yaml"),
+    "frequencies": (FrequencyLibrary, "safety/frequencies.yaml"),
     "narrative": (Narrative, "process/narrative.md (front matter)"),
     "control_philosophy": (Philosophy, "control/philosophy.md (front matter)"),
     "process-run": (RunRecord, "runs/<run-id>/run.yaml"),
@@ -153,6 +155,7 @@ __all__ = [
     "ElectricalList",
     "FactorFile",
     "FailureModeLibrary",
+    "FrequencyLibrary",
     "HazopCoverage",
     "HazopStudy",
     "DesignBasis",
