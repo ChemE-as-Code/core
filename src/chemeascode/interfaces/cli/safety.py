@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -207,7 +208,13 @@ def rate(
 @hazop_app.command("propagate")
 def propagate(
     study: STUDY,
-    node: Annotated[str, typer.Option(help="The node id whose scenarios are walked.")],
+    node: Annotated[
+        str | None,
+        typer.Option(
+            help="The node id whose scenarios are walked (default: every node, printed by "
+            "consequence: each top event with the nodes and causes that reach it)."
+        ),
+    ] = None,
     deviation: Annotated[
         str | None,
         typer.Option(
@@ -218,15 +225,63 @@ def propagate(
     library: Annotated[
         str, typer.Option(help="The failure-mode library (cheme schema failure-modes).")
     ] = "safety/failure-modes.yaml",
+    paths: Annotated[
+        bool, typer.Option("--paths", help="Print each path with its candidate safeguards.")
+    ] = False,
+    coverage: Annotated[
+        bool,
+        typer.Option(
+            "--coverage",
+            help="Compare the node's (or every node's) scenarios with the top events the walk "
+            "brings to it: those no scenario covers and no outcome of coverage.yaml decides, "
+            "and the scenarios no walk reaches. Exits 1 while one is open.",
+        ),
+    ] = False,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write",
+            help="With --coverage: bring safety/hazop/STUDY/coverage.yaml up to date (an open "
+            "outcome per gap; dismissed and question outcomes kept as they are).",
+        ),
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
-    over the study's analysed P&IDs, object by object, to a top event, a study limit or an
-    object that absorbs it, with the safeguards the plant has along the path and the questions
-    the files leave open. Read-only: proposals for the study, never written into it."""
-    from chemeascode.project.hazop import node_propagation
+    over the study's analysed P&IDs, object by object, to a top event, a study limit, a closed
+    valve or an object that absorbs it, with the safeguards the plant has along the path and the
+    questions the files leave open. One candidate per outcome, on its shortest path, with the
+    other nodes it passes through. Without --node, every node, grouped by top event. Read-only:
+    proposals for the study, never written into it."""
+    from chemeascode.project.hazop import node_propagation, study_coverage, study_propagation
 
     workspace = _workspace()
+    if write and not coverage:
+        typer.echo("--write needs --coverage", err=True)
+        raise typer.Exit(2)
+    if coverage:
+        if deviation:
+            typer.echo("--coverage compares every deviation: drop --deviation", err=True)
+            raise typer.Exit(2)
+        try:
+            report = study_coverage(workspace, study, node, library, write)
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(2) from failure
+        if _print_coverage(report, as_json):
+            raise typer.Exit(1)
+        return
+    if node is None:
+        if deviation:
+            typer.echo("--deviation needs --node", err=True)
+            raise typer.Exit(2)
+        try:
+            found_all = study_propagation(workspace, study, library)
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(2) from failure
+        _print_consequences(found_all, as_json)
+        return
     try:
         found = node_propagation(workspace, study, node, deviation, library)
     except ValueError as failure:
@@ -267,6 +322,7 @@ def propagate(
                                 for s in c.path
                             ],
                             "reached": c.reached,
+                            "crosses": [{"node": n, "at": at} for n, at in c.crosses],
                             "safeguards": [asdict(g) for g in c.safeguards],
                             "questions": c.questions,
                         }
@@ -280,22 +336,189 @@ def propagate(
             )
         )
         return
+    ends = Counter(c.end for c in candidates)
     typer.echo(
         f"{found.study} {found.node}: {len(candidates)} candidate(s) from {found.library} over "
-        f"{', '.join(found.sheets)} (proposals: the team decides)"
+        f"{', '.join(found.sheets)} (proposals: the team decides); "
+        + ", ".join(f"{n} {end}" for end, n in ends.most_common())
     )
-    for c in candidates:
-        ending = c.top_event or c.end
-        typer.echo(
-            f"{c.deviation.text()} at {c.at}: {c.cause} {c.mode} [{c.kind}] -> {ending}"
-            + (f" ({c.fluid})" if c.fluid else "")
-        )
-        typer.echo(f"  path: {c.path_text()}")
-        for guard in c.safeguards:
-            typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
-        for question in c.questions:
-            typer.echo(f"  question: {question}")
+    questions: Counter[str] = Counter(q for c in candidates for q in c.questions)
+    if paths:
+        for c in candidates:
+            typer.echo(
+                f"{c.deviation.text()} at {c.at}: {c.cause} {c.mode} [{c.kind}] -> "
+                f"{c.top_event or c.end} at {c.path[-1].label}"
+                + (f" ({c.fluid})" if c.fluid else "")
+            )
+            typer.echo(f"  path: {c.path_text()}")
+            if c.crosses:
+                typer.echo(f"  crosses: {', '.join(f'{n} at {at}' for n, at in c.crosses)}")
+            for guard in c.safeguards:
+                typer.echo(f"  safeguard? {guard.kind} {guard.ref}: {guard.detail}")
+    else:
+        # One line per outcome with its causes; ends that say nothing about a consequence
+        # (a closed valve, an object already walked, no connection) are only counted.
+        shown = ("top-event", "study-limit", "absorbed", "unknown", "depth")
+        outcomes: dict[tuple[str, str, str, str | None], tuple[list[str], list[str]]] = {}
+        for c in sorted(candidates, key=lambda c: shown.index(c.end) if c.end in shown else 9):
+            if c.end in shown:
+                key = (c.deviation.text(), c.top_event or c.end, c.path[-1].label, c.fluid)
+                causes, nodes = outcomes.setdefault(key, ([], []))
+                if c.cause not in causes:
+                    causes.append(c.cause)
+                nodes.extend(n for n, _ in c.crosses if n not in nodes)
+        for (deviation_text, ending, where, fluid), (causes, nodes) in outcomes.items():
+            typer.echo(
+                f"{deviation_text} -> {ending} at {where}"
+                + (f" ({fluid})" if fluid else "")
+                + (f" [via {', '.join(nodes)}]" if nodes else "")
+                + f": {', '.join(causes)}"
+            )
+        hidden = sum(n for end, n in ends.items() if end not in shown)
+        if hidden:
+            typer.echo(
+                f"{hidden} candidate(s) end at a closed valve, an object already walked or no "
+                "connection: --paths lists every candidate with its path"
+            )
+    for question, n in questions.most_common():
+        typer.echo(f"question ({n} candidate(s)): {question}")
     for finding in found.findings:
+        typer.echo(finding.format())
+
+
+def _print_coverage(report: Any, as_json: bool) -> int:
+    """Each node's coverage; returns the number of open gaps."""
+    found_all = report.found
+    gaps = sum(len(f.coverage.gaps) for f in found_all)
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "study": found_all[0].study if found_all else None,
+                    "library": found_all[0].library if found_all else None,
+                    "triage": report.path,
+                    "stale": report.stale,
+                    "written": report.written,
+                    "nodes": [
+                        {
+                            "node": f.node,
+                            "covered": f.coverage.covered,
+                            "dismissed": f.coverage.dismissed,
+                            "questions": f.coverage.questions,
+                            "gaps": [
+                                {
+                                    "deviation": {
+                                        "guide_word": g.deviation.guide_word,
+                                        "parameter": g.deviation.parameter,
+                                    },
+                                    "top_event": g.top_event,
+                                    "at": g.at,
+                                    "fluid": g.fluid,
+                                    "crosses": g.crosses,
+                                    "uncovered": g.uncovered,
+                                    "cause_only": g.cause_only,
+                                }
+                                for g in f.coverage.gaps
+                            ],
+                            "unreached": f.coverage.unreached,
+                        }
+                        for f in found_all
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return gaps
+    covered = sum(f.coverage.covered for f in found_all)
+    dismissed = sum(f.coverage.dismissed for f in found_all)
+    questions = sum(f.coverage.questions for f in found_all)
+    unreached = sum(len(f.coverage.unreached) for f in found_all)
+    if found_all:
+        typer.echo(
+            f"{found_all[0].study} coverage over {len(found_all)} node(s): {gaps} open top "
+            f"event(s); cause and top event pairs: {covered} covered, {dismissed} dismissed, "
+            f"{questions} question(s); {unreached} scenario(s) no walk reaches. Close each open "
+            f"one with a scenario, or as dismissed or question (with the reason) in {report.path}"
+            + (" (written)" if report.written else " (--write lists them there)")
+        )
+    if report.stale:
+        typer.echo(
+            f"{report.path}: the library or an analysed sheet changed since it was written: "
+            "check its decisions, then --write"
+        )
+    for f in found_all:
+        for g in f.coverage.gaps:
+            line = (
+                f"{f.node}: {g.deviation.text()} -> {g.top_event} at {g.at}"
+                + (f" ({g.fluid})" if g.fluid else "")
+                + (f" [via {', '.join(g.crosses)}]" if g.crosses else "")
+            )
+            if g.uncovered:
+                line += f"; no scenario: {', '.join(g.uncovered)}"
+            if g.cause_only:
+                line += f"; cause only, another consequence: {', '.join(g.cause_only)}"
+            typer.echo(line)
+        if f.coverage.unreached:
+            typer.echo(
+                f"{f.node}: no walk reaches {', '.join(f.coverage.unreached)} (outside the library)"
+            )
+    return gaps
+
+
+def _print_consequences(found_all: list, as_json: bool) -> None:
+    """Every node's top events grouped by consequence: the top event, where it happens, and per
+    node the causes that reach it, the consequences reached from most nodes first."""
+    groups: dict[tuple[str, str, str | None], dict[str, list[str]]] = {}
+    for found in found_all:
+        for c in found.result.candidates:
+            if c.end != "top-event":
+                continue
+            by_node = groups.setdefault((str(c.top_event), c.path[-1].label, c.fluid), {})
+            causes = by_node.setdefault(found.node, [])
+            if c.cause not in causes:
+                causes.append(c.cause)
+    ordered = sorted(groups.items(), key=lambda item: (-len(item[1]), item[0][0], item[0][1]))
+    findings = [f for found in found_all for f in found.findings]
+    if as_json:
+        first = found_all[0] if found_all else None
+        typer.echo(
+            json.dumps(
+                {
+                    "study": first.study if first else None,
+                    "library": first.library if first else None,
+                    "sheets": first.sheets if first else [],
+                    "nodes": [found.node for found in found_all],
+                    "consequences": [
+                        {
+                            "top_event": top_event,
+                            "at": where,
+                            "fluid": fluid,
+                            "nodes": [{"node": n, "causes": cs} for n, cs in by_node.items()],
+                        }
+                        for (top_event, where, fluid), by_node in ordered
+                    ],
+                    "findings": [{**asdict(f), "id": f.id} for f in findings],
+                },
+                indent=2,
+            )
+        )
+        return
+    if found_all:
+        first = found_all[0]
+        typer.echo(
+            f"{first.study}: {len(ordered)} top event(s) reached from {len(found_all)} node(s) "
+            f"with {first.library} over {', '.join(first.sheets)} (proposals: the team decides; "
+            "--node N for one node's outcomes and questions)"
+        )
+    for (top_event, where, fluid), by_node in ordered:
+        typer.echo(
+            f"{top_event} at {where}"
+            + (f" ({fluid})" if fluid else "")
+            + f": {len(by_node)} node(s)"
+        )
+        for node_id, causes in by_node.items():
+            typer.echo(f"  {node_id}: {', '.join(causes)}")
+    for finding in findings:
         typer.echo(finding.format())
 
 

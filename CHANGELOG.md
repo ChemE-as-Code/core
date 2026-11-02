@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Fix: `cheme safety hazop propagate` lost the pipe between two items of different segments
+  when the second segment came later in the file (the walk ended in `no-connection`); items
+  are now indexed before pipes.
+- Safety: `cheme safety hazop propagate` reports outcomes, not routes. The walk is breadth
+  first, takes each object with a deviation once per cause and keeps one candidate per outcome
+  on its shortest path, so a meshed header or a recycle no longer multiplies candidates or runs
+  into the depth limit; a valve with a normally closed, locked closed or car sealed closed DEXPI
+  `Role` stops it (end `closed`). The command prints one line per outcome with its causes and
+  each open question once; `--paths` prints every candidate with its path and safeguards.
+  On a 14-node pump station: 126,643 candidates to 12,011, none cut off at the depth limit.
+- Safety: each `propagate` candidate names the study's other nodes its path enters (`[via N3]`,
+  `crosses` in JSON), and `cheme safety hazop propagate STUDY` without `--node` walks every node
+  and groups the top events by consequence, with the nodes and causes reaching each.
+- Safety: `cheme safety hazop propagate STUDY [--node N] --coverage` compares the scenarios with
+  the walk by tag: the top events no scenario covers (no scenario, or the cause with another
+  consequence) and the scenarios no walk reaches; exit 1 while a gap is open. `--write` keeps
+  the triage in `safety/hazop/<id>/coverage.yaml` (new kind `hazop-coverage`): each gap `open`
+  until a scenario covers it or it is `dismissed` or a `question`, with the reason; decisions
+  survive later writes, and a change of the library or an analysed sheet is reported.
+- Skills: `hazop-scenario-propagation` names `cheme safety hazop propagate` as an optional
+  cross-check (with a failure-mode library; how to read its ends and limits), not a required
+  step; the `process-safety` hub points to it.
 - Safety: three HAZOP skills, guidance only (no new command): `hazop-node-breakdown` (nodes
   by named boundary rules, with members and design intent), `hazop-scenario-propagation`
   (causes inside the node, consequences followed object by object over the P&ID to a top

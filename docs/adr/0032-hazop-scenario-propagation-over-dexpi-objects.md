@@ -45,6 +45,33 @@ Two forces shape how:
   Safeguards are collected along the path and never stop it. What the files do not settle (a
   fail position not recorded, a response the library lacks, the fluid at a top event) is a
   question on the candidate, never a choice.
+- The walk is **breadth first and reports outcomes, not routes**: per cause it takes each object
+  with a given deviation and direction once, and keeps one candidate per outcome (deviation at
+  the node, end, top event, the object it ends at) on its shortest path. A valve whose DEXPI
+  `Role` is normally closed, locked closed or car sealed closed stops a walk (the line-up of
+  normal operation). The command prints one line per outcome with its causes; `--paths` and
+  `--json` give every candidate. On the pump-station case (14 nodes) enumerating every route
+  gave 126,643 candidates, 31 % of them cut off at the depth limit in loops through recycles
+  and closed valves; outcomes on shortest paths give 12,011, none cut off.
+- **Causes are the node's, consequences are wherever the walk ends.** 74 % of the case's
+  top-event candidates lie in another node than their cause, and some top events are reached
+  from up to seven nodes. Each candidate names the other nodes its path enters (and where), and
+  `propagate STUDY` without `--node` groups every node's top events by consequence, so the team
+  discusses a shared consequence once. A node never repeats another node's cause: a deviation
+  entering from outside is that node's reference, not a new row.
+- **The walk checks the study; it does not seed it.** `propagate --coverage` compares each
+  node's scenarios with its top events by tag (the deviation, the cause and the object the walk
+  ends at named in the scenario's `refs`; no text is compared, ADR 0010) and lists what no
+  scenario covers, and the scenarios no walk reaches. Seeding rows from the walk was set aside:
+  it anchors the draft on the library and hides what the library lacks.
+- **The triage lives beside the study, not in it.** Not every gap needs a row, but none may be
+  dropped silently: `--coverage --write` lists each in `safety/hazop/<id>/coverage.yaml`
+  (`cheme/hazop-coverage/v1`) as `open`, and an agent or the team marks it `dismissed` or
+  `question` with the reason (covered is derived from the scenarios, never written). A later
+  write keeps the decisions, adds new gaps and drops open ones no gap needs; the file records
+  the fingerprints of the library and the analysed sheets, and the command says when they
+  changed. The worksheet holds only its rows; the file is the record of what the walk raised
+  and what became of it.
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 
@@ -60,8 +87,9 @@ Two forces shape how:
 - Negative: the index reimplements connectivity that `cheme show` also derives (from the XML).
 - Known limitations and open follow-ups: off-page connectors are not paired across sheets
   (P&IDs here carry no model link between them); writing candidates into the study
-  (`--write`, with fingerprints and staleness, ADR 0011) and the skill rewritten around the
-  command are the next step.
+  (`--write`, with fingerprints and staleness, ADR 0011) is the next step. The skill names the
+  command as an optional cross-check, not a required step: the trace by hand stays its method.
+  Other operating modes than normal (a switched standby, a start-up line-up) are not walked.
 
 ## Evidence
 

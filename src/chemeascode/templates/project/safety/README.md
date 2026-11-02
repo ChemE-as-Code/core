@@ -76,7 +76,11 @@ actions:
 3. **Deviations.** For each node, the guide words that make sense with each parameter of its
    intent (flow, pressure, temperature, level, composition, ...).
 4. **Causes and consequences.** One scenario per credible cause and consequence; a deviation
-   without a credible cause says so in `notes:`. Skill `hazop-scenario-propagation`.
+   without a credible cause says so in `notes:`. Skill `hazop-scenario-propagation`. With a
+   failure-mode library (`safety/failure-modes.yaml`), `cheme safety hazop propagate H-01
+   --coverage` then lists the top events the walk brings to a node that no scenario names (by
+   its `refs`); `--write` lists them in `safety/hazop/H-01/coverage.yaml` beside the study, each
+   `open` until a scenario covers it or it is marked `dismissed` or `question` with the reason.
 5. **Safeguards.** The ones the P&IDs and the cause and effect actually have, by tag or
    interlock id.
 6. **Assessment and recommendations.** The team rates severity and likelihood per category,

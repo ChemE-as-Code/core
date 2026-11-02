@@ -24,8 +24,9 @@ the lists and sheets, interlocks of `control/cause-effect.yaml`) and the matrix,
 bands and analysed inputs, the targeted band write, the study's state and review.
 `hazop_report.py`: the report. `propagation.py` (ADR 0032, `cheme safety hazop propagate`):
 the candidate scenarios of a node, each failure mode of its objects walked over the pyDEXPI
-objects of the analysed P&IDs to a top event or study limit, with the safeguards on the path and
-the open questions; the failure modes come from the project's `safety/failure-modes.yaml`
+objects of the analysed P&IDs to a top event, a study limit or a valve closed in normal operation
+(breadth first, one candidate per outcome on its shortest path), with the safeguards on the path
+and the open questions; the failure modes come from the project's `safety/failure-modes.yaml`
 (`cheme/failure-modes/v1`, none shipped). `data/risk-matrix-example.yaml`: the illustrative matrix that
 `cheme init` writes. Skills `hazop-study`, `hazop-node-breakdown`, `hazop-scenario-propagation`,
 `hazop-risk-classification`, `hazop-assessment`, `hazop-review`. Review records

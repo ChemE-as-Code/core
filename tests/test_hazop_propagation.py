@@ -164,6 +164,160 @@ def test_a_local_cause_is_followed_downstream_to_the_study_limit(model):
     assert ("control", "FIC-104") in [(g.kind, g.ref) for g in candidate.safeguards]
 
 
+def test_a_pipe_may_end_at_an_item_of_a_later_segment():
+    from pydexpi.pydexpi_classes import pydexpi_classes as d
+
+    a, b = d.GateValve(id="A"), d.GateValve(id="B")
+    first = d.PipingNetworkSegment(
+        id="S1", items=[a], connections=[d.Pipe(sourceItem=a, targetItem=b)]
+    )
+    second = d.PipingNetworkSegment(id="S2", items=[b])
+    system = d.PipingNetworkSystem(id="L1", segments=[first, second])
+    model = d.EngineeringModel(conceptualModel=d.PlantModel(pipingNetworkSystems=[system]))
+    index = prop._index([("P-01", model)])
+    assert [(t, s) for t, s in index.down[id(a)]] == [(id(b), id(first))]
+
+
+GATES = """
+schema: cheme/failure-modes/v1
+kind: failure-modes
+example: true
+source: synthetic test data
+classes:
+  GateValve:
+    modes:
+      - {id: M5, gives: {parameter: flow, guide_word: "no", towards: downstream}}
+    responses:
+      - {incoming: {parameter: flow, guide_word: "no"}, effect: passes}
+"""
+
+
+def gates(edges: list[tuple[str, str]], roles: dict[str, str] | None = None):
+    """A model of untagged gate valves joined by *edges*; *roles* gives a valve a role name."""
+    from pydexpi.pydexpi_classes import pydexpi_classes as d
+
+    names = sorted({n for edge in edges for n in edge})
+    valves = {n: d.GateValve(id=n) for n in names}
+    for name, role in (roles or {}).items():
+        valves[name].performedRoles = [d.Role(name=role)]
+    pipes = [d.Pipe(sourceItem=valves[a], targetItem=valves[b]) for a, b in edges]
+    segment = d.PipingNetworkSegment(id="S1", items=list(valves.values()), connections=pipes)
+    system = d.PipingNetworkSystem(id="L1", segments=[segment])
+    return d.EngineeringModel(conceptualModel=d.PlantModel(pipingNetworkSystems=[system]))
+
+
+def walk(model, members):
+    refs = [PlantRef(sheet="P-01", object=m) for m in members]
+    return propagate([("P-01", model)], library(GATES), refs).candidates
+
+
+def test_two_routes_to_the_same_outcome_give_one_candidate_on_the_shorter():
+    # A splits to B and C, which join again at D before E; C takes the long way round.
+    model = gates([("A", "B"), ("A", "C"), ("C", "X"), ("X", "D"), ("B", "D"), ("D", "E")])
+    ends = [c for c in walk(model, ["A"]) if c.end == "no-connection"]
+    assert len(ends) == 1  # one per route before
+    assert tags(ends[0]) == ["A", "B", "D", "E"]
+
+
+def test_a_recycle_is_walked_once():
+    model = gates([("A", "B"), ("B", "C"), ("C", "A"), ("B", "E")])
+    candidates = walk(model, ["A"])
+    assert {c.end for c in candidates} == {"visited", "no-connection"}
+    assert all(c.end != "depth" for c in candidates)
+
+
+@pytest.mark.parametrize(
+    "role", ["Normally closed", "urn:example:valve-position:locked-closed", "CAR_SEALED_CLOSED"]
+)
+def test_a_valve_closed_in_normal_operation_stops_the_walk(role):
+    model = gates([("A", "B"), ("B", "E")], roles={"B": role})
+    candidates = [c for c in walk(model, ["A", "E"]) if c.cause == "A"]
+    assert [(c.end, tags(c)) for c in candidates] == [("closed", ["A", "B"])]
+    assert candidates[0].path[-1].effect == "closed"
+    open_ = gates([("A", "B"), ("B", "E")], roles={"B": "Locked open"})
+    assert all(c.end != "closed" for c in walk(open_, ["A"]))
+
+
+def test_a_candidate_names_the_other_nodes_its_path_enters(model):
+    others = {"N1": [PlantRef(tag="V-101")], "N3": [PlantRef(tag="FV-104")]}
+    refs = [PlantRef(tag="P-101")]
+    result = propagate([("P-01", model)], library(), refs, deviation=NO_FLOW, others=others)
+    by_end = {c.top_event or c.end: c.crosses for c in result.candidates if c.cause == "P-101"}
+    assert by_end["overfill"] == [("N1", "V-101")]
+    assert by_end["study-limit"] == [("N3", "FV-104")]
+    # A line member of another node: its first object on the path names it.
+    lines = {"N9": [PlantRef(tag="50-P-102")]}
+    result = propagate([("P-01", model)], library(), refs, deviation=NO_FLOW, others=lines)
+    limit = next(c for c in result.candidates if c.end == "study-limit")
+    assert limit.crosses == [("N9", "CV-1")]
+
+
+OVERFILL = {"node": "N2", "guide_word": "no", "parameter": "flow", "top_event": "overfill"}
+
+
+def scenario_node(refs):
+    from chemeascode.domains.safety.schemas import Node
+
+    scenario = {"id": "S1", "cause": "P-101 stops", "refs": refs}
+    return Node.model_validate(
+        {
+            "id": "N2",
+            "members": ["P-101"],
+            "deviations": [{"guide_word": "no", "parameter": "flow", "scenarios": [scenario]}],
+        }
+    )
+
+
+def outcome(**fields):
+    from chemeascode.domains.safety.schemas import Outcome
+
+    return Outcome.model_validate({**OVERFILL, "at": "V-101", **fields})
+
+
+def at_vessel(result):
+    return [g for g in result.gaps if g.at == "V-101"]
+
+
+def test_coverage_compares_the_scenarios_by_tag_and_takes_the_triage(model):
+    candidates = run(model, ["P-101"]).candidates
+    full = prop.coverage(scenario_node(["P-101", "V-101"]), candidates)
+    assert not at_vessel(full) and full.covered and full.unreached == []
+    cause_only = at_vessel(prop.coverage(scenario_node(["P-101"]), candidates))
+    assert [(g.top_event, g.cause_only, g.uncovered) for g in cause_only] == [
+        ("overfill", ["P-101"], [])
+    ]
+    elsewhere = prop.coverage(scenario_node(["X-1"]), candidates)
+    assert at_vessel(elsewhere)[0].uncovered == ["P-101"] and elsewhere.unreached == ["S1"]
+
+    gone = prop.coverage(
+        scenario_node(["X-1"]), candidates, [outcome(status="dismissed", reason="the team's")]
+    )
+    assert not at_vessel(gone) and gone.dismissed == 1
+    asked = prop.coverage(
+        scenario_node(["X-1"]), candidates, [outcome(status="question", reason="which fluid?")]
+    )
+    assert not at_vessel(asked) and asked.questions == 1
+    for undecided in (outcome(), outcome(status="dismissed", reason="x", causes=["P-9"])):
+        result = prop.coverage(scenario_node(["X-1"]), candidates, [undecided])
+        assert at_vessel(result) and result.dismissed == 0
+    with pytest.raises(ValidationError, match="needs its reason"):
+        outcome(status="dismissed")
+
+
+def test_the_triage_lists_open_gaps_and_keeps_decisions(model):
+    candidates = run(model, ["P-101"]).candidates
+    gaps = prop.coverage(scenario_node(["X-1"]), candidates)
+    decided = outcome(at="X-9", status="dismissed", reason="kept")
+    stale_open = outcome(at="X-8")
+    elsewhere = outcome(node="N7", at="X-7")
+    listed = prop.triage([("N2", gaps)], [decided, stale_open, elsewhere], "tool")
+    assert decided in listed and elsewhere in listed and stale_open not in listed
+    vessel = [o for o in listed if o.at == "V-101"]
+    assert [(o.status, o.causes, o.by) for o in vessel] == [("open", ["P-101"], "tool")]
+    again = prop.triage([("N2", gaps)], listed, "tool")
+    assert again == listed  # a second write changes nothing
+
+
 def test_upstream_the_vessel_fills_to_a_top_event_with_its_level_trip(model):
     context = Context(interlocks={"LT-102": ["I-01"]})
     result = run(model, ["P-101"], context, NO_FLOW)
@@ -290,11 +444,12 @@ def plant(tmp_path: Path, monkeypatch) -> Path:
     study = root / "safety" / "hazop" / "H-01" / "study.yaml"
     data = yaml.safe_load(study.read_text(encoding="utf-8"))
     data["nodes"] = [
+        {"id": "N1", "members": ["V-101", "80-P-101"]},
         {
             "id": "N2",
             "members": ["P-101", "FV-104", "50-P-102"],
             "deviations": [{"id": "N2-NF", "guide_word": "no", "parameter": "flow"}],
-        }
+        },
     ]
     study.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return root
@@ -322,7 +477,57 @@ def test_the_command_prints_the_candidates_and_writes_nothing(plant):
     assert study.read_text(encoding="utf-8") == before
 
     text = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2"])
-    assert text.exit_code == 0 and "P-101 M1 [local]" in text.output
+    assert text.exit_code == 0
+    assert "no flow -> overfill at V-101 (Water) [via N1]: P-101" in text.output
+    assert "path:" not in text.output
+    assert "question (" in text.output  # FV-104's fail position, once with its count
+    paths = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N2", "--paths"])
+    assert paths.exit_code == 0 and "P-101 M1 [local]" in paths.output
+    assert "path: P-101 (no flow, cause)" in paths.output
+    assert "  crosses: N1 at V-101" in paths.output
+
+    every = runner.invoke(app, ["safety", "hazop", "propagate", "H-01"])
+    assert every.exit_code == 0, every.output
+    assert "overfill at V-101 (Water): 1 node(s)\n  N2: P-101" in every.output
+    data = json.loads(runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--json"]).output)
+    assert data["nodes"] == ["N1", "N2"]
+    overfill = next(c for c in data["consequences"] if c["top_event"] == "overfill")
+    assert overfill["nodes"] == [{"node": "N2", "causes": ["P-101"]}]
+    alone = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--deviation", "no flow"])
+    assert alone.exit_code == 2 and "--deviation needs --node" in alone.output
+
+    node_coverage = ["safety", "hazop", "propagate", "H-01", "--node", "N2", "--coverage"]
+    gaps = runner.invoke(app, node_coverage)
+    assert gaps.exit_code == 1, gaps.output
+    assert "N2: no flow -> overfill at V-101 (Water) [via N1]; no scenario: P-101" in gaps.output
+    every = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--coverage", "--json"])
+    assert every.exit_code == 1
+    nodes = {n["node"]: n for n in json.loads(every.output)["nodes"]}
+    assert nodes["N1"]["gaps"] == [] and nodes["N2"]["gaps"]
+    both = ["safety", "hazop", "propagate", "H-01", "--coverage", "--deviation", "N2-NF"]
+    assert runner.invoke(app, both).exit_code == 2
+    assert runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--write"]).exit_code == 2
+
+    # The triage file: written open, decided by hand, kept by the next write.
+    triage = plant / "safety" / "hazop" / "H-01" / "coverage.yaml"
+    written = runner.invoke(app, [*node_coverage, "--write"])
+    assert written.exit_code == 1 and "(written)" in written.output
+    data = yaml.safe_load(triage.read_text(encoding="utf-8"))
+    assert data["kind"] == "hazop-coverage" and data["walk"]["sheets"]
+    assert b"\r\n" not in triage.read_bytes()
+    assert "reason:" not in triage.read_text(encoding="utf-8")  # empty fields left out
+    for entry in data["outcomes"]:
+        entry.update(status="dismissed", reason="test: not credible here", by="agent")
+    triage.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    closed = runner.invoke(app, [*node_coverage, "--write"])
+    assert closed.exit_code == 0, closed.output
+    assert yaml.safe_load(triage.read_text(encoding="utf-8"))["outcomes"] == data["outcomes"]
+    assert study.read_text(encoding="utf-8") == before
+
+    pid = plant / "pid" / "P-01.xml"
+    pid.write_bytes(pid.read_bytes() + b"\n")
+    assert "changed since it was written" in runner.invoke(app, node_coverage).output
+    assert study.read_text(encoding="utf-8") == before
 
     missing = runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--node", "N9"])
     assert missing.exit_code == 2 and "no node N9" in missing.output

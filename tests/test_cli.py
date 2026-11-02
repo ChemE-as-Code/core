@@ -383,6 +383,7 @@ def test_schema_lists_kinds(plant: Path, monkeypatch):
         "risk-matrix",
         "hazop-study",
         "failure-modes",
+        "hazop-coverage",
         "narrative",
         "control_philosophy",
         "process-run",

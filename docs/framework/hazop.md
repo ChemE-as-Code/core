@@ -124,7 +124,10 @@ impact` adds `cheme.review-needed` for a changed analysed input and for stale ba
 
 ## Not covered
 
-Automated node selection, scenario propagation over the P&ID, frequency estimation, safeguard
-credit (LOPA), consequence modelling and LLM classification; a dedicated viewer page. None of
+Automated node selection, frequency estimation, safeguard credit (LOPA), consequence modelling
+and LLM classification; a dedicated viewer page. Scenario propagation over the P&ID exists as a
+read-only cross-check (`cheme safety hazop propagate`, ADR 0032): it never writes scenarios,
+`--coverage` reports the top events no scenario covers, and `--coverage --write` keeps their
+triage (open, dismissed, question, each with its reason) in `coverage.yaml` beside the study. None of
 them is needed for authoring, validation or reporting, and no database, external analysis
 package, LLM service or credential is.

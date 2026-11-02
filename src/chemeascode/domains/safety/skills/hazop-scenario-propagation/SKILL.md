@@ -26,6 +26,9 @@ nobody followed far enough. You propose; the team decides what is credible.
   fluid codes. DEXPI files often do not say. A missing fluid is a question for the team, never a
   guess.
 - The operating modes of the study: a cause may belong to start-up or shutdown only.
+- Optional: the project's failure-mode library `safety/failure-modes.yaml` (`cheme schema
+  failure-modes`, written by the team with its sources), which `cheme safety hazop propagate`
+  needs. Without it, trace by hand; never write the library yourself to have one.
 
 ## Workflow and tools
 
@@ -94,6 +97,60 @@ nobody followed far enough. You propose; the team decides what is credible.
      `notes:` with the path that showed it, so the team can disagree.
 6. **Check**: `cheme safety hazop check H-01`.
 
+**Optional: the walk as a cross-check.** With a failure-mode library,
+`cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--paths] [--json]` does
+steps 2 and 3 mechanically: each failure mode of the node's objects is walked over the analysed
+P&IDs with the library's responses, one candidate per outcome on its shortest path. It prints
+one line per outcome (deviation, top event or end, where, `[via ...]` the other nodes the path
+enters, the causes that reach it) and the open questions once each; `--paths` gives every
+candidate with its path, the nodes it crosses and the safeguards on it. Causes come only from
+the node, consequences lie wherever the walk ends: a consequence in another node is recorded
+here, under its cause, and that node refers back ("see N1"), it does not repeat the row.
+Without `--node`, the command walks every node and groups the top events: each with the nodes
+and causes that reach it, the most shared first. Discuss a shared consequence once and refer to
+it from the other nodes. It is a tool, not a step: use it where it helps (a large or meshed node, a check after
+drafting for a cause or branch nobody followed, the instruments and interlocks along a long
+path) and skip it for a small node. Read its output as candidates, never as rows:
+- the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `unknown`
+  (the library has no response there: a question, never a guessed response), `depth` (cut off
+  after 40 objects: follow it by hand), and, only counted, `closed`, `visited` and
+  `no-connection`;
+- a valve with a normally closed or locked closed role stops a walk: the line-up of normal
+  operation. A cause at that valve (opened in error, passing) still starts its own walk, but
+  another mode (a switched standby filter, a start-up line-up) is yours to follow by hand;
+- it judges nothing: credibility and outcome are steps 4 and 5, and a safeguard on the path is
+  a candidate, not an effective one (skill `safeguard-crediting`). Consequences inside a pump
+  or at a seal come from its own responses in the library, not from the walk.
+Say in a scenario's `notes:` when the walk found it.
+
+**Coverage after drafting.** Once the node's rows are written (by hand, steps 1 to 5), `cheme
+safety hazop propagate H-01 --node N1 --coverage` (or the whole study without `--node`)
+compares them with the walk by tag: a top event is covered when a scenario of that deviation
+names the cause and the object the walk ends at in its `refs`. It lists each top event that is
+not (`no scenario`, or `cause only` where a row has the cause but another consequence), with
+the nodes the path crosses, and the scenarios no walk reaches (outside the library: seals,
+maintenance, operators; expected, not a fault). It exits 1 while a gap is open.
+
+`--coverage --write` lists the open gaps in the triage file beside the study,
+`safety/hazop/H-01/coverage.yaml` (`cheme schema hazop-coverage`), one `status: open` outcome
+each; the study itself is not touched. Not every gap needs a row: decide each one, never add
+rows only to silence it, and never leave it silently:
+- **a scenario** (steps 4 and 5), its `refs` naming the cause and where the walk ends: the gap
+  is covered and the next `--write` drops its open outcome;
+- **dismissed**, with the reason (a train covered by one representative row, a library response
+  you do not accept, a consequence analysed in the node it lies in);
+- **question**, with what the files do not settle (the fluid, a design pressure, whether the
+  library's response is right): for the team.
+```yaml
+outcomes:
+  - {node: N4, guide_word: more, parameter: pressure, top_event: overpressure, at: E-301,
+     causes: [MOV-411A], status: dismissed, reason: "covered by S19 for the pump train", by: agent}
+```
+Edit only `status`, `reason`, `by` (and `causes` to split an outcome); `judgement: accepted` is
+the team's. A later `--write` keeps every dismissed and question outcome, adds the new gaps and
+drops open ones no gap needs; when the library or an analysed sheet changed since, the command
+says so: check the decisions. Never dismiss what you have not traced.
+
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and
 `notes`, keeping its id; a different cause or outcome is a new scenario with a new id.
 
@@ -106,6 +163,8 @@ nobody followed far enough. You propose; the team decides what is credible.
   there, record it, and ask whether the other sheet belongs to the study.
 - A behaviour the files do not settle (a fail position, a set pressure, whether a vessel is
   rated for the pump's shut-off pressure): write the question in `notes:`; do not choose.
+- `propagate` names the node's objects whose class the library does not cover and the members
+  it cannot resolve: trace those by hand. A gap in the library is for the team to fill.
 
 ## Outputs and provenance
 
@@ -124,6 +183,7 @@ safeguard, and never present a traced path as the team's conclusion.
 ## References
 
 - `safety/README.md`; `cheme schema hazop-study`; `cheme show --help`.
+- `cheme safety hazop propagate --help`, `cheme schema failure-modes` (the optional walk).
 - IEC 61882:2016, Hazard and operability studies (HAZOP studies) - Application guide.
 - Skills `hazop-node-breakdown` (the nodes), `hazop-equipment-causes` (credible deviations and
   causes per equipment type), `safeguard-crediting`, `relief-scenarios`,

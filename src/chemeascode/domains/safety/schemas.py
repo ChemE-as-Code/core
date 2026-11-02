@@ -1,6 +1,8 @@
 """Schemas of the safety files: the risk matrix (``cheme/risk-matrix/v1``), the HAZOP study
-(``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``) and the failure-mode library
-scenario propagation walks with (``cheme/failure-modes/v1``, ``safety/failure-modes.yaml``).
+(``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``), the failure-mode library
+scenario propagation walks with (``cheme/failure-modes/v1``, ``safety/failure-modes.yaml``) and
+the triage of the walk's outcomes (``cheme/hazop-coverage/v1``,
+``safety/hazop/<study-id>/coverage.yaml``).
 
 A study is one nested file in worksheet order: nodes, their deviations (guide word and
 parameter) and the scenarios of each deviation (a cause leading to a consequence), with the
@@ -39,6 +41,7 @@ from chemeascode.foundation.schemas.reviews import Basis
 MATRIX_SCHEMA = "cheme/risk-matrix/v1"
 STUDY_SCHEMA = "cheme/hazop-study/v1"
 FAILURE_MODES_SCHEMA = "cheme/failure-modes/v1"
+COVERAGE_SCHEMA = "cheme/hazop-coverage/v1"
 
 
 def _stable_id(value: Any) -> Any:
@@ -190,6 +193,9 @@ ActionStatus = Literal["proposed", "open", "closed", "rejected"]
 
 #: Data of other tools, by tool name; cheme-as-code keeps it and does not read it.
 Extensions = dict[str, Any]
+
+#: The events that end a chain: a loss of primary containment or a fire or explosion inside.
+TopEvent = Literal["loss-of-containment", "overpressure", "overfill", "internal-fire-explosion"]
 
 
 def _plant_ref(value: Any) -> Any:
@@ -414,6 +420,66 @@ class HazopStudy(Strict):
 
 
 # ---------------------------------------------------------------------------
+# Coverage triage (safety/hazop/<id>/coverage.yaml)
+# ---------------------------------------------------------------------------
+
+#: ``open``: found by the walk, not looked at yet; ``dismissed``: needs no scenario, with the
+#: reason; ``question``: the files do not settle it, for the team. Covered is never written:
+#: ``--coverage`` derives it from the scenarios' refs.
+TriageStatus = Literal["open", "dismissed", "question"]
+
+
+class Outcome(Strict):
+    """A top event the walk brings to a node that no scenario covers, and what was decided."""
+
+    node: StableId
+    guide_word: GuideWord
+    parameter: str = Field(min_length=1)
+    top_event: TopEvent
+    at: str = Field(min_length=1, description="The tag or object id where the walk ends.")
+    causes: list[str] = Field(
+        default_factory=list, description="The causes (tags) it is about; none: every cause."
+    )
+    status: TriageStatus = "open"
+    reason: str = Field(default="", description="Why dismissed, or what the question is.")
+    judgement: Judgement = Field(
+        default="proposed", description="accepted once the team agrees with the status."
+    )
+    by: str = ""
+
+    @model_validator(mode="after")
+    def _reasoned(self) -> Outcome:
+        if self.status != "open" and not self.reason.strip():
+            raise ValueError(f"status {self.status} needs its reason")
+        return self
+
+
+class Walk(Strict):
+    """The inputs of the walk the outcomes were listed from (written by the tool)."""
+
+    library: str = Field(description="sha256 of the failure-mode library.")
+    sheets: dict[str, str] = Field(default_factory=dict, description="Sheet file -> sha256.")
+
+
+class HazopCoverage(Strict):
+    """The triage of a study's propagation outcomes: one entry per top event no scenario covers,
+    written ``open`` by ``cheme safety hazop propagate --coverage --write``, decided by an agent
+    or the team. Kept beside the study so the worksheet holds only its rows."""
+
+    schema_: str = Field(alias="schema", description=f"Always {COVERAGE_SCHEMA}.")
+    kind: Literal["hazop-coverage"]
+    study: StableId
+    walk: Walk | None = None
+    outcomes: list[Outcome] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _version(self) -> HazopCoverage:
+        if self.schema_ != COVERAGE_SCHEMA:
+            raise ValueError(unsupported_schema(self.schema_, COVERAGE_SCHEMA))
+        return self
+
+
+# ---------------------------------------------------------------------------
 # Failure-mode library (scenario propagation)
 # ---------------------------------------------------------------------------
 
@@ -424,8 +490,6 @@ Towards = Literal["downstream", "upstream", "both", "none"]
 #: it through (``passes``, ``no-effect``: not recorded as a step), takes it up (``absorbs``) or
 #: ends the chain at a top event (``stops``).
 ResponseEffect = Literal["responds", "passes", "no-effect", "absorbs", "stops"]
-#: The events that end a chain: a loss of primary containment or a fire or explosion inside.
-TopEvent = Literal["loss-of-containment", "overpressure", "overfill", "internal-fire-explosion"]
 
 
 class DeviationSpec(Strict):

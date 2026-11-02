@@ -11,7 +11,10 @@ that object, a *driver* when it starts at another object of the node.
 
 The walk is deterministic and reads the pyDEXPI objects directly (no graph library): pipes give
 the flow direction (source to target), a nozzle stands for its equipment, an off-page connector
-is a study limit. Along the way it collects candidate safeguards that the plant has (an
+is a study limit, and a valve performing a normally closed or locked closed role stops the
+deviation. It goes breadth first and takes each object with a given deviation once per cause,
+so a meshed header or a recycle gives one candidate per outcome (on its shortest path), not one
+per route. Along the way it collects candidate safeguards that the plant has (an
 instrument measuring the deviated parameter on the path, its controller, the C&E interlocks it
 starts, a check valve against reverse flow, a relief device at a pressure deviation) without
 ever stopping the chain for them. What the files do not settle (a fail position not recorded, a
@@ -23,6 +26,7 @@ or whether a safeguard works.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -31,6 +35,8 @@ from chemeascode.domains.safety.schemas import (
     ClassEntry,
     FailureMode,
     FailureModeLibrary,
+    Node,
+    Outcome,
     PlantRef,
     Response,
 )
@@ -39,9 +45,18 @@ from chemeascode.domains.safety.schemas import (
 MAX_STEPS = 40
 #: The measured variable of an instrument function by its first letter (ISA 5.1 convention).
 MEASURED = {"F": "flow", "L": "level", "P": "pressure", "T": "temperature"}
+#: Role names or URIs (lower case, - and _ as spaces) of a valve closed in normal operation.
+CLOSED_ROLES = ("normally closed", "locked closed", "car sealed closed")
 
 End = Literal[
-    "top-event", "study-limit", "absorbed", "visited", "no-connection", "unknown", "depth"
+    "top-event",
+    "study-limit",
+    "absorbed",
+    "closed",
+    "visited",
+    "no-connection",
+    "unknown",
+    "depth",
 ]
 
 
@@ -63,7 +78,8 @@ class Step:
     tag: str | None
     cls: str
     deviation: Deviation
-    #: ``cause``, or the library's response: responds, passes, no-effect, absorbs, stops.
+    #: ``cause``, the library's response (responds, passes, no-effect, absorbs, stops),
+    #: ``closed`` (a valve closed in normal operation) or ``study-limit``.
     effect: str
     #: The object's key in the walk and the segment the deviation arrived by.
     key: int = field(compare=False, repr=False)
@@ -100,6 +116,8 @@ class Candidate:
     fluid: str | None
     safeguards: list[CandidateSafeguard]
     questions: list[str]
+    #: The other nodes the path enters, in order, each with the first object of it on the path.
+    crosses: list[tuple[str, str]] = field(default_factory=list)
 
     def path_text(self) -> str:
         return " > ".join(f"{s.label} ({s.deviation.text()}, {s.effect})" for s in self.path)
@@ -139,6 +157,7 @@ class _Object:
     fluid: str | None = None
     actuated: bool = False
     limit: bool = False
+    closed: bool = False
 
     @property
     def label(self) -> str:
@@ -175,6 +194,16 @@ def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _closed(obj: Any) -> bool:
+    """Whether *obj* performs a role of a valve closed in normal operation (DEXPI Role)."""
+    for role in getattr(obj, "performedRoles", None) or ():
+        names = (_text(getattr(role, "name", None)), _text(getattr(role, "uri_", None)))
+        text = " ".join(n for n in names if n).lower().replace("-", " ").replace("_", " ")
+        if any(closed in text for closed in CLOSED_ROLES):
+            return True
+    return False
+
+
 def _index(models: Iterable[tuple[str, Any]]) -> _Index:
     """The objects, pipes and instruments of the loaded *models* (``(sheet id, model)``)."""
     from pydexpi.pydexpi_classes.pydexpi_classes import TaggedPlantItem
@@ -198,6 +227,7 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 classes,
                 fluid,
                 limit="PipeOffPageConnector" in classes,
+                closed=_closed(obj),
             ),
         )
 
@@ -212,7 +242,8 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 add(sheet, obj, _text(get_tag(obj)))
                 for nozzle in getattr(obj, "nozzles", None) or ():
                     owner[id(nozzle)] = id(obj)
-        for system in getattr(conceptual, "pipingNetworkSystems", None) or ():
+        systems = getattr(conceptual, "pipingNetworkSystems", None) or ()
+        for system in systems:
             line = _text(getattr(system, "lineNumber", None))
             for segment in system.segments or ():
                 fluid = _text(getattr(segment, "fluidCode", None)) or _text(
@@ -221,6 +252,9 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 index.segments[id(segment)] = (sheet, line, fluid)
                 for item in segment.items or ():
                     add(sheet, item, _text(piping_tag(item)), fluid)
+        # Pipes second: a pipe may end at an item of a segment listed after its own.
+        for system in systems:
+            for segment in system.segments or ():
                 # A segment without pipes still joins its own ends.
                 for pipe in segment.connections or [segment]:
                     source = node(getattr(pipe, "sourceItem", None))
@@ -332,10 +366,20 @@ class _Walked:
 
 
 class _Walker:
+    """The walks of one cause, breadth first: each object is taken once with a given deviation
+    and direction, so the first walk to reach it is the shortest and later ones end there as
+    ``visited``."""
+
     def __init__(self, index: _Index, library: FailureModeLibrary) -> None:
         self.index = index
         self.library = library
         self.done: list[_Walked] = []
+        self.queue: deque[tuple[list[Step], int, int, Deviation, str, list[str]]] = deque()
+        self.seen: set[tuple[int, Deviation, str]] = set()
+
+    def run(self) -> None:
+        while self.queue:
+            self.arrive(*self.queue.popleft())
 
     def step(self, key: int, deviation: Deviation, effect: str, segment: int | None) -> Step:
         obj = self.index.objects[key]
@@ -358,7 +402,7 @@ class _Walker:
                 if following == back:
                     continue  # never straight back to where it came from
                 moved = True
-                self.arrive(path, following, segment, deviation, direction, questions)
+                self.queue.append((path, following, segment, deviation, direction, questions))
         if not moved:
             self.done.append(_Walked(path, "no-connection", None, questions))
 
@@ -375,12 +419,18 @@ class _Walker:
         if len(path) >= MAX_STEPS:
             self.done.append(_Walked(path, "depth", None, questions))
             return
-        if any(s.key == key and s.deviation == deviation for s in path):
+        state = (key, deviation, direction)
+        if state in self.seen or any(s.key == key and s.deviation == deviation for s in path):
             self.done.append(_Walked(path, "visited", None, questions))
             return
+        self.seen.add(state)
         if obj.limit:
             limit = self.step(key, deviation, "study-limit", segment)
             self.done.append(_Walked([*path, limit], "study-limit", None, questions))
+            return
+        if obj.closed:
+            closed = self.step(key, deviation, "closed", segment)
+            self.done.append(_Walked([*path, closed], "closed", None, questions))
             return
         via = "inlet" if direction == "downstream" else "outlet"
         self.react(path, key, segment, deviation, via, direction, questions)
@@ -473,14 +523,34 @@ def propagate(
     members: Iterable[PlantRef],
     context: Context | None = None,
     deviation: Deviation | None = None,
+    others: dict[str, Iterable[PlantRef]] | None = None,
 ) -> Propagation:
     """The candidate scenarios of a node with *members*, over the loaded *models* (``(sheet id,
-    pyDEXPI model)``), for one *deviation* or every one a cause reaches the node with."""
+    pyDEXPI model)``), for one *deviation* or every one a cause reaches the node with. *others*
+    (node id -> members) are the study's other nodes: each candidate names those its path
+    enters."""
     context = context or Context()
     index = _index(models)
     member_list = list(members)
     keys, segments, unresolved = _members(index, member_list)
     in_node = set(keys)
+    other_nodes = []
+    for node_id, refs in (others or {}).items():
+        other_keys, other_segments, _ = _members(index, refs)
+        other_nodes.append((node_id, set(other_keys), other_segments))
+
+    def crosses(path: list[Step]) -> list[tuple[str, str]]:
+        entered: list[tuple[str, str]] = []
+        for step in path:
+            if step.key in in_node:
+                continue
+            for node_id, other_keys, other_segments in other_nodes:
+                inside = step.key in other_keys or (
+                    step.segment in other_segments and step.segment not in segments
+                )
+                if inside and all(node_id != n for n, _ in entered):
+                    entered.append((node_id, step.label))
+        return entered
 
     uncovered = []
     for key in keys:
@@ -506,6 +576,7 @@ def propagate(
                 first = Deviation(mode.gives.parameter, mode.gives.guide_word)
                 cause = walker.step(start, first, "cause", None)
                 walker.advance([cause], first, mode.gives.towards, [question] if question else [])
+                walker.run()
                 for walked in walker.done:
                     reached_here: set[Deviation] = set()
                     for i, step in enumerate(walked.path):
@@ -516,12 +587,16 @@ def propagate(
                         if step.deviation in reached_here:
                             continue
                         reached_here.add(step.deviation)
+                        # One candidate per outcome; the walk is breadth first, so the first
+                        # one kept has the shortest path.
                         signature = (
                             step.deviation,
-                            obj.label,
+                            step.key,
+                            start,
                             mode.id,
-                            tuple(s.key for s in walked.path),
                             walked.end,
+                            walked.top_event,
+                            walked.path[-1].key,
                         )
                         if signature in seen:
                             continue
@@ -546,6 +621,135 @@ def propagate(
                                 fluid=fluid,
                                 safeguards=_safeguards(index, walked.path, context),
                                 questions=questions,
+                                crosses=crosses(walked.path),
                             )
                         )
     return Propagation(candidates, uncovered, unresolved)
+
+
+# ---------------------------------------------------------------------------
+# Coverage: the node's scenarios against the walk
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Gap:
+    """A top event the walk brings to the node that no scenario of the node covers."""
+
+    deviation: Deviation
+    top_event: str
+    #: The object the walk ends at.
+    at: str
+    fluid: str | None
+    crosses: list[str]
+    #: Causes no scenario of this deviation names.
+    uncovered: list[str]
+    #: Causes a scenario of this deviation names, but none of those names where the walk ends.
+    cause_only: list[str]
+
+
+@dataclass
+class Coverage:
+    #: The open gaps: top events with a cause no scenario covers and no decision handles.
+    gaps: list[Gap]
+    #: Cause and top event pairs a scenario names, and those decided in the triage.
+    covered: int
+    dismissed: int
+    questions: int
+    #: Scenarios no walk reaches with their deviation from a cause they name: outside the library.
+    unreached: list[str]
+
+
+def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] = ()) -> Coverage:
+    """Compare the node's scenarios with its candidates by tag: a scenario covers a top event
+    when it has the deviation and its ``refs`` name the cause and the object the walk ends at.
+    A ``dismissed`` or ``question`` outcome of the triage (coverage.yaml) handles its causes."""
+    decided = [o for o in triage if o.node == node.id and o.status != "open"]
+    rows = [
+        ((d.guide_word, d.parameter), {str(r.tag or r.object) for r in s.refs}, s.id)
+        for d in node.deviations
+        for s in d.scenarios
+    ]
+    gaps: dict[tuple[Deviation, str | None, str], Gap] = {}
+    # Distinct cause and top event pairs: one cause's several failure modes count once.
+    pairs: dict[str, set[tuple[Any, ...]]] = {
+        "covered": set(),
+        "dismissed": set(),
+        "question": set(),
+    }
+    reached: set[str] = set()
+    for c in candidates:
+        deviation = (c.deviation.guide_word, c.deviation.parameter)
+        naming = [(refs, sid) for dev, refs, sid in rows if dev == deviation and c.cause in refs]
+        reached.update(sid for _, sid in naming)
+        if c.end != "top-event":
+            continue
+        at = c.path[-1].label
+        decision = next(
+            (
+                o
+                for o in decided
+                if (o.guide_word, o.parameter, o.top_event, o.at) == (*deviation, c.top_event, at)
+                and (not o.causes or c.cause in o.causes)
+            ),
+            None,
+        )
+        pair = (c.cause, deviation, c.top_event, at)
+        if decision is not None:
+            pairs[decision.status].add(pair)
+            continue
+        if any(at in refs for refs, _ in naming):
+            pairs["covered"].add(pair)
+            continue
+        gap = gaps.setdefault(
+            (c.deviation, c.top_event, at),
+            Gap(c.deviation, str(c.top_event), at, c.fluid, [], [], []),
+        )
+        causes = gap.cause_only if naming else gap.uncovered
+        if c.cause not in causes:
+            causes.append(c.cause)
+        gap.crosses.extend(n for n, _ in c.crosses if n not in gap.crosses)
+    unreached = [sid for _, _, sid in rows if sid not in reached]
+    return Coverage(
+        list(gaps.values()),
+        len(pairs["covered"]),
+        len(pairs["dismissed"]),
+        len(pairs["question"]),
+        unreached,
+    )
+
+
+def triage(
+    found: Iterable[tuple[str, Coverage]], outcomes: list[Outcome], by: str
+) -> list[Outcome]:
+    """*outcomes* brought up to date with the gaps *found* (node id, its coverage): decided
+    outcomes kept as they are, an ``open`` one per gap with the causes still open (new ones
+    appended, *by* naming the tool), ``open`` ones of the walked nodes no gap needs dropped."""
+    walked: dict[str, Coverage] = dict(found)
+    wanted: dict[tuple[str, Deviation, str, str], list[str]] = {}
+    for node_id, result in walked.items():
+        for gap in result.gaps:
+            key = (node_id, gap.deviation, gap.top_event, gap.at)
+            wanted[key] = [*gap.uncovered, *gap.cause_only]
+    kept: list[Outcome] = []
+    for o in outcomes:
+        key = (o.node, Deviation(o.parameter, o.guide_word), o.top_event, o.at)
+        if o.status != "open" or o.node not in walked:
+            kept.append(o)
+        elif key in wanted:
+            kept.append(o.model_copy(update={"causes": wanted.pop(key)}))
+    for (node_id, deviation, top_event, at), causes in wanted.items():
+        kept.append(
+            Outcome.model_validate(
+                {
+                    "node": node_id,
+                    "guide_word": deviation.guide_word,
+                    "parameter": deviation.parameter,
+                    "top_event": top_event,
+                    "at": at,
+                    "causes": causes,
+                    "by": by,
+                }
+            )
+        )
+    return kept

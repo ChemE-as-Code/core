@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import fnmatch
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Any
 
 import yaml
@@ -33,7 +34,14 @@ from chemeascode.domains.safety.hazop import (
     study_state,
     workspace_studies,
 )
-from chemeascode.domains.safety.propagation import Context, Deviation, Propagation, propagate
+from chemeascode.domains.safety.propagation import (
+    Context,
+    Coverage,
+    Deviation,
+    Propagation,
+    coverage,
+    propagate,
+)
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.workspace import Workspace
 
@@ -202,6 +210,8 @@ class NodePropagation:
     deviation: Deviation | None
     result: Propagation
     findings: list[Finding]
+    #: The node's scenarios against its candidates (all deviations only).
+    coverage: Coverage | None = None
 
 
 def _deviation(node: Any, wanted: str) -> Deviation:
@@ -227,6 +237,108 @@ def node_propagation(
 ) -> NodePropagation:
     """Walk the study's analysed P&IDs from the members of node *node_id* with the failure-mode
     library. Reads only; raises ValueError for a missing study, node, library or P&ID."""
+    inputs = _propagation_inputs(workspace, study_id, library_file)
+    node = next((n for n in inputs.study.nodes if n.id == node_id), None)
+    if node is None:
+        raise ValueError(f"{inputs.path}: no node {node_id}")
+    return _walk_node(inputs, node, _deviation(node, deviation) if deviation else None)
+
+
+def study_propagation(
+    workspace: Workspace, study_id: str, library_file: str = LIBRARY_FILE
+) -> list[NodePropagation]:
+    """:func:`node_propagation` for every node of the study, the inputs read once."""
+    inputs = _propagation_inputs(workspace, study_id, library_file)
+    return [_walk_node(inputs, node, None) for node in inputs.study.nodes if node.members]
+
+
+#: The triage of the walk's outcomes, beside the study (``cheme/hazop-coverage/v1``).
+COVERAGE_FILE = "coverage.yaml"
+#: Who writes the open outcomes.
+COVERAGE_WRITER = "cheme safety hazop propagate --coverage --write"
+
+
+@dataclass
+class StudyCoverage:
+    """``propagate --coverage``: each node's coverage and the state of the triage file."""
+
+    path: str
+    found: list[NodePropagation]
+    #: The library or an analysed sheet changed since the triage file was written.
+    stale: bool
+    written: bool
+
+
+def study_coverage(
+    workspace: Workspace,
+    study_id: str,
+    node_id: str | None = None,
+    library_file: str = LIBRARY_FILE,
+    write: bool = False,
+) -> StudyCoverage:
+    """Every node's (or one node's) scenarios against the walk, the triage file's decisions
+    applied; *write* brings the triage file up to date (open outcomes only, decisions kept)."""
+    from chemeascode.domains.safety.propagation import triage
+    from chemeascode.domains.safety.schemas import COVERAGE_SCHEMA, HazopCoverage, Walk
+    from chemeascode.foundation import provenance
+
+    inputs = _propagation_inputs(workspace, study_id, library_file)
+    nodes = [n for n in inputs.study.nodes if n.members and node_id in (None, n.id)]
+    if node_id is not None and not nodes:
+        raise ValueError(f"{inputs.path}: no node {node_id} with members")
+    found = [_walk_node(inputs, node, None) for node in nodes]
+    root = workspace.root
+    walk = Walk(
+        library=provenance.file_fingerprint(root / library_file),
+        sheets={p: provenance.file_fingerprint(root / p) for p in inputs.sheet_files},
+    )
+    recorded = inputs.triage
+    stale = recorded is not None and recorded.walk is not None and recorded.walk != walk
+    path = str(PurePosixPath(inputs.path).parent / COVERAGE_FILE)
+    if write:
+        outcomes = triage(
+            [(f.node, f.coverage) for f in found if f.coverage is not None],
+            recorded.outcomes if recorded else [],
+            COVERAGE_WRITER,
+        )
+        data = HazopCoverage.model_validate(
+            {
+                "schema": COVERAGE_SCHEMA,
+                "kind": "hazop-coverage",
+                "study": inputs.study.id,
+                "walk": walk.model_dump(),
+                "outcomes": [o.model_dump(mode="json") for o in outcomes],
+            }
+        )
+        dumped = data.model_dump(mode="json", by_alias=True)
+        # Empty reason, by or causes are left out: the file is edited by hand.
+        dumped["outcomes"] = [
+            {k: v for k, v in o.items() if v not in ("", [])} for o in dumped["outcomes"]
+        ]
+        text = yaml.safe_dump(dumped, sort_keys=False)
+        with (root / path).open("w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+        inputs.triage = data
+        stale = False
+    return StudyCoverage(path, found, stale, write)
+
+
+@dataclass
+class _PropagationInputs:
+    path: str
+    study: Any
+    library_file: str
+    library: Any
+    models: list[tuple[str, Any]]
+    context: Context
+    sheet_files: list[str] = field(default_factory=list)
+    #: The study's coverage.yaml, if it has one.
+    triage: Any = None
+
+
+def _propagation_inputs(
+    workspace: Workspace, study_id: str, library_file: str
+) -> _PropagationInputs:
     from pydantic import ValidationError
 
     from chemeascode.domains.piping.sheet_query import load_sheets, sheet_id_of
@@ -239,10 +351,6 @@ def node_propagation(
     loaded = load_study(workspace.root, path)
     if loaded.model is None:
         raise ValueError(f"{path} does not load: cheme safety hazop check {study_id}")
-    node = next((n for n in loaded.model.nodes if n.id == node_id), None)
-    if node is None:
-        raise ValueError(f"{path}: no node {node_id}")
-    wanted = _deviation(node, deviation) if deviation else None
 
     library_path = workspace.root / library_file
     if not library_path.is_file():
@@ -259,12 +367,14 @@ def node_propagation(
 
     analysed = {basis.path for basis in loaded.model.analysed}
     models = []
+    sheet_files = []
     for sheet in load_sheets(workspace):
         if sheet.name not in analysed:
             continue
         if sheet.model is None:
             raise ValueError(f"{sheet.name} does not load: {sheet.error}")
         models.append((sheet_id_of(workspace, sheet.name), sheet.model))
+        sheet_files.append(sheet.name)
     if not models:
         raise ValueError(
             f"{path} analyses no P&ID: cheme safety hazop stamp {study_id} --input pid/<sheet>.xml"
@@ -281,7 +391,26 @@ def node_propagation(
                 if element.fail:
                     context.fail[str(element.tag)] = element.fail
 
-    result = propagate(models, library, node.members, context, wanted)
+    from chemeascode.domains.safety.schemas import HazopCoverage
+
+    triage_file = workspace.root / PurePosixPath(path).parent / COVERAGE_FILE
+    recorded = None
+    if triage_file.is_file():
+        try:
+            recorded = HazopCoverage.model_validate(
+                yaml.safe_load(triage_file.read_text(encoding="utf-8")) or {}
+            )
+        except (yaml.YAMLError, ValidationError) as failure:
+            raise ValueError(f"{COVERAGE_FILE} of {study_id} does not load: {failure}") from failure
+    return _PropagationInputs(
+        path, loaded.model, library_file, library, models, context, sheet_files, recorded
+    )
+
+
+def _walk_node(inputs: _PropagationInputs, node: Any, wanted: Deviation | None) -> NodePropagation:
+    path, node_id, library_file = inputs.path, node.id, inputs.library_file
+    others = {n.id: n.members for n in inputs.study.nodes if n.id != node_id}
+    result = propagate(inputs.models, inputs.library, node.members, inputs.context, wanted, others)
     findings = []
     if result.unresolved:
         findings.append(
@@ -307,11 +436,14 @@ def node_propagation(
             )
         )
     return NodePropagation(
-        loaded.model.id,
+        inputs.study.id,
         node_id,
         library_file,
-        [sheet for sheet, _ in models],
+        [sheet for sheet, _ in inputs.models],
         wanted,
         result,
         findings,
+        None
+        if wanted
+        else coverage(node, result.candidates, inputs.triage.outcomes if inputs.triage else ()),
     )
