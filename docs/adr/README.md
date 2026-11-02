@@ -81,3 +81,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0031](0031-one-glossary-and-qualified-maturity.md) | One glossary for the project name and the maturity, stage and review axes | Accepted | 2026-10-27 |
 | [0032](0032-hazop-scenario-propagation-over-dexpi-objects.md) | HAZOP scenario propagation over the DEXPI objects, with the failure modes as project data | Proposed | 2026-10-28 |
 | [0033](0033-hazop-likelihood-from-a-project-frequency-library.md) | HAZOP likelihood derived from a project frequency library, never estimated | Proposed | 2026-10-30 |
+| [0034](0034-hazop-likelihood-of-the-outcome-with-lopa-modifiers.md) | HAZOP likelihood of the outcome: the cause's frequency times LOPA modifiers | Proposed | 2026-11-02 |

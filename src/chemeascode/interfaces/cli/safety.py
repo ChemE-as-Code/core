@@ -192,6 +192,9 @@ def rate(
                             "likelihood": r.rating.likelihood,
                             "derived": r.derived.code,
                             "record": r.derived.record.id if r.derived.record else None,
+                            "modifiers": [m.id for m in r.derived.modifiers],
+                            "frequency": r.derived.value,
+                            "publication": r.derived.publication,
                         }
                         for r in result.likelihoods
                     ],
@@ -203,12 +206,11 @@ def rate(
     else:
         typer.echo(f"matrix: {result.matrix or '(none)'} {result.matrix_id or ''}".rstrip())
         for r in result.likelihoods:
-            record = r.derived.record
-            assert record is not None
+            label = r.derived.publication or "unlabelled source"
             typer.echo(
                 f"{r.scenario} {r.which:<8} {r.rating.category} likelihood "
                 f"{r.rating.likelihood or '?'} -> {r.derived.code} "
-                f"({record.id}, {record.value}/yr) "
+                f"({r.derived.chain()}; {label}) "
                 + ("written" if result.written else "would write")
             )
         for r in result.rows:

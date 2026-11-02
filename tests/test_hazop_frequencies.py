@@ -26,8 +26,13 @@ kind: frequencies
 example: true
 source: synthetic test data
 sources:
-  lopa: {short: a LOPA table, basis: lopa_ief}
-  qra: {short: a QRA manual, basis: qra_loc}
+  lopa: {short: a LOPA table, basis: lopa_ief, publication: public}
+  qra: {short: a QRA manual, basis: qra_loc, publication: public}
+  guide: {short: modifier table, basis: lopa_modifier, licence: (c), publication: restricted}
+modifiers:
+  - {id: IGN, kind: ignition, value: 0.03, categories: [health-safety, financial], source: guide}
+  - {id: MANNED, kind: presence, value: 0.1, categories: [health-safety], source: guide}
+  - {id: MODE, kind: enabling, value: 0.5, source: guide}
 event_types:
   seal_leak: {label: Seal leak}
   pipe_break: {label: Pipe break}
@@ -159,3 +164,37 @@ def test_a_link_without_a_library_is_an_error_and_a_missing_record_is_info(plant
         f.rule == "cheme.hazop-frequency" and f.level == "error" and "no frequencies" in f.message
         for f in found
     )
+
+
+def test_modifiers_give_the_outcome_likelihood_and_the_strictest_label(plant):
+    library, matrix = _models(plant)
+    outcome = derive(
+        library, matrix, FrequencyRef(record="R1", modifiers=["IGN", "MANNED"]), "health-safety"
+    )
+    assert outcome.value == pytest.approx(3.0e-4) and outcome.code == "B"  # the cause alone: C
+    assert outcome.chain() == "R1 0.1 x IGN 0.03 x MANNED 0.1 = 0.0003/yr"
+    assert outcome.publication == "restricted"  # a public record, a restricted modifier
+    plain = derive(library, matrix, FrequencyRef(record="R1"), "health-safety")
+    assert (plain.code, plain.publication) == ("C", "public")
+
+
+def test_a_modifier_applies_only_to_its_categories_and_must_exist(plant):
+    library, matrix = _models(plant)
+    spill = derive(library, matrix, FrequencyRef(record="R1", modifiers=["MANNED"]), "environment")
+    assert spill.code is None and spill.level == "error" and "does not apply" in spill.problem
+    mode = derive(library, matrix, FrequencyRef(record="R1", modifiers=["MODE"]), "environment")
+    assert mode.value == pytest.approx(0.05) and mode.code == "C"  # no categories: any
+    missing = derive(library, matrix, FrequencyRef(record="R1", modifiers=["NOPE"]), "financial")
+    assert missing.level == "error" and "no modifier NOPE" in missing.problem
+
+
+def test_an_unlabelled_source_leaves_the_label_open(plant):
+    data = yaml.safe_load(LIBRARY)
+    del data["sources"]["lopa"]["publication"]
+    library = FrequencyLibrary.model_validate(data)
+    _, matrix = _models(plant)
+    assert derive(library, matrix, FrequencyRef(record="R1"), "financial").publication is None
+    with pytest.raises(ValidationError, match="source 'other'"):
+        FrequencyLibrary.model_validate(
+            {**data, "modifiers": [{"id": "X", "kind": "other", "value": 0.5, "source": "other"}]}
+        )

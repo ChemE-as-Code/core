@@ -282,6 +282,12 @@ class FrequencyRef(Strict):
 
     record: str | None = None
     event_type: str | None = None
+    modifiers: list[str] = Field(
+        default_factory=list,
+        description="Ids of the library's modifiers (enabling conditions, conditional modifiers) "
+        "the cause's frequency is multiplied by to give the outcome's: the likelihood of the "
+        "consequence as rated, before any safeguard.",
+    )
 
     @model_validator(mode="after")
     def _one(self) -> FrequencyRef:
@@ -628,11 +634,17 @@ class FailureModeLibrary(Strict):
 
 #: ``lopa_ief``: a screening initiating-event frequency from LOPA guidance (conservative, order of
 #: magnitude); ``qra_loc``: a generic loss-of-containment frequency from QRA guidance.
-FrequencyBasis = Literal["lopa_ief", "qra_loc"]
+FrequencyBasis = Literal["lopa_ief", "qra_loc", "lopa_modifier"]
+#: What may be done with what a source's numbers contribute to, as for LCA sources: ``public``
+#: (may be published), ``restricted`` (kept private unless the project's reviewed policy allows
+#: it), ``local`` (never leaves the machine). A likelihood takes the most restrictive of the
+#: sources it rests on. The label records the terms; it does not interpret a licence.
+Publication = Literal["public", "restricted", "local"]
+PUBLICATIONS: tuple[str, ...] = ("public", "restricted", "local")
 
 
 class FrequencySource(Strict):
-    """A source the records cite."""
+    """A source the records cite, with the terms its numbers are used under."""
 
     short: str = Field(min_length=1)
     citation: str = ""
@@ -640,6 +652,41 @@ class FrequencySource(Strict):
     url: str = ""
     year: int | None = None
     basis: FrequencyBasis | None = None
+    licence: str = Field(default="", description="Licence or terms, e.g. CC-BY-4.0, copyright.")
+    publication: Publication | None = Field(
+        default=None, description="public, restricted or local; unset: not labelled yet."
+    )
+    redistribution: bool = Field(
+        default=False, description="True when its numbers may be bundled in a repository."
+    )
+    notes: str = ""
+
+
+#: ``enabling``: a condition that must hold for the cause to lead on (a mode, time at risk);
+#: the conditional modifiers ``ignition``, ``explosion``, ``presence``, ``vulnerability``
+#: (injury or fatality), ``damage``; ``failure``: the top event given the deviation (rupture at
+#: an overpressure); ``other``.
+ModifierKind = Literal[
+    "enabling", "ignition", "explosion", "presence", "vulnerability", "damage", "failure", "other"
+]
+
+
+class Modifier(Strict):
+    """A probability the cause's frequency is multiplied by on its way to the outcome rated."""
+
+    id: StableId
+    kind: ModifierKind
+    value: float = Field(gt=0, le=1, description="A probability.")
+    label: str = ""
+    conditions: str = Field(default="", description="When it applies (release rate, manning).")
+    categories: list[str] = Field(
+        default_factory=list,
+        description="The matrix categories it may modify (occupancy is no modifier of harm to "
+        "the environment); none: any.",
+    )
+    source: str = Field(description="A key of sources:.")
+    locator: str = ""
+    verified: bool = False
     notes: str = ""
 
 
@@ -694,12 +741,24 @@ class FrequencyLibrary(Strict):
     modes: list[ModeEvent] = Field(
         default_factory=list, description="Failure mode -> event type, a help for choosing one."
     )
+    modifiers: list[Modifier] = Field(
+        default_factory=list,
+        description="Enabling conditions and conditional modifiers ratings may apply.",
+    )
     notes: str = ""
 
     @model_validator(mode="after")
     def _consistent(self) -> FrequencyLibrary:
         if self.schema_ != FREQUENCIES_SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, FREQUENCIES_SCHEMA))
+        modifier_ids = [m.id for m in self.modifiers]
+        if len(modifier_ids) != len(set(modifier_ids)):
+            raise ValueError("modifier ids given twice")
+        for modifier in self.modifiers:
+            if modifier.source not in self.sources:
+                raise ValueError(
+                    f"modifier {modifier.id}: source {modifier.source!r} is not under sources:"
+                )
         ids = [r.id for r in self.records]
         if len(ids) != len(set(ids)):
             raise ValueError(

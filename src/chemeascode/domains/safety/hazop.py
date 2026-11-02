@@ -299,7 +299,9 @@ def likelihood_rows(loaded: LoadedStudy) -> list[LikelihoodRow]:
                         elif matrix is None or matrix.model is None or not matrix.usable:
                             derived = Derived(None, None, "no usable risk matrix", "error")
                         else:
-                            derived = derive(library.model, matrix.model, rating.frequency)
+                            derived = derive(
+                                library.model, matrix.model, rating.frequency, rating.category
+                            )
                         loc = ["nodes", ni, "deviations", di, "scenarios", si, "risk", which, ri]
                         rows.append(LikelihoodRow(scen.id, which, rating, loc, derived))
     return rows
@@ -728,8 +730,8 @@ def study_findings(
             add(
                 "warning",
                 "likelihood-derived",
-                f"{owner}: likelihood {row.rating.likelihood or 'none'}, but {record.id} "
-                f"({record.value}/yr) gives {row.derived.code}",
+                f"{owner}: likelihood {row.rating.likelihood or 'none'}, but "
+                f"{row.derived.chain()} gives {row.derived.code}",
                 [*row.loc, "likelihood"],
                 [row.scenario, row.rating.category],
                 f"cheme safety hazop rate {study.id} --target {row.scenario} --write sets it "
