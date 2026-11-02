@@ -156,4 +156,5 @@ nav:
       - "0030 Conversion reactors checked against the declared conversion": adr/0030-conversion-reactors-checked-against-the-declared-conversion.md
       - "0031 One glossary and qualified maturity": adr/0031-one-glossary-and-qualified-maturity.md
       - "0032 HAZOP scenario propagation over DEXPI objects": adr/0032-hazop-scenario-propagation-over-dexpi-objects.md
+      - "0033 HAZOP likelihood from a project frequency library": adr/0033-hazop-likelihood-from-a-project-frequency-library.md
       - Template: adr/template.md
