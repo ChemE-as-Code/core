@@ -137,6 +137,142 @@ def _subcritical(library: Any, prop: str) -> Any:
     return Library
 
 
+#: IDAES example packages whose Perry's liquid heat-capacity coefficients are labelled J/kmol/K
+#: but are numerically kJ/kmol/K: BT_ideal (idaes-pse 2.13) gives toluene 1.40e2, -1.52e-1,
+#: 6.95e-4, where IDAES's own BTX_activity_coeff_VLE package gives 1.40e5, -1.52e2, 6.95e-1 in
+#: J/kmol/K (Perry's form; about 157 J/mol/K at 298 K). Read as labelled, a liquid's heat
+#: capacity is a thousandth of its value and its enthalpy barely changes with temperature (a
+#: mixer or heater energy balance has a wrong answer, or none). The worker reads them in kJ.
+LIQUID_CP_IN_KJ = ("BT_ideal",)
+
+
+def _liquid_cp_in_kj(entry: dict[str, Any]) -> None:
+    """Relabel *entry*'s Perry's liquid heat-capacity coefficients from J to kJ (in place)."""
+    from pyomo.environ import units as pyunits
+
+    coefficients = entry.get("parameter_data", {}).get("cp_mol_liq_comp_coeff")
+    for index, (number, unit) in list((coefficients or {}).items()):
+        coefficients[index] = (number, pyunits.kJ / pyunits.J * unit)
+
+
+#: The smoothing of the phase-flow complementarity of :func:`_complementarity_vle`, as a
+#: fraction of the feeds' molar flow (:func:`_set_vle_smoothing`): a phase that is absent keeps
+#: ``eps**2 / (4 s)`` mol/s, *s* its temperature slack (K), and a phase that is present shifts
+#: the equilibrium temperature by ``eps**2 / (4 F_p)`` K. At 1e-3 of the feeds both are
+#: negligible: with 62 mol/s of feeds, a liquid 10 K below its bubble point keeps 1e-4 mol/s
+#: as vapour, and a phase of 1 mol/s is off its equilibrium temperature by 4e-3 K.
+VLE_EPS_FRACTION = 1e-3
+
+
+def _complementarity_vle() -> Any:
+    """The phase equilibrium of the ideal package: the complementarity formulation of
+    Dabadghao et al. (AIChE J., doi:10.1002/aic.18029) that IDAES implements for cubic
+    equations of state (``CubicComplementarityVLE``), without its cubic-root terms, which an
+    ideal phase does not have.
+
+    The equilibrium temperature is ``T + s_vap - s_liq``; each slack is zero while its phase is
+    present (``smooth_min(s_p, F_p) = 0``). IDAES's ``SmoothVLE`` instead takes it between the
+    bubble and the dew point, smoothed by ``eps_2`` (5e-4 K): for a near-pure stream the two
+    points are closer than that (pure toluene with :data:`TRACE` benzene: 3e-7 K), the
+    equilibrium temperature falls outside them and a subcooled liquid has no solution, or,
+    smoothed tighter, its vapour fraction is free (the same liquid converged to 5e-6 and to
+    0.05 vapour in two state blocks). Here a subcooled liquid has ``F_vap ~ 0`` and its
+    equilibrium temperature at the bubble point, pure or not."""
+    import idaes.core.util.scaling as iscale
+    from idaes.core.util.exceptions import ConfigurationError
+    from idaes.core.util.math import smooth_min
+    from idaes.models.properties.modular_properties.base.utility import (
+        estimate_Tbub,
+        estimate_Tdew,
+        identify_VL_component_list,
+    )
+    from idaes.models.properties.modular_properties.phase_equil.smooth_VLE_2 import (
+        EPS_INIT,
+        CubicComplementarityVLEScaler,
+        _calculate_temperature_slacks,
+    )
+    from pyomo.environ import Constraint, Param, Set, Var, value
+
+    class IdealComplementarityVLE:
+        default_scaler = CubicComplementarityVLEScaler  # it scales _teq only
+
+        @staticmethod
+        def phase_equil(b: Any, phase_pair: tuple[str, str]) -> None:
+            suffix = "_" + phase_pair[0] + "_" + phase_pair[1]
+            l_phase, v_phase, *_ = identify_VL_component_list(b, phase_pair)
+            if l_phase is None or v_phase is None:
+                raise ConfigurationError(f"{phase_pair} is not a vapour-liquid pair")
+            uom = b.params.get_metadata().default_units
+            t_units, f_units = uom.TEMPERATURE, uom.AMOUNT / uom.TIME
+            b.add_component("_vle_set" + suffix, Set(initialize=list(phase_pair)))
+            pair = getattr(b, "_vle_set" + suffix)
+            slack = Var(pair, initialize=EPS_INIT, bounds=(0, None), units=t_units)
+            b.add_component("s" + suffix, slack)
+            b.add_component(
+                "_teq_constraint" + suffix,
+                Constraint(
+                    expr=b._teq[phase_pair] - b.temperature - slack[v_phase] + slack[l_phase] == 0
+                ),
+            )
+            # set to the flowsheet's scale once the feeds are known (_set_vle_smoothing)
+            eps = Param(default=1.0, mutable=True, units=f_units)
+            b.add_component("eps_t" + suffix, eps)
+
+            def complementarity(b: Any, p: str) -> Any:
+                return smooth_min(slack[p] * f_units / t_units, b.flow_mol_phase[p], eps) == 0
+
+            b.add_component(
+                "temperature_slack_complementarity" + suffix,
+                Constraint(pair, rule=complementarity),
+            )
+
+        @staticmethod
+        def calculate_scaling_factors(b: Any, phase_pair: tuple[str, str]) -> None:
+            suffix = "_" + phase_pair[0] + "_" + phase_pair[1]
+            sf_t = iscale.get_scaling_factor(b.temperature, default=1, warning=True)
+            if b.is_property_constructed("_teq_constraint" + suffix):
+                iscale.set_scaling_factor(b._teq[phase_pair], sf_t)
+                constraint = getattr(b, "_teq_constraint" + suffix)
+                iscale.constraint_scaling_transform(constraint, sf_t, overwrite=False)
+
+        @staticmethod
+        def calculate_teq(b: Any, pp: tuple[str, str]) -> None:
+            t_units = b.params.get_metadata().default_units.TEMPERATURE
+            liquid, vapour, raoult, henry, l_only, v_only = identify_VL_component_list(b, pp)
+            t = value(b.temperature)
+            if not v_only:
+                t = max(t, estimate_Tbub(b, t_units, raoult, henry, liquid))
+            if not l_only:
+                t = min(t, estimate_Tdew(b, t_units, raoult, henry, liquid))
+            b._teq[pp].set_value(t)
+            _calculate_temperature_slacks(b, pp, liquid, vapour)
+
+        @staticmethod
+        def phase_equil_initialization(b: Any, phase_pair: tuple[str, str]) -> None:
+            suffix = "_" + phase_pair[0] + "_" + phase_pair[1]
+            for c in b.component_objects(Constraint):
+                if c.local_name in (
+                    "_teq_constraint" + suffix,
+                    "temperature_slack_complementarity" + suffix,
+                ):
+                    c.activate()
+
+    return IdealComplementarityVLE
+
+
+def _set_vle_smoothing(m: Any, feed_mol_s: float) -> None:
+    """Set every state block's phase-flow smoothing (``eps_t``) to :data:`VLE_EPS_FRACTION` of
+    *feed_mol_s*: IDAES's default (1 mol/s) is a plant's scale and larger than a laboratory
+    flowsheet's flows."""
+    from pyomo.environ import Param
+
+    eps = max(VLE_EPS_FRACTION * feed_mol_s, 1e-9)
+    # component_objects: a scalar Param at its default has no data object to iterate
+    for param in m.component_objects(Param, descend_into=True):
+        if param.local_name.startswith("eps_t_"):
+            param.set_value(eps)
+
+
 def _ids(model: dict[str, Any]) -> dict[str, str]:
     """Compound id -> its component name in the package (the IDAES example's key)."""
     package = PACKAGES[model["property_package"]]
@@ -171,6 +307,8 @@ def configuration(model: dict[str, Any]) -> dict[str, Any]:
     for c in model["compounds"]:
         source, key = package["components"][c["cas"]]
         components[key] = copy.deepcopy(_example(source)["components"][key])
+        if source in LIQUID_CP_IN_KJ:
+            _liquid_cp_in_kj(components[key])
         for prop in ("dens_mol_liq_comp", "pressure_sat_comp"):
             if prop in components[key]:
                 components[key][prop] = _subcritical(components[key][prop], prop)
@@ -185,6 +323,7 @@ def configuration(model: dict[str, Any]) -> dict[str, Any]:
             "Vap": {"type": VaporPhase, "equation_of_state": Ideal},
         }
         bubble_dew = IdealBubbleDew
+        vle = _complementarity_vle()
         extra: dict[str, Any] = {}
     else:
         options = {"type": CubicType.PR}
@@ -201,6 +340,9 @@ def configuration(model: dict[str, Any]) -> dict[str, Any]:
             },
         }
         bubble_dew = LogBubbleDew
+        # IDAES's SmoothVLE as before: its CubicComplementarityVLE did not initialize a pure
+        # toluene liquid reliably either (idaes-pse 2.13)
+        vle = SmoothVLE
         # every pair 0: IDAES's example data hold no other value for these components
         keys = list(names.values())
         extra = {"parameter_data": {"PR_kappa": {(a, b): 0.0 for a in keys for b in keys}}}
@@ -226,7 +368,7 @@ def configuration(model: dict[str, Any]) -> dict[str, Any]:
         "pressure_ref": (101325.0, pyunits.Pa),
         "temperature_ref": (298.15, pyunits.K),
         "phases_in_equilibrium": [("Vap", "Liq")],
-        "phase_equilibrium_state": {("Vap", "Liq"): SmoothVLE},
+        "phase_equilibrium_state": {("Vap", "Liq"): vle},
         "bubble_dew_method": bubble_dew,
         **extra,
     }
@@ -623,6 +765,7 @@ def solve(request: dict[str, Any]) -> dict[str, Any]:
         m.fs.add_component(f"arc_{len(arcs)}", arc)
         arcs[sid] = arc
     pyo.TransformationFactory("network.expand_arcs").apply_to(m)
+    _set_vle_smoothing(m, sum(pyo.value(b.outlet.flow_mol[0]) for b in feeds.values()))
 
     dof = degrees_of_freedom(m)
     if dof != 0:

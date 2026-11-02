@@ -21,6 +21,17 @@
 - `cheme init` writes `.claude/skills/NOTICE.md`, which states this in the plant repository;
   `cheme skills status` and `update` track it.
 
+### Fixed
+
+- IDAES backend, `IDAES ideal VLE`: a subcooled near-pure liquid (a pure toluene feed) did not
+  converge, so neither did any flowsheet with one (#12). The package now takes its phase
+  equilibrium in the complementarity form (Dabadghao et al., doi:10.1002/aic.18029) instead of
+  IDAES's smooth VLE, whose bubble-to-dew smoothing exceeds such a stream's bubble-dew gap. Its
+  liquid heat capacities of benzene and toluene were a thousandth of their value (IDAES's
+  `BT_ideal` labels kJ/kmol/K coefficients J/kmol/K); a liquid mixer or heater had a wrong
+  energy balance. Results of the ideal package change (the HDA example's heater duty 48.84 to
+  48.60 kW).
+
 ## 1.3.0 (2026-10-31)
 
 Minor release: the Viewer tells an embedding page how far it is and shows large 3D models in stages

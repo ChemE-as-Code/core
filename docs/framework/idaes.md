@@ -73,8 +73,19 @@ interaction parameters, `--save`.
 | `IDAES ideal VLE` | Raoult's law and ideal gas (methods.yml `IDEAL`) | IDAES's `BT_ideal` (benzene, toluene) and `HC_PR` (hydrogen, methane) component data |
 | `IDAES Peng-Robinson` | Peng-Robinson, every kij 0 (methods.yml `PR`) | IDAES's `BT_PR` and `HC_PR` component data |
 
-Both use IDAES's generic (modular) property framework with smooth VLE; the worker reads the
-component data from the IDAES installation at run time. Compounds: benzene (71-43-2), toluene
+Both use IDAES's generic (modular) property framework; the worker reads the component data from
+the IDAES installation at run time. Two deviations from that data and IDAES's defaults:
+
+- `IDAES ideal VLE` takes its vapour-liquid equilibrium in the complementarity form of
+  Dabadghao et al., doi:10.1002/aic.18029, which IDAES ships for cubic equations of state
+  only, without the cubic-root terms. IDAES's smooth VLE has no solution for a subcooled
+  near-pure liquid (pure toluene, benzene at its trace), or one with a free vapour fraction:
+  the bubble and dew points are closer than its smoothing. `IDAES Peng-Robinson` keeps smooth
+  VLE and does not converge on such a stream (neither does IDAES's cubic complementarity form
+  reliably in idaes-pse 2.13).
+- `BT_ideal`'s Perry's liquid heat-capacity coefficients are read in kJ/kmol/K: IDAES labels
+  them J/kmol/K, a thousand times below its own `BTX_activity_coeff_VLE` values for the same
+  correlation, which leaves a liquid's enthalpy almost independent of temperature. Compounds: benzene (71-43-2), toluene
 (108-88-3), hydrogen (1333-74-0) and methane (74-82-8), hydrogen and methane in the vapour
 only. Enthalpies include the formation enthalpies at 298.15 K, so a reactor needs no separate
 heat of reaction.

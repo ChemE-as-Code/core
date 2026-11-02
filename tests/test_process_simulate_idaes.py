@@ -284,7 +284,7 @@ def test_fill_from_the_recorded_response_and_check_is_then_clean(hda):
         assert s8[field]["fingerprint"]
     assert s8["temperature"]["value"] == pytest.approx(325.0)
     assert s8["flow"]["value"] == pytest.approx(77.80, abs=0.01)
-    assert _state(hda, "Q1")["duty"]["value"] == pytest.approx(48.84, abs=0.01)
+    assert _state(hda, "Q1")["duty"]["value"] == pytest.approx(48.60, abs=0.01)
     assert _state(hda, "S1")["flow"]["provenance"] == "assumed"  # a feed is never rewritten
 
     entry = record.entry_of(record.read(hda.root), "design")
@@ -294,7 +294,7 @@ def test_fill_from_the_recorded_response_and_check_is_then_clean(hda):
         "method": "IDAES ideal VLE",
         "solver": "ipopt 3.13.2.0",
     }
-    assert entry["converged"] and entry["status"] == "converged" and entry["iterations"] == 10
+    assert entry["converged"] and entry["status"] == "converged" and entry["iterations"] == 20
     assert entry["model_fingerprint"] == s8["flow"]["fingerprint"]
     r1 = next(u for u in entry["units"] if u["id"] == "R1")
     assert r1["results"]["extents_kmol_h"]["HDA"] == pytest.approx(0.8505, abs=1e-4)
@@ -393,3 +393,84 @@ def test_idaes_solves_the_hda_loop(hda):
     result = run(hda, process, "design", write=True)
     assert not [f for f in result.findings if f.level in ("error", "warning")]
     assert _state(hda, "S8")["flow"]["source"].startswith("cheme process simulate: IDAES 2.")
+
+
+def _liquid_feed_model(package: str = "IDAES ideal VLE") -> dict:
+    """Pure toluene (a near-pure stream: the worker gives benzene its trace) and a recycle with
+    1.5 % benzene, both subcooled liquids, mixed and pumped: the feed section of an HDA plant."""
+
+    def feed(sid: str, t: float, p: float, kg_s: float, x: dict) -> dict:
+        state = {"temperature_K": t, "pressure_Pa": p, "mass_flow_kg_s": kg_s, "mole_fractions": x}
+        return {"id": sid, "kind": "material", "feed": state}
+
+    return {
+        "case": "design",
+        "property_package": package,
+        "compounds": [
+            {"id": "TOL", "cas": "108-88-3", "name": None, "title": "Toluene"},
+            {"id": "BZ", "cas": "71-43-2", "name": None, "title": "Benzene"},
+        ],
+        "units": [
+            {
+                "id": "M1",
+                "type": "mixer",
+                "inlets": ["S1", "S2"],
+                "outlets": ["S3"],
+                "energies": {},
+                "spec": {},
+            },
+            {
+                "id": "P1",
+                "type": "pump",
+                "inlets": ["S3"],
+                "outlets": ["S4"],
+                "energies": {"energy": "Q1"},
+                "spec": {"outlet_pressure_Pa": 3.6e6, "efficiency": 0.65},
+            },
+        ],
+        "recycles": [],
+        "streams": [
+            feed("S1", 303.15, 3.0e5, 4.31, {"TOL": 1.0}),
+            feed("S2", 344.98, 1.5e5, 1.37, {"TOL": 0.985, "BZ": 0.015}),
+            {"id": "S3", "kind": "material", "feed": None},
+            {"id": "S4", "kind": "material", "feed": None},
+            {"id": "Q1", "kind": "energy", "feed": None},
+        ],
+        "simulator": "idaes",
+    }
+
+
+@idaes_tests
+def test_idaes_mixes_a_near_pure_subcooled_liquid():
+    """A pure-component liquid feed converges with the ideal package (IDAES's smooth VLE has no
+    solution for it, or a free vapour fraction) and the mixer conserves energy: its outlet lies
+    between the inlets, liquid, and the enthalpy flows in and out agree."""
+    out = idaes.solve(_liquid_feed_model(), details=True)
+    assert out["converged"], out["messages"]
+    s = out["streams"]
+    assert 303.15 < s["S3"]["temperature_K"] < 344.98
+    assert s["S3"]["vapor_fraction"] < 1e-5 and s["S4"]["vapor_fraction"] < 1e-5
+
+    def enthalpy_kw(sid: str) -> float:
+        return s[sid]["mass_flow_kg_s"] * s[sid]["mass_enthalpy_kJ_kg"]
+
+    assert enthalpy_kw("S3") == pytest.approx(enthalpy_kw("S1") + enthalpy_kw("S2"), rel=1e-6)
+    # the pump: dP V / eta, about 35 kW for 5.7 kg/s of toluene (870 kg/m3) over 34.5 bar
+    assert out["units"]["P1"]["duty_kW"] == pytest.approx(35.0, rel=0.1)
+
+
+@idaes_tests
+def test_idaes_liquid_heat_capacity_is_toluenes():
+    """The ideal package's liquid toluene takes about 1.7 kJ/(kg K) (Perry's correlation, read in
+    kJ/kmol/K: IDAES's BT_ideal labels it J/kmol/K): the outlet of mixing 303 K and 345 K
+    toluene sits near the flow-weighted mean temperature, not where a heat capacity a
+    thousand times smaller would put it."""
+    model = _liquid_feed_model()
+    for s in model["streams"][:2]:
+        s["feed"]["mole_fractions"] = {"TOL": 1.0}
+    out = idaes.solve(model)
+    assert out["converged"], out["messages"]
+    mean = (4.31 * 303.15 + 1.37 * 344.98) / (4.31 + 1.37)
+    assert out["streams"]["S3"]["temperature_K"] == pytest.approx(mean, abs=1.0)
+    rise = out["streams"]["S1"]["mass_enthalpy_kJ_kg"] - out["streams"]["S2"]["mass_enthalpy_kJ_kg"]
+    assert -rise / (344.98 - 303.15) == pytest.approx(1.75, rel=0.1)
