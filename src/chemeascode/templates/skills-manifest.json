@@ -199,6 +199,7 @@
   },
   "hazop-assessment": {
    "SKILL.md": [
+    "7cbe88052eb896c61d2865a247ff9a4aa212d297dbacfc97873077fd6ce9fc4a",
     "06cb2c1c29c00b9d19dca6ccff1b5d885754af637826f225640c7b8319581f66",
     "f89293d1b7839829b3bb3f92f42ea44452be5a1a384ce236bf01de1ecee25422",
     "12cc0783c0a03e7e86c7932bd845677b0cf83b63770ebbc2e11896ae66ebda60"
@@ -222,6 +223,7 @@
   },
   "hazop-risk-classification": {
    "SKILL.md": [
+    "fbded0222a7709d10ab51655dfa2fb1e061d0342e7319621d2a7aa9b4c48ac56",
     "d08eb8a4f22c8f949195d017eb328aa4017a199a058fd7234b6e67c7d30e89a7",
     "ff7f1dca3d722d56fbfa0a35f0858e9545bc2000bdfe1cdbf720b9e093833f7d"
    ]

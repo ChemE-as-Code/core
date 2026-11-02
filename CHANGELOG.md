@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Safety: the likelihood rated is the outcome's (ADR 0034). The frequency library may hold
+  `modifiers:` (enabling conditions and conditional modifiers: ignition, explosion, presence,
+  vulnerability, ...; each a probability with its source and the categories it applies to), and
+  a rating's link names those its outcome needs (`frequency: {event_type, modifiers: [...]}`):
+  `rate` multiplies them into the cause's frequency and prints the chain. Library sources carry
+  their terms (`licence`, `publication: public | restricted | local`, `redistribution`); a
+  derived likelihood takes the most restrictive label of its sources.
 - Safety: a HAZOP rating's likelihood can come from the project's frequency library (new kind
   `frequencies`, `cheme/frequencies/v1`, named by the study's `frequencies:`; project data,
   none shipped). A rating links `frequency: {event_type}` (its screening value: LOPA records

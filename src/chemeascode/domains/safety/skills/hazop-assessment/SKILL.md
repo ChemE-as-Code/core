@@ -70,8 +70,10 @@ changed (`hazop-band-stale`), or before the review.
 - `hazop-band-stale`: rate again (`--target`); `hazop-band-edited` (error): a band was edited by
   hand; change the rating, not the band, and rate again.
 - `hazop-frequency`: a `frequency:` link that gives no likelihood: no library named, an
-  unknown record or event type, a matrix without `max_frequency` (error); no record per item
-  (info: give the likelihood by hand). `hazop-likelihood-derived`: rate again.
+  unknown record, event type or modifier, a modifier outside its `categories`, a matrix
+  without `max_frequency` (error); no record per item (info: give the likelihood by hand).
+  `hazop-likelihood-derived`: rate again. `rate` prints each derived likelihood's chain
+  (record x modifiers = outcome frequency) and the publication label of its sources.
 - `cheme safety hazop rate` exits 1 while a band or a derived likelihood is missing, stale or
   unresolved.
 

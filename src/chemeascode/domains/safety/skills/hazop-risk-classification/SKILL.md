@@ -41,7 +41,9 @@ uncertain.
    `"matrix people 3, lost-time injury: hot water at the seal next to the walkway"`. Where two
    codes are close, say so in the basis (`"between 2 and 3; 3 if the area is manned"`), take the
    one the facts support, and leave the question for the team.
-4. **Likelihood** (of the cause). Take the code whose description matches the evidence the
+4. **Likelihood** of the outcome rated: the consequence as written, from this cause, before any
+   safeguard (a matrix's likelihood describes the event, "a similar event has occurred ...",
+   not the failure that starts it). Take the code whose description matches the evidence the
    project holds, and name that evidence in the basis. With no evidence, write `likelihood:
    null` and say what is needed: an unknown code stays unresolved, it is never filled with a
    default. Do not estimate a frequency, and do not convert a number from another study's scale.
@@ -55,6 +57,19 @@ uncertain.
    per a length (100 m of pipe) or the event type has no record (`hazop-frequency`, info): no
    link, `likelihood: null` and what is needed. Name the record and that it is unverified in
    the basis when the library says so.
+   **From the cause to the outcome**: the record is the cause's frequency. Add the library's
+   `modifiers:` that the consequence needs to come about, per rating, as LOPA does without its
+   protection layers: an enabling condition (the mode the cause matters in, time at risk), and
+   the conditional modifiers of that category's outcome (ignition and explosion for a fire,
+   presence and vulnerability for harm to people; none of those for a spill's harm to the
+   environment, which a modifier limited by `categories` refuses):
+   `frequency: {event_type: pump_seal_failure, modifiers: [IGN-LIQ-1-50, VULN-POOL-UNMANNED]}`.
+   `rate` multiplies them and prints the chain. Rules: the agent selects modifiers, it never
+   writes their values (the team or a cited source does); add one only where the outcome as
+   written needs it, never more until a code comes out lower (the pitfall LOPA guidance names);
+   a factor the outcome needs but the library lacks is a gap named in the basis, and the
+   rating stays on the cause's frequency, the conservative side; a likelihood resting on a
+   `restricted` source (`rate` prints the label) stays out of anything published.
 5. **Initial and residual stay apart.** The initial rating ignores the safeguards. A residual
    rating is a separate entry, made only for the safeguards the team credits, and its basis
    names them (skill `safeguard-crediting`). Never lower a code because a safeguard is listed.

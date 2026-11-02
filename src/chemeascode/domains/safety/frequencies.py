@@ -7,6 +7,13 @@ any, so the value is conservative and never an average) placed in the matrix's l
 grades by their ``max_frequency``. A record that is per a length or a joint, an event type
 without records or a matrix without frequency bounds gives no likelihood: that is a problem
 named for the team, not a default.
+
+The link may name modifiers of the library (``FrequencyRef.modifiers``): enabling conditions and
+conditional modifiers, each a probability. The value placed in the grades is then the cause's
+frequency times their product, the likelihood of the outcome as rated (LOPA's intermediate event
+likelihood without any protection layer). A modifier limited to some categories (presence, not
+for harm to the environment) applies only to ratings in them. The likelihood carries the most
+restrictive publication label of the sources it rests on.
 """
 
 from __future__ import annotations
@@ -18,9 +25,11 @@ import yaml
 from pydantic import ValidationError
 
 from chemeascode.domains.safety.schemas import (
+    PUBLICATIONS,
     FrequencyLibrary,
     FrequencyRecord,
     FrequencyRef,
+    Modifier,
     RiskMatrix,
 )
 from chemeascode.foundation.findings import Finding, Level
@@ -72,6 +81,20 @@ class Derived:
     #: ``error``: a link or matrix to fix; ``info``: the library has no value for it, so the
     #: likelihood is given by hand.
     level: Level = "info"
+    #: The outcome's frequency per year: the record's value times the modifiers'.
+    value: float | None = None
+    modifiers: tuple[Modifier, ...] = ()
+    #: The most restrictive publication label of the sources (None: one is not labelled).
+    publication: str | None = None
+
+    def chain(self) -> str:
+        """``F020 0.1 x M-IGN-1 0.03 = 0.003/yr``."""
+        if self.record is None:
+            return ""
+        parts = [f"{self.record.id} {self.record.value:g}"]
+        parts += [f"{m.id} {m.value:g}" for m in self.modifiers]
+        tail = f" = {self.value:g}/yr" if self.modifiers and self.value is not None else "/yr"
+        return " x ".join(parts) + tail
 
 
 def screening(
@@ -105,16 +128,42 @@ def likelihood_code(matrix: RiskMatrix, value: float) -> str | None:
     )
 
 
-def derive(library: FrequencyLibrary, matrix: RiskMatrix, ref: FrequencyRef) -> Derived:
+def _publication(library: FrequencyLibrary, sources: list[str]) -> str | None:
+    labels = [library.sources[s].publication for s in sources]
+    if any(label is None for label in labels):
+        return None
+    return max(labels, key=PUBLICATIONS.index) if labels else None
+
+
+def derive(
+    library: FrequencyLibrary, matrix: RiskMatrix, ref: FrequencyRef, category: str | None = None
+) -> Derived:
+    """The likelihood code of a rating in *category* linked by *ref*."""
     record, problem, level = screening(library, ref)
     if record is None:
         return Derived(None, None, problem, level)
     if record.per is not None:
         return Derived(None, record, f"record {record.id} is per {record.per}: give the likelihood")
-    code = likelihood_code(matrix, record.value)
+    by_id = {m.id: m for m in library.modifiers}
+    unknown = [m for m in ref.modifiers if m not in by_id]
+    if unknown:
+        return Derived(None, record, f"no modifier {', '.join(unknown)} in the library", "error")
+    modifiers = tuple(by_id[m] for m in ref.modifiers)
+    outside = [m.id for m in modifiers if m.categories and category not in m.categories]
+    if outside:
+        return Derived(
+            None, record, f"modifier {', '.join(outside)} does not apply to {category}", "error"
+        )
+    value = record.value
+    for modifier in modifiers:
+        value *= modifier.value
+    publication = _publication(library, [record.source, *(m.source for m in modifiers)])
+    code = likelihood_code(matrix, value)
     if code is None:
         if any(g.max_frequency is not None for g in matrix.likelihood):
-            why = f"{record.id} ({record.value}/yr) is above the matrix's highest max_frequency"
-            return Derived(None, record, why, "error")
-        return Derived(None, record, "the risk matrix gives no max_frequency", "error")
-    return Derived(code, record)
+            why = f"{record.id} ({value:g}/yr) is above the matrix's highest max_frequency"
+            return Derived(None, record, why, "error", value, modifiers, publication)
+        return Derived(
+            None, record, "the risk matrix gives no max_frequency", "error", value, modifiers
+        )
+    return Derived(code, record, "", "info", value, modifiers, publication)
