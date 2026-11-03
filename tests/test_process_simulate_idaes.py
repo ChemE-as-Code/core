@@ -15,6 +15,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
 import yaml
@@ -23,6 +24,7 @@ from chemeascode.domains.process.model import load as load_process
 from chemeascode.domains.process.simulation import backends, record
 from chemeascode.domains.process.simulation import energy as energy_checks
 from chemeascode.domains.process.simulation.run import run
+from chemeascode.domains.process.simulation.schema import Simulation
 from chemeascode.domains.process.simulation.translate import load, translate
 from chemeascode.foundation.workspace import Workspace
 from chemeascode.integrations import idaes, idaes_worker
@@ -311,7 +313,6 @@ def test_the_energy_audit_states_the_idaes_enthalpy_reference(hda):
     process, _ = load_process(hda.root)
     run(hda, process, "design", write=True, solver=recorded)
     energy = record.entry_of(record.read(hda.root), "design")["energy"]
-    assert energy["reference"] == energy_checks.REFERENCES["idaes"]
     assert energy["reference"]["formation_enthalpy_included"] is True
     assert "IDAES" in energy["reference"]["source"]
     formation = energy["formation"]
@@ -321,7 +322,15 @@ def test_the_energy_audit_states_the_idaes_enthalpy_reference(hda):
     assert "DWSIM" not in json.dumps(texts)
     r1 = next(u for u in energy["closure"]["units"] if u["id"] == "R1")
     assert r1["status"] == "unsupported" and "formation_kW" not in r1
-    assert energy["closure"]["plant"]["status"] == "unsupported"
+    plant = energy["closure"]["plant"]
+    assert plant["status"] == "unsupported" and plant["basis"] == "simulator"
+
+
+def test_every_simulator_has_an_enthalpy_reference():
+    """A backend added to ``simulator:`` without its reference would crash the energy audit."""
+    simulators = set(get_args(Simulation.model_fields["simulator"].annotation))
+    assert set(energy_checks.REFERENCES) == simulators
+    assert set(energy_checks.FORMATION_REFERENCES) == simulators
 
 
 def test_a_changed_spec_makes_the_values_stale(hda):

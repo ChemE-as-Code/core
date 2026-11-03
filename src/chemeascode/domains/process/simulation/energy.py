@@ -651,7 +651,8 @@ def _formation_data(
 ) -> dict[str, Any]:
     """The formation enthalpies of the model's compounds: DWSIM's own (the worker reports its
     database's; the closure's basis; IDAES reports none) and the project's (declared in
-    materials, else chemicals' as a fallback; compared with DWSIM's), each with its source,
+    materials, else chemicals' as a fallback; compared with the simulator's: DWSIM's, IDAES
+    reports none), each with its source,
     whether the property package's reference is verified and what it is
     (:data:`FORMATION_REFERENCES` of *simulator*)."""
     reported = out.get("compounds") or {}
@@ -865,9 +866,9 @@ def _reactor_problem(formation: dict[str, Any] | None) -> str:
     if not formation["reference_verified"]:
         if formation["property_package"] in IDAES_PACKAGES:
             return (
-                "a reacting unit needs enthalpies on a heat-of-formation basis; the closure is "
-                f"not verified for the IDAES backend's {formation['property_package']!r} (it "
-                "reports no formation enthalpies; its enthalpies include them)"
+                f"the IDAES backend's {formation['property_package']!r} enthalpies include the "
+                "formation enthalpies (IDAES's example data) and it reports none separately; a "
+                "closure on them (no formation term added) is not yet verified by cheme-as-code"
             )
         return (
             "a reacting unit needs enthalpies on a heat-of-formation basis; DWSIM's enthalpy "
@@ -1030,6 +1031,7 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
     unknown: list[str] = []  # specified splits whose imbalance is not evaluable
     reacting: set[str] | None = set()
     any_reactor = False
+    idaes = formation is not None and formation["property_package"] in IDAES_PACKAGES
 
     def refuse(row: dict[str, Any], uid: str, kind: str, why: str) -> None:
         row.update(status="unsupported", reason=why)
@@ -1162,7 +1164,8 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
         "products": products,
         "heat_in_kW": total_q,
         "work_in_kW": total_w,
-        "basis": "formation" if any_reactor else "simulator",
+        # "formation": the DWSIM closure adding sum n_i dHf_i; IDAES's enthalpies include them
+        "basis": "formation" if any_reactor and not idaes else "simulator",
         "reasons": [],
     }
     if stated or unknown:

@@ -89,8 +89,8 @@ the IDAES installation at run time. Two deviations from that data and IDAES's de
 
 Compounds: benzene (71-43-2), toluene
 (108-88-3), hydrogen (1333-74-0) and methane (74-82-8), hydrogen and methane in the vapour
-only. Enthalpies include the formation enthalpies at 298.15 K, so a reactor needs no separate
-heat of reaction.
+only. Enthalpies include the formation enthalpies at 298.15 K (IDAES's example data, not
+verified by cheme-as-code), so a reactor needs no separate heat of reaction.
 
 **No IDAES package is benchmarked by cheme-as-code.** Translation always reports
 `cheme.process-sim-method-unbenchmarked` (info); `methods.yml` claims no application range for
@@ -112,8 +112,10 @@ the numerical solver (`solver: ipopt <version>`), `iterations` is the IPOPT iter
 the final solve, and `notes` keeps an initialization that did not finish (the simultaneous
 solve may still converge; `converged` is what counts). A run that does not converge writes no
 stream value. The conversion and energy checks of a DWSIM run apply, except that a
-reactor's energy closure is reported as unsupported: the IDAES packages report no separate
-formation enthalpies, so the heat-of-formation basis the closure needs is not verified. The
+reactor's energy closure is reported as unsupported: the IDAES packages' enthalpies include
+the formation enthalpies and they report none separately, and a closure on them (no formation
+term added) is not yet verified by cheme-as-code. The plant closure's `basis` is then
+`simulator`. The
 record's `energy.reference` (and `energy.formation`, with a reactor) states IDAES's basis:
 `formation_enthalpy_included: true`, no formation term added.
 
