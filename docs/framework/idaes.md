@@ -113,7 +113,9 @@ the final solve, and `notes` keeps an initialization that did not finish (the si
 solve may still converge; `converged` is what counts). A run that does not converge writes no
 stream value. The conversion and energy checks of a DWSIM run apply, except that a
 reactor's energy closure is reported as unsupported: the IDAES packages report no separate
-formation enthalpies, so the heat-of-formation basis the closure needs is not verified.
+formation enthalpies, so the heat-of-formation basis the closure needs is not verified. The
+record's `energy.reference` (and `energy.formation`, with a reactor) states IDAES's basis:
+`formation_enthalpy_included: true`, no formation term added.
 
 ## Tests
 

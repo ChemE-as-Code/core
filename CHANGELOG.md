@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- IDAES runs: the energy audit labelled the enthalpy reference as DWSIM's
+  (`energy.reference.source` "DWSIM mass enthalpy", `formation_enthalpy_included: false`, and
+  DWSIM's database as the formation basis) (#125). The reference now comes from the backend
+  (`energy.REFERENCES`): an IDAES record says its enthalpies include the formation enthalpies
+  at 298.15 K, and its `energy.formation` states the IDAES reference and that no reacting closure
+  is evaluated. The closure itself is unchanged: an IDAES reactor, and the plant with one, stay
+  `unsupported`; no formation term is added. Records simulated earlier keep the old label until
+  simulated again.
+
 ## 1.4.1 (2026-11-02)
 
 Patch release: the IDAES backend converges on near-pure liquids and gives liquids their heat

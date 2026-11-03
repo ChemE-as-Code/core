@@ -21,6 +21,7 @@ import yaml
 
 from chemeascode.domains.process.model import load as load_process
 from chemeascode.domains.process.simulation import backends, record
+from chemeascode.domains.process.simulation import energy as energy_checks
 from chemeascode.domains.process.simulation.run import run
 from chemeascode.domains.process.simulation.translate import load, translate
 from chemeascode.foundation.workspace import Workspace
@@ -302,6 +303,25 @@ def test_fill_from_the_recorded_response_and_check_is_then_clean(hda):
     process, _ = load_process(hda.root)
     check = run(hda, process, "design", write=False, solver=recorded)
     assert not [f for f in check.findings if f.level != "info" or "not-filled" in f.rule]
+
+
+def test_the_energy_audit_states_the_idaes_enthalpy_reference(hda):
+    """#125: the run record states IDAES's enthalpy reference (formation enthalpies included),
+    not DWSIM's, and the reactor's closure is refused rather than given a formation term."""
+    process, _ = load_process(hda.root)
+    run(hda, process, "design", write=True, solver=recorded)
+    energy = record.entry_of(record.read(hda.root), "design")["energy"]
+    assert energy["reference"] == energy_checks.REFERENCES["idaes"]
+    assert energy["reference"]["formation_enthalpy_included"] is True
+    assert "IDAES" in energy["reference"]["source"]
+    formation = energy["formation"]
+    assert formation["reference_verified"] is False
+    assert "included" in formation["reference"]
+    texts = [energy["reference"], formation["reference"], formation["closure_basis"]]
+    assert "DWSIM" not in json.dumps(texts)
+    r1 = next(u for u in energy["closure"]["units"] if u["id"] == "R1")
+    assert r1["status"] == "unsupported" and "formation_kW" not in r1
+    assert energy["closure"]["plant"]["status"] == "unsupported"
 
 
 def test_a_changed_spec_makes_the_values_stale(hda):
