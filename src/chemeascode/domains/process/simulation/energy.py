@@ -44,9 +44,12 @@
   info listing the limitations otherwise (a nonzero difference within it, chemicals' fallback
   values that differ, a reacting component without a project value).
 
-The enthalpies are the simulator's (``mass_enthalpy_kJ_kg``, DWSIM's own reference); they are
-compared only with each other in one run, never with ``cheme process props`` values (thermo,
-:data:`chemeascode.domains.process.props.ENTHALPY_REFERENCE`).
+The enthalpies are the simulator's (``mass_enthalpy_kJ_kg``, its own reference: :data:`REFERENCES`
+states it per backend, and the record keeps it as ``reference``); they are compared only with
+each other in one run, never with ``cheme process props`` values (thermo,
+:data:`chemeascode.domains.process.props.ENTHALPY_REFERENCE`). IDAES's enthalpies include the
+formation enthalpies at 298.15 K and it reports none separately: the formation basis below is
+DWSIM's, and an IDAES reactor's closure is not evaluated (``sim-energy-unsupported``).
 
 Reacting units (:data:`REACTORS`) close on a heat-of-formation basis. In DWSIM 9.0.5 with the
 packages of :data:`FORMATION_PACKAGES` a stream's enthalpy is each component's ideal gas at
@@ -100,21 +103,11 @@ from chemeascode.domains.process.heat_integration.pinch import (
     minimum_approach,
 )
 from chemeascode.domains.process.simulation import SIMULATION_FILE
-from chemeascode.domains.process.simulation.backends import IDAES_PACKAGES
+from chemeascode.domains.process.simulation.backends import DWSIM, IDAES, IDAES_PACKAGES
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.units import to_kelvin
 from chemeascode.foundation.yamlsource import _yaml_line
 
-#: The basis the closure uses, as the record states it.
-REFERENCE = {
-    "source": "simulator (DWSIM mass enthalpy, kJ/kg, its own reference state)",
-    "formation_enthalpy_included": False,
-    "comparable_with": "values of the same run only",
-    "formation_basis": (
-        "reacting units, and the plant with a reactor: plus sum n_i dHf_i (ideal gas, 298.15 K, "
-        "DWSIM's database) of the reacting components whose flow changes (energy.formation)"
-    ),
-}
 #: DWSIM property packages whose stream enthalpy is verified (DWSIM 9.0.5, live tests in
 #: tests/test_process_simulate_energy.py) to be each component's ideal gas at 298.15 K = 0
 #: without formation enthalpies, a liquid below it by its departure function
@@ -125,6 +118,55 @@ FORMATION_PACKAGES = (
     "Peng-Robinson 1978 (PR78)",
     "Soave-Redlich-Kwong (SRK)",
 )
+#: The basis the closure uses, as the record states it, by simulator (``simulator:``).
+REFERENCES = {
+    DWSIM: {
+        "source": "simulator (DWSIM mass enthalpy, kJ/kg, its own reference state)",
+        "formation_enthalpy_included": False,
+        "comparable_with": "values of the same run only",
+        "formation_basis": (
+            "reacting units, and the plant with a reactor: plus sum n_i dHf_i (ideal gas, "
+            "298.15 K, DWSIM's database) of the reacting components whose flow changes "
+            "(energy.formation)"
+        ),
+    },
+    IDAES: {
+        "source": (
+            "simulator (IDAES molar enthalpy over molar mass, kJ/kg, formation enthalpies at "
+            "298.15 K included)"
+        ),
+        "formation_enthalpy_included": True,
+        "comparable_with": "values of the same run only",
+        "formation_basis": (
+            "none added: the enthalpies include the formation enthalpies (IDAES's example "
+            "data, not verified by cheme-as-code); a reacting unit, and the plant with one, is "
+            "not evaluated"
+        ),
+    },
+}
+#: DWSIM's (the default simulator's).
+REFERENCE = REFERENCES[DWSIM]
+#: What the formation data of a run (energy.formation) rest on, by simulator.
+FORMATION_REFERENCES = {
+    DWSIM: {
+        "reference": (
+            "each component's ideal gas at 298.15 K = 0, without formation enthalpies, a "
+            "liquid below it by its departure function "
+            f"(verified live for DWSIM 9.0.5: {', '.join(FORMATION_PACKAGES)})"
+        ),
+        "closure_basis": "DWSIM's formation enthalpies (simulator_dHf_298_kJ_kmol)",
+    },
+    IDAES: {
+        "reference": (
+            "formation enthalpies at 298.15 K included (IDAES's example data, not verified by "
+            "cheme-as-code); IDAES reports none separately"
+        ),
+        "closure_basis": (
+            "none: a reacting unit's closure is not evaluated (simulator_dHf_298_kJ_kmol not "
+            "reported)"
+        ),
+    },
+}
 #: The project's formation data against DWSIM's, judged on the data, not on a reactor's duty
 #: (which an adiabatic reactor does not have): ``max(rel_reaction_heat x |formation term|,
 #: abs_kW)``. 1 % of the reaction heat is about the spread between authoritative compilations:
@@ -225,6 +267,7 @@ def audit(
     summary lines. *out* is the simulator's result with the units as ``run`` reports them
     (``shaft_kW`` where a drive efficiency is given)."""
     findings: list[Finding] = []
+    simulator = getattr(sim, "simulator", DWSIM)
     units = out.get("units") or {}
     ends = _ends(process)
     terminals = _terminals(process)
@@ -238,7 +281,7 @@ def audit(
     levels, found = _utility_levels(model, out, units, ends, terminals, temps, line)
     findings += found
     formation = (
-        _formation_data(process, model, out)
+        _formation_data(process, model, out, simulator)
         if any(u["type"] in REACTORS for u in model["units"])
         else None
     )
@@ -272,7 +315,7 @@ def audit(
         )
     )
     entry = {
-        "reference": dict(REFERENCE),
+        "reference": dict(REFERENCES[simulator]),
         "tolerance": dict(ENERGY_TOLERANCE),
         "closure": closure,
         "formation": formation,
@@ -603,28 +646,27 @@ def _tolerance(q: float, w: float, h_in: float, h_out: float) -> float:
     return tolerance(abs(q) + abs(w), h_in, h_out)
 
 
-def _formation_data(process: Any, model: dict[str, Any], out: dict[str, Any]) -> dict[str, Any]:
+def _formation_data(
+    process: Any, model: dict[str, Any], out: dict[str, Any], simulator: str = DWSIM
+) -> dict[str, Any]:
     """The formation enthalpies of the model's compounds: DWSIM's own (the worker reports its
-    database's; the closure's basis) and the project's (declared in materials, else chemicals'
-    as a fallback; compared with DWSIM's), each with its source, and whether the property
-    package's reference is verified."""
-    simulator = out.get("compounds") or {}
+    database's; the closure's basis; IDAES reports none) and the project's (declared in
+    materials, else chemicals' as a fallback; compared with the simulator's: DWSIM's, IDAES
+    reports none), each with its source,
+    whether the property package's reference is verified and what it is
+    (:data:`FORMATION_REFERENCES` of *simulator*)."""
+    reported = out.get("compounds") or {}
     package = model.get("property_package")
     components = _project_formation(process, model.get("compounds") or [])
     for cid, row in components.items():
-        theirs = simulator.get(cid) or {}
+        theirs = reported.get(cid) or {}
         row["simulator_dHf_298_kJ_kmol"] = theirs.get("dHf_298_kJ_kmol")
         row["simulator_database"] = theirs.get("database") or None
         row["molar_mass"] = row["molar_mass"] or theirs.get("molar_mass")
     return {
         "property_package": package,
-        "reference_verified": package in FORMATION_PACKAGES,
-        "reference": (
-            "each component's ideal gas at 298.15 K = 0, without formation enthalpies, a "
-            "liquid below it by its departure function "
-            f"(verified live for DWSIM 9.0.5: {', '.join(FORMATION_PACKAGES)})"
-        ),
-        "closure_basis": "DWSIM's formation enthalpies (simulator_dHf_298_kJ_kmol)",
+        "reference_verified": simulator == DWSIM and package in FORMATION_PACKAGES,
+        **FORMATION_REFERENCES[simulator],
         "components": components,
     }
 
@@ -824,9 +866,9 @@ def _reactor_problem(formation: dict[str, Any] | None) -> str:
     if not formation["reference_verified"]:
         if formation["property_package"] in IDAES_PACKAGES:
             return (
-                "a reacting unit needs enthalpies on a heat-of-formation basis; the closure is "
-                f"not verified for the IDAES backend's {formation['property_package']!r} (it "
-                "reports no formation enthalpies; its enthalpies include them)"
+                f"the IDAES backend's {formation['property_package']!r} enthalpies include the "
+                "formation enthalpies (IDAES's example data) and it reports none separately; a "
+                "closure on them (no formation term added) is not yet verified by cheme-as-code"
             )
         return (
             "a reacting unit needs enthalpies on a heat-of-formation basis; DWSIM's enthalpy "
@@ -989,6 +1031,7 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
     unknown: list[str] = []  # specified splits whose imbalance is not evaluable
     reacting: set[str] | None = set()
     any_reactor = False
+    idaes = formation is not None and formation["property_package"] in IDAES_PACKAGES
 
     def refuse(row: dict[str, Any], uid: str, kind: str, why: str) -> None:
         row.update(status="unsupported", reason=why)
@@ -1121,7 +1164,8 @@ def _closure(model, out, units, line, formation: dict[str, Any] | None = None):
         "products": products,
         "heat_in_kW": total_q,
         "work_in_kW": total_w,
-        "basis": "formation" if any_reactor else "simulator",
+        # "formation": the DWSIM closure adding sum n_i dHf_i; IDAES's enthalpies include them
+        "basis": "formation" if any_reactor and not idaes else "simulator",
         "reasons": [],
     }
     if stated or unknown:

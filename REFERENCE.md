@@ -1270,7 +1270,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   difference in kJ/kmol (ammonia: -45558 kJ/kmol in ATcT, -45898 in DWSIM, 0.74 % of the
   synthesis heat). Another package and units
   with an unestablished duty sign (a column top without condenser) are
-  `sim-energy-unsupported`, never a number. A component separator (a specified split) conserves
+  `sim-energy-unsupported`, never a number. With `simulator: idaes` the record's
+  `energy.reference` states IDAES's basis (formation enthalpies included,
+  `formation_enthalpy_included: true`) and a reactor's closure is `sim-energy-unsupported`
+  ([idaes.md](docs/framework/idaes.md)). A component separator (a specified split) conserves
   no energy: its imbalance is stated, not judged (`status: stated`, `imbalance_kW` = enthalpy
   out minus in from the solved streams, positive: heat the unit would have to take in; DWSIM's
   `EnergyImb` is recorded with its observed sign, `simulator_convention`, and not relied on),
