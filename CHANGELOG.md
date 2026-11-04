@@ -12,7 +12,8 @@
   and the time outside is summed), the anolyte reservoir's pH and inventory, product, charge,
   energy, dosing (on a pH trigger or continuous) and bleed over time, the time to the stated
   pH threshold, comparison at equal delivered product, aligned time plots and an operating
-  map. `cheme.duty-*` findings; `cheme validate` reports the schema, cell and model ones.
+  map. `cheme.duty-*` findings; `cheme validate` reports the schema, cell and model ones
+  (every error a duty is refused on before it is integrated).
 - An anolyte model interface (`domains/chemistry/anolyte.py`: protocol and registry by id, no
   default) and its first model `well-mixed-carbonate` v1 (`domains/chemistry/carbonate.py`):
   moles of cation and inorganic carbon and the volume, equilibrium carbonate speciation from

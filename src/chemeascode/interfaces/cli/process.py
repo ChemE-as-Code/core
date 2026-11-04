@@ -354,11 +354,13 @@ def duty(
     against the anolyte reservoir (voltage, efficiencies and WDE from the measured series or
     the specified cell, never extrapolated), the pH, inventory, product, charge, energy,
     dosing and bleed over time, the time to the stated pH threshold and the time outside the
-    measured range. --compare ID,ID --co KG compares duties at equal delivered product.
-    Writes nothing but the plots. Exit 1 on an error finding, 2 without process/duties.yaml
-    or for an unknown duty id."""
+    measured range. --compare ID,ID --co KG compares duties at equal delivered product (the
+    duties are named there, not as IDS; --plot then draws the compared transients). Writes
+    nothing but the plots. Exit 1 on an error finding, 2 without process/duties.yaml, for an
+    unknown duty id or for IDS given with --compare."""
     from chemeascode.domains.process.electrolysis_duty import (
         DUTIES_FILE,
+        DutyReport,
         compare_duties,
         comparison_text,
         duty_report,
@@ -374,6 +376,13 @@ def duty(
         if co is None:
             typer.echo("--compare needs --co KG (the delivered product)", err=True)
             raise typer.Exit(2)
+        if ids:
+            typer.echo(
+                f"--compare names the duties to compare (ID,ID); drop {' '.join(ids)} or add "
+                "them to --compare",
+                err=True,
+            )
+            raise typer.Exit(2)
         names = [n.strip() for n in compare.split(",") if n.strip()]
         try:
             comparison = compare_duties(workspace.root, names, co, tolerance)
@@ -381,6 +390,8 @@ def duty(
             typer.echo(str(failure).strip("'\""), err=True)
             raise typer.Exit(2) from failure
         typer.echo(comparison.to_json() if as_json else comparison_text(comparison))
+        if plot is not None:  # the compared transients, each to the target
+            _duty_plots(DutyReport(comparison.duties, comparison.findings), plot, as_json)
         if any(f.level == "error" for f in comparison.findings):
             raise typer.Exit(1)
         return
@@ -391,15 +402,19 @@ def duty(
         raise typer.Exit(2) from failure
     typer.echo(report.to_json() if as_json else report_text(report))
     if plot is not None:
-        from chemeascode.domains.process.electrolysis_plots import duty_plots
-
-        plot.mkdir(parents=True, exist_ok=True)
-        for name, svg in duty_plots(report).items():
-            (plot / name).write_text(svg, encoding="utf-8")
-            if not as_json:
-                typer.echo(f"wrote {plot / name}")
+        _duty_plots(report, plot, as_json)
     if report.errors:
         raise typer.Exit(1)
+
+
+def _duty_plots(report, directory: Path, as_json: bool) -> None:
+    from chemeascode.domains.process.electrolysis_plots import duty_plots
+
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, svg in duty_plots(report).items():
+        (directory / name).write_text(svg, encoding="utf-8")
+        if not as_json:
+            typer.echo(f"wrote {directory / name}")
 
 
 @process_app.command("energy")

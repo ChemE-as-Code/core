@@ -132,7 +132,9 @@ cumulative product equals 0.5 kg. A duty reaches the target when it delivers it 
 relative tolerance (`--tolerance`, default 1e-3 of the target); a duty whose horizon,
 threshold, inventory or measured range ends it first is reported as not reaching it
 (`cheme.duty-target-not-reached`). Per duty: the elapsed time, charge, energy, time outside
-the measured range, final pH, dosing used and the cumulative hydroxide deficit.
+the measured range, final pH, dosing used and the cumulative hydroxide deficit. The duties
+are named in `--compare`, not as positional ids (both is an error); `--plot DIR` draws the
+compared transients, each up to the target.
 
 ## Plots
 
@@ -150,21 +152,25 @@ the measured range, final pH, dosing used and the cumulative hydroxide deficit.
 
 | rule | level | when |
 | --- | --- | --- |
-| `cheme.duty-schema` | error | the file does not follow the schema, a unit or a value out of range, a dosing trigger not above the threshold |
-| `cheme.duty-cell-missing` | error | the cell is not in `process/cells.yaml` or lacks what the duty needs (voltage, FE, a bipolar membrane with WDE and co-ion split, area, product), or its measurement has errors |
+| `cheme.duty-schema` | error | the file does not follow the schema, a unit or a value out of range, a dosing trigger not above the threshold, an on/off schedule of more than 100 000 periods over the horizon |
+| `cheme.duty-cell-missing` | error | the cell is not in `process/cells.yaml` or lacks what the duty needs (voltage, FE, a bipolar membrane with WDE and co-ion split from the membrane block or the measurement's titration, area, product), its membrane block is invalid (co-ion shares not in 0..1 or not adding up to 1, WDE outside 0..1), or its measurement has errors |
 | `cheme.duty-model-unknown` | error | no anolyte model of that id |
-| `cheme.duty-model-species` | error | a co-ion or anode reaction the model does not carry |
+| `cheme.duty-model-species` | error | a co-ion or anode reaction the model does not carry, or a model whose state names no `cation` (mol) and `volume` (L) |
 | `cheme.duty-out-of-range` | warning | operation outside the measured range, or the anolyte outside the model's validity (info: a specified cell without a current density range) |
 | `cheme.duty-threshold-reached` | info | the time to the stated threshold |
 | `cheme.duty-horizon-reached` | info | the threshold is not reached within the horizon |
-| `cheme.duty-inventory-low` | warning | the minimum inventory is reached |
+| `cheme.duty-inventory-low` | warning | the minimum inventory is reached, the reservoir empties, or a conserved inventory (cation, carbon) is exhausted: the transient stops there |
 | `cheme.duty-dosing-saturated` | warning | the threshold is reached while dosing, or dosing never reaches its stop pH |
+| `cheme.duty-dosing-chatter` | warning | threshold dosing switched on and off more than 20 000 times (a band `stop_ph - trigger_ph` too narrow for the dosing rate); the transient stops there |
 | `cheme.duty-not-converged` | error | the integration failed |
 | `cheme.duty-degassing` | info | no CO2 degassing stated |
 | `cheme.duty-compare` | error | compared duties form different products |
 | `cheme.duty-target-not-reached` | warning | a compared duty ends before the target |
 
-`cheme validate` reports the schema, cell and model findings without integrating. `--json`
-records the model ids and versions (the duty's and the anolyte model's), their assumptions and
-limitations, and the source revision with the sha256 of every input, the measurement file
-included.
+`cheme validate` reports the schema, cell and model findings without integrating: every error
+`cheme process duty` refuses a duty on before it integrates (units, ranges, the cell and its
+membrane, the anolyte model and its species). `--json` records the model ids and versions (the
+duty's and the anolyte model's), their assumptions and limitations, the range each duty is
+checked against (`measured_range`: current density, temperature, the power of all cells for a
+power schedule, the measured WDE), and the source revision with the sha256 of every input, the
+measurement file included.

@@ -598,3 +598,253 @@ def test_import_needs_neither_typer_nor_fastapi():
         "assert 'typer' not in sys.modules and 'fastapi' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ})
+
+
+# -- review fixes: inventories, validate, membranes, caps, the state layout, the range --------
+
+
+def test_a_cation_inventory_that_runs_out_ends_the_duty():
+    """20 mL of 0.01 M KOH (2e-4 mol K+) at 0.5 A, WDE 0.9, C_x 0.66: the cation leaves at
+    0.34 x 0.1 x 0.5 / F mol/s and is gone after about 0.32 h. The duty ends there (more K+
+    cannot leave than the reservoir held) and is not feasible, with an inventory-low warning,
+    instead of integrating on with a negative inventory."""
+    duty = Duty.model_validate(
+        {
+            "id": "drain",
+            "cell": "bench",
+            "schedule": {"kind": "constant_current", "current": {"value": 0.5, "unit": "A"}},
+            "reservoir": {
+                "volume": {"value": 20, "unit": "mL"},
+                "composition": {"hydroxide": {"value": 0.01, "unit": "mol/L"}},
+                "model": "well-mixed-carbonate",
+            },
+            "threshold": {"ph": 3},
+            "horizon": {"value": 10, "unit": "h"},
+        }
+    )
+    out = ed._Out(ed.DUTIES_FILE, None)
+    d = simulate_duty(duty, _bench(0.9, 0.66), out=out)
+    expected_h = 2e-4 / (0.34 * 0.1 * 0.5 / FARADAY) / 3600
+    assert d.ended == "minimum-inventory" and not d.feasible
+    assert d.simulated_h == pytest.approx(expected_h, rel=1e-6)
+    assert d.totals["final_cation_mol"] == pytest.approx(0.0, abs=1e-12)
+    assert min(d.series["cation_mol"]) >= -1e-12
+    event = next(e for e in d.events if e["kind"] == "minimum-inventory")
+    assert "cation inventory is exhausted" in event["detail"]
+    low = next(f for f in out.findings if f.rule == "cheme.duty-inventory-low")
+    assert low.level == "warning" and "exhausted" in low.message
+
+
+def test_validate_reports_the_errors_the_duty_refuses_on(tmp_path):
+    """``cheme validate`` (duty_findings) reports the unit, range and model-species errors
+    that need no integration, the same as ``cheme process duty`` before it integrates."""
+    root = _plant(tmp_path)
+
+    def edit(duties):
+        duties[0]["reservoir"]["volume"]["unit"] = "gal"
+        duties[4]["dosing"]["trigger_ph"] = 11.5
+        duties[2]["reservoir"]["cation"] = "Na+"
+
+    _duties(root, edit)
+    found = duty_findings(root)
+    messages = {(f.rule, f.message) for f in found if f.level == "error"}
+    assert any(r == "cheme.duty-schema" and "'gal'" in m for r, m in messages)
+    assert any(r == "cheme.duty-schema" and "trigger pH 11.5" in m for r, m in messages)
+    assert any(r == "cheme.duty-model-species" and "Na+" in m for r, m in messages)
+    report = duty_report(root)
+    assert messages == {(f.rule, f.message) for f in report.errors}
+    assert all(f.line for f in found)
+
+
+@pytest.mark.parametrize(
+    ("edit", "text"),
+    [
+        (lambda m: m.__setitem__("co_ion_crossover", {"K+": 0.2, "HCO3-": 0.3}), "add up to 0.5"),
+        (
+            lambda m: m["water_dissociation_efficiency"].__setitem__("value", 1.4),
+            "water dissociation efficiency 1.4",
+        ),
+    ],
+)
+def test_an_invalid_membrane_block_is_refused(tmp_path, edit, text):
+    root = _plant(tmp_path)
+    cells = root / "process" / "cells.yaml"
+    data = yaml.safe_load(cells.read_text(encoding="utf-8"))
+    edit(data["cells"][1]["membrane"])  # BPM-S
+    cells.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    report = duty_report(root, ["SPEC-CONST"])
+    assert _by_id(report, "SPEC-CONST").refused
+    missing = [f for f in report.findings if f.rule == "cheme.duty-cell-missing"]
+    assert missing and text in missing[0].message and missing[0].level == "error"
+    assert any(f.rule == "cheme.duty-cell-missing" for f in duty_findings(root))
+
+
+def test_the_fluxes_of_a_valid_membrane_are_electroneutral():
+    from chemeascode.domains.chemistry.carbonate import charge_closure
+
+    for shares in ({"K+": 0.34, "HCO3-": 0.66}, {"K+": 0.5, "CO3-2": 0.5}):
+        cell = DutyCell("c", SpecifiedPerformance(3.9, 0.8, 0.9, shares), 2.0, "CO", 1.0)
+        duty = _duty(200, 1.0, 1.0)
+        plan = ed._plan(
+            duty, DutyCell(**{**cell.__dict__, "area_m2": 5e-4}), ed._Out("x", None), []
+        )
+        op = ed._Op(1.0, None, cell.performance.at(None), True)
+        fluxes, _ = ed._fluxes(op, plan, cell, False)
+        assert charge_closure(fluxes, "K+") == pytest.approx(0.0, abs=1e-18)
+
+
+def _without_titrations(node):
+    if isinstance(node, dict):
+        return {k: _without_titrations(v) for k, v in node.items() if k != "titration"}
+    if isinstance(node, list):
+        return [_without_titrations(v) for v in node]
+    return node
+
+
+def test_a_measured_cell_without_a_wde_is_refused(tmp_path):
+    """No titration in the measurement and no WDE in the membrane block: cell-missing, not a
+    duty that is "outside the measured range" from t = 0."""
+    root = _plant(tmp_path)
+    path = root / "experiments" / "electrochemistry" / "synthetic-bpm.yaml"
+    data = _without_titrations(yaml.safe_load(path.read_text(encoding="utf-8")))
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    report = duty_report(root, ["MEAS-150"])
+    d = _by_id(report, "MEAS-150")
+    assert d.refused and "cheme.duty-out-of-range" not in _rules(report.findings)
+    missing = next(f for f in report.findings if f.rule == "cheme.duty-cell-missing")
+    assert "water dissociation efficiency" in missing.message
+    assert "co-ion split" not in missing.message  # the membrane block gives the split
+    assert "cheme.duty-cell-missing" in _rules(duty_findings(root), "MEAS-150")
+
+
+def test_too_many_on_off_periods_is_a_schema_error(tmp_path):
+    """A 1 s period over 300 h (1.08e6 periods) is refused, not silently truncated."""
+    root = _plant(tmp_path)
+
+    def edit(duties):
+        duties[3]["schedule"]["period"] = {"value": 1, "unit": "s"}
+        duties[3]["horizon"] = {"value": 300, "unit": "h"}
+
+    _duties(root, edit)
+    report = duty_report(root, ["SPEC-ONOFF"])
+    assert _by_id(report, "SPEC-ONOFF").refused
+    error = next(f for f in report.errors if f.rule == "cheme.duty-schema")
+    assert "1.08e+06 periods" in error.message and str(ed.MAX_PERIODS) in error.message
+    assert any("periods" in f.message for f in duty_findings(root))
+
+
+def test_dosing_chatter_is_not_a_convergence_failure(tmp_path, monkeypatch):
+    """Past MAX_DOSING_SWITCHES the transient stops with a dosing-chatter warning naming the
+    band, not a not-converged error (the integration converged)."""
+    monkeypatch.setattr(ed, "MAX_DOSING_SWITCHES", 6)
+    report = duty_report(_plant(tmp_path), ["SPEC-DOSED"])
+    d = _by_id(report, "SPEC-DOSED")
+    assert d.ended == "dosing-switch-limit" and not d.feasible
+    assert sum(e["kind"] in ("dosing-on", "dosing-off") for e in d.events) == 7
+    rules = _rules(report.findings)
+    assert "cheme.duty-not-converged" not in rules and not report.errors
+    chatter = next(f for f in report.findings if f.rule == "cheme.duty-dosing-chatter")
+    assert chatter.level == "warning" and "stop pH 13.3" in chatter.message
+    assert "widen stop_ph - trigger_ph" in chatter.hint
+
+
+class _Permuted:
+    """well-mixed-carbonate with its state reordered (volume, cation, carbon) and the
+    inventories renamed nowhere: the duty must find them by name."""
+
+    id = "permuted-carbonate"
+    version = 1
+
+    def __init__(self, **parameters):
+        from chemeascode.domains.chemistry.carbonate import WellMixedCarbonate
+
+        self.inner = WellMixedCarbonate(**parameters)
+        self.state = tuple(self.inner.state[i] for i in (2, 0, 1))
+        for name in ("species", "composition_keys", "validity", "assumptions", "limitations"):
+            setattr(self, name, getattr(self.inner, name))
+        self.degassing = self.inner.degassing
+
+    @staticmethod
+    def _back(s):
+        return [s[1], s[2], s[0]]
+
+    def initial(self, composition, volume_l):
+        c, t, v = self.inner.initial(composition, volume_l)
+        return [v, c, t]
+
+    def rates(self, state, fluxes, t):
+        c, t_, v = self.inner.rates(self._back(state), fluxes, t)
+        return [v, c, t_]
+
+    def losses(self, state):
+        return self.inner.losses(self._back(state))
+
+    def speciate(self, state, volume_l=None):
+        return self.inner.speciate(self._back(state), volume_l)
+
+    def describe(self):
+        return {**self.inner.describe(), "id": self.id}
+
+
+class _NoVolume(_Permuted):
+    id = "no-volume"
+
+    def __init__(self, **parameters):
+        super().__init__(**parameters)
+        self.state = (("water", "L"), ("cation", "mol"), ("carbon", "mol"))
+
+
+def test_the_duty_reads_the_model_state_by_name(tmp_path, monkeypatch):
+    from chemeascode.domains.chemistry import anolyte
+
+    monkeypatch.setitem(anolyte._REGISTRY, "permuted-carbonate", (__name__, "_Permuted"))
+    monkeypatch.setitem(anolyte._REGISTRY, "no-volume", (__name__, "_NoVolume"))
+    root = _plant(tmp_path)
+    _duties(root, lambda duties: duties[4].pop("makeup_water"))  # ends on the minimum volume
+    stock = _by_id(duty_report(root, ["SPEC-DOSED"]), "SPEC-DOSED")
+    _duties(root, lambda duties: duties[4]["reservoir"].__setitem__("model", "permuted-carbonate"))
+    permuted = _by_id(duty_report(root, ["SPEC-DOSED"]), "SPEC-DOSED")
+    assert permuted.ended == stock.ended == "minimum-inventory"
+    assert permuted.simulated_h == pytest.approx(stock.simulated_h, rel=1e-9)
+    for key in ("cation_mol", "carbon_mol", "volume_l", "ph"):
+        assert permuted.series[key] == pytest.approx(stock.series[key], rel=1e-9, abs=1e-12)
+    assert permuted.series["cation_mol"][0] == pytest.approx(0.2)
+    _duties(root, lambda duties: duties[4]["reservoir"].__setitem__("model", "no-volume"))
+    report = duty_report(root, ["SPEC-DOSED"])
+    assert _by_id(report, "SPEC-DOSED").refused
+    species = next(f for f in report.errors if f.rule == "cheme.duty-model-species")
+    assert "volume (L)" in species.message
+
+
+def test_the_json_records_the_measured_range(tmp_path):
+    report = duty_report(_plant(tmp_path), ["MEAS-150", "MEAS-POWER", "SPEC-CONST"])
+    payload = json.loads(report.to_json())
+    ranges = {d["id"]: d["measured_range"] for d in payload["duties"]}
+    meas = ranges["MEAS-150"]
+    assert meas["basis"] == "measured" and meas["current_density_a_m2"] == [500.0, 2000.0]
+    assert meas["source"] == "experiments/electrochemistry/synthetic-bpm.yaml"
+    assert meas["temperature_k"] and meas["water_dissociation_efficiency"]
+    assert meas["power_w"] is None and ranges["MEAS-POWER"]["power_w"][1] < 4.5
+    spec = ranges["SPEC-CONST"]
+    assert spec["basis"] == "specified" and spec["current_density_a_m2"] == [500, 4000]
+    assert "measured range: current density 500-2000 A/m2" in ed.report_text(report)
+
+
+def test_cli_compare_with_plots_ids_and_tolerance(tmp_path, monkeypatch):
+    root = _plant(tmp_path)
+    monkeypatch.chdir(root)
+    args = ["process", "duty", "--compare", "SPEC-CONST,SPEC-ONOFF", "--co", "0.02"]
+    result = runner.invoke(app, [*args, "--plot", str(tmp_path / "c")])
+    assert result.exit_code == 0, result.output
+    assert {p.name for p in (tmp_path / "c").iterdir()} >= {
+        "duty-SPEC-CONST.svg",
+        "duty-SPEC-ONOFF.svg",
+    }
+    result = runner.invoke(app, ["process", "duty", "MEAS-150", *args[2:]])
+    assert result.exit_code == 2 and "MEAS-150" in result.output
+    result = runner.invoke(app, [*args, "--tolerance", "0.01", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["tolerance"] == 0.01
+    expected = compare_duties(root, ["SPEC-CONST", "SPEC-ONOFF"], 0.02, 0.01).as_dict()
+    assert payload == json.loads(json.dumps(expected))

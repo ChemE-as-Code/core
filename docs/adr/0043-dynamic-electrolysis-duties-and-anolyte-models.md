@@ -47,7 +47,10 @@ ODE solver; `fixed_bed._dopri_step` clamps the bed's own states.
   protocol states its id and version, state, accepted species, `initial`, `rates`, `losses`,
   `speciate`, its validity (ionic strength, pH, temperature), assumptions and limitations. An
   unknown id is `cheme.duty-model-unknown`; there is no default model. Time outside the model's
-  validity is reported and also makes a duty not feasible.
+  validity is reported and also makes a duty not feasible. The duty reads a model's state by
+  the names it declares (`cation` in mol and `volume` in L required, `carbon` reported when
+  present), never by position, and stops when any conserved inventory (mol) of it is
+  exhausted.
 - The first model is `well-mixed-carbonate` v1 (`domains/chemistry/carbonate.py`): moles of
   the cation and of total inorganic carbon and the volume as conserved quantities,
   instantaneous carbonate equilibrium from the charge balance (Kw 1e-14, pK1 6.37, pK2 10.32
@@ -62,8 +65,11 @@ ODE solver; `fixed_bed._dopri_step` clamps the bed's own states.
   (`electrolytes.py`, `electrolytes.yml` unchanged); a test keeps it so.
 - Duties are integrated by a small generic adaptive Dormand-Prince 5(4) integrator with dense
   output and event location in `foundation/ode.py` (pure Python, no subject knowledge):
-  events for the threshold, the minimum inventory, dosing on and off, a product target; the
-  schedule's breakpoints and range crossings split the integration.
+  events for the threshold, the minimum inventory, an exhausted inventory, dosing on and off,
+  a product target; the schedule's breakpoints and range crossings split the integration. Its
+  caps are reported, never silent: more than 100 000 on/off periods over the horizon is a
+  schema error, more than 20 000 dosing switches stops the transient with
+  `cheme.duty-dosing-chatter`.
 - `compare_duties` compares duties **at equal delivered product**: each runs until its
   cumulative product equals the target, within a stated relative tolerance (default 1e-3), or
   is reported as not reaching it. `cheme process duty [--json] [--plot DIR] [--compare ID,ID

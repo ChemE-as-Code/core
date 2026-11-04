@@ -81,7 +81,9 @@ to threshold is not a measurement of one.
 - `cheme.duty-threshold-reached` (info) gives the time; `cheme.duty-horizon-reached` (info)
   says the threshold is not reached: extend the horizon to find the time.
 - `cheme.duty-dosing-saturated`, `cheme.duty-inventory-low` (warnings): the dosing cannot keep
-  up, or the bleed empties the reservoir.
+  up, the bleed empties the reservoir, or more cation left than the reservoir held.
+- `cheme.duty-dosing-chatter` (warning): the dosing band is too narrow for its rate; widen
+  `stop_ph - trigger_ph` (a tolerance change does not help).
 - `cheme.duty-not-converged` (error): loosen `tolerance`, shorten the horizon or check inputs.
 - `cheme.duty-target-not-reached` (warning, compare): the duty ended before the target.
 - For a result that matters, rerun with `tolerance` halved: the time to the threshold should
@@ -90,8 +92,8 @@ to threshold is not a measurement of one.
 ## Outputs and provenance
 
 `process/duties.yaml`, reviewed in the diff; `cheme process duty --json` records the duty
-model and the anolyte model (ids, versions, assumptions, limitations), the measured range, the
-events, the time series and the sha256 of every input, the measurement file included. Plots
+model and the anolyte model (ids, versions, assumptions, limitations), the measured range
+(`measured_range`: current density, temperature, power, measured WDE), the events, the time series and the sha256 of every input, the measurement file included. Plots
 are written only where asked and are not plant files. Quote a time to threshold as "time to
 the specified pH threshold X (the criterion's source)", with the model's limitations
 (concentration-basis pH of an ideal solution).

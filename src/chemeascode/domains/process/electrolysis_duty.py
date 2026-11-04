@@ -47,20 +47,27 @@ Rules (``cheme.duty-*``), each finding naming the file, line, rule and a hint:
 
 - ``schema`` (error): the file does not follow the schema, a duplicate id, a unit the quantity
   does not take, a value out of its range (a non-positive volume, a dosing trigger not above
-  the threshold);
+  the threshold, an on/off schedule of more than :data:`MAX_PERIODS` periods);
 - ``cell-missing`` (error, refused): the cell is not in ``process/cells.yaml``, or it lacks
   what the duty needs (voltage, Faradaic efficiency, a bipolar membrane with a water
-  dissociation efficiency and co-ion split, the active area, the product and its reaction),
-  or its measurement file has errors;
+  dissociation efficiency and co-ion split, from the membrane block or, for a measured cell,
+  its measurement; the active area, the product and its reaction), its membrane block is
+  invalid (co-ion shares not each in 0..1 or not adding up to 1, a WDE outside 0..1), or its
+  measurement file has errors;
 - ``model-unknown`` (error, refused): no anolyte model of that id (there is no default);
-  ``model-species`` (error, refused): a co-ion or the anode reaction the model does not carry;
+  ``model-species`` (error, refused): a co-ion or the anode reaction the model does not carry,
+  or a model whose state names no ``cation`` (mol) and ``volume`` (L);
 - ``out-of-range`` (warning): operation outside the measured range (current density,
   temperature), with the time of the first exit and the time outside; the state outside the
   anolyte model's validity (pH, ionic strength, temperature), with the time outside;
 - ``threshold-reached`` (info): the time to the stated pH threshold;
-- ``inventory-low`` (warning): the reservoir reached its minimum inventory or emptied;
+- ``inventory-low`` (warning): the reservoir reached its minimum inventory, emptied, or
+  exhausted a conserved inventory of the model (its cation or carbon: more left than it held);
 - ``dosing-saturated`` (warning): the threshold was reached while dosing, or dosing ran to
   the end without reaching its stop pH;
+- ``dosing-chatter`` (warning): threshold dosing switched on and off more than
+  :data:`MAX_DOSING_SWITCHES` times (a band ``stop_ph - trigger_ph`` too narrow for the dosing
+  rate); the transient stops there;
 - ``horizon-reached`` (info): the threshold was not reached within the horizon;
 - ``not-converged`` (error): the integration failed (step size, step count);
 - ``degassing`` (info): no CO2 degassing (no ``k_L a`` stated): it is off;
@@ -106,6 +113,14 @@ DEFAULT_PRODUCT_TOLERANCE = 1e-3
 SAMPLES = 240
 #: K: a measurement's temperature range counts as the duty's within this (thermostatted cell)
 _TEMPERATURE_SLACK = 0.5
+#: The most on/off periods a duty's horizon may hold (each is two integration pieces); more is
+#: a schema error, never a silent truncation.
+MAX_PERIODS = 100_000
+#: The most dosing switches (on or off) a duty integrates; past it the transient stops with a
+#: ``dosing-chatter`` warning.
+MAX_DOSING_SWITCHES = 20_000
+#: Co-ion shares and a water dissociation efficiency are checked to this.
+_SHARE_TOLERANCE = 1e-6
 
 ASSUMPTIONS = (
     "the cell's voltage, Faradaic efficiency, water dissociation efficiency and co-ion split "
@@ -589,6 +604,10 @@ class DutyResult:
     reasons: list[str] = field(default_factory=list)
     performance: str | None = None
     measurement: str | None = None
+    #: the range the duty was checked against: current density (A/m2) and temperature (K) of
+    #: the measurement (or the specified cell's operating range), the power of all cells over
+    #: it for a power schedule, and the measured WDE; None where unbounded
+    measured_range: dict[str, Any] | None = None
     anolyte_model: dict[str, Any] | None = None
     cells_in_series: int | None = None
     stacks: int | None = None
@@ -599,7 +618,7 @@ class DutyResult:
     horizon_h: float | None = None
     rtol: float | None = None
     #: why the transient ended: threshold, horizon, measured-range-exit, minimum-inventory,
-    #: product-target, not-converged
+    #: product-target, dosing-switch-limit, not-converged
     ended: str | None = None
     simulated_h: float | None = None
     time_to_threshold_h: float | None = None
@@ -923,6 +942,24 @@ def _plan(duty: Duty, cell: DutyCell, out: _Out, loc: list[Any]) -> _Plan | None
             ids,
             "give the longest time to integrate",
         )
+    if (
+        period is not None
+        and period > 0
+        and on is not None
+        and on < 1
+        and horizon is not None
+        and horizon / period > MAX_PERIODS
+    ):
+        out.add(
+            "error",
+            "schema",
+            f"duty {duty.id}: the on/off schedule has {horizon / period:.6g} periods over the "
+            f"horizon, more than the {MAX_PERIODS} a duty integrates",
+            [*at, "period"],
+            ids,
+            "lengthen the period, shorten the horizon, or give the mean current as "
+            "constant_current where the period is short against the reservoir's time scale",
+        )
     minimum = duty.minimum_inventory
     min_volume = min_cation = None
     if minimum is not None:
@@ -1020,9 +1057,13 @@ class _Operation:
         return phase >= (1 - p.on_fraction) * p.period
 
     def breakpoints(self, horizon: float) -> list[float]:
+        """Every schedule point and on/off switch in (0, *horizon*): all of them (the plan
+        holds at most :data:`MAX_PERIODS` periods; more raises ValueError, never truncates)."""
         p = self.plan
         found = {t for t in p.times if 0 < t < horizon}
         if p.period is not None and p.on_fraction is not None and p.on_fraction < 1:
+            if horizon / p.period > MAX_PERIODS + 1:
+                raise ValueError(f"more than {MAX_PERIODS} on/off periods over the horizon")
             switch = p.on_fraction if p.start_on else 1 - p.on_fraction
             k = 0
             while k * p.period < horizon:
@@ -1030,8 +1071,6 @@ class _Operation:
                     if 0 < t < horizon:
                         found.add(t)
                 k += 1
-                if k > 1_000_000:
-                    break
         return sorted(found)
 
     # the current and the performance
@@ -1259,19 +1298,55 @@ def _fluxes(
     return ReservoirFluxes(ions, dosing, volume_in, plan.bleed_l_s), rates
 
 
+@dataclass(frozen=True)
+class _Layout:
+    """Where the duty finds what it needs in a model's state vector, by the names of
+    ``model.state`` (never by position): the volume (L), the cation (mol), the carbon (mol, if
+    the model carries it) and every conserved inventory (mol) that must not go negative."""
+
+    k: int
+    volume: int
+    cation: int
+    carbon: int | None
+    inventories: tuple[tuple[int, str], ...]
+
+
+def _layout(model: Any) -> _Layout:
+    """The :class:`_Layout` of *model*; ValueError when its state names no ``cation`` in mol
+    and ``volume`` in L."""
+    names = [(str(n), str(u)) for n, u in model.state]
+    index = {n: i for i, (n, _) in enumerate(names)}
+    lacking = [
+        f"{name} ({unit})"
+        for name, unit in (("cation", "mol"), ("volume", "L"))
+        if name not in index or names[index[name]][1] != unit
+    ]
+    if lacking:
+        raise ValueError(f"its state declares no {' and no '.join(lacking)}")
+    carbon = index.get("carbon")
+    return _Layout(
+        len(names),
+        index["volume"],
+        index["cation"],
+        carbon if carbon is not None and names[carbon][1] == "mol" else None,
+        tuple((i, n) for i, (n, u) in enumerate(names) if u == "mol"),
+    )
+
+
 class _Speciator:
     """The model's speciation with a one-entry cache (events and samples ask twice)."""
 
-    def __init__(self, model: Any, k: int) -> None:
+    def __init__(self, model: Any, layout: _Layout) -> None:
         self.model = model
-        self.k = k
+        self.k = layout.k
+        self.volume = layout.volume
         self._key: tuple[float, ...] | None = None
         self._value: Speciation | None = None
 
     def __call__(self, y: Sequence[float]) -> Speciation:
         key = tuple(y[: self.k])
         if key != self._key:
-            self._value = self.model.speciate(key) if key[-1] > 0 else None
+            self._value = self.model.speciate(key) if key[self.volume] > 0 else None
             self._key = key
         if self._value is None:
             raise ValueError("the reservoir is empty")
@@ -1308,8 +1383,12 @@ class _Run:
     validity_cuts: list[float]
     message: str = ""
     model: Any = None
-    k: int = 3
+    layout: _Layout | None = None
     dosing_starts: list[tuple[float, float]] = field(default_factory=list)
+
+    @property
+    def k(self) -> int:
+        return self.layout.k if self.layout is not None else 0
 
 
 def _integrate(
@@ -1321,10 +1400,12 @@ def _integrate(
     product_target_mol: float | None = None,
     track_validity: bool = True,
 ) -> _Run:
-    k = len(model.state)
+    layout = _layout(model)
+    k = layout.k
+    iv, ic = layout.volume, layout.cation
     y0 = list(model.initial(plan.composition, plan.volume_l)) + [0.0] * len(_ACCUMULATORS)
     atol = _scales(plan, cell, y0, k)
-    speciate = _Speciator(model, k)
+    speciate = _Speciator(model, layout)
     events: list[dict[str, Any]] = []
     pieces: list[_Piece] = []
     validity_cuts: list[float] = []
@@ -1344,22 +1425,26 @@ def _integrate(
         dosing_starts.append((0.0, initial.ph))
     if initial.ph <= plan.threshold_ph:
         events.append({"kind": "threshold", "t_h": 0.0, "ph": initial.ph})
-        return _Run([], "threshold", events, [], model=model, k=k)
+        return _Run([], "threshold", events, [], model=model, layout=layout)
     validity = model.validity if track_validity else None
     volume_floor = 1e-9 * plan.volume_l
 
     def make_events(on: bool) -> list[Event]:
         found = [
             Event(lambda t, y: ph(y) - plan.threshold_ph, "threshold", True, -1),
-            Event(lambda t, y: y[2] - volume_floor, "empty", True, -1),
+            Event(lambda t, y: y[iv] - volume_floor, "empty", True, -1),
         ]
+        # a conserved inventory (the cation, the carbon) that falls to zero: more has left than
+        # the reservoir held, the model's state is no longer physical
+        for i, name in layout.inventories:
+            found.append(Event(lambda t, y, i=i: y[i], f"exhausted:{name}", True, -1))
         if plan.min_volume_l is not None:
             found.append(
-                Event(lambda t, y: y[2] - plan.min_volume_l, "minimum-inventory", True, -1)
+                Event(lambda t, y: y[iv] - plan.min_volume_l, "minimum-inventory", True, -1)
             )
         if plan.min_cation_mol is not None:
             found.append(
-                Event(lambda t, y: y[0] - plan.min_cation_mol, "minimum-inventory", True, -1)
+                Event(lambda t, y: y[ic] - plan.min_cation_mol, "minimum-inventory", True, -1)
             )
         if plan.dosing == "on_threshold":
             if on:
@@ -1384,7 +1469,7 @@ def _integrate(
             op = op_of(t)
             fluxes, acc = _fluxes(op, plan, cell, on)
             state = list(y[:k])
-            if state[2] <= 0:
+            if state[iv] <= 0:
                 return [math.nan] * len(y)
             d = list(model.rates(state, fluxes, t))
             acc["co2_degassed_mol"] = model.losses(state).get("CO2", 0.0)
@@ -1432,21 +1517,37 @@ def _integrate(
                     if dosing_on:
                         dosing_starts.append((t, current))
                     restarts += 1
-                    if restarts > 20000:
-                        ended, message = "not-converged", "more than 20000 dosing switches"
+                    if restarts > MAX_DOSING_SWITCHES:
+                        ended = "dosing-switch-limit"
+                        message = f"{restarts} dosing switches by {t / 3600:.6g} h"
+                        events.append(
+                            {"kind": "dosing-switch-limit", "t_h": t / 3600, "ph": current}
+                        )
                         break
                     a = t
                     continue
-                kind = "minimum-inventory" if hit.name == "empty" else hit.name
-                events.append({"kind": kind, "t_h": t / 3600, "ph": current})
-                ended = kind
+                event: dict[str, Any] = {"kind": hit.name, "t_h": t / 3600, "ph": current}
+                if hit.name == "empty":
+                    event.update(kind="minimum-inventory", detail="the reservoir is empty")
+                elif hit.name.startswith("exhausted:"):
+                    name = hit.name.split(":", 1)[1]
+                    event.update(
+                        kind="minimum-inventory",
+                        detail=f"the {name} inventory is exhausted (more {name} left the "
+                        "reservoir than it held)",
+                    )
+                elif hit.name == "minimum-inventory":
+                    event["detail"] = "the stated minimum inventory"
+                events.append(event)
+                ended = event["kind"]
+                message = event.get("detail", "")
                 break
             a = b
         if ended:
             break
     if not ended:
         ended = "horizon" if stop_at >= plan.horizon_s else "measured-range-exit"
-    return _Run(pieces, ended, events, validity_cuts, message, model, k, dosing_starts)
+    return _Run(pieces, ended, events, validity_cuts, message, model, layout, dosing_starts)
 
 
 def _locate_piece(pieces: list[_Piece], t: float, left: bool = False) -> _Piece | None:
@@ -1500,6 +1601,18 @@ def _model_for(plan: _Plan, result: DutyResult, out: _Out, loc: list[Any]) -> An
         )
         return None
     try:
+        _layout(model)
+    except ValueError as failure:
+        _refuse(
+            result,
+            out,
+            "model-species",
+            f"anolyte model {plan.model_id}: {failure}",
+            [*loc, "reservoir", "model"],
+            "a duty needs the model's cation inventory (mol) and volume (L) by name in its state",
+        )
+        return None
+    try:
         model.initial(plan.composition, plan.volume_l)
     except ValueError as failure:
         _refuse(
@@ -1521,10 +1634,11 @@ def _co_ion_names(performance: Any) -> set[str]:
 
 
 def _check_species(cell: DutyCell, model: Any, plan: _Plan, result: DutyResult, out: _Out, loc):
-    """Every co-ion of the cell is one the model carries, and the cation is the reservoir's."""
+    """Every co-ion of the cell is one the model carries, and it is the reservoir's cation or
+    a carbon anion (the fluxes treat every other ion as the cation leaving)."""
     names = _co_ion_names(cell.performance)
     unknown = sorted(n for n in names if n not in model.species)
-    cations = sorted(n for n in names if n.endswith("+") and n != plan.cation)
+    cations = sorted(n for n in names if n != plan.cation and n not in _CARBON_IONS)
     if unknown or cations:
         _refuse(
             result,
@@ -1537,6 +1651,45 @@ def _check_species(cell: DutyCell, model: Any, plan: _Plan, result: DutyResult, 
         )
         return False
     return True
+
+
+def _prepare(
+    duty: Duty, cell: DutyCell, result: DutyResult, out: _Out, loc: list[Any]
+) -> tuple[_Plan, Any] | None:
+    """The checks that need no integration: the plan (units and ranges), the anolyte model
+    and the species it carries; None (the result refused, findings in *out*) when one fails.
+    :func:`simulate_duty` and :func:`duty_findings` (``cheme validate``) share them."""
+    plan = _plan(duty, cell, out, loc)
+    if plan is None:
+        result.refused = True
+        result.reasons.append("schema or unit errors")
+        return None
+    result.horizon_h = plan.horizon_s / 3600
+    result.rtol = plan.rtol
+    model = _model_for(plan, result, out, loc)
+    if model is None:
+        return None
+    result.anolyte_model = model.describe()  # its assumptions and limitations included
+    if not _check_species(cell, model, plan, result, out, loc):
+        return None
+    return plan, model
+
+
+def _measured_range(cell: DutyCell, plan: _Plan, operation: _Operation) -> dict[str, Any]:
+    """The range the duty is checked against (:attr:`DutyResult.measured_range`)."""
+    perf = cell.performance
+    bounds = perf.bounds
+    temperature = perf.temperature_range
+    power = operation.power_range() if plan.quantity == "power" else None
+    measured = [m[1] for m in perf.measured_wde]
+    return {
+        "basis": perf.basis,
+        "source": perf.file,
+        "current_density_a_m2": list(bounds) if bounds else None,
+        "temperature_k": list(temperature) if temperature else None,
+        "power_w": list(power) if power and math.isfinite(power[0]) else None,
+        "water_dissociation_efficiency": [min(measured), max(measured)] if measured else None,
+    }
 
 
 def _probe_density(cell: DutyCell, plan: _Plan) -> float | None:
@@ -1572,19 +1725,10 @@ def simulate_duty(
     result.threshold_ph = duty.threshold.ph
     result.threshold_source = duty.threshold.source
     result.limitations = list(cell.limitations)
-    plan = _plan(duty, cell, out, loc)
-    if plan is None:
-        result.refused = True
-        result.reasons.append("schema or unit errors")
+    prepared = _prepare(duty, cell, result, out, loc)
+    if prepared is None:
         return result
-    result.horizon_h = plan.horizon_s / 3600
-    result.rtol = plan.rtol
-    model = _model_for(plan, result, out, loc)
-    if model is None:
-        return result
-    result.anolyte_model = model.describe()  # its assumptions and limitations included
-    if not _check_species(cell, model, plan, result, out, loc):
-        return result
+    plan, model = prepared
     if not getattr(model, "degassing", True):
         out.add(
             "info",
@@ -1595,6 +1739,7 @@ def simulate_duty(
             "give reservoir.degassing: {kla, co2_partial_pressure} with their source to include it",
         )
     operation = _Operation(plan, cell, cell.performance)
+    result.measured_range = _measured_range(cell, plan, operation)
     rows = operation.intervals(plan.horizon_s)
     first_exit = next((a for a, _, s in rows if s == "out"), None)
     stop_at = plan.horizon_s if first_exit is None else min(first_exit, plan.horizon_s)
@@ -1623,7 +1768,7 @@ def _outside_model(run: _Run, t_end: float, temperature_k: float | None) -> floa
     for a, b in zip(cuts, cuts[1:], strict=False):
         y, _ = _state_at(run, 0.5 * (a + b))
         state = y[: run.k]
-        if state[2] <= 0:
+        if run.layout is None or state[run.layout.volume] <= 0:
             continue
         if run.model.speciate(state).outside(run.model.validity, temperature_k):
             total += b - a
@@ -1720,13 +1865,32 @@ def _report(
             "extend the horizon to find the time to the threshold",
         )
     if run.ended == "minimum-inventory":
+        exhausted = "exhausted" in run.message
+        stated = run.message == "the stated minimum inventory"
         out.add(
             "warning",
             "inventory-low",
-            f"duty {did}: the reservoir reached its minimum inventory at {t_end / 3600:.6g} h",
-            [*loc, "minimum_inventory"],
+            f"duty {did}: the reservoir reached its minimum inventory at {t_end / 3600:.6g} h"
+            + (f" ({run.message})" if run.message else "")
+            + ("; the transient stops there" if exhausted else ""),
+            [*loc, "minimum_inventory" if stated else "reservoir"],
             [did],
-            "balance the bleed with make-up water or dosing, or enlarge the reservoir",
+            "dose the cation's hydroxide, enlarge the reservoir or shorten the duty"
+            if exhausted
+            else "balance the bleed with make-up water or dosing, or enlarge the reservoir",
+        )
+    if run.ended == "dosing-switch-limit":
+        band = (plan.stop_ph or 0.0) - (plan.trigger_ph or 0.0)
+        out.add(
+            "warning",
+            "dosing-chatter",
+            f"duty {did}: the dosing switched on and off more than {MAX_DOSING_SWITCHES} times "
+            f"({run.message}): the band from trigger pH {plan.trigger_ph:g} to stop pH "
+            f"{plan.stop_ph:g} ({band:.3g}) is narrow for the dosing rate; the transient stops "
+            "there (the integration itself converged)",
+            [*loc, "dosing"],
+            [did],
+            "widen stop_ph - trigger_ph, or lower the dosing rate or concentration",
         )
     # the series, sampled on the dense output
     times = [t_end * i / samples for i in range(samples + 1)] if t_end > 0 else [0.0]
@@ -1852,9 +2016,7 @@ def _initial_row(run: _Run, plan: _Plan, operation: _Operation) -> dict[str, Any
         ph=s.ph,
         species=dict(s.concentrations),
         ionic_strength_mol_l=s.ionic_strength_mol_l,
-        cation_mol=state[0],
-        carbon_mol=state[1],
-        volume_l=state[2],
+        **_inventory(run.layout, state),
     )
     op = operation.op(0.0)
     row.update(
@@ -1863,6 +2025,17 @@ def _initial_row(run: _Run, plan: _Plan, operation: _Operation) -> dict[str, Any
         in_measured_range=op.in_range,
     )
     return row
+
+
+def _inventory(layout: _Layout | None, y: Sequence[float]) -> dict[str, float | None]:
+    """The cation, carbon and volume of state *y*, by the model's state names."""
+    assert layout is not None
+    carbon = layout.carbon
+    return {
+        "cation_mol": y[layout.cation],
+        "carbon_mol": y[carbon] if carbon is not None else None,
+        "volume_l": y[layout.volume],
+    }
 
 
 def _empty_row(t: float) -> dict[str, Any]:
@@ -1917,9 +2090,7 @@ def _sample(run: _Run, plan: _Plan, cell: DutyCell, t: float, left: bool) -> dic
         ph=s.ph,
         species=dict(s.concentrations),
         ionic_strength_mol_l=s.ionic_strength_mol_l,
-        cation_mol=y[0],
-        carbon_mol=y[1],
-        volume_l=y[2],
+        **_inventory(run.layout, y),
         product_rate_mol_s=acc["product_mol"],
         product_rate_kg_h=acc["product_mol"] * mass * 3600 if mass else None,
         dosing_on=piece.dosing_on and plan.dosing != "none",
@@ -2026,6 +2197,25 @@ def _fraction(q: Any) -> float | None:
     return None if factor is None else q.value * factor
 
 
+def _membrane_errors(wde: float | None, shares: dict[str, float]) -> list[str]:
+    """What makes a membrane block unusable for the anolyte balance: the checks of
+    ``cheme.cell-membrane`` (each share in 0..1, adding up to 1; the WDE in 0..1)."""
+    errors = []
+    tol = _SHARE_TOLERANCE
+    if shares and (
+        abs(sum(shares.values()) - 1) > tol
+        or any(not -tol <= v <= 1 + tol for v in shares.values())
+    ):
+        listed = ", ".join(f"{ion} {share:g}" for ion, share in shares.items())
+        errors.append(
+            f"the co-ion shares ({listed}) add up to {sum(shares.values()):.6g}, not 1 with each "
+            "in 0..1"
+        )
+    if wde is not None and not -tol <= wde <= 1 + tol:
+        errors.append(f"the water dissociation efficiency {wde:g} is outside 0..1")
+    return errors
+
+
 def resolve_cell(
     duty: Duty, ctx: _Context, out: _Out, index: int
 ) -> tuple[DutyCell | None, list[str]]:
@@ -2066,6 +2256,14 @@ def resolve_cell(
         return None, reasons
     wde_given = _fraction(membrane.water_dissociation_efficiency)
     shares = dict(membrane.co_ion_crossover)
+    invalid = _membrane_errors(wde_given, shares)
+    if invalid:
+        missing(
+            f"the membrane block of cell {cid} is invalid: {'; '.join(invalid)} (the anolyte "
+            "balance would not be electroneutral)",
+            "fix membrane: in process/cells.yaml (`cheme validate` reports cheme.cell-membrane)",
+        )
+        return None, reasons
     reaction = ctx.reactions.get(cell.reaction)
     limitations: list[str] = []
     if cell.performance == "measured":
@@ -2114,6 +2312,29 @@ def resolve_cell(
         performance: Any = MeasuredCellPerformance(
             report, product, duty.reservoir.cation, wde_given, shares or None
         )
+        points = performance.measured.points
+        absent = [
+            name
+            for name, given in (
+                (
+                    "a water dissociation efficiency (no titration or WDE at any point, no "
+                    "membrane.water_dissociation_efficiency)",
+                    wde_given is not None or bool(performance.measured_wde),
+                ),
+                (
+                    "a co-ion split (no titrated C_x at any point, no membrane.co_ion_crossover)",
+                    bool(shares) or any(p.co_ion_carbon_fraction is not None for p in points),
+                ),
+            )
+            if not given
+        ]
+        if absent:
+            missing(
+                f"measured cell {cid} ({link.file}) gives {' nor '.join(absent)}",
+                "titrate the anolyte in the measurement, or give membrane."
+                "water_dissociation_efficiency and co_ion_crossover with their source",
+            )
+            return None, reasons
     else:
         if cell.performance != "specified":
             missing(f"cell {cid} is {cell.performance}", "a specified or measured cell")
@@ -2243,8 +2464,10 @@ def _duplicates(duties: Duties, out: _Out) -> None:
 
 
 def duty_findings(root: Path) -> list[Finding]:
-    """The findings of ``process/duties.yaml`` that need no integration: the schema, the
-    cells, the anolyte models (for ``cheme validate``)."""
+    """The findings of ``process/duties.yaml`` that need no integration (for ``cheme
+    validate``): the schema, the cells (:func:`resolve_cell`), and for a duty whose cell
+    resolves the units and ranges, the anolyte model and its species (:func:`_prepare`), the
+    error findings :func:`duty_report` gives before it integrates."""
     from chemeascode.domains.chemistry.anolyte import anolyte_models
 
     root = Path(root)
@@ -2256,7 +2479,7 @@ def duty_findings(root: Path) -> list[Finding]:
     _duplicates(duties, out)
     ctx = _context(root)
     for index, duty in enumerate(duties.duties):
-        resolve_cell(duty, ctx, out, index)
+        cell, _ = resolve_cell(duty, ctx, out, index)
         if duty.reservoir.model not in anolyte_models():
             out.add(
                 "error",
@@ -2266,6 +2489,13 @@ def duty_findings(root: Path) -> list[Finding]:
                 [duty.id],
                 "name one of " + ", ".join(anolyte_models()) + " (there is no default)",
             )
+            if cell is None:
+                continue
+            # the plan's unit and range findings still apply; the model's are reported above
+            _plan(duty, cell, out, ["duties", index])
+            continue
+        if cell is not None:
+            _prepare(duty, cell, DutyResult(duty.id, cell.id), out, ["duties", index])
     return out.findings
 
 
@@ -2575,6 +2805,22 @@ def _g(value: float | None, digits: str = ".4g") -> str:
     return "-" if value is None else f"{value:{digits}}"
 
 
+def _range_text(rng: dict[str, Any]) -> str:
+    def span(key: str, unit: str, digits: str = ".6g") -> str:
+        value = rng.get(key)
+        return f"{value[0]:{digits}}-{value[1]:{digits}} {unit}" if value else "unbounded"
+
+    text = (
+        f"{rng['basis']} range: current density {span('current_density_a_m2', 'A/m2')}, "
+        f"temperature {span('temperature_k', 'K')}"
+    )
+    if rng.get("power_w"):
+        text += f", power of all cells {span('power_w', 'W')}"
+    if rng.get("water_dissociation_efficiency"):
+        text += f", measured WDE {span('water_dissociation_efficiency', '', '.4g').strip()}"
+    return text
+
+
 def report_text(report: DutyReport) -> str:
     lines = [f"model {MODEL['id']} v{MODEL['version']} ({SCHEMA}), core {_version()}"]
     for d in report.duties:
@@ -2594,6 +2840,8 @@ def report_text(report: DutyReport) -> str:
             if d.time_to_threshold_h is not None
             else "not reached"
         )
+        if d.measured_range:
+            lines.append("  " + _range_text(d.measured_range))
         lines.append(
             f"  time to the specified pH threshold {d.threshold_ph:g}"
             + (f" ({d.threshold_source})" if d.threshold_source else "")
@@ -2606,8 +2854,9 @@ def report_text(report: DutyReport) -> str:
         )
         lines.append(
             f"  final pH {t['final_ph']:.4f} (minimum {t['minimum_ph']:.4f}), cation "
-            f"{t['final_cation_mol']:.6g} mol, carbon {t['final_carbon_mol']:.6g} mol, volume "
-            f"{t['final_volume_l']:.6g} L; hydroxide deficit {t['hydroxide_deficit_mol']:.6g} mol"
+            f"{t['final_cation_mol']:.6g} mol, carbon {_g(t['final_carbon_mol'], '.6g')} mol, "
+            f"volume {t['final_volume_l']:.6g} L; hydroxide deficit "
+            f"{t['hydroxide_deficit_mol']:.6g} mol"
         )
         lines.append(
             f"  dosing {t['dosing_mol']:.6g} mol ({t['dosing_solution_l']:.6g} L, hydroxide "
