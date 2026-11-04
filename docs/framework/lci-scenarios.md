@@ -2,7 +2,7 @@
 
 Status: accepted. Code: `domains/assessment/lca/scenarios.py`, the `Scenario` model
 of `lca/lca.yaml`, the `Case` model of `process/flowsheet.yaml`. Commands:
-`cheme assess lca-scenarios`, `cheme assess lca-cases`.
+`cheme assess lca-scenarios`, `cheme assess lca-cases`, `cheme assess lca --case`.
 
 ## Context
 
@@ -137,6 +137,41 @@ category, the dropped exchange keys, or null. `results.csv` keeps its numeric ro
 gaps in `gaps.csv`. `cheme export-static` withholds `lca/scenarios/**` together with the other
 LCA result files whenever the results may not be published.
 
+## A design case's own dataset
+
+A scenario record characterises a design case, but `lca/dataset.yaml` is the unallocated
+dataset of the study's case only. A plant with two computed designs exports the other one with
+`--case` ([ADR 0045](../adr/0045-a-design-case-lci-dataset-with-its-own-identity.md)):
+
+```sh
+cheme assess lca --dataset --case hot   # the YAML, to stdout
+cheme assess lca --write --case hot     # lca/datasets/<dataset id>-hot.yaml
+cheme assess lca --check --case hot     # exit 1 when that file is missing or stale
+```
+
+The dataset is derived from case `hot`'s stream states in the same way as `lca/dataset.yaml`,
+with the study's scope. Its identity names the case, so two datasets of one process never
+share an id, a title or a uuid:
+
+- `id`: `<dataset id>-<case>` (the case id made an identifier);
+- `title`: `<title>, case <case>`;
+- `uuid`: `uuid5(<base uuid>, "case:<case>")`, from the uuid `dataset: uuid:` pins, or else
+  the one cheme derives for `lca/dataset.yaml`. The same base and case give the same uuid.
+
+The reference product, functional unit, basis and `dataset:` documentation are the study's.
+The header comment says the file is generated and names the command that rewrites it. The
+provenance (`generator`, `case` and the sha256 of each input file) records what it was
+derived from. `--write --case` writes only this file, never over a dataset in `lca/datasets/`
+that it did not generate for that case (`cheme.lca-dataset-not-generated`). `--check --case`
+reports `cheme.lca-dataset-stale` with the file and the hint to rerun. Run it in a
+`kind: command` gate. `cheme assess lca --check` without `--case` checks the study's outputs
+only.
+
+A case the flowsheet does not declare exits 2 and lists the declared cases. `--case` naming
+the study's own case is the same as no `--case`, so `lca/dataset.yaml` is unchanged. Data
+quality (`lca/manifest.json`), the allocation choice, the results and the scenario records
+remain those of the study's case.
+
 ## Why this avoids duplication
 
 The engineering sources (P&IDs, flowsheet, design basis) exist once. A regional background is
@@ -184,6 +219,7 @@ cheme assess lca-scenarios nl-grid-2025 --json
 cheme assess lca-scenarios --write         # lca/scenarios/<id>.json
 cheme assess lca-scenarios --check         # exit 1 when a record is stale
 cheme assess lca-cases                     # existing cases side by side, per unit of product
+cheme assess lca --write --case hot        # the hot case's own dataset, lca/datasets/
 ```
 
 The fixture `tests/data/lca-scenarios-asu` shows all of it on an ASU-like plant.

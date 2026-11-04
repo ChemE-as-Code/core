@@ -147,7 +147,11 @@ gate `lca` fails.
    unless its terms and a reviewed `publication:` decision of a person allow more; never
    commit or publish them by default, and never write that decision yourself.
 9. **Foreground only.** `cheme assess lca --dataset` exports the unallocated foreground with
-   no factors, Brightway or credentials: what a process library publishes.
+   no factors, Brightway or credentials: what a process library publishes. A second computed
+   design (another flowsheet case) gets its own dataset: `cheme assess lca --write --case <id>`
+   writes `lca/datasets/<dataset id>-<case>.yaml`, whose id, title and uuid name the case.
+   Never edit it; keep it current with `cheme assess lca --check --case <id>` (a
+   `kind: command` gate). Do not copy the project or change `case:` in `lca/lca.yaml` for it.
 10. **Document the dataset** before it is published (`cheme/lci_dataset/v2`). Give what cheme
    cannot derive under `dataset:` of `lca/lca.yaml`: `version`, `methodology_version`,
    `geography.description` (what the location code represents; the site apart), `system_model`,

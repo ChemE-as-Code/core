@@ -36,6 +36,16 @@
 - Skill `skid-design` (domains/equipment): the skid chain from `cheme process build` through
   the cell, duty and stack sizing, the control P&ID, the datasheets and the layout, what goes
   into the LCA's flowsheet streams by hand, and what a human must judge.
+- `cheme assess lca --dataset|--write|--check --case <id>` (#136, ADR 0045): the unallocated
+  LCI dataset of another computed flowsheet case, with the study's scope, reference product
+  and functional unit. Its id (`<dataset id>-<case>`), title (`<title>, case <case>`) and
+  uuid (`uuid5(<base uuid>, "case:<case>")`) name the case, so two datasets of one process
+  stay distinct. `--write --case` writes `lca/datasets/<dataset id>-<case>.yaml` (generated:
+  header comment and provenance; never over a file it did not generate,
+  `cheme.lca-dataset-not-generated`), and `--check --case` reports `cheme.lca-dataset-stale`.
+  An undeclared case exits 2 and lists the declared ones. `lca/dataset.yaml` is unchanged,
+  and naming the study's case is the same as no `--case`. Python: `lca_report(root,
+  case=...)`, `domains/assessment/lca/case_dataset.py`.
 - `cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]` (#138,
   ADR 0043): dynamic electrolysis duties in `process/duties.yaml` (schema
   `cheme/electrolysis-duties/v1`, catalogue key `process-duties`). Current, power and on/off
