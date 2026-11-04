@@ -8,7 +8,11 @@ date, operator), a dataset, a fitted parameter set that names the data and the m
 
 **Related code today.** `kinetic_fit.py`: kinetic data files (`experiments/kinetics/*.yaml`),
 power-law and LHHW fits with their uncertainty, and data sampled from a microkinetic mechanism
-(`cheme experiments fit-rate`, `sample-mechanism`). Provenance follows the convention in
+(`cheme experiments fit-rate`, `sample-mechanism`). `electrochemistry.py`: measured
+electrochemical series (`experiments/electrochemistry/*.yaml`): Faradaic efficiency, partial
+current densities, water dissociation efficiency from the anolyte titration, power, heat,
+charge and carbon balances, the measured performance interpolated between points and never
+extrapolated, and SVG plots (`cheme experiments electrochem`). Provenance follows the convention in
 [the architecture](../../../../docs/framework/architecture.md): a record names its source files
 and revisions, so a fit can be flagged for review when its data change.
 

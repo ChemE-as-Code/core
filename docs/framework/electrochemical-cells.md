@@ -16,6 +16,74 @@ Nernst equation or Butler-Volmer kinetics predicts a voltage; a cell with
 `performance: predictive` is refused (`cheme.cell-unsupported`). `cheme maturity` therefore
 counts a cell as specified: it can support `balanced`, never `predictive`.
 
+## Measured performance
+
+A cell with `performance: measured` takes its voltage and Faradaic efficiencies from a
+measured series ([electrochemical measurements](electrochemical-measurements.md),
+[ADR 0041](../adr/0041-measured-electrochemical-performance-and-membrane-block.md)) at its
+current density `I / active_area`:
+
+```yaml
+  - id: BPM-1
+    performance: measured
+    reaction: CO2R
+    electrons: 2
+    current: {value: 0.75, unit: A, provenance: given, source: "..."}
+    active_area: {value: 5, unit: cm2, provenance: given, source: "..."}   # required
+    side_reactions:
+      - {reaction: WS, electrons: 2}       # current_fraction from the measurement
+    measurements:
+      file: experiments/electrochemistry/rbpm-1m-koh.yaml
+      product: CO                          # the measurement's product of the overall reaction
+      side_products: [H2]                  # their FE -> the side reaction their entry names
+    thermal: {kind: isothermal, temperature: {value: 25, unit: °C, provenance: given}}
+```
+
+- The values are the measurement's point means, interpolated linearly in the current density;
+  the result names the file, the bracketing points and the standard deviations. Outside the
+  measurement's validity range of current density or temperature (within 0.5 K), or beyond its
+  measured points, the cell is **refused** (`cheme.cell-operating-range`, error): a measured
+  cell is never extrapolated.
+- `voltage`, `faradaic_efficiency` or a side reaction's `current_fraction` may be left out. A
+  value given anyway that differs from the measured one by more than the replicates' standard
+  deviation is `cheme.cell-measured-conflict` (warning); the measured value is used.
+- A side product whose measurement entry names a reaction of `side_reactions` gives that
+  reaction its current fraction; one that names none counts as unassigned current (heat),
+  with an info finding and a limitation.
+- The measurement's voltage basis must be a terminal voltage: electrode potentials against a
+  reference are refused; an iR-corrected voltage is used with the limitation that the power
+  and heat leave out the ohmic loss.
+- A missing measurement file, one with error findings, or a product it does not have is
+  `cheme.cell-measurement` (error, refused). For maturity a measured cell is specified (never
+  predictive) and sourced when the measurement file states its `source`.
+
+## Membrane
+
+An optional `membrane:` block reports the transport across the membrane apart from the
+Faraday balance, which it never changes:
+
+```yaml
+    membrane:
+      kind: bipolar                        # bipolar | cation_exchange | anion_exchange | diaphragm | none
+      bias: reverse
+      water_dissociation_efficiency: {value: 0.94, provenance: given, source: "..."}   # or from the measurement
+      co_ion_crossover: {K+: 0.34, HCO3-: 0.66}   # shares of the current not carried by water dissociation
+      source: "..."
+```
+
+| Quantity | Relation |
+| --- | --- |
+| co-ion current | `(1 - WDE) N I` |
+| co-ion flux of ion `i` (charge `z_i`) | `f_i (1 - WDE) N I / (abs(z_i) F)`, mol/s and kmol/h |
+| anolyte hydroxide deficit | `(1 - WDE) N I / F`, mol/s and kmol/h |
+
+A measured cell takes the water dissociation efficiency from its measurement (with its sd and
+the measured carbon share of the co-ion current); a stated one that disagrees is
+`cheme.cell-measured-conflict`. Shares that do not add up to 1, an unreadable ion or an
+efficiency outside [0, 1] are `cheme.cell-membrane` errors; no efficiency at all is an info.
+The water dissociation efficiency is not a Faradaic efficiency: it does not change the
+extents, the products or the heat.
+
 ## The contract
 
 ```yaml
@@ -91,6 +159,8 @@ Every finding names `process/cells.yaml`, the line, a rule id and a hint.
 - **Temperature** (info): a heat of reaction taken at another temperature than the cell's; the
   sensible heat and the temperature dependence of dH are then left out and listed as a
   limitation.
+- **Measured cells and membranes**: see the two sections above (`cheme.cell-measurement`,
+  `cheme.cell-measured-conflict`, `cheme.cell-operating-range`, `cheme.cell-membrane`).
 - **Flowsheet link**: the step exists; the electricity stream flows into it and carries `P`;
   the heat stream carries `Q` (out of the step when positive); one stream named for both is an
   error and any other energy stream at the step a warning (`cheme.cell-double-count`).

@@ -128,6 +128,7 @@ nav:
       - Engineering contract: framework/contract.md
       - Calculation maturity: framework/maturity.md
       - Electrochemical cells: framework/electrochemical-cells.md
+      - Electrochemical measurements: framework/electrochemical-measurements.md
       - Restructuring summary: framework/SUMMARY.md
       - Contributing: framework/contributing.md
       - Repository baseline: framework/monorepo-baseline.md
@@ -177,4 +178,6 @@ nav:
       - "0038 A specified split's energy imbalance is stated": adr/0038-stated-imbalance-of-specified-splits.md
       - "0039 IDAES as an optional second simulation backend": adr/0039-idaes-as-an-optional-second-simulation-backend.md
       - "0040 Pinch targets from the recorded simulation run": adr/0040-pinch-targets-from-the-recorded-simulation-run.md
+      - "0041 Measured electrochemical performance and a membrane block": adr/0041-measured-electrochemical-performance-and-membrane-block.md
+      - "0042 WaterTAP and IDAES not reused for electrochemical cells": adr/0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md
       - Template: adr/template.md

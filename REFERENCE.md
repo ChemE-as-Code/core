@@ -1093,6 +1093,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   parameter with its 95 % interval; **`cheme experiments sample-mechanism`** makes such data
   from a mechanism, to lump it into a rate law for a fixed bed. Mechanism steps may give DFT
   `energies:` (transition state theory) instead of rate constants.
+- **Electrochemical cells and measurements**: **`cheme process cell [--json]`** evaluates the
+  cells of `process/cells.yaml` (schema `cheme/electrochemical-cells/v1`): the Faraday
+  balance, power, heat duty and kWh per kg, from specified values or, with
+  `performance: measured`, from a measured series looked up at the cell's current density
+  (refused outside its range, never extrapolated), and an optional membrane block (water
+  dissociation efficiency, co-ion fluxes, anolyte hydroxide deficit;
+  `docs/framework/electrochemical-cells.md`). `experiments/electrochemistry/*.yaml` (schema
+  `cheme/electrochemical-measurements/v1`) holds a measured series with replicates;
+  **`cheme experiments electrochem FILE [--json] [--plot DIR]`** computes per replicate and
+  point (mean, sd, n) the Faradaic efficiency of each product from the outlet flow and mole
+  fractions (standard conditions required), partial current densities, the water dissociation
+  efficiency from the anolyte titration, power, heat and the charge and carbon balances, and
+  writes polarisation, efficiency, partial-current and water-dissociation plots only for the
+  inputs that support them (`docs/framework/electrochemical-measurements.md`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
