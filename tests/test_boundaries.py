@@ -300,6 +300,8 @@ BASIC_IMPORTS = [
     "chemeascode.domains.process.thermodynamics.phase",
     "chemeascode.domains.process.separations.selection",
     "chemeascode.domains.process.heat_integration.pinch",
+    "chemeascode.domains.process.electrochemical_cell",
+    "chemeascode.domains.experiments.electrochemistry",
     "chemeascode.domains.chemistry.properties",
     "chemeascode.integrations.rdkit",
     "chemeascode.schemas",

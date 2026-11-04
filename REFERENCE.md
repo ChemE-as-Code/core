@@ -1093,6 +1093,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   parameter with its 95 % interval; **`cheme experiments sample-mechanism`** makes such data
   from a mechanism, to lump it into a rate law for a fixed bed. Mechanism steps may give DFT
   `energies:` (transition state theory) instead of rate constants.
+- **Electrochemical cells and measurements**: **`cheme process cell [--json]`** evaluates the
+  cells of `process/cells.yaml` (schema `cheme/electrochemical-cells/v1`): the Faraday
+  balance, power, heat duty and kWh per kg, from specified values or, with
+  `performance: measured`, from a measured series looked up at the cell's current density
+  (refused outside its range, never extrapolated), and an optional membrane block (water
+  dissociation efficiency, co-ion fluxes, anolyte hydroxide deficit;
+  `docs/framework/electrochemical-cells.md`). `experiments/electrochemistry/*.yaml` (schema
+  `cheme/electrochemical-measurements/v1`) holds a measured series with replicates;
+  **`cheme experiments electrochem FILE [--json] [--plot DIR]`** computes per replicate and
+  point (mean, sd, n) the Faradaic efficiency of each product from the outlet flow and mole
+  fractions (standard conditions required), partial current densities, the water dissociation
+  efficiency from the anolyte titration, power, heat and the charge and carbon balances, and
+  writes polarisation, efficiency, partial-current and water-dissociation plots only for the
+  inputs that support them (`docs/framework/electrochemical-measurements.md`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
@@ -1671,6 +1685,8 @@ skills in `.claude/skills/`:
 | `reaction-evidence-search` | the evidence behind a reaction model in `process/reaction-evidence.yaml`: searches with the agent's own tools (logged with dates), sources with DOI or patent number, access reached and reuse terms, one observation per experiment or patent example at its exact location (conversion, selectivity and yield kept apart; kinetics with units, basis and range), conflicts and gaps, never a value a source does not give |
 | `route-selection` | comparing the routes (`cheme chemistry evidence`), selecting one with its rationale, the `model_basis` (reactions, evidence, assumptions, validation plan) and the handoff to `reactions.yaml` with each value citing its observation |
 | `reactions` | `process/reactions.yaml` (stoichiometry, conversion, heat of reaction, catalyst, sources), reactions on reactor steps, element and extent balances, conversion reactors in `process propagate` |
+| `electrochemical-cell-modelling` | `process/cells.yaml`: reactions and electrons, half-reactions, specified or measured performance (`performance: measured`, never extrapolated), the membrane block with FE and WDE kept apart, `cheme process cell` and the flowsheet link |
+| `experiment-reproduction` | reproducing a published measured series: the data set pinned by DOI and checksum, tolerances frozen before comparing, reproduction kept apart from validation and design use, no third-party content copied, `cheme experiments electrochem` |
 | `process-simulation` | `process/simulation.yaml` (property package, step specs), `process simulate --check` and `--fill` with DWSIM, deviations from assumed values, shortcut before rigorous columns, recycles |
 | `pid-edit` | changing a sheet: edit, fmt, validate, render, diff, commit |
 | `pid-draft` | a new sheet (`cheme sheet new`) started from the PFD, drafted with fragments or with a generator script on `chemeascode.domains.piping.authoring` (`cheme run`), and whether it stays generated |

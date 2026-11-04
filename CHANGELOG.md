@@ -4,6 +4,27 @@
 
 ### Added
 
+- `cheme experiments electrochem FILE [--json] [--plot DIR]` (#137, ADR 0041): measured
+  electrochemical series in `experiments/electrochemistry/*.yaml` (schema
+  `cheme/electrochemical-measurements/v1`). Per replicate and point (mean, sd, n): Faradaic
+  efficiency per product from the outlet flow (standard conditions required, never assumed)
+  and mole fractions, partial current densities, the charge balance, the water dissociation
+  efficiency of a bipolar membrane from the Warder double end-point titration of the anolyte,
+  power, the heat at an isothermal boundary and the carbon balance; the charge balance and the
+  `fe-sum-high` (above `max(1 + 3 sd, 1.05)`) and `fe-sum-low` checks per electrode;
+  `cheme.electrochem-*` findings, also in `cheme validate`; SVG plots only for supported
+  inputs.
+  `MeasuredPerformance.at(j)` interpolates the point means and never extrapolates.
+- `process/cells.yaml` (schema unchanged, optional fields): `performance: measured` with
+  `measurements:` takes the voltage and Faradaic efficiencies from a measured series at the
+  cell's current density, refused outside its range (`cheme.cell-operating-range`), with
+  `cheme.cell-measured-conflict` and `cheme.cell-measurement`; a `membrane:` block reports the
+  water dissociation efficiency, co-ion fluxes and the anolyte hydroxide deficit apart from
+  the Faradaic efficiency (`cheme.cell-membrane`). The measured product must be formed by the
+  cell's reaction; measured efficiencies above 1 within the measurement's tolerance are scaled
+  to 1. A side reaction's `current_fraction` is optional (a specified cell without one is
+  refused with `cheme.cell-input-missing`). Cells without the new fields report as
+  before. ADR 0042 records why no WaterTAP or IDAES model is used for this.
 - `cheme process pinch --dt-min X` (#134, ADR 0040): whole-plant pinch targets of the case's
   recorded simulation run. One thermal stream per duty with class (utility, recovery,
   constrained, excluded) and quality (linearised or insufficient), reconciled against the run's

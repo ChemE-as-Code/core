@@ -1,5 +1,6 @@
 """``cheme experiments``: kinetic data and the rate laws fitted to them
-(domains/experiments/kinetic_fit.py, project/kinetics.py)."""
+(domains/experiments/kinetic_fit.py, project/kinetics.py), and measured electrochemical series
+(domains/experiments/electrochemistry.py)."""
 
 from __future__ import annotations
 
@@ -10,7 +11,8 @@ from typing import Annotated
 import typer
 
 experiments_app = typer.Typer(
-    help="Experiments: kinetic data, rate laws fitted to them, data sampled from a mechanism.",
+    help="Experiments: kinetic data, rate laws fitted to them, data sampled from a mechanism, "
+    "measured electrochemical series.",
     no_args_is_help=True,
 )
 
@@ -114,3 +116,48 @@ def sample(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(data_yaml(data), encoding="utf-8")
     typer.echo(f"{out}: {len(data.points)} points")
+
+
+@experiments_app.command("electrochem")
+def electrochem(
+    file: Annotated[
+        Path,
+        typer.Argument(help="A measurement file (cheme/electrochemical-measurements/v1)."),
+    ],
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    plot: Annotated[
+        Path | None,
+        typer.Option(help="Write the SVG figures the data support into this directory."),
+    ] = None,
+) -> None:
+    """Process a measured electrochemical series: per replicate and point (mean, sd, n) the
+    Faradaic efficiency of each product, partial current densities, the water dissociation
+    efficiency from the anolyte titration, power, heat and the charge and carbon balances.
+    Reads the file only (a plant repository is not needed); --plot writes polarisation,
+    Faradaic efficiency, partial current density and water dissociation plots. Exit 1 on an
+    error finding, 2 when the file does not exist."""
+    from chemeascode.domains.experiments.electrochemistry import (
+        measurement_plots,
+        measurement_report,
+        report_text,
+    )
+    from chemeascode.foundation.workspace import NotAPlantRepository, Workspace
+
+    if not file.is_file():
+        typer.echo(f"{file} does not exist", err=True)
+        raise typer.Exit(2)
+    path = file.resolve()
+    try:
+        root = Workspace.find(path.parent).root
+    except NotAPlantRepository:
+        root = path.parent  # a measurement outside a plant repository: its folder
+    report = measurement_report(root, path)
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if plot is not None:
+        plot.mkdir(parents=True, exist_ok=True)
+        for name, svg in measurement_plots(report).items():
+            (plot / name).write_text(svg, encoding="utf-8")
+            if not as_json:
+                typer.echo(f"wrote {plot / name}")
+    if report.errors:
+        raise typer.Exit(1)

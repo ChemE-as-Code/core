@@ -88,3 +88,5 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0038](0038-stated-imbalance-of-specified-splits.md) | A specified split's energy imbalance is stated, and the plant closure takes it | Proposed | 2026-10-30 |
 | [0039](0039-idaes-as-an-optional-second-simulation-backend.md) | IDAES as an optional second simulation backend, chosen in simulation.yaml | Proposed | 2026-10-31 |
 | [0040](0040-pinch-targets-from-the-recorded-simulation-run.md) | Pinch targets from the recorded simulation run, every duty in one class and reconciled | Proposed | 2026-11-04 |
+| [0041](0041-measured-electrochemical-performance-and-membrane-block.md) | Measured electrochemical performance from a processed series, and a membrane block | Proposed | 2026-11-04 |
+| [0042](0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md) | WaterTAP and IDAES are not reused for measured electrochemical cells | Proposed | 2026-11-04 |

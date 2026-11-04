@@ -557,3 +557,425 @@ def test_import_needs_neither_typer_nor_fastapi():
         "assert 'typer' not in sys.modules and 'fastapi' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ})
+
+
+# -- measured performance and the membrane (co2-bpm: a synthetic measured series) --------------
+
+SERIES = "experiments/electrochemistry/synthetic-bpm.yaml"
+
+
+def _measured_point(root: Path, j: float):
+    from chemeascode.domains.experiments.electrochemistry import (
+        MeasuredPerformance,
+        measurement_report,
+    )
+
+    return MeasuredPerformance(measurement_report(root, SERIES)).at(j)
+
+
+def test_measured_cell_takes_voltage_and_efficiencies_from_the_measurement(tmp_path):
+    """0.75 A on 5 cm2 = 1500 A/m2, halfway between the points at 1000 and 2000 A/m2: the
+    voltage and Faradaic efficiencies are their means' midpoints, H2's efficiency becomes the
+    current fraction of the side reaction WS, and the rest of the current is unassigned."""
+    root = _plant(tmp_path, "co2-bpm")
+    report, cell = _only(root)
+    assert not cell.refused, cell.reasons
+    assert not _rules(report, "error") and not _rules(report, "warning")
+    at = _measured_point(root, 1500.0)
+    assert at.bracket == ("P100", "P200")
+    assert cell.current_density_a_m2 == pytest.approx(1500.0)
+    assert cell.voltage_v == pytest.approx(at.voltage_v)
+    fe_co, fe_h2 = at.faradaic_efficiency["CO"], at.faradaic_efficiency["H2"]
+    assert cell.faradaic_efficiency == pytest.approx(fe_co)
+    assert cell.extents["CO2R"] == pytest.approx(fe_co * 0.75 / (2 * FARADAY) * 3.6)
+    assert cell.extents["WS"] == pytest.approx(fe_h2 * 0.75 / (2 * FARADAY) * 3.6)
+    assert cell.unassigned_current_fraction == pytest.approx(1 - fe_co - fe_h2)
+    _closes(cell)
+    # U_tn of CO2 -> CO + 1/2 O2 from CODATA dfH(CO2, g) and dfH(CO, g)
+    assert cell.thermoneutral_voltage_v == pytest.approx((393.51 - 110.53) * 1000 / (2 * FARADAY))
+    assert cell.performance == "measured" and cell.sourced
+    assert cell.measurement["file"] == SERIES and cell.measurement["bracket"] == ["P100", "P200"]
+    assert any(SERIES in s for s in cell.sources)
+    assert set(report.source.fingerprints) >= {"process/cells.yaml", SERIES}
+
+
+def test_membrane_reports_wde_apart_from_the_faradaic_efficiency(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _, cell = _only(root)
+    at = _measured_point(root, 1500.0)
+    membrane = cell.membrane
+    wde = at.water_dissociation_efficiency
+    assert membrane["water_dissociation_efficiency"] == pytest.approx(wde)
+    assert membrane["basis"] == "measured" and membrane["kind"] == "bipolar"
+    # what the membrane does not carry by water dissociation, the co-ions carry
+    deficit = (1 - wde) * 0.75 / FARADAY
+    assert membrane["hydroxide_deficit_mol_s"] == pytest.approx(deficit)
+    assert membrane["hydroxide_deficit_kmol_h"] == pytest.approx(deficit * 3.6)
+    assert membrane["co_ion_flux_mol_s"]["K+"] == pytest.approx(0.34 * deficit)
+    assert membrane["co_ion_flux_mol_s"]["HCO3-"] == pytest.approx(0.66 * deficit)
+    assert membrane["measured_co_ion_carbon_fraction"] == pytest.approx(at.co_ion_carbon_fraction)
+    # the membrane changes nothing in the Faraday balance
+    _cell(root, lambda c: c.pop("membrane"))
+    _, without = _only(root)
+    assert without.membrane is None
+    assert without.extents == cell.extents and without.heat_duty_kw == cell.heat_duty_kw
+    assert "membrane" not in without.as_dict()
+
+
+@pytest.mark.parametrize(
+    ("edit", "rule"),
+    [
+        (lambda c: c["current"].update(value=1.5), "cheme.cell-operating-range"),  # 3000 A/m2
+        (lambda c: c["current"].update(value=0.2), "cheme.cell-operating-range"),  # 400 A/m2
+        (lambda c: c["thermal"]["temperature"].update(value=60), "cheme.cell-operating-range"),
+        (lambda c: c.pop("active_area"), "cheme.cell-input-missing"),
+        (lambda c: c.pop("measurements"), "cheme.cell-input-missing"),
+        (lambda c: c.update(performance="specified"), "cheme.cell-measurement"),
+        (
+            lambda c: c["measurements"].update(file="experiments/nope.yaml"),
+            "cheme.cell-measurement",
+        ),
+        (lambda c: c["measurements"].update(product="HCOOH"), "cheme.cell-measurement"),
+    ],
+)
+def test_measured_cell_refusals(tmp_path, edit, rule):
+    root = _plant(tmp_path, "co2-bpm")
+    _cell(root, edit)
+    report, cell = _only(root)
+    assert cell.refused and rule in _rules(report, "error"), [f.format() for f in report.findings]
+    assert cell.power_kw is None and not cell.extents
+
+
+def test_measured_cell_is_never_extrapolated(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _cell(root, lambda c: c["current"].update(value=1.5))
+    report, cell = _only(root)
+    found = next(f for f in report.findings if f.rule == "cheme.cell-operating-range")
+    assert "never extrapolated" in found.message and "500-2000 A/m2" in found.hint
+    # the line of the current's entry (its mapping starts on the line below the key)
+    assert found.line in (_line(root, "current:"), _line(root, "current:") + 1)
+
+
+def test_measurement_with_errors_refuses_the_cell(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _edit(root, SERIES, lambda d: d["points"][0].update(current={"value": 1, "unit": "A"}))
+    report, cell = _only(root)
+    assert cell.refused and "cheme.cell-measurement" in _rules(report, "error")
+    assert any("cheme experiments electrochem" in f.hint for f in report.findings)
+
+
+def test_measured_conflicts(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    at = _measured_point(root, 1500.0)
+    _cell(root, lambda c: c.update(voltage={"value": 3.0, "unit": "V", "provenance": "given"}))
+    report, cell = _only(root)
+    assert "cheme.cell-measured-conflict" in _rules(report, "warning")
+    assert cell.voltage_v == pytest.approx(at.voltage_v)  # the measured value is used
+    # within the replicates' standard deviation: no conflict
+    near = at.voltage_v + 0.5 * at.voltage_sd_v
+    _cell(root, lambda c: c["voltage"].update(value=near))
+    report, _ = _only(root)
+    assert "cheme.cell-measured-conflict" not in _rules(report)
+    _cell(
+        root,
+        lambda c: c["membrane"].update(
+            water_dissociation_efficiency={"value": 0.5, "provenance": "assumed"}
+        ),
+    )
+    report, _ = _only(root)
+    assert "cheme.cell-measured-conflict" in _rules(report, "warning")
+
+
+def test_side_product_without_a_side_reaction_is_unassigned_current(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _cell(root, lambda c: c.pop("side_reactions"))
+    report, cell = _only(root)
+    assert not cell.refused and "cheme.cell-measurement" in _rules(report, "info")
+    assert cell.unassigned_current_fraction == pytest.approx(1 - cell.faradaic_efficiency)
+    assert any("unassigned" in text for text in cell.limitations)
+
+
+def test_unsourced_measurement_is_specified_but_not_sourced(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _edit(root, SERIES, lambda d: d.update(source=""))
+    _, cell = _only(root)
+    assert not cell.refused and not cell.sourced
+
+
+def test_measured_cell_basis(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    sheet = json.loads(json.dumps(FLOWSHEET))
+    sheet["blocks"][0]["reactions"] = ["CO2R"]
+    for stream in sheet["streams"]:
+        stream.pop("state", None)
+    (root / "process" / "flowsheet.yaml").write_text(yaml.safe_dump(sheet), encoding="utf-8")
+    _cell(root, lambda c: c.update(flowsheet={"step": "ELY", "electricity": "E1", "heat": "Q1"}))
+    basis = cell_bases(cell_report(root))["ELY"]
+    assert (basis.basis, basis.predictive, basis.sourced) == ("electrochemical-cell", False, True)
+    assert basis.detail.startswith("measured electrochemical cell BPM-1")
+    assert "interpolated between measured points" in basis.limitations[0]
+
+
+def test_membrane_on_a_specified_cell(tmp_path):
+    root = _plant(tmp_path, "water-electrolysis")
+    _, before = _only(root)
+    _cell(root, lambda c: c.update(membrane={"kind": "cation_exchange"}))
+    report, cell = _only(root)
+    assert "cheme.cell-membrane" in _rules(report, "info")  # no WDE: no fluxes
+    assert cell.membrane["hydroxide_deficit_mol_s"] is None
+    assert cell.extents == before.extents and cell.power_kw == before.power_kw
+
+    def given(c):
+        c["membrane"] = {
+            "kind": "bipolar",
+            "water_dissociation_efficiency": {"value": 90, "unit": "%", "provenance": "assumed"},
+            "co_ion_crossover": {"K+": 1.0},
+        }
+
+    _cell(root, given)
+    _, cell = _only(root)
+    assert cell.membrane["basis"] == "given"
+    assert cell.membrane["co_ion_flux_mol_s"]["K+"] == pytest.approx(0.1 * 20000 / FARADAY)
+    _cell(root, lambda c: c["membrane"].update(co_ion_crossover={"K+": 0.5, "CO3-2": 0.4}))
+    report, _ = _only(root)
+    assert "cheme.cell-membrane" in _rules(report, "error")
+    _cell(root, lambda c: c["membrane"].update(co_ion_crossover={"K+": 0.5, "CO3-2": 0.5}))
+    _, cell = _only(root)
+    # a doubly charged co-ion carries twice the charge per mol
+    flux = cell.membrane["co_ion_flux_mol_s"]
+    assert flux["CO3-2"] == pytest.approx(flux["K+"] / 2)
+
+
+def test_specified_cells_report_as_before(tmp_path):
+    """The fields for measured cells and membranes stay out of a specified cell's result."""
+    for name in ("water-electrolysis", "chlor-alkali"):
+        _, cell = _only(_plant(tmp_path, name))
+        assert not {"performance", "measurement", "membrane"} & set(cell.as_dict())
+
+
+SNAPSHOTS = DATA / "snapshots"
+
+
+def _masked(payload: dict) -> dict:
+    """The JSON report without what changes between releases and checkouts: the core version,
+    the commit and the files' fingerprints (their names stay)."""
+    payload["core_version"] = "<version>"
+    source = payload["source"]
+    source["commit"] = "<commit>"
+    source["dirty"] = []
+    source["fingerprints"] = dict.fromkeys(source["fingerprints"], "<sha256>")
+    return payload
+
+
+@pytest.mark.parametrize("name", ["water-electrolysis", "chlor-alkali"])
+def test_specified_cells_output_is_unchanged(tmp_path, monkeypatch, name):
+    """`cheme process cell` text and JSON of the specified fixtures against stored snapshots
+    (taken on main before measured cells existed; core version, commit and fingerprints masked).
+    Regenerate on an intended change with CHEME_UPDATE_SNAPSHOTS=1 and review the diff."""
+    root = _plant(tmp_path, name)
+    monkeypatch.chdir(root)
+    text = runner.invoke(app, ["process", "cell"])
+    assert text.exit_code == 0, text.output
+    first, rest = text.stdout.split("\n", 1)
+    assert first.startswith("model faraday-balance v1 (cheme/electrochemical-cells/v1), core ")
+    shown = first.rsplit(" core ", 1)[0] + " core <version>\n" + rest
+    payload = json.loads(runner.invoke(app, ["process", "cell", "--json"]).stdout)
+    shown_json = json.dumps(_masked(payload), indent=2) + "\n"
+    if os.environ.get("CHEME_UPDATE_SNAPSHOTS"):
+        SNAPSHOTS.mkdir(exist_ok=True)
+        (SNAPSHOTS / f"{name}.txt").write_text(shown, encoding="utf-8")
+        (SNAPSHOTS / f"{name}.json").write_text(shown_json, encoding="utf-8")
+    assert shown == (SNAPSHOTS / f"{name}.txt").read_text(encoding="utf-8")
+    assert shown_json == (SNAPSHOTS / f"{name}.json").read_text(encoding="utf-8")
+
+
+def _messages(report, rule: str, level: str = "error") -> list[str]:
+    return [f.message for f in report.findings if f.rule == rule and f.level == level]
+
+
+def test_measured_product_must_be_formed_by_the_cells_reaction(tmp_path):
+    """H2 is formed by WS in the measurement: its Faradaic efficiency is no current efficiency
+    of CO2R."""
+    root = _plant(tmp_path, "co2-bpm")
+    _cell(
+        root,
+        lambda c: (
+            c["measurements"].update(product="H2", side_products=[]),
+            c.pop("side_reactions"),
+        ),
+    )
+    report, cell = _only(root)
+    assert cell.refused and cell.power_kw is None
+    (message,) = _messages(report, "cheme.cell-measurement")
+    assert "forms H2 by reaction WS, not by the cell's reaction CO2R" in message
+    # without reaction: in the measurement, the product must be one of the reaction's
+    _edit(root, SERIES, lambda d: [p.pop("reaction") for p in d["products"]])
+    report, cell = _only(root)
+    assert cell.refused
+    assert _messages(report, "cheme.cell-measurement") == [
+        "cell BPM-1: H2 is no product of the cell's reaction CO2R: refused"
+    ]
+    _cell(root, lambda c: c["measurements"].update(product="CO"))
+    report, cell = _only(root)
+    assert not cell.refused, cell.reasons
+
+
+def test_side_product_at_the_other_electrode_is_refused(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _edit(
+        root,
+        SERIES,
+        lambda d: (
+            d["products"][1].update(electrode="anode"),
+            d["products"][1].pop("thermoneutral_voltage"),
+        ),
+    )
+    report, cell = _only(root)
+    assert cell.refused
+    (message,) = _messages(report, "cheme.cell-measurement")
+    assert "side product H2 forms at the other electrode than CO (cathode)" in message
+
+
+def test_measured_efficiencies_above_1_within_tolerance_are_scaled(tmp_path):
+    """FE sums of 1.012 and 1.018 pass the measurement's own check (below 1.05): the cell
+    scales the measured shares to add up to 1 instead of refusing with cell-charge."""
+    root = _plant(tmp_path, "co2-bpm")
+
+    def raise_h2(d):
+        for point, values in (("P100", (4.55, 4.72)), ("P200", (13.6, 12.2))):
+            p = next(p for p in d["points"] if p["id"] == point)
+            for rep, x in zip(p["replicates"], values, strict=True):
+                rep["fractions"]["H2"]["value"] = x
+
+    _edit(root, SERIES, raise_h2)
+    from chemeascode.domains.experiments.electrochemistry import measurement_report
+
+    assert not measurement_report(root, SERIES).errors
+    at = _measured_point(root, 1500.0)
+    total = at.faradaic_efficiency["CO"] + at.faradaic_efficiency["H2"]
+    assert total > 1
+    report, cell = _only(root)
+    assert not cell.refused, cell.reasons
+    assert "cheme.cell-charge" not in _rules(report)
+    assert any(
+        "scaled to add up to 1" in m for m in _messages(report, "cheme.cell-measurement", "info")
+    )
+    assert cell.faradaic_efficiency == pytest.approx(at.faradaic_efficiency["CO"] / total)
+    assert cell.extents["WS"] == pytest.approx(
+        at.faradaic_efficiency["H2"] / total * 0.75 / (2 * FARADAY) * 3.6
+    )
+    assert cell.unassigned_current_fraction == pytest.approx(0.0, abs=1e-12)
+    assert cell.measurement["normalised_from"] == pytest.approx(total)
+    _closes(cell)
+    # a stated side fraction on top of the measured ones is still refused, naming the file
+    _edit(
+        root,
+        "process/reactions.yaml",
+        lambda d: d["reactions"].append(
+            {**next(r for r in d["reactions"] if r["id"] == "WS"), "id": "WS2"}
+        ),
+    )
+    _cell(
+        root,
+        lambda c: c["side_reactions"].append(
+            {
+                "reaction": "WS2",
+                "electrons": 2,
+                "current_fraction": {"value": 0.1, "provenance": "assumed"},
+            }
+        ),
+    )
+    report, cell = _only(root)
+    found = next(f for f in report.findings if f.rule == "cheme.cell-charge")
+    assert cell.refused and SERIES in found.hint
+
+
+def test_measured_side_product_below_detection_forms_nothing(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+
+    def no_h2(d):
+        for p in d["points"]:
+            for rep in p["replicates"]:
+                rep["fractions"]["H2"] = {"value": 0, "unit": "mol%"}
+
+    _edit(root, SERIES, no_h2)
+    report, cell = _only(root)
+    assert not cell.refused, cell.reasons
+    assert "cheme.cell-charge" not in _rules(report)
+    assert cell.extents["WS"] == 0.0
+    _closes(cell)
+
+
+def test_refused_measured_cell_has_no_membrane_info(tmp_path):
+    """The measurement holds the titrations: a refused lookup does not ask for them."""
+    root = _plant(tmp_path, "co2-bpm")
+    for edit in (
+        lambda c: c["current"].update(value=1.5),
+        lambda c: c["measurements"].update(file="experiments/nope.yaml"),
+    ):
+        _cell(root, edit)
+        report, cell = _only(root)
+        assert cell.refused
+        assert "cheme.cell-membrane" not in _rules(report)
+
+
+def test_measured_cell_refuses_electrode_potentials(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _edit(root, SERIES, lambda d: d.update(voltage_basis="electrode_vs_reference"))
+    report, cell = _only(root)
+    assert cell.refused
+    (message,) = _messages(report, "cheme.cell-input-missing")
+    assert "electrode potentials against a reference, not a cell voltage" in message
+
+
+def test_measured_ir_corrected_voltage_is_a_limitation(tmp_path):
+    root = _plant(tmp_path, "co2-bpm")
+    _edit(root, SERIES, lambda d: d.update(voltage_basis="cell_ir_corrected"))
+    _, cell = _only(root)
+    assert not cell.refused and cell.measurement["voltage_basis"] == "cell_ir_corrected"
+    assert any("iR-corrected" in text for text in cell.limitations)
+
+
+@pytest.mark.parametrize(
+    ("membrane", "text"),
+    [
+        (
+            {
+                "kind": "bipolar",
+                "water_dissociation_efficiency": {"value": 0.9, "provenance": "assumed"},
+                "co_ion_crossover": {"Kx": 1.0},
+            },
+            "co-ion Kx is no ion",
+        ),
+        (
+            {
+                "kind": "bipolar",
+                "water_dissociation_efficiency": {"value": 1.2, "provenance": "assumed"},
+            },
+            "water dissociation efficiency 1.2 not in [0, 1]",
+        ),
+    ],
+)
+def test_membrane_errors(tmp_path, membrane, text):
+    root = _plant(tmp_path, "water-electrolysis")
+    _cell(root, lambda c: c.update(membrane=membrane))
+    report, _ = _only(root)
+    assert any(text in m for m in _messages(report, "cheme.cell-membrane"))
+
+
+def test_side_reaction_without_fraction_on_a_specified_cell(tmp_path):
+    root = _plant(tmp_path, "water-electrolysis")
+    _cell(root, lambda c: c.update(side_reactions=[{"reaction": "WS", "electrons": 2}]))
+    report, cell = _only(root)
+    assert cell.refused and "cheme.cell-input-missing" in _rules(report, "error")
+
+
+def test_cli_measured_cell(tmp_path, monkeypatch):
+    root = _plant(tmp_path, "co2-bpm")
+    monkeypatch.chdir(root)
+    result = runner.invoke(app, ["process", "cell"])
+    assert result.exit_code == 0, result.output
+    assert f"measured: {SERIES} at 1500 A/m2 (between P100 and P200)" in result.stdout
+    assert "membrane (bipolar, reverse bias): water dissociation efficiency" in result.stdout
+    payload = json.loads(runner.invoke(app, ["process", "cell", "--json"]).stdout)
+    assert payload == json.loads(cell_report(root).to_json())

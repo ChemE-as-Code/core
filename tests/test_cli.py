@@ -372,6 +372,7 @@ def test_schema_lists_kinds(plant: Path, monkeypatch):
         "process-extraction",
         "furnaces",
         "kinetic-data",
+        "electrochemical-measurements",
         "layout_model",
         "lci_dataset",
         "lci_estimate",

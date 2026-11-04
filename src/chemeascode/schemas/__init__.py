@@ -41,6 +41,7 @@ from chemeascode.domains.control.schemas import (
 )
 from chemeascode.domains.equipment.schemas.datasheet import Datasheet
 from chemeascode.domains.equipment.schemas.equipment import EquipmentItem, EquipmentList
+from chemeascode.domains.experiments.electrochemistry import ElectrochemicalMeasurements
 from chemeascode.domains.experiments.kinetic_fit import KineticData
 from chemeascode.domains.piping.schemas.lines import (
     Instrument,
@@ -118,6 +119,10 @@ OTHER_SCHEMAS = {
     "process-extraction": (ExtractionFile, "process/extraction.yaml"),
     "furnaces": (FurnacesFile, "process/furnaces.yaml"),
     "kinetic-data": (KineticData, "experiments/kinetics/*.yaml"),
+    "electrochemical-measurements": (
+        ElectrochemicalMeasurements,
+        "experiments/electrochemistry/*.yaml",
+    ),
     "layout_model": (LayoutModelFile, "layout/plant-model.yaml (generated)"),
     "lci_dataset": (LciDataset, "lca/dataset.yaml (generated), lca/datasets/*.yaml"),
     "lci_estimate": (LciEstimate, "lca/estimate.yaml"),
@@ -144,6 +149,7 @@ __all__ = [
     "CheckList",
     "Datasheet",
     "ElectricalList",
+    "ElectrochemicalMeasurements",
     "FactorFile",
     "HazopStudy",
     "DesignBasis",
