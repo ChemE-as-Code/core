@@ -185,4 +185,5 @@ nav:
       - "0043 Dynamic electrolysis duties and the anolyte model interface": adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md
       - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
       - "0045 A design case's LCI dataset with its own identity": adr/0045-a-design-case-lci-dataset-with-its-own-identity.md
+      - "0046 The PFD drawn as an engineering sheet": adr/0046-pfd-drawn-as-an-engineering-sheet.md
       - Template: adr/template.md

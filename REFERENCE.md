@@ -935,6 +935,19 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   provenance and case. The layout is layered left to right with recycles routed back, labels
   placed clear of lines and nodes, and the `layout.<view>` pins applied. A rebuild is
   byte-identical; a title rename moves nothing.
+- **The PFD drawing** (ADR 0046). The sheet is the smallest that holds the drawing and the stream
+  table: ISO 216 A3 to A0 or an ISO 5457 elongated one (A3x3 to A0x3), landscape, with the
+  frame, zone markers and a title block (title, project, drawing number, case, sheet). A layout
+  wider than an A0 wraps into rows, read like text. Steps are drawn with the ISO symbol of
+  their class (a step's optional `symbol:` overrides it: a symbol name, `junction` or `box`;
+  an unknown name is `cheme.process-symbol`, warning); mixing and splitting steps are junction
+  tees. A utility terminal (`category: utility`, a `utility:` given, or only energy ports) is
+  not a box with a line to every user: each of its streams is a short stub on top of the step
+  it serves, with the utility's id. Process lines are drawn heavier than equipment, with flow
+  arrowheads; blocks holding steps are light dash-dot process areas. Below the drawing the
+  stream table lists each material stream's phase, temperature (°C), pressure (bar), mass flow
+  and the flows of the largest components, and each energy stream's duty, for the default case
+  (assumed values marked `*`, stale ones blank). The BFD gets the same frame and title block.
 - **Calculated values and phase in the sheets.** Each material stream's `MaterialState` (its
   `MaterialStateType`) carries the `state.calculated` values DEXPI 2.0.1 has a property for:
   `density` (kg/m3) and `specificEnthalpy`, one `QualifiedValue` per case with the YAML
