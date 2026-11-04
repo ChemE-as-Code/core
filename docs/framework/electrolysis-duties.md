@@ -22,6 +22,7 @@ duties:
     cell: BPM-1                      # an id of process/cells.yaml
     cells_in_series: 1               # default: the cell's
     stacks: 1                        # stacks in parallel on the one reservoir
+    # stack: STK-1                   # or: run at the arrangement that stack is sized at
     schedule: {kind: constant_current, current_density: {value: 150, unit: mA/cm2}}
     reservoir:
       volume: {value: 1, unit: L}
@@ -31,6 +32,8 @@ duties:
       degassing:                     # optional; without it CO2 degassing is off (info)
         kla: {value: 2, unit: 1/h, source: "..."}
         co2_partial_pressure: {value: 0.0004, unit: atm, source: "air"}
+      # size: to_horizon             # optional: the volume that reaches the horizon
+      # time_margin: {value: 0.1}    # with size: a fraction of the horizon, or {value, unit: h}
     dosing:
       kind: on_threshold             # none | on_threshold | continuous
       trigger_ph: 12.5
@@ -60,6 +63,11 @@ Schedules:
 `process/cells.yaml` names under `equipment.duty` runs at the arrangement that stack is sized
 at, in `cheme process duty` as in `cheme process stack` (`cheme.duty-arrangement`, info): its
 own `cells_in_series` and `stacks` are then not used ([electrolyser stacks](electrolyser-stacks.md)).
+A duty no stack's equipment names, such as a comparison duty on a skid's hardware, gets that
+arrangement by naming the stack (`stack: STK-1`); it may not state other `cells_in_series` or
+`stacks` (`cheme.duty-arrangement`, error: the duty is refused), and a duty naming a stack
+that is not in `process/cells.yaml`, is of another cell, or whose arrangement is not given
+(the stack refused; the duty run without the stack sizing) is refused too.
 
 ## What is computed
 
@@ -95,9 +103,50 @@ density or temperature): the state after it is not computed. The scheduled opera
 outside the range is summed (to the horizon when the transient stopped at an exit). Time with
 the anolyte outside the model's validity (pH, ionic strength, temperature) is summed too.
 
+The totals are also split by route, so that the cation and the carbon balance of the
+reservoir close on their own (the LCI's reconciliation needs no closing by difference):
+
+| total | what |
+| --- | --- |
+| `initial_cation_mol`, `initial_carbon_mol`, `initial_volume_l` | the reservoir at the start |
+| `dosing_cation_mol` | the cation dosed (one per hydroxide: `dosing_mol`) |
+| `membrane_cation_mol` | the cation leaving the anolyte through the membrane, `(1 - C_x)(1 - WDE) Q / F` at constant performance |
+| `membrane_carbon_mol` | the carbon entering through the membrane (one per HCO3- or CO3-2), `C_x (1 - WDE) Q / F` |
+| `bleed_cation_mol`, `bleed_carbon_mol` | the cation and carbon leaving with the bleed, at the reservoir's composition |
+
+`initial + dosed - bled - membrane = final` for the cation and `initial + membrane - bled -
+degassed = final` for the carbon, to rounding (a test holds both to 1e-9 relative). They are
+integrated as quadratures on the integration's own steps, outside its error control, so every
+other value is as without them.
+
 A duty is **feasible** when it runs to its horizon (or reaches a comparison's target) without
 reaching the threshold or the minimum inventory, entirely inside the measured range and the
 model's validity, and the integration converged.
+
+## The reservoir volume that reaches the horizon
+
+`reservoir.size: to_horizon` asks for the reservoir volume that reaches the duty's horizon
+(plus `time_margin`: a fraction of the horizon, or a time in h or d) at the stated pH threshold.
+Without dosing, bleed, make-up water and degassing, and with the cell on at one operating point
+(one WDE and co-ion split whenever it is on: constant current, on/off, or steps of a specified
+cell), the reservoir's state moves along the charge `Q` passed, and the threshold falls at a
+fixed charge per volume `Q* / V0`. The volume is then exact:
+
+`V = V0 Q(target) / Q*`
+
+with `V0` the stated volume, `Q(target)` the schedule's charge up to the target and `Q*` the
+charge at the threshold: from the run when it reaches the threshold, otherwise by following the
+run's straight path in the charge (the model's speciation) to the threshold. At constant current
+it is `V0 H / t_threshold`. The run itself is at `V0`, as without `size`; the volume is in
+`required_volume` of the JSON (`volume_l`, `target_h`, `probe_volume_l`, the charges and the
+basis) and a `cheme.duty-size` info finding. `cheme process stack --write` writes it into
+`reservoir.volume` for a duty a stack's equipment names
+([electrolyser stacks](electrolyser-stacks.md)), rounded up to 4 significant figures so that
+the duty at the written volume reaches the target. With dosing, a bleed, make-up water or
+degassing the volume does not scale exactly and `size: to_horizon` is refused
+(`cheme.duty-size`, error), as for a schedule at more than one operating point, one leaving the
+measured range before the target, or a run ended otherwise than by the threshold or the
+horizon; the duty itself still runs.
 
 ## The anolyte model `well-mixed-carbonate` v1
 
@@ -169,11 +218,13 @@ compared transients, each up to the target.
 | `cheme.duty-degassing` | info | no CO2 degassing stated |
 | `cheme.duty-compare` | error | compared duties form different products |
 | `cheme.duty-target-not-reached` | warning | a compared duty ends before the target |
-| `cheme.duty-arrangement` | info | the duty runs at the arrangement a stack of `process/cells.yaml` is sized at, not its own |
+| `cheme.duty-arrangement` | info / error | the duty runs at the arrangement a stack of `process/cells.yaml` is sized at, not its own; error (refused): it names a stack (`stack:`) not in the file, of another cell, whose arrangement is not given, that another stack's equipment runs, or states `cells_in_series` or `stacks` other than the stack's |
+| `cheme.duty-size` | info / error / warning | `reservoir.size: to_horizon`: the volume that reaches the horizon; error: no exact volume (dosing, bleed, make-up, degassing, more than one operating point, the measured range left, a time margin not a fraction or time); warning: a time margin without `size` |
 
 `cheme validate` reports the schema, cell and model findings without integrating: every error
 `cheme process duty` refuses a duty on before it integrates (units, ranges, the cell and its
-membrane, the anolyte model and its species). `--json` records the model ids and versions (the
+membrane, the anolyte model and its species, a `stack:` not in `process/cells.yaml` or of
+another cell, `size: to_horizon` with dosing, bleed, make-up or degassing). `--json` records the model ids and versions (the
 duty's and the anolyte model's), their assumptions and limitations, the range each duty is
 checked against (`measured_range`: current density, temperature, the power of all cells for a
 power schedule, the measured WDE), and the source revision with the sha256 of every input, the

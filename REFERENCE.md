@@ -1138,7 +1138,13 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `well-mixed-carbonate` v1 (equilibrium carbonate speciation on a concentration basis;
   `docs/framework/electrolysis-duties.md`). A duty a stack of `process/cells.yaml` names runs
   at the arrangement that stack is sized at (`cheme.duty-arrangement`), as in
-  `cheme process stack`.
+  `cheme process stack`, and so does a duty that names the stack itself (`stack: STK-1`, a
+  comparison duty on the skid's hardware; another `cells_in_series` or `stacks` on it is an
+  error). The totals are split by route (the cation and carbon dosed, bled and through the
+  membrane, the initial inventories), so both balances close on their own.
+  `reservoir.size: to_horizon` (optional `time_margin`) reports the exact volume that reaches
+  the horizon, `V0 Q(target) / Q*`, for a duty without dosing, bleed, make-up or degassing at
+  one operating point (`required_volume`; otherwise `cheme.duty-size`, error).
 - **Electrolyser stacks**: the optional `stacks:` section of `process/cells.yaml` (same schema,
   optional fields only) names per stack design a cell, the product duty, the electrical
   limits, the assumed envelope per cell, clearances, the replacement interval and the skid
@@ -1149,7 +1155,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   power, output and margin, kWh per kg, the envelope and footprint; and the reservoir, dosing
   and bleed tanks and the recirculation and dosing pumps' inputs from the named duty, run at
   that arrangement (a duty at another current density or of another cell, or not feasible,
-  gives none: `cheme.stack-duty`). Without `--write` it writes nothing and reports what
+  gives none: `cheme.stack-duty`); a dosing tank's `refill_interval` and a bleed tank's
+  `empty_interval` size it for the most dosed or bled in any such interval, with the fills or
+  emptyings per campaign; `product.recovery` (default 1) sizes the stacks for the product
+  formed, rate / recovery, and reports formed and delivered output; a duty with
+  `reservoir.size: to_horizon` gets its reservoir volume written into `process/duties.yaml` by
+  `--write`. Without `--write` it writes nothing and reports what
   differs (`cheme.stack-outdated`); `--write` edits the equipment-list `dimensions` in place and
   the pumps' datasheet `type_specific` (the recirculation pump's with its end points
   `suction_from` and `discharge_to`), never over a value written by hand

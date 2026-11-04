@@ -4,6 +4,23 @@
 
 ### Added
 
+- Skid inputs for pilot skids (follow-up to #139, ADR 0044 amended), optional fields only:
+  a dosing tank's `refill_interval` and a bleed tank's `empty_interval` size the tank for the
+  most dosed or bled in any window of min(campaign, interval) and report the fills or emptyings
+  per campaign; a duty's `stack:` runs a comparison duty at that stack's arrangement in
+  `cheme process duty` and `--compare` (another `cells_in_series` or `stacks` on it, or a
+  stack that is not there, is refused: `cheme.duty-arrangement`, error); `reservoir.size:
+  to_horizon` (with an optional `time_margin`) gives the exact volume that reaches the horizon,
+  `V0 Q(target) / Q*`, in the duty's `required_volume` and the stack's
+  `reservoir_required_volume_l`, which `cheme process stack --write` writes (rounded up to 4
+  significant figures) into `process/duties.yaml`, then the tanks from the duty at it; refused
+  with dosing, bleed, make-up, degassing or more than one operating point (`cheme.duty-size`);
+  a stack's `product.recovery` (default 1) sizes the stacks for the rate over the recovery
+  formed and reports formed and delivered output and kWh per kg. Every duty's totals are split
+  by route (`initial_*`, `dosing_cation_mol`, `membrane_cation_mol`, `membrane_carbon_mol`,
+  `bleed_cation_mol`, `bleed_carbon_mol`), so the cation and carbon balances close on their own;
+  they are quadratures outside the integrator's error control (`foundation/ode.py`
+  `solve(..., error_components=)`), so every existing value is unchanged.
 - `cheme process stack [IDS] [--json] [--write]` (#139, ADR 0044): electrolyser stacks sized
   for a product duty from the optional `stacks:` section of `process/cells.yaml` (schema
   `cheme/electrochemical-cells/v1` unchanged, optional fields only), at the cell's operating
