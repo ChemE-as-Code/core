@@ -91,3 +91,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0041](0041-measured-electrochemical-performance-and-membrane-block.md) | Measured electrochemical performance from a processed series, and a membrane block | Proposed | 2026-11-04 |
 | [0042](0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md) | WaterTAP and IDAES are not reused for measured electrochemical cells | Proposed | 2026-11-04 |
 | [0043](0043-dynamic-electrolysis-duties-and-anolyte-models.md) | Dynamic electrolysis duties with an anolyte model interface, on a concentration basis | Proposed | 2026-11-04 |
+| [0044](0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md) | Stack sizing in process/cells.yaml, skid equipment inputs through the equipment list | Proposed | 2026-11-04 |

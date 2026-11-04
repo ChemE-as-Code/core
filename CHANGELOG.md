@@ -4,6 +4,38 @@
 
 ### Added
 
+- `cheme process stack [IDS] [--json] [--write]` (#139, ADR 0044): electrolyser stacks sized
+  for a product duty from the optional `stacks:` section of `process/cells.yaml` (schema
+  `cheme/electrochemical-cells/v1` unchanged, optional fields only), at the cell's operating
+  point (a measured cell refused outside its measured range, never extrapolated): total active
+  area, cells, cells per stack from the voltage limit, stacks, stack voltage and current, DC and
+  AC power, rectifiers, output and its margin, kWh per kg, heat, the stack envelope and
+  footprint, cell replacements. The skid equipment inputs come from the named duty of
+  `process/duties.yaml`, run at the sized arrangement over its horizon: the reservoir, dosing
+  and bleed tanks (vertical cylinders of the stated H/D, `head: flat`, `support: none`) and the
+  recirculation and dosing pumps' inputs to the pump sizing (the recirculation pump's with its
+  end points, the reservoir and the first stack). A duty at another current density or of another cell than
+  the stack's, or not feasible there, gives none (`cheme.stack-duty`, error). `--write` puts
+  them into the equipment-list `dimensions` (edited in place, comments kept) and the pumps'
+  datasheet `type_specific`, never over a value written by hand; `cheme layout build` and
+  `cheme datasheets draft`/`fill` take them from there. A value it wrote that the design basis
+  no longer gives is reported outdated and cleared on `--write`; a tag two stacks or roles name
+  is written by neither, and a second stack naming a skid duty gets no inputs from it;
+  `--write --json` reports `written`. `cheme.stack-*` findings; `cheme validate` reports those
+  that need no duty run. Docs: `docs/framework/electrolyser-stacks.md`.
+- `cheme datasheets fill` gives a pump no flowsheet stream links its `flow_m3_h` from the
+  declared mass flow and density when its lines are not routed yet (the head, NPSH and power
+  stay TBD with the reason), and names `suction_from`/`discharge_to` when a declared pump has
+  no end points.
+- The equipment list's `dimensions` take optional `source`, `assumed` and `fingerprint` for
+  sizes a tool calculated; `cheme datasheets draft` and `fill` carry `source` and `assumed`
+  onto the datasheet's main dimensions.
+- `cheme process duty` (and `--compare`) runs a duty a stack names at the arrangement that
+  stack is sized at (`cheme.duty-arrangement`, info), as `cheme process stack` does: one result
+  per duty id.
+- Skill `skid-design` (domains/equipment): the skid chain from `cheme process build` through
+  the cell, duty and stack sizing, the control P&ID, the datasheets and the layout, what goes
+  into the LCA's flowsheet streams by hand, and what a human must judge.
 - `cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]` (#138,
   ADR 0043): dynamic electrolysis duties in `process/duties.yaml` (schema
   `cheme/electrolysis-duties/v1`, catalogue key `process-duties`). Current, power and on/off

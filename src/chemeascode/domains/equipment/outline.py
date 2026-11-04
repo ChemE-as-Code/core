@@ -329,7 +329,9 @@ def derived_dimensions(
     its generated shell (the 3D model's proportions: marked assumed), a horizontal item's
     axis direction and, for an item placed above grade, its base elevation and the item it
     stands on (``support.elevation``, ``support.stands_on``). *mark* starts every source
-    (``cheme datasheets fill: ``). Nothing is given that neither file states."""
+    (``cheme datasheets fill: ``). Sizes a tool wrote into the list (``dimensions.source``,
+    ``assumed``: ``cheme process stack``) carry that source and marking. Nothing is given that
+    neither file states."""
     prefix = f"{mark}: " if mark else ""
     dims: dict[str, Any] = {}
     weights: dict[str, Any] = {}
@@ -337,20 +339,27 @@ def derived_dimensions(
     if d is None:
         return dims, weights
     src = f"{prefix}{list_file} dimensions"
+    # sizes a tool wrote into the list (cheme process stack) carry its source and marking
+    told = getattr(d, "source", "") or ""
+    listed_assumed = bool(getattr(d, "assumed", False))
+
+    def listed(value: Any, unit: str, where: str) -> dict[str, Any]:
+        return _entry(value, unit, f"{where}: {told}" if told else where, listed_assumed)
+
     kind = kind_of(getattr(item, "type", None))
     round_ = d.diameter is not None
     if round_:
         horizontal = kind not in ("column", "tank") and d.length is not None
         dims["orientation"] = "horizontal" if horizontal else "vertical"
-        dims["outside_diameter"] = _entry(d.diameter, "m", f"{src}.diameter", False)
+        dims["outside_diameter"] = listed(d.diameter, "m", f"{src}.diameter")
         if horizontal:
-            dims["overall_length"] = _entry(d.length, "m", f"{src}.length", False)
+            dims["overall_length"] = listed(d.length, "m", f"{src}.length")
             if d.height is not None:
-                dims["overall_height"] = _entry(
-                    d.height, "m", f"{src}.height (top of the shell on its supports)", False
+                dims["overall_height"] = listed(
+                    d.height, "m", f"{src}.height (top of the shell on its supports)"
                 )
         elif d.height is not None:
-            dims["overall_height"] = _entry(d.height, "m", f"{src}.height", False)
+            dims["overall_height"] = listed(d.height, "m", f"{src}.height")
         if d.head:
             dims["head"] = {"value": d.head, "source": f"{src}.head"}
     else:
@@ -359,7 +368,7 @@ def derived_dimensions(
             if name == "width" and value is None:
                 value = d.depth
             if value is not None:
-                dims[f"overall_{name}"] = _entry(value, "m", f"{src}.{name}", False)
+                dims[f"overall_{name}"] = listed(value, "m", f"{src}.{name}")
     if d.support:
         dims["support"] = {"type": {"value": d.support, "source": f"{src}.support"}}
     if d.weight is not None:

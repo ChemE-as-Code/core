@@ -130,6 +130,7 @@ nav:
       - Electrochemical cells: framework/electrochemical-cells.md
       - Electrochemical measurements: framework/electrochemical-measurements.md
       - Electrolysis duties: framework/electrolysis-duties.md
+      - Electrolyser stacks: framework/electrolyser-stacks.md
       - Restructuring summary: framework/SUMMARY.md
       - Contributing: framework/contributing.md
       - Repository baseline: framework/monorepo-baseline.md
@@ -182,4 +183,5 @@ nav:
       - "0041 Measured electrochemical performance and a membrane block": adr/0041-measured-electrochemical-performance-and-membrane-block.md
       - "0042 WaterTAP and IDAES not reused for electrochemical cells": adr/0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md
       - "0043 Dynamic electrolysis duties and the anolyte model interface": adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md
+      - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
       - Template: adr/template.md

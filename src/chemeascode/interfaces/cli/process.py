@@ -354,10 +354,13 @@ def duty(
     against the anolyte reservoir (voltage, efficiencies and WDE from the measured series or
     the specified cell, never extrapolated), the pH, inventory, product, charge, energy,
     dosing and bleed over time, the time to the stated pH threshold and the time outside the
-    measured range. --compare ID,ID --co KG compares duties at equal delivered product (the
-    duties are named there, not as IDS; --plot then draws the compared transients). Writes
-    nothing but the plots. Exit 1 on an error finding, 2 without process/duties.yaml, for an
-    unknown duty id or for IDS given with --compare."""
+    measured range. A duty a stack of process/cells.yaml names (equipment.duty) runs at the
+    arrangement that stack is sized at, as in cheme process stack (cheme.duty-arrangement).
+    --compare ID,ID --co KG compares duties at equal delivered product (the duties are named
+    there, not as IDS; --plot then draws the compared transients). Writes nothing but the
+    plots. Exit 1 on an error finding, 2 without process/duties.yaml, for an unknown duty id or
+    for IDS given with --compare."""
+    from chemeascode.domains.equipment.electrolyser_stack import stack_arrangements
     from chemeascode.domains.process.electrolysis_duty import (
         DUTIES_FILE,
         DutyReport,
@@ -372,6 +375,7 @@ def duty(
     if not has_duties(workspace.root):
         typer.echo(f"{DUTIES_FILE} does not exist", err=True)
         raise typer.Exit(2)
+    arrangements = stack_arrangements(workspace.root)  # one design basis with the stacks
     if compare is not None:
         if co is None:
             typer.echo("--compare needs --co KG (the delivered product)", err=True)
@@ -385,7 +389,7 @@ def duty(
             raise typer.Exit(2)
         names = [n.strip() for n in compare.split(",") if n.strip()]
         try:
-            comparison = compare_duties(workspace.root, names, co, tolerance)
+            comparison = compare_duties(workspace.root, names, co, tolerance, arrangements)
         except (KeyError, ValueError) as failure:
             typer.echo(str(failure).strip("'\""), err=True)
             raise typer.Exit(2) from failure
@@ -396,13 +400,86 @@ def duty(
             raise typer.Exit(1)
         return
     try:
-        report = duty_report(workspace.root, ids or None)
+        report = duty_report(workspace.root, ids or None, arrangements)
     except KeyError as failure:
         typer.echo(str(failure).strip("'\""), err=True)
         raise typer.Exit(2) from failure
     typer.echo(report.to_json() if as_json else report_text(report))
     if plot is not None:
         _duty_plots(report, plot, as_json)
+    if report.errors:
+        raise typer.Exit(1)
+
+
+@process_app.command("stack")
+def stack(
+    ids: Annotated[
+        list[str] | None, typer.Argument(help="Stack ids (default: every stack).")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write",
+            help="Write the calculated stack and tank dimensions into the equipment list and "
+            "the pumps' inputs into their datasheets (never over a value written by hand).",
+        ),
+    ] = False,
+) -> None:
+    """The stacks of the stacks: section of process/cells.yaml sized for their product duty
+    at the cell's operating point (never outside its measured or declared range): active area,
+    cells, cells per stack from the voltage limit, stacks, stack voltage and current, DC power,
+    output and its margin, kWh per kg, the stack envelope; and the skid equipment inputs from
+    the duty named, run at the sized arrangement over its horizon: reservoir and tank
+    dimensions, the recirculation and dosing pumps' flows. Without --write it writes nothing
+    and reports what differs from the equipment list and datasheets (cheme.stack-outdated);
+    with --write --json the report (as the files are then) carries `written`, each file
+    written with its tags.
+    Exit 1 on an error finding (process/cells.yaml not following its schema among them: its
+    findings are printed), 2 without process/cells.yaml or stacks, or for an unknown id."""
+    from chemeascode.domains.equipment.electrolyser_stack import (
+        has_stacks,
+        report_text,
+        stack_report,
+        write_stack_inputs,
+    )
+    from chemeascode.domains.process.electrochemical_cell import CELLS_FILE, has_cells
+
+    workspace = _workspace()
+    if not has_cells(workspace.root):
+        typer.echo(f"{CELLS_FILE} does not exist", err=True)
+        raise typer.Exit(2)
+    if not has_stacks(workspace.root):
+        loaded = stack_report(workspace.root)  # a file that does not load: its findings
+        if loaded.errors:
+            typer.echo(loaded.to_json() if as_json else report_text(loaded))
+            raise typer.Exit(1)
+        typer.echo(f"{CELLS_FILE} has no stacks: section", err=True)
+        raise typer.Exit(2)
+    try:
+        report = stack_report(workspace.root, ids or None)
+    except KeyError as failure:
+        typer.echo(str(failure).strip("'\""), err=True)
+        raise typer.Exit(2) from failure
+    if write:
+        try:
+            written = write_stack_inputs(workspace.root, report)
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(1) from failure
+        report = stack_report(workspace.root, ids or None)  # as the files are now
+        if as_json:
+            # the report as the files are now, and what this run wrote (file -> tags)
+            payload = {**report.as_dict(), "written": written.written}
+            typer.echo(json.dumps(payload, indent=2))
+            if report.errors:
+                raise typer.Exit(1)
+            return
+        for name, tags in written.written.items():
+            typer.echo(f"wrote {name}: {', '.join(tags)}")
+        if not written.written:
+            typer.echo("nothing to write")
+    typer.echo(report.to_json() if as_json else report_text(report))
     if report.errors:
         raise typer.Exit(1)
 

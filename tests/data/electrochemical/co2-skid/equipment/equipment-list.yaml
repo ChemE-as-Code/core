@@ -1,0 +1,18 @@
+# Equipment list of the CO2-to-CO skid (tests only). The sizes of the stacks and the tanks are
+# written by `cheme process stack --write` from process/cells.yaml and process/duties.yaml.
+schema: cheme/equipment/v1
+equipment:
+  - tag: E-101A
+    type: Electrolyser
+    service: CO2 electrolysis stack A
+  - tag: E-101B
+    type: Electrolyser
+    service: CO2 electrolysis stack B
+  - tag: T-101
+    type: Tank
+    service: Anolyte reservoir
+    material: PP  # polypropylene for the KOH anolyte
+  - {tag: T-102, type: Tank, service: KOH dosing tank}
+  - {tag: P-101, type: CentrifugalPump, service: Anolyte recirculation,
+     dimensions: {length: 0.6, width: 0.3, height: 0.4}}
+  - {tag: P-102, type: ReciprocatingPump, service: KOH dosing}

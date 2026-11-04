@@ -72,7 +72,10 @@ Rules (``cheme.duty-*``), each finding naming the file, line, rule and a hint:
 - ``not-converged`` (error): the integration failed (step size, step count);
 - ``degassing`` (info): no CO2 degassing (no ``k_L a`` stated): it is off;
 - ``compare`` (error): duties compared at equal product that form different products or
-  cannot give one; ``target-not-reached`` (warning): a compared duty ended before the target.
+  cannot give one; ``target-not-reached`` (warning): a compared duty ended before the target;
+- ``arrangement`` (info): the duty is run at the arrangement a stack design of
+  ``process/cells.yaml`` sized for it (``cheme process stack``: its cells in series and stacks),
+  not the duty's own ``cells_in_series`` and ``stacks`` (one design basis).
 """
 
 from __future__ import annotations
@@ -80,7 +83,7 @@ from __future__ import annotations
 import bisect
 import json
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -2448,6 +2451,12 @@ def _load_duties(root: Path) -> tuple[Duties | None, Any, list[Finding]]:
     return duties, doc, findings
 
 
+def load_duties(root: Path) -> tuple[Duties | None, Any, list[Finding]]:
+    """``process/duties.yaml`` under *root*: the model (None when missing or invalid), its
+    composed YAML document (for line numbers) and the schema findings."""
+    return _load_duties(Path(root))
+
+
 def _duplicates(duties: Duties, out: _Out) -> None:
     seen: set[str] = set()
     for index, duty in enumerate(duties.duties):
@@ -2499,10 +2508,51 @@ def duty_findings(root: Path) -> list[Finding]:
     return out.findings
 
 
-def duty_report(root: Path, ids: Sequence[str] | None = None) -> DutyReport:
+@dataclass(frozen=True)
+class Arrangement:
+    """The cells in series per stack and the stacks a duty runs at, set by something else
+    than the duty (a stack sizing): *by* names it (``stack STK-1``)."""
+
+    cells_in_series: int
+    stacks: int
+    by: str
+
+
+def _arrange(
+    duty: Duty, cell: DutyCell, arrangement: Arrangement | None, out: _Out, index: int
+) -> None:
+    """*cell* at *arrangement* (when given), with the ``duty-arrangement`` info finding."""
+    if arrangement is None:
+        return
+    cell.cells_in_series, cell.stacks = arrangement.cells_in_series, arrangement.stacks
+    stated = (
+        f"its own {duty.cells_in_series} cell(s) x {duty.stacks} stack(s) are not used"
+        if duty.cells_in_series is not None or duty.stacks != 1
+        else "the cell's default arrangement is not used"
+    )
+    out.add(
+        "info",
+        "arrangement",
+        f"duty {duty.id} runs at {arrangement.cells_in_series} cells in series x "
+        f"{arrangement.stacks} stack(s), the arrangement {arrangement.by} is sized at "
+        f"(`cheme process stack`); {stated}",
+        ["duties", index],
+        [duty.id],
+        "the arrangement comes from the stack sizing (one design basis): change the stack's "
+        "product duty or limits, not the duty"
+        + ("; drop cells_in_series and stacks from the duty" if "own" in stated else ""),
+    )
+
+
+def duty_report(
+    root: Path,
+    ids: Sequence[str] | None = None,
+    arrangements: Mapping[str, Arrangement] | None = None,
+) -> DutyReport:
     """Every duty of ``process/duties.yaml`` under *root* (or those in *ids*) integrated (see
-    the module docstring). Read-only. A missing file gives an empty report; an unknown id in
-    *ids* raises KeyError."""
+    the module docstring). *arrangements* (duty id to :class:`Arrangement`, from the stack
+    sizing) replaces those duties' cells in series and stacks. Read-only. A missing file gives
+    an empty report; an unknown id in *ids* raises KeyError."""
     from chemeascode.foundation.provenance import source_revision
 
     root = Path(root)
@@ -2521,12 +2571,54 @@ def duty_report(root: Path, ids: Sequence[str] | None = None) -> DutyReport:
     for index, duty in enumerate(duties.duties):
         if ids is not None and duty.id not in ids:
             continue
-        results.append(_one(duty, ctx, out, index))
+        results.append(_one(duty, ctx, out, index, arrangement=(arrangements or {}).get(duty.id)))
     return DutyReport(results, out.findings, source)
 
 
+def run_duty(
+    root: Path,
+    duty_id: str,
+    cells_in_series: int | None = None,
+    stacks: int | None = None,
+) -> DutyReport:
+    """Duty *duty_id* of the plant at *root* integrated (as :func:`duty_report`), with its
+    arrangement replaced where given: *cells_in_series* per stack and *stacks* on the one
+    reservoir (the arrangement a stack sizing chose; the duty's own are then not used).
+    Read-only; an unknown id raises KeyError, a missing file gives an empty report."""
+    from chemeascode.foundation.provenance import source_revision
+
+    root = Path(root)
+    duties, doc, findings = _load_duties(root)
+    ctx = _context(root)
+    source = source_revision(root, ctx.inputs)
+    if duties is None:
+        return DutyReport([], findings, source)
+    known = {d.id: (i, d) for i, d in enumerate(duties.duties)}
+    if duty_id not in known:
+        raise KeyError(f"no duty {duty_id} in {DUTIES_FILE}")
+    out = _Out(DUTIES_FILE, doc)
+    out.findings += findings
+    index, duty = known[duty_id]
+    cell, reasons = resolve_cell(duty, ctx, out, index)
+    if cell is None:
+        result = DutyResult(duty.id, duty.cell, line=_yaml_line(out.doc, ["duties", index]))
+        result.title, result.refused, result.reasons = duty.title, True, reasons
+        return DutyReport([result], out.findings, source)
+    if cells_in_series is not None:
+        cell.cells_in_series = cells_in_series
+    if stacks is not None:
+        cell.stacks = stacks
+    result = simulate_duty(duty, cell, out=out, index=index)
+    return DutyReport([result], out.findings, source)
+
+
 def _one(
-    duty: Duty, ctx: _Context, out: _Out, index: int, target: float | None = None
+    duty: Duty,
+    ctx: _Context,
+    out: _Out,
+    index: int,
+    target: float | None = None,
+    arrangement: Arrangement | None = None,
 ) -> DutyResult:
     cell, reasons = resolve_cell(duty, ctx, out, index)
     if cell is None:
@@ -2535,6 +2627,7 @@ def _one(
         result.refused = True
         result.reasons = reasons
         return result
+    _arrange(duty, cell, arrangement, out, index)
     return simulate_duty(duty, cell, product_target_mol=target, out=out, index=index)
 
 
@@ -2676,10 +2769,15 @@ def _row(did: str, result: DutyResult | None, reached: bool, reason: str) -> Com
 
 
 def compare_duties(
-    root: Path, ids: Sequence[str], target_kg: float, tolerance: float = DEFAULT_PRODUCT_TOLERANCE
+    root: Path,
+    ids: Sequence[str],
+    target_kg: float,
+    tolerance: float = DEFAULT_PRODUCT_TOLERANCE,
+    arrangements: Mapping[str, Arrangement] | None = None,
 ) -> Comparison:
     """The duties *ids* of the plant at *root* compared at *target_kg* of delivered product
-    (see :func:`compare`). Read-only; an unknown id raises KeyError."""
+    (see :func:`compare`), each at its *arrangements* entry where given (as
+    :func:`duty_report`). Read-only; an unknown id raises KeyError."""
     from chemeascode.foundation.provenance import source_revision
 
     root = Path(root)
@@ -2702,6 +2800,7 @@ def compare_duties(
         if cell is None:
             refused.append(_row(did, None, False, "; ".join(reasons)))
             continue
+        _arrange(duty, cell, (arrangements or {}).get(did), out, index)
         pairs.append((duty, cell))
         indices.append(index)
     comparison = compare(pairs, target_kg, tolerance, out, indices)

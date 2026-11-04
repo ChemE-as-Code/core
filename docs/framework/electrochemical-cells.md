@@ -94,6 +94,15 @@ efficiency outside [0, 1] are `cheme.cell-membrane` errors; no efficiency at all
 The water dissociation efficiency is not a Faradaic efficiency: it does not change the
 extents, the products or the heat.
 
+## Stacks
+
+An optional `stacks:` section (same schema, optional fields only) sizes electrolyser stacks of
+a cell of this file for a product duty: the cells and stacks, their arrangement on the DC bus,
+power, output and envelope, and the skid equipment a duty of `process/duties.yaml` sizes.
+`cheme process stack` evaluates it; the cell's Faraday balance does not read it. See
+[electrolyser stacks](electrolyser-stacks.md) and
+[ADR 0044](../adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md).
+
 ## The contract
 
 ```yaml

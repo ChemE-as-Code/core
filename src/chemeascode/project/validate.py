@@ -1523,6 +1523,11 @@ def validate_workspace(
     if cells_path.is_file() and (targets is None or cells_path.resolve() in targets):
         report.findings += cell_report(workspace.root).findings
         report.files.append(CELLS_FILE)
+        # Stacks sized from the cells: the sizing and the equipment list's stack dimensions;
+        # `cheme process stack` runs the duties for the skid equipment.
+        from chemeascode.domains.equipment.electrolyser_stack import stack_findings
+
+        report.findings += stack_findings(workspace.root)
 
     # Measured electrochemical series: schema, units, Faradaic and charge balances.
     from chemeascode.domains.experiments.electrochemistry import (
