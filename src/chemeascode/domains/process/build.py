@@ -655,10 +655,11 @@ def place(process: Process, view: str) -> Placed:
             if process.home(item.id) is None and item.id not in local:
                 nodes.append(sized(item, kind))
     edges = [LEdge(c.stream.id, c.src[0], c.src[1], c.dst[0], c.dst[1]) for c in top]
-    bounds = layout(nodes, edges, origin=(20.0, 40.0))
+    pull = view == "pfd"
+    bounds = layout(nodes, edges, origin=(20.0, 40.0), pull_sources=pull)
     rows = _rows(bounds) if not any(p.pinned for p in overrides.values()) else 1
     if rows > 1:
-        bounds = layout(nodes, edges, origin=(20.0, 40.0), rows=rows)
+        bounds = layout(nodes, edges, origin=(20.0, 40.0), rows=rows, pull_sources=pull)
     for node in nodes:
         placed.nodes[node.id] = node
     for edge in edges:

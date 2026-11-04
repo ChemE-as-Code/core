@@ -11,7 +11,8 @@
   with the utility's id on each step they serve instead of boxes with a line to every user;
   mixing and splitting steps as junction tees; inlets aligned with their source (no small
   jogs); wrapped titles; heavier process lines with arrowheads; process areas as light
-  dash-dot boundaries; layouts wider than an A0 wrapped into rows. The BFD gets the frame and
+  dash-dot boundaries; layouts wider than an A0 wrapped into rows; each feed placed just before
+  its first consumer. The BFD gets the frame and
   title block.
 - `cheme render` paints the backdrop in the sheet's own `BackgroundColor` (white) instead of
   pyDEXPI's viewer grey, unless a filled shape on the sheet has that colour.

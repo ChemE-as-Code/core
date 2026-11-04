@@ -154,12 +154,15 @@ def layout(
     area: Area | None = None,
     order_ports: bool = False,
     rows: int = 1,
+    pull_sources: bool = False,
 ) -> tuple[float, float, float, float]:
     """Place unpinned *nodes* and route *edges* in place; returns the bounds (x0, y0, x1, y1).
 
     With *rows* above one the layers wrap into that many rows, read like text (left to right,
     then the next row below), on one grid of columns: a line between rows, and every recycle, is
-    routed by :class:`GridRouter`.
+    routed by :class:`GridRouter`. With *pull_sources* a node without inputs (a feed) sits in the
+    layer just before its first consumer instead of the first layer, so it enters where it is
+    used.
 
     With *order_ports* each node's ports are sorted by where their lines go (inside a block,
     where the grid router takes every route; the channel routes outside keep declared order).
@@ -186,6 +189,12 @@ def layout(
                 changed = True
         if not changed:
             break
+    if pull_sources:
+        fed = {e.dst for e in forward}
+        for n in order:
+            succ = [layer[e.dst] for e in forward if e.src == n]
+            if n not in fed and succ and not by_id[n].pinned and not by_id[n].ghost:
+                layer[n] = max(0, min(succ) - 1)
     final = max((layer[n] for n in order if not by_id[n].last), default=0) + 1
     for n in order:
         if by_id[n].last:

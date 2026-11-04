@@ -25,7 +25,9 @@ box for junctions.
   note). A layout with pins is not moved (pins are absolute). The BFD gets the same frame.
 - **Rows.** A top-level layout wider than an A0's drawing width (1130 mm) wraps into two to four
   rows (`layout(rows=)`), chosen for a width-to-height ratio near 1.8, on one grid of columns
-  shared by all rows; lines between rows and recycles go through the grid router.
+  shared by all rows; lines between rows and recycles go through the grid router. A feed sits
+  in the column just before its first consumer (not all feeds in the first column), so it
+  enters where it is used.
 - **Utilities.** A terminal with `category: utility`, a `utility:` or only energy ports is
   drawn at each step it serves: a short vertical stub on top of the step's symbol with the
   utility's id as a flag, the stream's id beside it. Its DEXPI ports and connections are
