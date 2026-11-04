@@ -1,6 +1,7 @@
 # 0033. HAZOP likelihood derived from a project frequency library, never estimated
 
-- **Status:** Proposed
+- **Status:** Proposed; amended by [0035](0035-hazop-likelihood-of-the-outcome-judged-without-data.md)
+  (a likelihood without evidence is judged against the matrix's descriptions, not left `null`)
 - **Date:** 2026-10-30
 
 ## Context

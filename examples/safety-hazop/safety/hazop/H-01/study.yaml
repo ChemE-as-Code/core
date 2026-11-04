@@ -19,7 +19,8 @@ risk_matrix: safety/risk-matrix.yaml
 assessment_basis: >-
   Each scenario is rated per category before its safeguards (initial) and, by the team's
   judgement, with them (residual). Severity is the credible worst outcome; likelihood that of
-  the cause. No frequencies are calculated and no safeguard is credited by a tool.
+  the outcome, judged against the matrix's descriptions. No frequencies are calculated and no
+  safeguard is credited by a tool.
 nodes:
   - id: N1
     title: V-101 feed vessel and P-101 suction

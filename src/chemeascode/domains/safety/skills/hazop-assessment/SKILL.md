@@ -19,8 +19,9 @@ changed (`hazop-band-stale`), or before the review.
   order and which bands require an action (`requires_action`). Read the matrix before rating.
 - `safety/risk-matrix.yaml` as `cheme init` writes it is **example data** (`example: true`):
   ask for the company's matrix, its procedure and revision before anything is assessed.
-- From the team: the severity of each consequence per category, the likelihood of its cause,
-  and which safeguards they credit for the residual rating, each with the argument. Frequencies,
+- From the team: the severity of each consequence per category, the likelihood of that outcome
+  (judged against the matrix's descriptions where there is no data, skill
+  `hazop-risk-classification`), and which safeguards they credit for the residual rating, each with the argument. Frequencies,
   failure rates and safeguard credits are the team's or a separate study's (e.g. a LOPA): do
   not estimate them.
 
