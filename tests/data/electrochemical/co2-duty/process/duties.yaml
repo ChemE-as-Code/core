@@ -1,0 +1,74 @@
+# Dynamic duties of the bench cells of process/cells.yaml (tests only; the reservoirs, schedules
+# and dosing are illustrative). BPM-1 takes its voltage, efficiencies and WDE from the synthetic
+# measured series (50-200 mA/cm2); BPM-S has specified constants.
+schema: cheme/electrolysis-duties/v1
+kind: electrolysis_duties
+duties:
+  - id: MEAS-150
+    title: Measured cell at 150 mA/cm2, 1 L of 1 M KOH
+    cell: BPM-1
+    schedule: {kind: constant_current, current_density: {value: 150, unit: mA/cm2}}
+    reservoir:
+      volume: {value: 1, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      cation: K+
+      model: well-mixed-carbonate
+    threshold: {ph: 12, source: "test: stated design criterion"}
+    horizon: {value: 2000, unit: h}
+  - id: MEAS-POWER
+    title: Power steps beyond the measured range
+    cell: BPM-1
+    schedule:
+      kind: power
+      points: [[0, 2.0], [10, 4.5]]
+      time_unit: h
+      unit: W
+    reservoir:
+      volume: {value: 1, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      model: well-mixed-carbonate
+    threshold: {ph: 12}
+    horizon: {value: 50, unit: h}
+  - id: SPEC-CONST
+    title: Specified cell at constant current
+    cell: BPM-S
+    product: CO
+    schedule: {kind: constant_current, current: {value: 1, unit: A}}
+    reservoir:
+      volume: {value: 1, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      model: well-mixed-carbonate
+    threshold: {ph: 12}
+    horizon: {value: 100, unit: h}
+  - id: SPEC-ONOFF
+    title: Specified cell on and off, the same charge
+    cell: BPM-S
+    product: CO
+    schedule: {kind: on_off, period: {value: 4, unit: h}, duty_fraction: 0.5, current: {value: 2, unit: A}}
+    reservoir:
+      volume: {value: 1, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      model: well-mixed-carbonate
+    threshold: {ph: 12}
+    horizon: {value: 100, unit: h}
+  - id: SPEC-DOSED
+    title: Specified cell with dosing on a pH trigger and a bleed
+    cell: BPM-S
+    product: CO
+    schedule: {kind: constant_current, current: {value: 1, unit: A}}
+    reservoir:
+      volume: {value: 0.2, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      model: well-mixed-carbonate
+    dosing:
+      kind: on_threshold
+      trigger_ph: 13.0
+      stop_ph: 13.3
+      concentration: {value: 5, unit: mol/L}
+      rate: {value: 10, unit: mL/h}
+      density: {value: 1.22, unit: kg/L, source: "test: about 5 M KOH"}
+    bleed: {rate: {value: 2, unit: mL/h}}
+    makeup_water: {rate: {value: 2, unit: mL/h}}
+    threshold: {ph: 12}
+    horizon: {value: 300, unit: h}
+    minimum_inventory: {volume: {value: 0.05, unit: L}}

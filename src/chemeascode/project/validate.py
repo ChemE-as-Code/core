@@ -1535,6 +1535,15 @@ def validate_workspace(
             report.findings += measurement_report(workspace.root, name).findings
             report.files.append(name)
 
+    # Electrolysis duties: the schema, the cells and the anolyte models only;
+    # `cheme process duty` integrates them.
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE, duty_findings
+
+    duties_path = workspace.root / DUTIES_FILE
+    if duties_path.is_file() and (targets is None or duties_path.resolve() in targets):
+        report.findings += duty_findings(workspace.root)
+        report.files.append(DUTIES_FILE)
+
     # Liquid-liquid extractors: the schema only; `cheme process extract` solves them.
     from chemeascode.domains.process.separations import extraction
 
