@@ -1,6 +1,6 @@
 # 0032. HAZOP scenario propagation over the DEXPI objects, with the failure modes as project data
 
-- **Status:** Proposed
+- **Status:** Proposed (amended 2026-11-04: the plant's normal state, below)
 - **Date:** 2026-10-28
 
 ## Context
@@ -75,6 +75,38 @@ Two forces shape how:
 - If another domain needs the same connectivity, the index moves to `domains/piping` then, not
   before.
 
+### Amendment 2026-11-04: the plant's normal state
+
+A study drafted with the walk and checked with its coverage (60 gaps on a 18-node study) showed
+that most gaps were paths the plant would not take: failure modes of valve classes applied
+whatever the valve's state, pressure walked back through check valves, the library's
+"control loop drives its variable" modes started at trip logic and alarms and for every
+variable, and rows written under another deviation or for one of parallel trains counted as
+gaps. The walk now reads the normal state from the P&ID itself:
+
+- **Valve state.** A valve closed by its DEXPI role cannot close (its closing modes: no or less
+  flow, more pressure upstream, less pressure); a valve open by role, or with no role (a P&ID
+  draws a valve open unless marked), cannot open further or pass (more flow, flow as well as,
+  more pressure downstream). Only a throttling valve, the final element of a controller, keeps
+  both. Check and safety valves are not valves in this sense.
+- **Check valves.** More pressure and reverse flow coming back against the flow (pipe source to
+  target is the flow, node 1 the inlet) stop at a check valve, as `closed` with the step effect
+  `check-valve`; the check valve's own failure to close is a cause of its own, so the single
+  failure is still walked.
+- **Control loops.** A final-element mode that drives a process variable (towards `none`)
+  belongs to a controller (ISA 5.1: a C after the first letter of the function's tag) and to the
+  variable it measures (its first letter); a spurious trip or a sequence failure (it moves the
+  final element) belongs to any function with final elements.
+- **Coverage.** A row of the node covers a walk's top event under whichever deviation it was
+  written, and a tag stands for its parallel trains (equal but for the letter after the
+  number). The triage file's format is unchanged.
+- **The walk follows drafting.** The skill runs the walk only after the node's rows are written:
+  its candidates are the library's generic causes and, read first, displaced the plant-specific
+  causes a team finds.
+
+On the same drafted study the gaps fell from 60 to 20; most of the rest end in a loop whose
+valves the drawing leaves unmarked, which is the drawing's to fix, not the walk's to guess.
+
 ## Consequences
 
 - Positive: one module and one file format; no dependency added; the walk is reproducible and
@@ -90,6 +122,9 @@ Two forces shape how:
   (`--write`, with fingerprints and staleness, ADR 0011) is the next step. The skill names the
   command as an optional cross-check, not a required step: the trace by hand stays its method.
   Other operating modes than normal (a switched standby, a start-up line-up) are not walked.
+  The walk has no pressure levels (a valve opening between two points at the same pressure
+  still gives "more pressure") and sees an exchanger as one object, so a deviation of one side
+  can leave by the other side's nozzles; both are left to the agent's judgement in the triage.
 
 ## Evidence
 

@@ -238,6 +238,113 @@ def test_a_valve_closed_in_normal_operation_stops_the_walk(role):
     assert all(c.end != "closed" for c in walk(open_, ["A"]))
 
 
+STATES = """
+schema: cheme/failure-modes/v1
+kind: failure-modes
+example: true
+source: synthetic test data
+classes:
+  GateValve:
+    modes:
+      - {id: SHUT, gives: {parameter: flow, guide_word: "no", towards: downstream}}
+      - {id: OPEN, gives: {parameter: flow, guide_word: more, towards: downstream}}
+      - {id: BACK, gives: {parameter: pressure, guide_word: more, towards: upstream}}
+    responses:
+      - {incoming: {parameter: flow, guide_word: "no"}, effect: passes}
+      - {incoming: {parameter: flow, guide_word: more}, effect: passes}
+      - {incoming: {parameter: pressure, guide_word: more}, effect: passes}
+  CheckValve:
+    responses:
+      - {incoming: {parameter: pressure, guide_word: more}, effect: passes}
+      - {incoming: {parameter: flow, guide_word: "no"}, effect: passes}
+"""
+
+
+@pytest.mark.parametrize(
+    ("role", "modes"),
+    [
+        ("Normally closed", {"OPEN"}),  # closed already: it can only open (or pass)
+        ("Locked open", {"SHUT", "BACK"}),  # open already: it can only close
+        (None, {"SHUT", "BACK"}),  # no role: open, as the P&ID draws it
+    ],
+)
+def test_a_valve_fails_only_away_from_its_normal_state(role, modes):
+    model = gates([("A", "B")], roles={"A": role} if role else None)
+    refs = [PlantRef(sheet="P-01", object="A")]
+    found = propagate([("P-01", model)], library(STATES), refs).candidates
+    assert {c.mode for c in found if c.cause == "A"} == modes
+
+
+def test_a_controllers_final_element_throttles_and_fails_both_ways(model):
+    text = LIBRARY.replace(
+        "  OperatedValve:\n    modes:\n",
+        "  OperatedValve:\n    modes:\n"
+        "      - {id: M8, gives: {parameter: flow, guide_word: 'no', towards: downstream}}\n",
+    )
+    # FV-104 is FIC-104's final element: a throttling valve keeps its opening and closing modes.
+    found = run(model, ["FV-104"], Context(fail={"FV-104": "open"}), lib=library(text))
+    assert {"M4", "M8"} <= {c.mode for c in found.candidates}
+
+
+def test_a_check_valve_holds_pressure_coming_back():
+    from pydexpi.pydexpi_classes import pydexpi_classes as d
+
+    a, check, b = d.GateValve(id="A"), d.SwingCheckValve(id="CV"), d.GateValve(id="B")
+    pipes = [d.Pipe(sourceItem=a, targetItem=check), d.Pipe(sourceItem=check, targetItem=b)]
+    segment = d.PipingNetworkSegment(id="S1", items=[a, check, b], connections=pipes)
+    system = d.PipingNetworkSystem(id="L1", segments=[segment])
+    plant = d.EngineeringModel(conceptualModel=d.PlantModel(pipingNetworkSystems=[system]))
+    refs = [PlantRef(sheet="P-01", object=m) for m in ("A", "B")]
+    found = propagate([("P-01", plant)], library(STATES), refs).candidates
+    back = [c for c in found if c.cause == "B" and c.mode == "BACK"]
+    assert [(c.end, tags(c), c.path[-1].effect) for c in back] == [
+        ("closed", ["B", "CV"], "check-valve")
+    ]
+    # Downstream, with the flow, it passes as before.
+    forward = [c for c in found if c.cause == "A" and c.mode == "SHUT"]
+    assert forward and tags(forward[0])[:3] == ["A", "CV", "B"]
+
+
+def test_a_control_loop_failure_belongs_to_a_controller_and_its_variable():
+    def mode(parameter, guide_word, towards):
+        gives = {"parameter": parameter, "guide_word": guide_word, "towards": towards}
+        return prop.FailureMode.model_validate(
+            {"id": "X", "gives": gives, "at": "final-element", "mechanism": "test"}
+        )
+
+    hot, high_pressure = mode("temperature", "more", "none"), mode("pressure", "more", "none")
+    trip = mode("flow", "no", "both")
+    pic = prop._Instrument("PIC-403", "pressure", [], [1])
+    logic = prop._Instrument("US-001", None, [], [1])
+    alarm = prop._Instrument("PIAH-406", "pressure", [], [1])
+    assert prop._loop_allows(high_pressure, pic) and not prop._loop_allows(hot, pic)
+    assert not prop._loop_allows(high_pressure, logic)
+    assert not prop._loop_allows(high_pressure, alarm)
+    assert all(prop._loop_allows(trip, i) for i in (pic, logic, alarm))  # a spurious trip: any
+
+
+def test_trains_studied_once_share_their_rows():
+    assert prop._alike("MOV-413B", "MOV-413A") and prop._alike("P-401E", "P-401A")
+    assert prop._alike("P-101", "P-101")
+    assert not prop._alike("MOV-413", "MOV-414") and not prop._alike("SB-301", "SB-302")
+    assert not prop._alike("PC_130", "PC_146")  # untagged objects: only themselves
+
+
+def test_a_row_under_another_deviation_covers_the_walk(model):
+    from chemeascode.domains.safety.schemas import Node
+
+    candidates = run(model, ["P-101"]).candidates
+    scenario = {"id": "S1", "cause": "P-101 stops", "refs": ["P-101", "V-101"]}
+    node = Node.model_validate(
+        {
+            "id": "N2",
+            "members": ["P-101"],
+            "deviations": [{"guide_word": "more", "parameter": "level", "scenarios": [scenario]}],
+        }
+    )
+    assert not at_vessel(prop.coverage(node, candidates))  # the no flow walk ends at V-101
+
+
 def test_a_candidate_names_the_other_nodes_its_path_enters(model):
     others = {"N1": [PlantRef(tag="V-101")], "N3": [PlantRef(tag="FV-104")]}
     refs = [PlantRef(tag="P-101")]

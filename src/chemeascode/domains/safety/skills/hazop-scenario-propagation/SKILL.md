@@ -97,7 +97,11 @@ nobody followed far enough. You propose; the team decides what is credible.
      `notes:` with the path that showed it, so the team can disagree.
 6. **Check**: `cheme safety hazop check H-01`.
 
-**Optional: the walk as a cross-check.** With a failure-mode library,
+**Optional: the walk as a cross-check, after drafting.** Draft the node's rows first, steps 1
+to 5, from the guide words and the P&ID; only then run the walk. Its candidates are the
+library's generic causes per object class: read before drafting, they crowd out the causes a
+team finds by thinking about the plant (the upstream station, the pipeline, a pig, an operator),
+so the walk is a check of what you drafted, never its source. With a failure-mode library,
 `cheme safety hazop propagate H-01 --node N1 [--deviation "no flow"] [--paths] [--json]` does
 steps 2 and 3 mechanically: each failure mode of the node's objects is walked over the analysed
 P&IDs with the library's responses, one candidate per outcome on its shortest path. It prints
@@ -108,9 +112,9 @@ the node, consequences lie wherever the walk ends: a consequence in another node
 here, under its cause, and that node refers back ("see N1"), it does not repeat the row.
 Without `--node`, the command walks every node and groups the top events: each with the nodes
 and causes that reach it, the most shared first. Discuss a shared consequence once and refer to
-it from the other nodes. It is a tool, not a step: use it where it helps (a large or meshed node, a check after
-drafting for a cause or branch nobody followed, the instruments and interlocks along a long
-path) and skip it for a small node. Read its output as candidates, never as rows:
+it from the other nodes. It is a tool, not a step: use it where it helps (a large or meshed node,
+a cause or branch nobody followed, the instruments and interlocks along a long path) and skip it
+for a small node. Read its output as candidates, never as rows:
 - the end of each walk: `top-event` (go on with step 4), `study-limit`, `absorbed`, `unknown`
   (the library has no response there: a question, never a guessed response), `depth` (cut off
   after 40 objects: follow it by hand), and, only counted, `closed`, `visited` and
@@ -118,6 +122,16 @@ path) and skip it for a small node. Read its output as candidates, never as rows
 - a valve with a normally closed or locked closed role stops a walk: the line-up of normal
   operation. A cause at that valve (opened in error, passing) still starts its own walk, but
   another mode (a switched standby filter, a start-up line-up) is yours to follow by hand;
+- the normal state decides which failures are causes: a closed valve cannot close, an on-off
+  valve open in service (open by role, or no role: open, as a P&ID draws it unless marked)
+  cannot open further or pass, and only a controller's final element fails both ways. A valve
+  the drawing leaves unmarked but the plant keeps closed (an idle loop) is walked as open: say so
+  as a question, it is the drawing's to fix;
+- more pressure or reverse flow coming back against the flow stops at a check valve (`closed`,
+  effect `check-valve`); the check valve failing to close is its own cause and its own walk;
+- a control-loop failure (the loop drives its variable high or low) starts only at a
+  controller (a C after the first letter of its tag: PIC, FIC, TIC) and only for the variable it
+  measures; a trip, alarm or logic function gives its spurious action, never a loop failure;
 - it judges nothing: credibility and outcome are steps 4 and 5, and a safeguard on the path is
   a candidate, not an effective one (skill `safeguard-crediting`). Consequences inside a pump
   or at a seal come from its own responses in the library, not from the walk.
@@ -125,8 +139,10 @@ Say in a scenario's `notes:` when the walk found it.
 
 **Coverage after drafting.** Once the node's rows are written (by hand, steps 1 to 5), `cheme
 safety hazop propagate H-01 --node N1 --coverage` (or the whole study without `--node`)
-compares them with the walk by tag: a top event is covered when a scenario of that deviation
-names the cause and the object the walk ends at in its `refs`. It lists each top event that is
+compares them with the walk by tag: a top event is covered when a scenario of the node, under
+whichever deviation it was written, names the cause and the object the walk ends at in its
+`refs` (a row for train A covers trains B to E: tags equal but for the train letter). It lists
+each top event that is
 not (`no scenario`, or `cause only` where a row has the cause but another consequence), with
 the nodes the path crosses, and the scenarios no walk reaches (outside the library: seals,
 maintenance, operators; expected, not a fault). It exits 1 while a gap is open.

@@ -12,7 +12,13 @@ that object, a *driver* when it starts at another object of the node.
 The walk is deterministic and reads the pyDEXPI objects directly (no graph library): pipes give
 the flow direction (source to target), a nozzle stands for its equipment, an off-page connector
 is a study limit, and a valve performing a normally closed or locked closed role stops the
-deviation. It goes breadth first and takes each object with a given deviation once per cause,
+deviation. The plant's normal state decides which failures are causes at all: a valve closed in
+normal operation cannot close, an on-off valve open in service (open by role, or no role and
+not the final element of a controller) cannot open further or pass, and only a throttling
+valve (a controller's final element) does both; a control-loop failure belongs to a controller
+(ISA 5.1: a C after the first letter) and to the variable it measures. A check valve holds more
+pressure and reverse flow coming back against the flow; its own failure to close is a cause of
+its own. It goes breadth first and takes each object with a given deviation once per cause,
 so a meshed header or a recycle gives one candidate per outcome (on its shortest path), not one
 per route. Along the way it collects candidate safeguards that the plant has (an
 instrument measuring the deviated parameter on the path, its controller, the C&E interlocks it
@@ -26,6 +32,7 @@ or whether a safeguard works.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -47,6 +54,19 @@ MAX_STEPS = 40
 MEASURED = {"F": "flow", "L": "level", "P": "pressure", "T": "temperature"}
 #: Role names or URIs (lower case, - and _ as spaces) of a valve closed in normal operation.
 CLOSED_ROLES = ("normally closed", "locked closed", "car sealed closed")
+#: ... and of one open in normal operation.
+OPEN_ROLES = ("normally open", "locked open", "car sealed open")
+#: Deviations a valve's failure gives by opening (or passing) and by closing, as
+#: (parameter, guide word, direction or None for any): the state rules of :func:`_state_allows`.
+OPENING = {("flow", "more", None), ("flow", "as-well-as", None), ("pressure", "more", "downstream")}
+CLOSING = {
+    ("flow", "no", None),
+    ("flow", "less", None),
+    ("pressure", "more", "upstream"),
+    ("pressure", "less", None),
+}
+#: Deviations a check valve holds when they come back against the flow.
+HELD_BY_CHECK_VALVE = {("pressure", "more"), ("flow", "reverse")}
 
 End = Literal[
     "top-event",
@@ -158,10 +178,23 @@ class _Object:
     actuated: bool = False
     limit: bool = False
     closed: bool = False
+    #: Open in normal operation by its role (normally, locked or car sealed open).
+    opened: bool = False
 
     @property
     def label(self) -> str:
         return self.tag or self.id
+
+    @property
+    def valve(self) -> bool:
+        """A valve an operator or actuator moves: not a check or safety valve."""
+        return any(c.endswith("Valve") for c in self.classes) and not any(
+            "CheckValve" in c or "SafetyValve" in c for c in self.classes
+        )
+
+    @property
+    def check_valve(self) -> bool:
+        return any("CheckValve" in c for c in self.classes)
 
 
 @dataclass
@@ -194,14 +227,26 @@ def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def _closed(obj: Any) -> bool:
-    """Whether *obj* performs a role of a valve closed in normal operation (DEXPI Role)."""
+def _has_role(obj: Any, roles: tuple[str, ...]) -> bool:
+    """Whether *obj* performs one of *roles* (DEXPI Role, by name or URI)."""
     for role in getattr(obj, "performedRoles", None) or ():
         names = (_text(getattr(role, "name", None)), _text(getattr(role, "uri_", None)))
         text = " ".join(n for n in names if n).lower().replace("-", " ").replace("_", " ")
-        if any(closed in text for closed in CLOSED_ROLES):
+        if any(r in text for r in roles):
             return True
     return False
+
+
+def _closed(obj: Any) -> bool:
+    """Whether *obj* performs a role of a valve closed in normal operation (DEXPI Role)."""
+    return _has_role(obj, CLOSED_ROLES)
+
+
+def _controller(tag: str) -> bool:
+    """An instrument function that controls (ISA 5.1: a C among the letters after the first),
+    as against an alarm, a switch, an indicator or trip logic."""
+    letters = tag.split("-")[0].upper()
+    return "C" in letters[1:]
 
 
 def _index(models: Iterable[tuple[str, Any]]) -> _Index:
@@ -228,6 +273,7 @@ def _index(models: Iterable[tuple[str, Any]]) -> _Index:
                 fluid,
                 limit="PipeOffPageConnector" in classes,
                 closed=_closed(obj),
+                opened=_has_role(obj, OPEN_ROLES),
             ),
         )
 
@@ -348,6 +394,43 @@ def _applies(mode: FailureMode, obj: _Object, context: Context) -> tuple[bool, s
     return known == mode.fail, None
 
 
+def _family(mode: FailureMode, families: set[tuple[str, str, str | None]]) -> bool:
+    gives = mode.gives
+    return any(
+        gives.parameter == parameter
+        and gives.guide_word == guide_word
+        and (towards is None or gives.towards == towards)
+        for parameter, guide_word, towards in families
+    )
+
+
+def _state_allows(mode: FailureMode, obj: _Object, throttling: bool) -> bool:
+    """Whether *mode* is a change from the valve's normal state: a valve closed in normal
+    operation cannot close, one open in service cannot open further or pass (only a throttling
+    valve can do both). A valve without a role is open, as a P&ID draws it unless marked."""
+    if not obj.valve:
+        return True
+    if obj.closed:
+        return not _family(mode, CLOSING)
+    if throttling and not obj.opened:
+        return True
+    return not _family(mode, OPENING)
+
+
+def _loop_allows(mode: FailureMode, instrument: _Instrument | None) -> bool:
+    """A failure of a control loop that drives a process variable belongs to a controller and to
+    the variable it measures; a trip or sequence failure (it moves the final element) to any."""
+    if mode.at != "final-element" or mode.gives.towards != "none":
+        return True
+    if mode.gives.parameter not in MEASURED.values():
+        return True
+    return (
+        instrument is not None
+        and _controller(instrument.tag)
+        and instrument.measures == mode.gives.parameter
+    )
+
+
 def _matches(response: Response, deviation: Deviation, via: str) -> bool:
     incoming = response.incoming
     return (
@@ -431,6 +514,12 @@ class _Walker:
         if obj.closed:
             closed = self.step(key, deviation, "closed", segment)
             self.done.append(_Walked([*path, closed], "closed", None, questions))
+            return
+        held = (deviation.parameter, deviation.guide_word) in HELD_BY_CHECK_VALVE
+        if obj.check_valve and direction == "upstream" and held:
+            # A check valve closes against what comes back; its failing to is its own cause.
+            stop = self.step(key, deviation, "check-valve", segment)
+            self.done.append(_Walked([*path, stop], "closed", None, questions))
             return
         via = "inlet" if direction == "downstream" else "outlet"
         self.react(path, key, segment, deviation, via, direction, questions)
@@ -558,6 +647,10 @@ def propagate(
         if _entry(library, obj.classes) is None:
             uncovered.append(f"{obj.label} ({obj.cls})")
 
+    # The final elements of controllers: the throttling valves.
+    throttling = {
+        final for i in index.instruments.values() if _controller(i.tag) for final in i.finals
+    }
     candidates: list[Candidate] = []
     seen: set[tuple[Any, ...]] = set()
     for key in keys:
@@ -565,11 +658,16 @@ def propagate(
         entry = _entry(library, obj.classes)
         for mode in entry.modes if entry else []:
             if mode.at == "final-element":
+                if not _loop_allows(mode, index.instruments.get(key)):
+                    continue
                 starts = index.instruments[key].finals if key in index.instruments else []
             else:
                 starts = [key] if key in index.objects else []
             for start in starts:
-                applies, question = _applies(mode, index.objects[start], context)
+                target = index.objects[start]
+                if not _state_allows(mode, target, start in throttling):
+                    continue
+                applies, question = _applies(mode, target, context)
                 if not applies:
                     continue
                 walker = _Walker(index, library)
@@ -642,9 +740,9 @@ class Gap:
     at: str
     fluid: str | None
     crosses: list[str]
-    #: Causes no scenario of this deviation names.
+    #: Causes no scenario of the node names.
     uncovered: list[str]
-    #: Causes a scenario of this deviation names, but none of those names where the walk ends.
+    #: Causes a scenario of the node names, but none of those names where the walk ends.
     cause_only: list[str]
 
 
@@ -660,10 +758,19 @@ class Coverage:
     unreached: list[str]
 
 
+def _alike(a: str, b: str) -> bool:
+    """The same tag, or one of parallel trains studied once: equal but for the train letter
+    after the number (MOV-413B and MOV-413A)."""
+    stem = re.sub(r"(?<=\d)[A-Z]$", "", a)
+    return a == b or (stem != a and stem == re.sub(r"(?<=\d)[A-Z]$", "", b))
+
+
 def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] = ()) -> Coverage:
-    """Compare the node's scenarios with its candidates by tag: a scenario covers a top event
-    when it has the deviation and its ``refs`` name the cause and the object the walk ends at.
-    A ``dismissed`` or ``question`` outcome of the triage (coverage.yaml) handles its causes."""
+    """Compare the node's scenarios with its candidates by tag: a scenario of the node covers a
+    top event when its ``refs`` name the cause and the object the walk ends at, under whichever
+    deviation it was written (a blocked outlet may be recorded as more pressure, not no flow),
+    a train's tag standing for its parallel trains. A ``dismissed`` or ``question`` outcome of
+    the triage (coverage.yaml) handles its causes."""
     decided = [o for o in triage if o.node == node.id and o.status != "open"]
     rows = [
         ((d.guide_word, d.parameter), {str(r.tag or r.object) for r in s.refs}, s.id)
@@ -682,6 +789,7 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         deviation = (c.deviation.guide_word, c.deviation.parameter)
         naming = [(refs, sid) for dev, refs, sid in rows if dev == deviation and c.cause in refs]
         reached.update(sid for _, sid in naming)
+        anywhere = [refs for _, refs, _ in rows if any(_alike(c.cause, r) for r in refs)]
         if c.end != "top-event":
             continue
         at = c.path[-1].label
@@ -698,14 +806,14 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         if decision is not None:
             pairs[decision.status].add(pair)
             continue
-        if any(at in refs for refs, _ in naming):
+        if any(any(_alike(at, r) for r in refs) for refs in anywhere):
             pairs["covered"].add(pair)
             continue
         gap = gaps.setdefault(
             (c.deviation, c.top_event, at),
             Gap(c.deviation, str(c.top_event), at, c.fluid, [], [], []),
         )
-        causes = gap.cause_only if naming else gap.uncovered
+        causes = gap.cause_only if anywhere else gap.uncovered
         if c.cause not in causes:
             causes.append(c.cause)
         gap.crosses.extend(n for n, _ in c.crosses if n not in gap.crosses)
