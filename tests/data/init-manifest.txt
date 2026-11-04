@@ -68,9 +68,9 @@ d5068a6a8b693997ad7177e8ae4e55dcad72670455149ade163946cb40f61d31  .claude/skills
 cae33a1ca894d74c65ad3b118f53ad435cec728064b8245fdefa5cbd6b87e4dc  .claude/skills/pid-design-pumps/SKILL.md
 c751c117802de54b6a04fbbae4cecf8238379683aadf8b05f8f45890dcef04df  .claude/skills/pid-design-vessels-and-tanks/SKILL.md
 e52c79bc9d617f67775a78fd3064a51dcf0110121af37e7c619314ccc66458e2  .claude/skills/pid-design/SKILL.md
-f3879229cd719a38c6f50aaa4885a24a68c97377a2d272519c4e087c37ba8946  .claude/skills/pid-draft/SKILL.md
+c54adca0da4b456b596808da0431edb927299c3f20eda39d4f9b7722744fd6dc  .claude/skills/pid-draft/SKILL.md
 0e5621cc82705da7a2c8539e56ac1606c52abcfd0d77625832e9484a02254088  .claude/skills/pid-drafting-standards/SKILL.md
-294f5e69d204834fd0f06e9aae56403f63ec2b493ef485804ff9f8ef6f6bbb12  .claude/skills/pid-edit/SKILL.md
+4794f319064640c9651253d17ad70e60839a6b50dbc042275d23b5387228546d  .claude/skills/pid-edit/SKILL.md
 81d11f6e4145f2318535c9685b6463ac7dc398e5c6a071a52bac8dec467bbfe9  .claude/skills/pid-review-commissioning-readiness/SKILL.md
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md
 1a4ccaae67d432572a692e594ddd1fed5cd0b1f107d588e2fbeabdc2ff61862d  .claude/skills/pipe-routing/SKILL.md
