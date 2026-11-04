@@ -8,8 +8,8 @@ description: Classify the scenarios of a HAZOP study on the study's own risk mat
 ## Purpose and when to use
 
 Suggest the risk ratings of the scenarios: for each category of the matrix, the severity of the
-consequence and the likelihood of the cause, each tied to the words of the matrix that support
-it. It prepares the team's rating; skill `hazop-assessment` records the ratings and looks the
+consequence and the likelihood of that outcome, each tied to the words of the matrix that
+support it. It prepares the team's rating; skill `hazop-assessment` records the ratings and looks the
 bands up. Use it after the scenarios are drafted (skill `hazop-scenario-propagation`), before a
 session so the team has a starting point, or to go through the ratings someone marked
 uncertain.
@@ -21,11 +21,12 @@ uncertain.
   Read all of it before the first rating. The matrix `cheme init` writes is example data:
   without the project's own matrix, rate nothing and ask for it.
 - Each scenario's cause, consequence, outcome and path (`notes:`), and the fluid's hazards.
-- For likelihood: what the project holds about how often the cause happens (operating
-  experience, the company's failure data, a LOPA or reliability study), or its frequency
-  library (`frequencies:` of the study, `cheme schema frequencies`: initiating-event
+- For likelihood: what the project holds about how often the cause and the outcome happen
+  (operating experience, the company's failure data, a LOPA or reliability study), or its
+  frequency library (`frequencies:` of the study, `cheme schema frequencies`: initiating-event
   frequencies with their sources, project data written or obtained by the team) with
-  `max_frequency` on the matrix's likelihood codes. Without either, the likelihood stays open.
+  `max_frequency` on the matrix's likelihood codes. Without either, the likelihood is judged
+  against the matrix's descriptions and marked as judged (step 4), for the team to confirm.
 - For residual ratings: which safeguards the team credits and why.
 
 ## Workflow and tools
@@ -41,20 +42,33 @@ uncertain.
    `"matrix people 3, lost-time injury: hot water at the seal next to the walkway"`. Where two
    codes are close, say so in the basis (`"between 2 and 3; 3 if the area is manned"`), take the
    one the facts support, and leave the question for the team.
-4. **Likelihood** (of the cause). Take the code whose description matches the evidence the
-   project holds, and name that evidence in the basis. With no evidence, write `likelihood:
-   null` and say what is needed: an unknown code stays unresolved, it is never filled with a
-   default. Do not estimate a frequency, and do not convert a number from another study's scale.
-   **With a frequency library**, choose what the cause is an instance of and link it instead of
-   typing a code: `frequency: {event_type: pump_seal_failure}` (its screening value: the highest
-   of its records, LOPA initiating-event records first) or `frequency: {record: F009}` when a
-   record's `conditions` fit the cause better (a non-routine task rather than an emergency).
-   `cheme safety hazop rate --write` derives the likelihood from the record and the matrix's
-   `max_frequency` (never type it: `hazop-likelihood-derived`). The library's `modes:` map
-   failure modes to event types, its `aliases` help find one. No event type fits, a record is
-   per a length (100 m of pipe) or the event type has no record (`hazop-frequency`, info): no
-   link, `likelihood: null` and what is needed. Name the record and that it is unverified in
-   the basis when the library says so.
+4. **Likelihood** of the outcome the consequence states (initial: with no safeguard acting).
+   The matrix's likelihood descriptions speak of how often such an event happens, not of how
+   often its cause does. Take the first of these that applies and say which in the basis:
+   1. **Project evidence** (operating experience, the company's failure data, a LOPA or
+      reliability study): the code it supports, naming the evidence.
+   2. **A frequency library**: choose what the cause is an instance of and link it instead of
+      typing a code: `frequency: {event_type: pump_seal_failure}` (its screening value: the
+      highest of its records, LOPA initiating-event records first) or `frequency: {record:
+      F009}` when a record's `conditions` fit the cause better (a non-routine task rather than
+      an emergency). `cheme safety hazop rate --write` derives the likelihood from the record
+      and the matrix's `max_frequency` (never type it: `hazop-likelihood-derived`). The
+      library's `modes:` map failure modes to event types, its `aliases` help find one. Name
+      the record and that it is unverified in the basis when the library says so. The record
+      is the frequency of the cause: where the outcome needs more to happen (ignition, a
+      rupture, someone present), the derived code is an upper bound, and the basis says so. No
+      event type fits, a record is per a length (100 m of pipe) or the event type has no record
+      (`hazop-frequency`, info): no link, go on to 3.
+   3. **Judgement against the matrix's descriptions**, as a risk-ranked HAZOP team gives it
+      without data. The basis starts with `judged:` and gives the argument: what has to happen
+      for the outcome (the cause, and each further failure or condition the consequence needs)
+      and which description that sequence meets (has it happened at a plant like this, in the
+      company, in the industry). Between two codes, say so and take the more likely one; the
+      team decides. Never write a frequency or a probability, and never convert a number from
+      another study's scale: the code is the argument.
+   4. **No description fits** (the outcome lies beyond what the matrix describes, or the cause
+      is not understood): `likelihood: null` and what is needed.
+   A code is never filled with a default.
 5. **Initial and residual stay apart.** The initial rating ignores the safeguards. A residual
    rating is a separate entry, made only for the safeguards the team credits, and its basis
    names them (skill `safeguard-crediting`). Never lower a code because a safeguard is listed.
@@ -62,8 +76,8 @@ uncertain.
    ```yaml
    risk:
      initial:
-       - {category: people, severity: "3", likelihood: null, status: proposed, by: agent,
-          basis: "matrix people 3, lost-time injury: hot water at the seal next to the walkway; likelihood: no failure data for P-101 seals yet"}
+       - {category: people, severity: "3", likelihood: B, status: proposed, by: agent,
+          basis: "matrix people 3, lost-time injury: hot water at the seal next to the walkway; judged: B (could happen once in the life of the plant): needs a seal failure and someone on the walkway at the time; close to C"}
        - {category: asset, severity: "2", frequency: {event_type: pump_seal_failure},
           status: proposed, by: agent,
           basis: "matrix asset 2, seal and bearing repair; likelihood from the library's pump_seal_failure (unverified)"}
@@ -75,8 +89,8 @@ uncertain.
    function by tag, says what to add, change or verify, and says which part of the scenario it
    addresses. Where the gap to a tolerable band is large, prefer a change to the design over a
    procedure.
-8. **Hand over** a short list for the team: the ratings marked as close calls, the open
-   likelihoods and what they need, and the proposed actions.
+8. **Hand over** a short list for the team: the ratings marked as close calls, the judged
+   likelihoods, the open likelihoods and what they need, and the proposed actions.
 
 **Revise one scenario.** Change only that scenario's ratings or actions, keeping their ids, and
 rate its bands again (`--target <scenario>`).
@@ -101,7 +115,8 @@ hand-over list. Commit with a message naming the study and the scenarios rated.
 Severity, likelihood, which safeguards are credited, and whether a risk is tolerable are the
 team's decisions. A suggested code is a starting point for their discussion, never a finding.
 Never set `status: accepted`, never invent failure data or a frequency, and never present a
-rating as agreed.
+rating as agreed. A judged likelihood is a code argued from the matrix's descriptions, never a
+number.
 
 ## References
 
