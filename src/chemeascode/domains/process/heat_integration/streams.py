@@ -778,7 +778,6 @@ def _column(u, got, out, base, linked, utility_of) -> list[ThermalStream]:
     found: list[ThermalStream] = []
     by_role = {d.role: d for d in process_duties(u, got, out)}
     link = (u.get("spec") or {}).get("heat_integration")
-    units = out.get("units") or {}
     for role, key, hot in (("condenser", "condenser_kW", True), ("reboiler", "reboiler_kW", False)):
         kw = abs(got.get(key) or 0.0)
         if kw <= SMALL_KW:
@@ -789,9 +788,8 @@ def _column(u, got, out, base, linked, utility_of) -> list[ThermalStream]:
         notes: list[str] = []
         exchange = None
         if role == "condenser" and uid in linked:
-            other = (units.get(linked[uid]) or {}).get("reboiler_kW") or 0.0
             duty_key = (uid, "condenser-excess")
-            counted = max(kw - other, 0.0)
+            counted = 0.0  # what it gives beyond the reboiler is left over, not recovered
             notes.append(f"heats {linked[uid]}'s reboiler: the same heat as that reboiler")
             exchange = f"{uid}/{linked[uid]}"
         if role == "reboiler" and link:

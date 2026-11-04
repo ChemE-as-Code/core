@@ -1,0 +1,58 @@
+# Components and templates of the process. Schema cheme/process/v1 (`cheme schema
+# process-materials`). Every component has a stable id; molar_mass in kg/kmol,
+# normal_boiling_point in K at 101.325 kPa.
+# Ideal-gas and critical data: `cheme chemistry thermo hydrogen methane toluene benzene biphenyl
+# --fit 298.15,1100` (the `chemicals` package: ATcT/CRC formation enthalpies, CRC/Yaws
+# entropies, heat capacities fitted to thermo's TRC ideal-gas correlations, HEOS/IUPAC critical
+# constants). Normal boiling points: `chemicals` (Tb), cross-checked against the NIST WebBook.
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: H2
+    name: Hydrogen
+    formula: H2
+    cas: 1333-74-0
+    molar_mass: 2.0159
+    normal_boiling_point: 20.37
+    critical: {Tc: 33.145, Pc: 1296.4, omega: -0.219, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 0.0, S_298: 130.7, cp_R: [2.94657, 0.00350536, -7.83009e-06, 7.47656e-09, -2.45987e-12], temperature_range: [298.15, 1100], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.19%)"}
+  - id: CH4
+    name: Methane
+    formula: CH4
+    cas: 74-82-8
+    molar_mass: 16.042
+    normal_boiling_point: 111.66
+    critical: {Tc: 190.564, Pc: 4599.2, omega: 0.01142, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: -74534.0, S_298: 186.3, cp_R: [3.82014, -0.00391799, 2.43036e-05, -2.20853e-08, 6.63251e-12], temperature_range: [298.15, 1100], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.22%)"}
+  - id: TOL
+    name: Toluene
+    formula: C7H8
+    cas: 108-88-3
+    molar_mass: 92.138
+    normal_boiling_point: 383.75
+    critical: {Tc: 591.75, Pc: 4126.3, omega: 0.2657, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 50410.0, S_298: 321.08, cp_R: [-4.37888, 0.0660337, -3.12814e-05, -5.94684e-09, 6.9489e-12], temperature_range: [298.15, 1100], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.47%)"}
+  - id: BZ
+    name: Benzene
+    formula: C6H6
+    cas: 71-43-2
+    molar_mass: 78.112
+    normal_boiling_point: 353.22
+    critical: {Tc: 562.02, Pc: 4907.28, omega: 0.211, provenance: given, source: "chemicals: Tc HEOS, Pc HEOS, omega HEOS"}
+    ideal_gas: {dHf_298: 83180.0, S_298: 269.2, cp_R: [-5.66748, 0.0651307, -4.71742e-05, 1.28733e-08, 2.50823e-13], temperature_range: [298.15, 1100], provenance: given, source: "chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.26%)"}
+  - id: BIPH
+    name: Biphenyl (diphenyl)
+    formula: C12H10
+    cas: 92-52-4
+    molar_mass: 154.21
+    normal_boiling_point: 528.15
+    critical: {Tc: 773.0, Pc: 3380.0, omega: 0.403, provenance: given, source: "chemicals: Tc IUPAC, Pc IUPAC, omega PSRK"}
+    ideal_gas: {dHf_298: 181400.0, S_298: 391.24, cp_R: [-10.0542, 0.127791, -0.000103844, 3.87119e-08, -4.31251e-12], temperature_range: [298.15, 1100], provenance: given, source: "chemicals: dHf_298 CRC, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.34%)"}
+templates:
+  - {id: mixture, title: HDA process mixture, components: [H2, CH4, TOL, BZ, BIPH]}
+# property_method is a placeholder until `cheme process props --fill` records the method. No
+# property package qualified by core covers aromatics with hydrogen (core#315): the stream values
+# are simulated by DWSIM with Peng-Robinson (D-014), a cross-check, not validated data.
+property_method:
+  adapter: thermo
+  status: placeholder

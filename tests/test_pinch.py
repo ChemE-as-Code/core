@@ -203,3 +203,70 @@ def test_minimum_approach_condenser_and_cross():
     assert crossed.crossed and crossed.minimum == pytest.approx(-10.0)
     with pytest.raises(ValueError, match="hot and a cold"):
         minimum_approach([PinchStream(400, 350, 2.0), PinchStream(390, 300, 1.0)])
+
+
+# -- textbook and hand-checked cases for the plant targets (cheme process pinch) -------------
+
+
+def smith():
+    """Smith, Chemical Process Design and Integration (Wiley, 2005), chapter 16, the
+    four-stream example (duties in MW there, kW/K and kW here): H1 250 -> 40 degC at 0.15,
+    H2 200 -> 80 degC at 0.25, C3 20 -> 180 degC at 0.20, C4 140 -> 230 degC at 0.30. At
+    dTmin 10 K the book gives minimum hot utility 7.5, cold utility 10.0 and the pinch at
+    150 degC (hot) / 140 degC (cold)."""
+    return [
+        PinchStream(250 + C, 40 + C, 0.15, "H1"),
+        PinchStream(200 + C, 80 + C, 0.25, "H2"),
+        PinchStream(20 + C, 180 + C, 0.20, "C3"),
+        PinchStream(140 + C, 230 + C, 0.30, "C4"),
+    ]
+
+
+def test_four_stream_textbook_example():
+    result = pinch_analysis(smith(), dt_min=10)
+    assert result.min_hot_utility == pytest.approx(7.5)
+    assert result.min_cold_utility == pytest.approx(10.0)
+    assert result.pinch_hot_temperature == pytest.approx(150 + C)
+    assert result.pinch_cold_temperature == pytest.approx(140 + C)
+    assert result.pinch_shifted_temperature == pytest.approx(145 + C)
+
+
+def test_threshold_approach_turns_into_a_pinch():
+    """Hot 200 -> 100 degC at 1 kW/K (100 kW), cold 50 -> 150 degC at 0.8 kW/K (80 kW),
+    constructed by hand. With no utility at the top the composites approach closest at the hot
+    end, 200 - 150 = 50 K, so up to dTmin 50 K the problem is a threshold problem: no hot
+    utility, 100 - 80 = 20 kW of cold utility, no pinch (the threshold behaviour of Kemp, Pinch
+    Analysis and Process Integration, 2nd ed., and Ray and Das, Process Equipment and Plant
+    Design, section 5.7). Beyond it the cold end above 200 - dTmin needs hot utility,
+    0.8 x (dTmin - 50): at 60 K 8 kW hot, 28 kW cold, pinch at the hot supply, 200 / 140 degC."""
+    streams = [PinchStream(200 + C, 100 + C, 1.0, "H1"), PinchStream(50 + C, 150 + C, 0.8, "C1")]
+    for dt in (10, 50):
+        below = pinch_analysis(streams, dt_min=dt)
+        assert below.threshold and below.pinch_hot_temperature is None
+        assert below.min_hot_utility == pytest.approx(0.0, abs=1e-9)
+        assert below.min_cold_utility == pytest.approx(20.0)
+    above = pinch_analysis(streams, dt_min=60)
+    assert not above.threshold
+    assert (above.min_hot_utility, above.min_cold_utility) == pytest.approx((8.0, 28.0))
+    assert above.pinch_hot_temperature == pytest.approx(200 + C)
+    assert above.pinch_cold_temperature == pytest.approx(140 + C)
+
+
+def test_latent_loads_of_a_column_against_a_process_stream():
+    """A column as the extraction gives it (cheme process pinch): its condenser an isothermal
+    hot load of 300 kW at 360 K, its reboiler an isothermal cold load of 400 kW at 420 K, and
+    a hot process stream 500 -> 380 K at 2 kW/K (240 kW), dTmin 10 K; constructed by hand.
+    Shifted: hot stream 495 -> 375, reboiler at 425, condenser at 355. Cascade: 495-425 gives
+    140 kW, the reboiler takes 400 (-260), 425-375 gives 100 (-160), the condenser gives 300
+    (+140). Most negative -260: 260 kW hot utility, 400 kW cold utility, pinch at the
+    reboiler (shifted 425 K: 430 K hot, 420 K cold): the reboiler's latent load sits at the
+    pinch, the condenser's lies wholly below it."""
+    condenser = PinchStream.piecewise([Segment.latent(360, 300)], "condenser", side="hot")
+    reboiler = PinchStream.piecewise([Segment.latent(420, 400)], "reboiler", side="cold")
+    result = pinch_analysis([condenser, reboiler, PinchStream(500, 380, 2.0, "H1")], dt_min=10)
+    assert result.min_hot_utility == pytest.approx(260.0)
+    assert result.min_cold_utility == pytest.approx(400.0)
+    assert result.pinch_shifted_temperature == pytest.approx(425.0)
+    assert (result.pinch_hot_temperature, result.pinch_cold_temperature) == pytest.approx(
+        (430.0, 420.0)
+    )
