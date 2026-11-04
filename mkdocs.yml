@@ -176,4 +176,5 @@ nav:
       - "0037 Several power trays per rack, by voltage class and fill": adr/0037-several-power-trays-per-rack.md
       - "0038 A specified split's energy imbalance is stated": adr/0038-stated-imbalance-of-specified-splits.md
       - "0039 IDAES as an optional second simulation backend": adr/0039-idaes-as-an-optional-second-simulation-backend.md
+      - "0040 Pinch targets from the recorded simulation run": adr/0040-pinch-targets-from-the-recorded-simulation-run.md
       - Template: adr/template.md
