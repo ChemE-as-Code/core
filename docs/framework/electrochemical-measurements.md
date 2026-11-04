@@ -83,11 +83,11 @@ Per replicate, with the current `I`, the current density `j` and the point's dur
 | product flow | `Ndot_i = x_i Ndot` |
 | Faradaic efficiency | `FE_i = n_i F Ndot_i / I`, F = 96485.33212 C/mol |
 | partial current density | `j_i = FE_i j` |
-| charge balance | `sum FE_i + unassigned = 1` |
+| charge balance, per electrode | `sum FE_i + unassigned = 1` over the products of one electrode (the full current passes the cathode and the anode, so each balances apart) |
 | co-ions from the titration | `n_K = (V0 - V2) c V_anolyte / V_aliquot`, `n_C = (V2 - V1) c V_anolyte / V_aliquot` |
 | water dissociation efficiency | `WDE = 1 - F (n_K + n_C) / (I t)`; carbon share of the co-ion current `n_C / (n_K + n_C)` |
 | power | `P = U I` (terminal voltage only) |
-| heat at an isothermal boundary | `Q = I (U - sum_i FE_i U_tn,i)`, when every product with an FE gives `U_tn` |
+| heat at an isothermal boundary | `Q = I (U - sum_i FE_i U_tn,i)` over the products of the electrode that gives `U_tn`, when each of them gives it (a product's `U_tn` is that of its overall reaction, which holds the other half-reaction: only one electrode's products give it) |
 | carbon balance (with `gas.inlet`) | carbon fed = in products + unreacted (when its outlet fraction is measured) + into the anolyte (`n_C / t`) |
 
 `V0` is the titrant to the second end point of the fresh anolyte, `V1` and `V2` to the first
@@ -117,10 +117,10 @@ Every finding names the file, the line, a rule id `cheme.electrochem-*` and a hi
 
 | Rule | Level | When |
 | --- | --- | --- |
-| `schema` | error | the file does not follow the schema; a duplicate id; a product not declared; two points at one current density |
+| `schema` | error | the file does not follow the schema or cannot be read as UTF-8; a duplicate id; a product not declared; two points at one current density; `thermoneutral_voltage` on products of both electrodes |
 | `unit` | error | a unit the quantity does not take |
 | `input-missing` | error | a standard flow without standard conditions; fractions without the outlet flow; a titration without the method block or the duration; a voltage series with no sample in its window |
-| `fe-sum-high` | error | the Faradaic efficiencies of a point add up to more than `1 + 3 sd` (one replicate: more than 1.05) |
+| `fe-sum-high` | error | the Faradaic efficiencies of a point at one electrode add up to more than `max(1 + 3 sd, 1.05)` (one replicate: 1.05); the replicates' spread says nothing of a calibration bias, so close replicates never tighten the limit below 1.05 |
 | `fe-sum-low` | warning | they add up to less than 0.9: an unmeasured product (liquids) or a flow error |
 | `single-replicate` | info | a point with one replicate |
 | `crossover-assumed` | warning | a membrane cell without a measured water dissociation efficiency |
@@ -135,7 +135,7 @@ Every finding names the file, the line, a rule id `cheme.electrochem-*` and a hi
 ## The command
 
 `cheme experiments electrochem FILE [--json] [--plot DIR]` prints each point (voltage, FE per
-product with the partial current density, the FE sum, the water dissociation efficiency, power
+product with the partial current density, the FE sum per electrode, the water dissociation efficiency, power
 and heat, each as mean +- sd (n)), the limitations and the findings. It reads the file only;
 inside a plant repository the paths are from its root, elsewhere from the file's folder.
 `--json` records the model id and version, the core version, the assumptions and limitations,

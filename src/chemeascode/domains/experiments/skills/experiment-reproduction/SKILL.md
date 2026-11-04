@@ -73,8 +73,9 @@ A reproduction does not validate a model, and a design case does not reproduce a
 - `cheme.electrochem-input-missing`: a standard flow without standard conditions, fractions
   without a flow, a titration without its method block or duration: find the value in the
   paper or the instrument's manual, or ask; never assume it.
-- `cheme.electrochem-fe-sum-high` (error): more charge in the products than the current: a
-  wrong flow unit, standard conditions, correction factor or fraction unit.
+- `cheme.electrochem-fe-sum-high` (error): more charge in the products of one electrode than
+  the current (above `max(1 + 3 sd, 1.05)`): a wrong flow unit, standard conditions,
+  correction factor, fraction unit or a product's `electrode`.
 - `cheme.electrochem-fe-sum-low` (warning): an unmeasured product (liquids) or lost gas.
 - `cheme.electrochem-crossover-assumed`: a membrane cell without a measured water
   dissociation efficiency.

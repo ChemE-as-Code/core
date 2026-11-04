@@ -1,0 +1,6 @@
+model faraday-balance v1 (cheme/electrochemical-cells/v1), core <version>
+PEM-1: reaction WS, 1 cell(s) x 20000 A at 1.9 V, current efficiency 1
+  power 38 kW = reaction enthalpy 29.6242 kW + heat to remove 8.37581 kW (U_tn 1.4812 V)
+  H2: formed 0.752197 kg/h, outlet 0.752197 kg/h (cathode); 50.52 kWh/kg formed, 50.52 kWh/kg delivered (all the cell's electricity, not allocated)
+  O2: formed 5.96945 kg/h, outlet 5.96945 kg/h (anode); 6.366 kWh/kg formed, 6.366 kWh/kg delivered (all the cell's electricity, not allocated)
+process/cells.yaml:21: info cheme.cell-unsourced [PEM-1]: cell PEM-1: faradaic_efficiency is assumed -- give provenance: given with the source (measured, vendor or literature data)

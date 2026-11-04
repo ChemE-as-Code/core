@@ -50,6 +50,20 @@ rather than by water dissociation, without mixing that efficiency into the Farad
   An optional `membrane:` block (kind, bias, water dissociation efficiency, co-ion split)
   reports the co-ion fluxes and the anolyte hydroxide deficit `(1 - WDE) N I / F` beside the
   Faraday balance, which it never changes. This extends ADR 0023, which stays accepted.
+- One existing field is loosened: `side_reactions[].current_fraction` was required and becomes
+  optional in `cheme/electrochemical-cells/v1` (a tool validating `cells.yaml` against the
+  published schema no longer requires it). A specified cell whose side reaction has none is no
+  longer a `cheme.cell-schema` error but is refused at evaluation with
+  `cheme.cell-input-missing`; a measured cell takes it from the measurement's side product
+  that names the reaction. Files that give it read as before.
+- The charge balance of a measured series is per electrode: each product names its
+  `electrode`, the full current passes both, so the Faradaic efficiencies of the cathode's and
+  of the anode's products are summed and checked (`fe-sum-high` above `max(1 + 3 sd, 1.05)`,
+  `fe-sum-low` below 0.9) apart. A product's thermoneutral voltage is that of its overall
+  reaction, so only one electrode's products may give one, and the heat sums over those. A
+  measured cell takes its efficiencies from one electrode (the product's reaction must be the
+  cell's), and scales measured efficiencies that add up to more than 1, within the
+  measurement's tolerance, to add up to 1 rather than refusing them.
 - The Faradaic efficiency (current to products at the electrodes) and the water dissociation
   efficiency (current the bipolar membrane carries by dissociating water) are separate
   quantities in every file, result and plot.

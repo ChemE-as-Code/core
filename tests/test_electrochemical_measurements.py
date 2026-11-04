@@ -143,7 +143,7 @@ def test_faradaic_efficiency_from_gas_data_by_hand():
     p V / (R T), the CO flow 2 % of it, FE = 2 F Ndot_CO / I."""
 
     def edit(d):
-        d["gas"] = GAS
+        d["gas"] = copy.deepcopy(GAS)
         rep = _rep(d)
         del rep["faradaic_efficiency"]
         rep.update(outlet_flow=50, fractions={"CO": {"value": 2, "unit": "mol%"}})
@@ -162,8 +162,11 @@ def test_faradaic_efficiency_from_gas_data_by_hand():
     # j = 0.5 A / 5 cm2 = 1000 A/m2; j_CO = FE j
     assert report.points[0].current_density_a_m2 == pytest.approx(1000)
     assert rep.partial_current_density_a_m2["CO"] == pytest.approx(fe * 1000, rel=1e-12)
-    # charge balance: sum FE + unassigned = 1
-    assert rep.faradaic_sum + rep.unassigned_current_fraction == pytest.approx(1.0, abs=1e-15)
+    # charge balance of the cathode: sum FE + unassigned = 1
+    assert rep.faradaic_sum.keys() == {"cathode"}
+    assert rep.faradaic_sum["cathode"] + rep.unassigned_current_fraction[
+        "cathode"
+    ] == pytest.approx(1.0, abs=1e-15)
     # the same in ppm, and a meter correction multiplies the flow
     report = _run(
         _data(
@@ -175,6 +178,7 @@ def test_faradaic_efficiency_from_gas_data_by_hand():
         )
     )
     assert report.points[0].replicates[0].faradaic_efficiency["CO"] == pytest.approx(1.1 * fe)
+    assert GAS["flow_correction"]["factor"] == 1.0  # the shared fixture is left as it was
 
 
 def _titration_point(volumes: dict) -> dict:
@@ -210,7 +214,7 @@ def test_water_dissociation_efficiency_from_the_titration_by_hand():
     assert rep.co_ion_carbon_fraction == pytest.approx(n_c / (n_k + n_c))
     assert rep.co_ion_carbon_fraction == pytest.approx(0.741, abs=1e-3)
     # the titration does not touch the Faradaic efficiency (none measured here)
-    assert rep.faradaic_efficiency == {} and rep.faradaic_sum is None
+    assert rep.faradaic_efficiency == {} and rep.faradaic_sum == {}
 
 
 def _series_329() -> dict:
@@ -277,9 +281,11 @@ def test_synthetic_series_balances(tmp_path):
     assert not _rules(report, "error") and not _rules(report, "warning")
     assert report.source.fingerprints.keys() == {SERIES}
     for point in report.points:
-        assert point.faradaic_sum.n == 2 and point.voltage_v.sd is not None
+        assert point.faradaic_sum["cathode"].n == 2 and point.voltage_v.sd is not None
         for rep in point.replicates:
-            assert rep.faradaic_sum + rep.unassigned_current_fraction == pytest.approx(1.0)
+            assert rep.faradaic_sum["cathode"] + rep.unassigned_current_fraction[
+                "cathode"
+            ] == pytest.approx(1.0)
             # the CO2 fed leaves as CO2, CO and carbonate in the anolyte (to the rounding)
             assert rep.carbon["closed"] and abs(rep.carbon["relative_residual"]) < 0.005
             # P = U I; Q = I (U - sum FE_i U_tn,i)
@@ -338,7 +344,8 @@ def test_fe_and_wde_are_separate():
     assert r1.water_dissociation_efficiency == r2.water_dissociation_efficiency
     assert r1.faradaic_efficiency == r3.faradaic_efficiency
     assert r1.water_dissociation_efficiency != r3.water_dissociation_efficiency
-    assert r1.unassigned_current_fraction == pytest.approx(0.3)  # 1 - FE, WDE plays no part
+    # 1 - FE, WDE plays no part
+    assert r1.unassigned_current_fraction["cathode"] == pytest.approx(0.3)
 
 
 # -- rules --------------------------------------------------------------------------------------
@@ -397,12 +404,14 @@ def test_one_way_per_quantity(edit):
             "cheme.electrochem-input-missing",
         ),
         (
-            lambda d: d.update(gas=GAS) or _rep(d).update(fractions={"H2O": {"value": 1}}),
+            lambda d: (
+                d.update(gas=copy.deepcopy(GAS)) or _rep(d).update(fractions={"H2O": {"value": 1}})
+            ),
             "cheme.electrochem-schema",
         ),
         (
             lambda d: (
-                d.update(gas=GAS)
+                d.update(gas=copy.deepcopy(GAS))
                 or _rep(d).pop("faradaic_efficiency")
                 and _rep(d).update(fractions={"CO": {"value": 2, "unit": "mol%"}})
             ),
@@ -431,6 +440,98 @@ def test_error_findings(edit, rule):
     assert rule in _rules(report, "error"), [f.format() for f in report.findings]
     finding = next(f for f in report.findings if f.rule == rule)
     assert finding.file == "m.yaml" and finding.hint
+
+
+def _messages(report, rule: str) -> list[str]:
+    return [f.message for f in report.findings if f.rule == rule and f.level == "error"]
+
+
+def test_duplicate_replicates_and_points_at_one_density_apart():
+    """Each schema rule on its own: a replicate id given twice in a point, and two points
+    (with their own ids) at one current density."""
+    report = _run(_data(lambda d: d["points"][0]["replicates"].append(copy.deepcopy(_rep(d)))))
+    assert _messages(report, "cheme.electrochem-schema") == [
+        "point P1: replicate R1 is declared twice"
+    ]
+
+    def twin(d):
+        other = copy.deepcopy(d["points"][0])
+        other["id"] = "P2"
+        d["points"].append(other)
+
+    messages = _messages(_run(_data(twin)), "cheme.electrochem-schema")
+    assert len(messages) == 1 and "points P1 and P2 are at one current density" in messages[0]
+
+
+def test_unreadable_file_names_a_hint(tmp_path):
+    folder = tmp_path / "experiments" / "electrochemistry"
+    folder.mkdir(parents=True)
+    (folder / "m.yaml").write_bytes("temperature: 25 °C\n".encode("latin-1"))
+    report = measurement_report(tmp_path, "experiments/electrochemistry/m.yaml")
+    (finding,) = report.findings
+    assert finding.rule == "cheme.electrochem-schema" and finding.level == "error"
+    assert "UTF-8" in finding.hint and "cheme schema electrochemical-measurements" in finding.hint
+
+
+def test_ir_corrected_voltages_are_a_limitation():
+    report = _run(_data(lambda d: d.update(voltage_basis="cell_ir_corrected")))
+    assert not _rules(report, "error")
+    assert any("iR-corrected" in text for text in report.limitations)
+    assert report.points[0].power_w.mean == pytest.approx(1.5)
+
+
+def _water_electrolysis(o2_utn: bool = False) -> dict:
+    """0.5 A at 2.0 V: H2 at the cathode (FE 0.98) and O2 at the anode (FE 0.97); the
+    thermoneutral voltage of water electrolysis, 1.481 V, on H2."""
+
+    def edit(d):
+        d["products"] = [
+            {
+                "id": "H2",
+                "electrons": 2,
+                "electrode": "cathode",
+                "thermoneutral_voltage": {"value": 1.481, "unit": "V"},
+            },
+            {"id": "O2", "electrons": 4, "electrode": "anode"},
+        ]
+        if o2_utn:
+            d["products"][1]["thermoneutral_voltage"] = {"value": 1.481, "unit": "V"}
+        _rep(d).update(
+            voltage={"value": 2.0},
+            faradaic_efficiency={"H2": {"value": 0.98}, "O2": {"value": 0.97}},
+        )
+
+    return _data(edit)
+
+
+def test_charge_balance_per_electrode():
+    """The full current passes the cathode and the anode: each electrode's products are
+    balanced apart, and the heat takes the electrode that gives the thermoneutral voltage of the
+    overall reaction (Q = I (U - FE_H2 U_tn), the anode's O2 left out)."""
+    report = _run(_water_electrolysis())
+    assert not _rules(report, "error") and not _rules(report, "warning")
+    assert "cheme.electrochem-heat" not in _rules(report)
+    rep = report.points[0].replicates[0]
+    assert rep.faradaic_sum == {"cathode": pytest.approx(0.98), "anode": pytest.approx(0.97)}
+    assert rep.unassigned_current_fraction == {
+        "cathode": pytest.approx(0.02),
+        "anode": pytest.approx(0.03),
+    }
+    assert rep.heat_w == pytest.approx(0.5 * (2.0 - 0.98 * 1.481))  # +0.274 W
+    point = report.points[0]
+    assert set(point.faradaic_sum) == {"cathode", "anode"}
+    assert report.electrodes == {"H2": "cathode", "O2": "anode"}
+    # an anode above 1 is its own error
+    data = _water_electrolysis()
+    _rep(data)["faradaic_efficiency"]["O2"] = {"value": 1.2}
+    messages = _messages(_run(data), "cheme.electrochem-fe-sum-high")
+    assert len(messages) == 1 and "at the anode" in messages[0]
+
+
+def test_thermoneutral_voltages_of_one_electrode_only():
+    report = _run(_water_electrolysis(o2_utn=True))
+    assert any("thermoneutral_voltage" in m for m in _messages(report, "cheme.electrochem-schema"))
+    assert report.points[0].replicates[0].heat_w is None
 
 
 def test_standard_conditions_are_never_assumed():
@@ -465,8 +566,13 @@ def test_standard_conditions_are_never_assumed():
     [
         ([1.10], "error"),  # one replicate above 1.05
         ([1.04], None),  # one replicate, within 1.05
-        ([1.02, 1.03], "error"),  # mean 1.025 > 1 + 3 x 0.0071
+        ([1.06, 1.07], "error"),  # mean 1.065 > max(1 + 3 x 0.0071, 1.05)
         ([0.99, 1.05], None),  # mean 1.02 < 1 + 3 x 0.042
+        ([1.04, 1.10], None),  # mean 1.07 < 1 + 3 x 0.042: a wide spread widens the limit
+        # close replicates never tighten the limit below 1.05 (the spread says nothing of a
+        # calibration bias): sd 0.00014 and sd 0 would give 1.0004 and 1
+        ([1.0100, 1.0102], None),
+        ([1.01, 1.01, 1.01], None),
         ([0.85], "warning"),  # below 0.9: an unmeasured product
     ],
 )
@@ -483,7 +589,7 @@ def test_faradaic_sum(values, level):
     assert (high, low) == (level == "error", level == "warning")
     assert ("cheme.electrochem-single-replicate" in _rules(report, "info")) == (len(values) == 1)
     if len(values) == 1:
-        assert report.points[0].faradaic_sum.sd is None
+        assert report.points[0].faradaic_sum["cathode"].sd is None
 
 
 def test_warnings_and_infos():

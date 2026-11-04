@@ -19,8 +19,9 @@ current ``I`` (A), the current density ``j`` and the point's duration ``t``:
   ``c_corr`` of the meter (default 1); a flow in mol/s is taken as it is;
 - the flow of each product ``Ndot_i = x_i Ndot`` and its Faradaic efficiency
   ``FE_i = n_i F Ndot_i / I`` (``n_i`` electrons per molecule, F = 96485.33212 C/mol), its
-  partial current density ``j_i = FE_i j``, and the charge balance
-  ``sum FE_i + unassigned = 1``;
+  partial current density ``j_i = FE_i j``, and the charge balance of each electrode
+  ``sum FE_i + unassigned = 1`` over the products formed at it (the full current passes both
+  electrodes, so the cathode's and the anode's products are balanced apart);
 - the water dissociation efficiency of a bipolar membrane from a Warder double end-point
   titration of the anolyte (aliquot ``V_aliquot`` of the anolyte volume ``V_anolyte``, titrant
   concentration ``c``; ``V0`` the titrant to the second end point of the fresh anolyte, ``V1``
@@ -33,9 +34,12 @@ current ``I`` (A), the current density ``j`` and the point's duration ``t``:
 
   (each crossing ion carries one charge, as in the paper: carbon crosses as HCO3-); and the
   carbon share of the co-ion current ``n_C / (n_K + n_C)``;
-- the electric power ``P = U I`` and, when every product with a Faradaic efficiency gives its
-  thermoneutral voltage, the heat at an isothermal boundary ``Q = I (U - sum_i FE_i U_tn,i)``
-  (the unassigned current becomes heat);
+- the electric power ``P = U I`` and, when every product with a Faradaic efficiency at the
+  electrode whose products give a thermoneutral voltage gives one, the heat at an isothermal
+  boundary ``Q = I (U - sum_i FE_i U_tn,i)`` over that electrode's products (the unassigned
+  current becomes heat). A thermoneutral voltage is that of the product's overall reaction,
+  which already holds the other half-reaction, so the products of the other electrode are left
+  out of the sum, and only the products of one electrode may give one;
 - with ``gas.inlet``, the carbon balance: carbon fed against carbon in the products, in the
   unreacted reactant (when its outlet fraction is measured) and crossed into the anolyte (from
   the titration, ``n_C / t``).
@@ -54,12 +58,14 @@ only when the data support it.
 Rules (``cheme.electrochem-*``), each finding naming the file, line, rule and a hint:
 
 - ``schema``: the file does not follow the schema, a duplicate id, an unknown product, two
-  points at one current density; ``unit``: a unit the quantity does not take;
+  points at one current density, thermoneutral voltages on products of both electrodes;
+  ``unit``: a unit the quantity does not take;
 - ``input-missing`` (error): a standard flow without standard conditions, product fractions
   without the outlet flow, a titration without the method block or the point's duration, a
   voltage series with no sample in its window;
-- ``fe-sum-high`` (error): the Faradaic efficiencies of a point add up to more than
-  ``1 + 3 sd`` (more than 1.05 with one replicate); ``fe-sum-low`` (warning): to less than 0.9
+- ``fe-sum-high`` (error): the Faradaic efficiencies of a point at one electrode add up to
+  more than ``max(1 + 3 sd, 1.05)`` (more than 1.05 with one replicate: the spread of the
+  replicates says nothing of a calibration bias); ``fe-sum-low`` (warning): to less than 0.9
   (unmeasured products, e.g. liquids);
 - ``single-replicate`` (info): a point with one replicate has no standard deviation;
 - ``crossover-assumed`` (warning): a membrane cell without a measured water dissociation
@@ -110,8 +116,11 @@ ASSUMPTIONS = (
     "water dissociation efficiency from the Warder double end-point titration: "
     "WDE = 1 - F (n_K + n_C) / (I t), every crossing co-ion carrying one charge (carbon as "
     "HCO3-), over the point's duration",
-    "the heat at an isothermal boundary Q = I (U - sum FE_i U_tn,i): current not assigned to "
-    "a product becomes heat",
+    "the heat at an isothermal boundary Q = I (U - sum FE_i U_tn,i) over the products of the "
+    "electrode that give a thermoneutral voltage (that of the overall reaction): current not "
+    "assigned to a product becomes heat",
+    "the charge balance per electrode: the full current passes both, so the Faradaic "
+    "efficiencies of the cathode's and of the anode's products each add up to at most 1",
     "per point: mean and sample standard deviation over the replicates; between points the "
     "means and standard deviations are interpolated linearly in the current density",
 )
@@ -138,8 +147,9 @@ _VOLUME = {"mL": 1e-3, "L": 1.0}  # to L
 _FRACTION = {None: 1.0, "-": 1.0, "1": 1.0, "%": 0.01, "mol%": 0.01, "ppm": 1e-6}
 #: m3/s per unit of a volumetric standard flow
 _STANDARD_FLOW = {"sccm": 1e-6 / 60, "slpm": 1e-3 / 60}
-#: the Faradaic efficiencies of one replicate may add up to this much above 1
-_FE_SUM_HIGH_SINGLE = 1.05
+#: the Faradaic efficiencies at one electrode may always add up to this (calibration bias of
+#: the GC and the flow meter); with replicates, up to 1 + 3 sd when that is more
+_FE_SUM_HIGH = 1.05
 #: below this sum some product is not measured (fe-sum-low)
 _FE_SUM_LOW = 0.9
 #: relative carbon imbalance reported as a warning (a screening threshold, not a test)
@@ -391,8 +401,10 @@ class ReplicateResult:
     faradaic_efficiency: dict[str, float] = field(default_factory=dict)
     #: product -> "gas" (from the flow and fraction) or "given"
     faradaic_basis: dict[str, str] = field(default_factory=dict)
-    faradaic_sum: float | None = None
-    unassigned_current_fraction: float | None = None
+    #: electrode -> the sum of the Faradaic efficiencies of the products formed at it
+    faradaic_sum: dict[str, float] = field(default_factory=dict)
+    #: electrode -> 1 - its sum: the current forming no measured product there
+    unassigned_current_fraction: dict[str, float] = field(default_factory=dict)
     partial_current_density_a_m2: dict[str, float] = field(default_factory=dict)
     co_ions_mol: dict[str, float] = field(default_factory=dict)
     co_ion_carbon_fraction: float | None = None
@@ -416,7 +428,8 @@ class PointResult:
     replicates: list[ReplicateResult] = field(default_factory=list)
     voltage_v: Stat | None = None
     faradaic_efficiency: dict[str, Stat] = field(default_factory=dict)
-    faradaic_sum: Stat | None = None
+    #: electrode -> the statistics of its replicates' sums
+    faradaic_sum: dict[str, Stat] = field(default_factory=dict)
     partial_current_density_a_m2: dict[str, Stat] = field(default_factory=dict)
     water_dissociation_efficiency: Stat | None = None
     co_ion_carbon_fraction: Stat | None = None
@@ -435,7 +448,7 @@ class PointResult:
             "duration_s": self.duration_s,
             "voltage_v": stat(self.voltage_v),
             "faradaic_efficiency": {k: stat(v) for k, v in self.faradaic_efficiency.items()},
-            "faradaic_sum": stat(self.faradaic_sum),
+            "faradaic_sum": {k: stat(v) for k, v in self.faradaic_sum.items()},
             "partial_current_density_a_m2": {
                 k: stat(v) for k, v in self.partial_current_density_a_m2.items()
             },
@@ -462,6 +475,8 @@ class MeasurementReport:
     products: list[str] = field(default_factory=list)
     #: product id -> the reaction id it names
     reactions: dict[str, str] = field(default_factory=dict)
+    #: product id -> the electrode it forms at (cathode, anode)
+    electrodes: dict[str, str] = field(default_factory=dict)
     temperature_k: float | None = None
     area_m2: float | None = None
     points: list[PointResult] = field(default_factory=list)
@@ -495,6 +510,7 @@ class MeasurementReport:
             "membrane": self.membrane,
             "products": list(self.products),
             "reactions": dict(self.reactions),
+            "electrodes": dict(self.electrodes),
             "temperature_k": self.temperature_k,
             "area_m2": self.area_m2,
             "validity": dict(self.validity),
@@ -575,6 +591,9 @@ class _Context:
     thermoneutral: dict[str, float | None]
     products: dict[str, Product]
     terminal: bool
+    #: the electrode whose products give the thermoneutral voltages (of the overall
+    #: reactions); None: no product gives one, or the products of both electrodes do
+    heat_electrode: str | None = None
 
 
 def _context(data: ElectrochemicalMeasurements, out: _Out, report: MeasurementReport) -> _Context:
@@ -707,6 +726,18 @@ def _context(data: ElectrochemicalMeasurements, out: _Out, report: MeasurementRe
             ["products", i, "thermoneutral_voltage"],
             [product.id],
         )
+    with_utn = {p.electrode for p in data.products if thermoneutral.get(p.id) is not None}
+    if len(with_utn) > 1:
+        out.add(
+            "error",
+            "schema",
+            "products of the cathode and of the anode give a thermoneutral_voltage: the heat "
+            "would count the overall reaction twice",
+            ["products"],
+            [p.id for p in data.products if thermoneutral.get(p.id) is not None],
+            "give thermoneutral_voltage (of the overall reaction) on the products of one "
+            "electrode only, e.g. the cathode's in CO2 or water electrolysis",
+        )
     return _Context(
         area,
         flow,
@@ -715,6 +746,7 @@ def _context(data: ElectrochemicalMeasurements, out: _Out, report: MeasurementRe
         thermoneutral,
         {p.id: p for p in data.products},
         data.voltage_basis != "electrode_vs_reference",
+        next(iter(with_utn)) if len(with_utn) == 1 else None,
     )
 
 
@@ -806,8 +838,13 @@ def _replicate(
             result.faradaic_efficiency[name] = fe
             result.faradaic_basis[name] = "given"
     if result.faradaic_efficiency:
-        result.faradaic_sum = sum(result.faradaic_efficiency.values())
-        result.unassigned_current_fraction = 1.0 - result.faradaic_sum
+        # the full current passes each electrode: one charge balance per electrode
+        for name, fe in result.faradaic_efficiency.items():
+            electrode = ctx.products[name].electrode
+            result.faradaic_sum[electrode] = result.faradaic_sum.get(electrode, 0.0) + fe
+        result.unassigned_current_fraction = {
+            electrode: 1.0 - total for electrode, total in result.faradaic_sum.items()
+        }
         if density is not None:
             result.partial_current_density_a_m2 = {
                 n: fe * density for n, fe in result.faradaic_efficiency.items()
@@ -865,11 +902,13 @@ def _replicate(
     # power and heat at the terminals
     if ctx.terminal and result.voltage_v is not None and current is not None:
         result.power_w = result.voltage_v * current
-        lacking = [n for n in result.faradaic_efficiency if ctx.thermoneutral.get(n) is None]
-        if result.faradaic_efficiency and not lacking:
+        # the thermoneutral voltages are of the overall reactions: one electrode's products
+        at_heat = _heat_products(result.faradaic_efficiency, ctx)
+        lacking = [n for n in at_heat if ctx.thermoneutral.get(n) is None]
+        if at_heat and ctx.heat_electrode is not None and not lacking:
             enthalpy = sum(
-                fe * ctx.thermoneutral[n]  # type: ignore[operator]
-                for n, fe in result.faradaic_efficiency.items()
+                result.faradaic_efficiency[n] * ctx.thermoneutral[n]  # type: ignore[operator]
+                for n in at_heat
             )
             result.heat_w = current * (result.voltage_v - enthalpy)
     # carbon in and out
@@ -879,6 +918,14 @@ def _replicate(
             inlet, ctx, result, duration, point, rep, [*loc, "fractions"], out
         )
     return result
+
+
+def _heat_products(names, ctx: _Context) -> list[str]:
+    """The products among *names* whose Faradaic efficiencies enter the heat: those of the
+    electrode that gives the thermoneutral voltages (every product when none does)."""
+    if ctx.heat_electrode is None:
+        return list(names)
+    return [n for n in names if ctx.products[n].electrode == ctx.heat_electrode]
 
 
 def _carbon_balance(
@@ -956,6 +1003,7 @@ def evaluate(
         voltage_basis=data.voltage_basis,
         products=[p.id for p in data.products],
         reactions={p.id: p.reaction for p in data.products if p.reaction},
+        electrodes={p.id: p.electrode for p in data.products},
     )
     ctx = _context(data, out, report)
     if data.voltage_basis == "electrode_vs_reference":
@@ -1085,7 +1133,10 @@ def _summarise(result: PointResult, ctx: _Context, out: _Out, loc: list[Any]) ->
     result.faradaic_efficiency = {
         n: s for n in names if (s := Stat.of([r.faradaic_efficiency.get(n) for r in reps]))
     }
-    result.faradaic_sum = Stat.of([r.faradaic_sum for r in reps])
+    electrodes = sorted({e for r in reps for e in r.faradaic_sum})
+    result.faradaic_sum = {
+        e: s for e in electrodes if (s := Stat.of([r.faradaic_sum.get(e) for r in reps]))
+    }
     result.partial_current_density_a_m2 = {
         n: s for n in names if (s := Stat.of([r.partial_current_density_a_m2.get(n) for r in reps]))
     }
@@ -1102,33 +1153,41 @@ def _summarise(result: PointResult, ctx: _Context, out: _Out, loc: list[Any]) ->
             [result.id],
             "repeat the run to state its spread",
         )
-    total = result.faradaic_sum
-    if total is None:
-        return
-    # above 1 by more than three standard deviations; with one replicate, above 1.05
-    if total.sd is not None:
+    for electrode, total in result.faradaic_sum.items():
+        _fe_sum_findings(result.id, electrode, total, out, loc)
+
+
+def _fe_sum_findings(point: str, electrode: str, total: Stat, out: _Out, loc: list[Any]) -> None:
+    """The charge balance of one electrode at a point: above ``max(1 + 3 sd, 1.05)`` (1.05
+    with one replicate; the replicates' spread says nothing of a calibration bias of the GC or
+    the flow meter, so close replicates do not tighten the limit below 1.05) an error, below
+    0.9 a warning."""
+    if total.sd is not None and 1 + 3 * total.sd > _FE_SUM_HIGH:
         limit, said = 1 + 3 * total.sd, f"1 + 3 sd ({1 + 3 * total.sd:.4g})"
     else:
-        limit, said = _FE_SUM_HIGH_SINGLE, f"{_FE_SUM_HIGH_SINGLE:g} (one replicate)"
+        limit = _FE_SUM_HIGH
+        said = f"{_FE_SUM_HIGH:g}" + (" (one replicate)" if total.sd is None else "")
     if total.mean > limit:
         out.add(
             "error",
             "fe-sum-high",
-            f"point {result.id}: the Faradaic efficiencies add up to {total.mean:.4g}, above "
-            f"{said}: more charge in the products than the current carried",
+            f"point {point}: the Faradaic efficiencies at the {electrode} add up to "
+            f"{total.mean:.4g}, above {said}: more charge in the products than the current "
+            "carried",
             loc,
-            [result.id],
-            "check the flow (unit, standard conditions, correction), the fractions' unit and "
-            "the electrons per product",
+            [point],
+            "check the flow (unit, standard conditions, correction), the fractions' unit, the "
+            "electrons per product and each product's electrode",
         )
     elif total.mean < _FE_SUM_LOW:
         out.add(
             "warning",
             "fe-sum-low",
-            f"point {result.id}: the Faradaic efficiencies add up to {total.mean:.4g}: "
-            f"{1 - total.mean:.3g} of the current forms no measured product",
+            f"point {point}: the Faradaic efficiencies at the {electrode} add up to "
+            f"{total.mean:.4g}: {1 - total.mean:.3g} of the current forms no measured product "
+            "there",
             loc,
-            [result.id],
+            [point],
             "products not measured (liquids such as formate, crossed-over gas) or a flow "
             "error; the unassigned current is counted as heat",
         )
@@ -1167,7 +1226,7 @@ def _heat_findings(
     with_fe = sorted(
         {n for p in report.points for r in p.replicates for n in r.faradaic_efficiency}
     )
-    lacking = [n for n in with_fe if ctx.thermoneutral.get(n) is None]
+    lacking = [n for n in _heat_products(with_fe, ctx) if ctx.thermoneutral.get(n) is None]
     if lacking:
         out.add(
             "info",
@@ -1244,7 +1303,20 @@ def load(path: Path, name: str) -> tuple[ElectrochemicalMeasurements | None, Any
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as failure:
-        return None, None, [Finding(name, "error", "cheme.electrochem-schema", str(failure))]
+        return (
+            None,
+            None,
+            [
+                Finding(
+                    name,
+                    "error",
+                    "cheme.electrochem-schema",
+                    f"the file cannot be read: {failure}",
+                    hint="save the file as UTF-8 YAML; see "
+                    "`cheme schema electrochemical-measurements`",
+                )
+            ],
+        )
     try:
         raw = yaml.safe_load(text)
     except yaml.YAMLError as failure:
@@ -1459,8 +1531,8 @@ def report_text(report: MeasurementReport) -> str:
         for name, s in p.faradaic_efficiency.items():
             partial = p.partial_current_density_a_m2.get(name)
             lines.append(f"  FE {name} {_pm(s)}; partial j {_pm(partial, unit=' A/m2')}")
-        if p.faradaic_sum is not None:
-            lines.append(f"  FE sum {_pm(p.faradaic_sum)}")
+        for electrode, total in p.faradaic_sum.items():
+            lines.append(f"  FE sum ({electrode}) {_pm(total)}")
         if p.water_dissociation_efficiency is not None:
             lines.append(
                 f"  water dissociation efficiency {_pm(p.water_dissociation_efficiency)}"
@@ -1660,7 +1732,8 @@ def measurement_plots(report: MeasurementReport) -> dict[str, str]:
     names = sorted({n for p in points for n in p.faradaic_efficiency})
     if names:
         fe = [(n, series(lambda p, n=n: p.faradaic_efficiency.get(n))) for n in names]
-        fe.append(("sum", series(lambda p: p.faradaic_sum)))
+        for electrode in sorted({e for p in points for e in p.faradaic_sum}):
+            fe.append((f"sum ({electrode})", series(lambda p, e=electrode: p.faradaic_sum.get(e))))
         figures["faradaic-efficiency.svg"] = _chart(
             "Faradaic efficiency",
             "current density / (A/m2)",

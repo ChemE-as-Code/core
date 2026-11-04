@@ -53,6 +53,16 @@ current density `I / active_area`:
 - The measurement's voltage basis must be a terminal voltage: electrode potentials against a
   reference are refused; an iR-corrected voltage is used with the limitation that the power
   and heat leave out the ohmic loss.
+- The measured Faradaic efficiencies are of one electrode: the product's and the side
+  products'. A product the measurement forms by another reaction than the cell's (or, with no
+  `reaction:` there, one that is no product of the cell's reaction), or a side product at the
+  other electrode, is refused (`cheme.cell-measurement`). A side product measured at 0 (below
+  detection) gives its side reaction no extent.
+- Measured efficiencies that add up to more than 1 at the cell's current density passed the
+  measurement's own `fe-sum-high` check (a file with errors refuses the cell), so they are
+  scaled to add up to 1 (`cheme.cell-measurement`, info; a limitation and
+  `measurement.normalised_from` give the sum). Side fractions stated in `cells.yaml` on top of
+  them are not scaled: above 1 in all, the cell is refused (`cheme.cell-charge`).
 - A missing measurement file, one with error findings, or a product it does not have is
   `cheme.cell-measurement` (error, refused). For maturity a measured cell is specified (never
   predictive) and sourced when the measurement file states its `source`.

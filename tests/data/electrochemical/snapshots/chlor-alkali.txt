@@ -1,0 +1,8 @@
+model faraday-balance v1 (cheme/electrochemical-cells/v1), core <version>
+MEM-1: reaction CA, 1 cell(s) x 6000 A at 3 V, current efficiency 0.95
+  power 18 kW = reaction enthalpy 13.1678 kW + heat to remove 4.83218 kW (U_tn 2.3101 V)
+  Cl2: formed 7.53932 kg/h, outlet 7.53932 kg/h (anode); 2.387 kWh/kg formed, 2.387 kWh/kg delivered (all the cell's electricity, not allocated)
+  H2: formed 0.214376 kg/h, outlet 0.214376 kg/h (cathode); 83.96 kWh/kg formed, 83.96 kWh/kg delivered (all the cell's electricity, not allocated)
+  NaOH: formed 8.50635 kg/h, outlet 8.50635 kg/h (cathode); 2.116 kWh/kg formed, 2.116 kWh/kg delivered (all the cell's electricity, not allocated)
+  limitation: heat of reaction CA at 298.15 K, the cell at 363.15 K: the sensible heat of feeds and products and the temperature dependence of dH are not included
+process/cells.yaml:26: info cheme.cell-temperature [MEM-1, CA]: cell MEM-1: heat of reaction CA at 298.15 K, the cell at 363.15 K: the sensible heat of feeds and products and the temperature dependence of dH are not included -- give heat_of_reaction at the cell temperature to include them

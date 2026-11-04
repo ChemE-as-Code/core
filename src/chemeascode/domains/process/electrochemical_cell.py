@@ -62,13 +62,17 @@ Rules (``cheme.cell-*``), each finding naming the file, line, rule and a hint:
 - ``cell-temperature`` (info): the heat of reaction is taken at another temperature than the
   cell's (sensible heat and the temperature dependence of dH are left out);
 - ``cell-measurement`` (error, refused): a measured cell's measurement file is missing, has
-  error findings, or lacks the product named; ``measurements:`` on a cell that is not
+  error findings, or lacks the product named; the product is formed by another reaction than
+  the cell's (or, with no ``reaction:`` in the measurement, is no product of it); a side
+  product forms at the other electrode than the product; a side product's measured Faradaic
+  efficiency is outside [0, 1]; ``measurements:`` on a cell that is not
   ``performance: measured``; (info) a side product that forms none of the cell's side
-  reactions (its current is unassigned); ``cell-measured-conflict`` (warning): a voltage,
-  efficiency or water dissociation efficiency stated in the cell differs from the measured one
-  by more than the replicates' standard deviation (the measured value is used); a measured
-  cell outside the measurement's current density or temperature range is refused with
-  ``cell-operating-range`` (error);
+  reactions (its current is unassigned); (info) measured Faradaic efficiencies that add up to
+  more than 1 (within the measurement's tolerance) are scaled to add up to 1;
+  ``cell-measured-conflict`` (warning): a voltage, efficiency or water dissociation efficiency
+  stated in the cell differs from the measured one by more than the replicates' standard
+  deviation (the measured value is used); a measured cell outside the measurement's current
+  density or temperature range is refused with ``cell-operating-range`` (error);
 - ``cell-membrane``: co-ion shares that do not add up to 1, an unreadable ion or a water
   dissociation efficiency outside [0, 1] (error); no water dissociation efficiency (info);
 - ``cell-flowsheet``: the linked step or stream does not exist or does not touch the step;
@@ -695,6 +699,7 @@ def _conflict(
 
 def _lookup(
     cell: Cell,
+    reaction: Reaction | None,
     loc: list[Any],
     root: Path | None,
     cache: dict[str, Any] | None,
@@ -766,6 +771,39 @@ def _lookup(
             f"{', '.join(unknown)} not a product of {link.file}",
             [*loc, "measurements"],
             f"name products of the measurement: {', '.join(report.products) or 'none'}",
+        )
+        return None
+    # the product's Faradaic efficiency becomes the current efficiency of the cell's reaction
+    named = report.reactions.get(link.product)
+    if named is not None and named != cell.reaction:
+        refuse(
+            "measurement",
+            f"{link.file} forms {link.product} by reaction {named}, not by the cell's reaction "
+            f"{cell.reaction}",
+            [*loc, "measurements", "product"],
+            f"name the product of {cell.reaction} as measurements.product ({link.product} may "
+            "be a side product), or correct the product's reaction: in the measurement",
+        )
+        return None
+    if named is None and reaction is not None and reaction.stoichiometry.get(link.product, 0) <= 0:
+        refuse(
+            "measurement",
+            f"{link.product} is no product of the cell's reaction {cell.reaction}",
+            [*loc, "measurements", "product"],
+            f"name a product of {cell.reaction} as measurements.product, or give it "
+            f"reaction: {cell.reaction} in the measurement",
+        )
+        return None
+    # the current fractions of the cell are of one electrode: the full current passes each
+    electrode = report.electrodes.get(link.product)
+    elsewhere = [p for p in link.side_products if report.electrodes.get(p, electrode) != electrode]
+    if elsewhere:
+        refuse(
+            "measurement",
+            f"side product {', '.join(elsewhere)} forms at the other electrode than "
+            f"{link.product} ({electrode}) in {link.file}: their current fractions do not add up",
+            [*loc, "measurements", "side_products"],
+            f"name side products formed at the {electrode} only",
         )
         return None
     if current is None:
@@ -867,6 +905,17 @@ def _lookup(
             )
             continue
         k, side = sides[reaction]
+        if not 0 <= fe <= 1:
+            refuse(
+                "measurement",
+                f"{link.file} gives side product {product} a Faradaic efficiency of {fe:.4g} at "
+                f"{j:.6g} A/m2 (points {' and '.join(dict.fromkeys(point.bracket or ()))}), "
+                "not in [0, 1]",
+                [*loc, "measurements", "side_products"],
+                f"check the measurement of {product}: run `cheme experiments electrochem "
+                f"{link.file}`",
+            )
+            return None
         lookup.fractions[reaction] = fe
         _conflict(
             side.current_fraction,
@@ -878,7 +927,40 @@ def _lookup(
             cid,
             out,
         )
+    _normalise(lookup, result, out, loc, cid, j)
     return lookup
+
+
+def _normalise(
+    lookup: _Lookup, result: CellResult, out: _Out, loc: list[Any], cid: str, j: float
+) -> None:
+    """Measured Faradaic efficiencies that add up to more than 1 (within the measurement's
+    own ``fe-sum-high`` tolerance, since a file with errors refuses the cell): scaled to add up
+    to 1, as the current cannot carry more charge than it has."""
+    if lookup.efficiency is None:
+        return
+    total = lookup.efficiency + sum(lookup.fractions.values())
+    if total <= 1 + 1e-9:
+        return
+    lookup.efficiency /= total
+    lookup.fractions = {r: f / total for r, f in lookup.fractions.items()}
+    if result.measurement is not None:
+        result.measurement["normalised_from"] = total
+    bracket = " and ".join(dict.fromkeys(lookup.point.bracket or ()))
+    text = (
+        f"the measured Faradaic efficiencies of {lookup.file} add up to {total:.6g} at "
+        f"{j:.6g} A/m2 (points {bracket}): scaled to add up to 1"
+    )
+    result.limitations.append(text)
+    out.add(
+        "info",
+        "measurement",
+        f"cell {cid}: {text}",
+        [*loc, "measurements"],
+        [cid],
+        "within the measurement's tolerance (calibration of the GC and the flow meter); "
+        f"check the flow and fractions of {lookup.file} if it is more than expected",
+    )
 
 
 #: K: a measurement's temperature counts as the cell's within this (a thermostatted bench cell)
@@ -989,6 +1071,8 @@ def _membrane(
     elif wde is not None:
         row["basis"] = "given"
     if wde is None:
+        if lookup is None and (cell.performance == "measured" or cell.measurements is not None):
+            return  # the measurement was refused (cell-measurement): it is not read
         out.add(
             "info",
             "membrane",
@@ -1158,7 +1242,7 @@ def _faraday(
     area: float | None = None
     if cell.performance == "measured" or cell.measurements is not None:
         area = _value(cell.active_area, _AREA, "active_area", out, [*loc, "active_area"], cid)
-        lookup = _lookup(cell, loc, root, measured, current, area, result, out, refuse)
+        lookup = _lookup(cell, reaction, loc, root, measured, current, area, result, out, refuse)
         efficiency = lookup.efficiency if lookup is not None else None
         voltage = lookup.voltage if lookup is not None else None
         missing = {"current": (current, "the current through each cell (A or kA)")}
@@ -1228,6 +1312,8 @@ def _faraday(
                 cid,
             )
         fractions.append(f if f is not None else 0.0)
+        if lookup is not None and s.reaction in lookup.fractions:
+            continue  # measured: in [0, 1] (_lookup); a product below detection forms nothing
         if f is None or not 0 < f <= 1:
             refuse(
                 "charge",
@@ -1241,7 +1327,12 @@ def _faraday(
             "charge",
             f"the current fractions add up to {1 - unassigned:.6g} > 1",
             loc,
-            "faradaic_efficiency plus the side reactions' fractions is at most 1",
+            (
+                f"the Faradaic efficiencies measured in {lookup.file} plus the current_fraction "
+                "stated for the other side reactions is at most 1: lower the stated fractions"
+            )
+            if lookup is not None
+            else "faradaic_efficiency plus the side reactions' fractions is at most 1",
         )
 
     thermal = cell.thermal
