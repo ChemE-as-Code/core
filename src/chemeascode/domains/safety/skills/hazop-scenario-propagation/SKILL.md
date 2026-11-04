@@ -141,7 +141,9 @@ Say in a scenario's `notes:` when the walk found it.
 safety hazop propagate H-01 --node N1 --coverage` (or the whole study without `--node`)
 compares them with the walk by tag: a top event is covered when a scenario of the node, under
 whichever deviation it was written, names the cause and the object the walk ends at in its
-`refs` (a row for train A covers trains B to E: tags equal but for the train letter). It lists
+`refs`, by tag or by object id (a row for train A covers trains B to E: tags equal but for the
+train letter; an untagged item, a pump's check valve, takes the train of the tagged item next to
+it). It lists
 each top event that is
 not (`no scenario`, or `cause only` where a row has the cause but another consequence), with
 the nodes the path crosses, and the scenarios no walk reaches (outside the library: seals,
