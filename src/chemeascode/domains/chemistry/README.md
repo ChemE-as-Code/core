@@ -15,7 +15,9 @@ formula parsing and element balances, extent fitting and the conversion reactor 
 `process` uses. `thermochemistry.py`, `equilibrium.py`: ideal-gas data, heats of reaction,
 equilibria. `rates.py`, `catalysts.py`: rate laws and catalyst records. `microkinetics.py`:
 mean-field surface mechanisms, their steady state and degree of rate control, and the Cantera
-export. `evidence.py`: the reaction evidence of a plant (`process/reaction-evidence.yaml`):
+export. `anolyte.py`, `carbonate.py`: the interface and registry of anolyte (electrolyte
+reservoir) models and the first one, `well-mixed-carbonate` (equilibrium carbonate speciation of
+a hydroxide anolyte), which `process` electrolysis duties integrate. `evidence.py`: the reaction evidence of a plant (`process/reaction-evidence.yaml`):
 sources, observations, candidate routes, conflicts and the model basis, its `cheme.evidence-*`
 rules and the route comparison (`cheme chemistry evidence`). Skills: `property-retrieval`,
 `materials`, `reactions`, `reaction-evidence-search`, `route-selection`. Adapters live in `integrations/`. Moved from LLM4ChemE, see

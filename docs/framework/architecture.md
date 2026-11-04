@@ -68,7 +68,7 @@ can live neither in `foundation` (which imports no domain) nor in an interface (
 
 | Module | Owns | Must not contain |
 |---|---|---|
-| `foundation` | `units` (the one unit converter and the (a)/(g) pressure convention), `Finding`/`Level`/`Report` (stable finding ids `<file>#<rule>:<subject>`), YAML source-line helpers, `Workspace` (paths and file kinds of a plant repository), `gitinfo` (read-only git, argument lists only), review records and their status vocabulary, the `plant.yaml`/`checks.yaml`/`status.json` schemas | engineering rules, DEXPI specifics, Typer, FastAPI |
+| `foundation` | `ode` (an adaptive Dormand-Prince integrator with events, no subject knowledge), `units` (the one unit converter and the (a)/(g) pressure convention), `Finding`/`Level`/`Report` (stable finding ids `<file>#<rule>:<subject>`), YAML source-line helpers, `Workspace` (paths and file kinds of a plant repository), `gitinfo` (read-only git, argument lists only), review records and their status vocabulary, the `plant.yaml`/`checks.yaml`/`status.json` schemas | engineering rules, DEXPI specifics, Typer, FastAPI |
 | `domains/<d>` | that domain's schemas, loaders, rules (findings), calculations, generators, and skills (`domains/<d>/skills/<name>/`) | CLI parsing, HTTP, printing, agent or LLM calls |
 | `project` | composing the domains over one workspace: `validate_workspace`, gate evaluation, sign-off, status summary, change impact | engineering methods (it calls the domains) |
 | `interfaces/cli` | commands, options, exit codes, output formats | logic that has no Python entry point in a domain or in `project` |

@@ -1107,6 +1107,21 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   efficiency from the anolyte titration, power, heat and the charge and carbon balances, and
   writes polarisation, efficiency, partial-current and water-dissociation plots only for the
   inputs that support them (`docs/framework/electrochemical-measurements.md`).
+- **Electrolysis duties**: `process/duties.yaml` (schema `cheme/electrolysis-duties/v1`)
+  states dynamic duties of a cell of `process/cells.yaml` against its anolyte reservoir: a
+  current, power or on/off schedule, the reservoir (volume, composition, anolyte model by id,
+  optional CO2 degassing), dosing on a pH trigger or continuous, bleed, make-up water, the
+  stated pH threshold (a design criterion) and the horizon.
+  **`cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]`** integrates
+  them (Dormand-Prince 5(4) with events): the voltage, Faradaic efficiency and water
+  dissociation efficiency at each instant from the measured series (never extrapolated: the
+  transient stops at the first exit from the measured range and the time outside is summed)
+  or the specified cell; pH, inventory, product, charge, energy, dosing and bleed over time;
+  the time to the specified pH threshold; `--compare` compares duties at equal delivered
+  product; `--plot` writes aligned time plots and an operating map (WDE x reservoir volume)
+  with the measured WDE points apart from the simulated values. The first anolyte model is
+  `well-mixed-carbonate` v1 (equilibrium carbonate speciation on a concentration basis;
+  `docs/framework/electrolysis-duties.md`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
