@@ -14,8 +14,9 @@ designs, and `process/duties.yaml` for how the cell is operated against its anol
 arrangement, the DC power, the output margin and the envelope, and the reservoir, pump and tank
 inputs of the duty run at that arrangement. With `--write` it puts them where the existing
 tools read sizes: the equipment list's `dimensions` (stacks, tanks) and the pumps' datasheet
-`type_specific`. The layout model, the datasheets and the LCA then follow by rerunning their
-commands. Use this skill to size a new skid for a product rate, to bring a skid up to date
+`type_specific`. The layout model and the datasheets then follow by rerunning their
+commands; the LCA reads the flowsheet, so the stacks' power and the dosing are entered there
+by hand (step 9). Use this skill to size a new skid for a product rate, to bring a skid up to date
 after a change of the cell, the duty or a stack input, or to answer what a change does to the
 stacks, tanks and footprint. It follows the skills `electrochemical-cell-modelling` and
 `electrolysis-duty-assessment`.
@@ -58,16 +59,28 @@ leave it out and the value stays TBD with the reason.
    the errors first: an error on the duty leaves the tanks and the dosing pump TBD.
 5. `cheme process stack --write`: writes the outdated stack and tank dimensions into
    `equipment/equipment-list.yaml` (only the named dimensions change; comments kept) and the
-   pump inputs into their datasheets; never over a value written by hand.
+   pump inputs into their datasheets (the recirculation pump's with its end points,
+   `suction_from` the reservoir and `discharge_to` the first stack); never over a value written
+   by hand. A value it wrote that is no longer given is cleared (a datasheet value set TBD,
+   list sizes removed). With `--json` the output's `written` names the files and tags.
 6. The control P&ID: draft or change the skid sheet (skills `pid-draft`, `pid-edit`; a
    generated sheet with `cheme regen`, a new one with `cheme sheet new`), then
    `cheme control report` for the loops and sequences (dosing on pH, level, recirculation).
 7. `cheme datasheets draft` for new tags, then `cheme datasheets fill --tag TAG` for the
-   tanks' volume and the pumps' head, NPSH and power along the routed lines.
+   tanks' volume and the recirculation pump: its flow from the written mass flow and density,
+   its head, NPSH and power along the lines from the reservoir to the stack routed in the
+   layout model (they need the skid P&ID of step 6 and `cheme layout build`; until then they
+   stay TBD with that reason). The dosing pump gets its capacity only: declare its
+   `suction_from`, `discharge_to`, viscosity and pressures on its datasheet by hand.
 8. `cheme layout build`, then `cheme layout render --plan` and `--section x=...` (or `y=...`):
    look at the PNGs, check the stacks' clearances and the tanks against the placement (skills
    `layout-yaml`, `pipe-routing`).
-9. `cheme assess lca` with the stacks' electricity per kg and the dosing (skill `lca`).
+9. `cheme assess lca` (skill `lca`): it reads the flowsheet, not the stacks. Set the duty of
+   the electricity stream into the electrolysis step (the stream the cell's
+   `flowsheet.electricity` names, in `process/flowsheet.yaml`) to the stacks' DC power (the AC
+   power with the rectifier inside the boundary), and the dosing stream to the duty's dosing
+   rate, each with its source `cheme process stack: stack ID`. Nothing reports them stale:
+   compare them with `cheme process stack` after every change.
 10. Rerun from step 2 after any change of the cell, the stack inputs or the duty; rerun
     `cheme process stack` without `--write` to see what is outdated.
 
@@ -82,13 +95,22 @@ leave it out and the value stays TBD with the reason.
   than the stack, or is not feasible at the sized arrangement. Correct the duty (its schedule at
   the stack's current density, its cell), or size the stack at the duty's operating point; for
   an undosed duty the hint gives the reservoir volume that reaches the horizon.
+- `cheme.stack-cell` (error) on the product: a side reaction forms it too (O2 of a CO2
+  cell); size on the cell's main or measured product.
+- `cheme.stack-duty` (error): an earlier stack names the same duty. One duty runs at one
+  arrangement: give the second skid its own duty.
 - `cheme.stack-schema` (error): a unit or a value out of range (a zero rectifier current, a
   negative pitch, flow, density or margin): the value is not used.
-- `cheme.stack-outdated` (warning): `cheme process stack --write`, then steps 7 and 8.
+- `cheme.stack-outdated` (warning): `cheme process stack --write`, then steps 7 and 8. Also
+  when a value written before is no longer given (an input removed): give the input, or let
+  `--write` clear it.
 - `cheme.stack-kept` (warning): a hand-written size differs from the calculated one. Keep it
-  only with its source (a vendor drawing); otherwise remove it and write.
+  only with its source (a vendor drawing); otherwise remove it and write. A tank stating a
+  head or a support is kept too (the calculated cylinder is flat-ended over its whole height):
+  remove them, or size the tank by hand.
 - `cheme.stack-tags` (warning): one equipment-list tag per stack; add or remove items in the
-  list and in `tags:`.
+  list and in `tags:`. (error): a tag given twice, by two stacks or two roles: give each its
+  own tag.
 - `cheme.stack-envelope`, `stack-input-missing`, `stack-unsourced` (info): an input is
   missing or unsourced; the value stays TBD.
 

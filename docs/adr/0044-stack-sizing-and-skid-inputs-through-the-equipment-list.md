@@ -74,8 +74,11 @@ design file the layout and datasheets would also read; or writing into the exist
   is never stated twice) over its horizon, the campaign: the reservoir's working volume (the
   largest over the duty) with its margin, the dosing and bleed tanks (what is dosed and bled
   over the campaign), each a vertical cylinder of the stated H/D; the recirculation pump from
-  the anolyte flow per area or per cell (declared: the measured series records none) and the
-  dosing pump from the duty's dosing rate with a margin. A duty that is not feasible there gives
+  the anolyte flow per area or per cell (declared: the measured series records none), with the
+  pressures and the end points the pump fill of a pump no stream links needs (`suction_from`
+  the reservoir's tag, `discharge_to` the first stack's: the stacks in parallel share the inlet
+  header), and the dosing pump from the duty's dosing rate with a margin (its end points and
+  pressures are declared by hand). A duty that is not feasible there gives
   no tank inputs (`cheme.stack-duty`, error).
 - One operating point: the stack is sized at the cell's current density of the `cells:`
   section, and the duty states its own schedule. A duty that runs the cell at another current
@@ -87,7 +90,9 @@ design file the layout and datasheets would also read; or writing into the exist
 - One arrangement in every command: `cheme process duty` (and `--compare`) runs a duty a stack
   names at the arrangement that stack is sized at (`electrolysis_duty.Arrangement`, from
   `electrolyser_stack.stack_arrangements`; `cheme.duty-arrangement`, info), so one duty id gives
-  one result in both commands. The process domain takes the arrangement as a parameter and
+  one result in both commands. The first stack naming a duty has it; a later stack naming the
+  same duty gets no inputs from it (`cheme.stack-duty`, error), and a tag two stacks or two
+  roles name is written by neither (`cheme.stack-tags`, error): one item, one size. The process domain takes the arrangement as a parameter and
   does not import the stack sizing; the command layer joins them.
 - The results go through the existing route, not a second file: the stacks' and tanks'
   equipment-list `dimensions`, and the pumps' datasheet `type_specific` parameters the pump
@@ -95,18 +100,28 @@ design file the layout and datasheets would also read; or writing into the exist
   `derived_dimensions` and `draft_datasheet` carry `source` and `assumed` onto the datasheet's
   main dimensions. The `fingerprint` stays in the list (and on the pumps' `type_specific`
   values), where `cheme process stack` compares it to report a stale size; the datasheets do
-  not carry it. A tank is written with `head: flat` (unless the list states its head), so the
-  layout's shell, and the fill's volume from it, hold the calculated volume.
+  not carry it. A tank is written with `head: flat` and `support: none`, so the layout's shell,
+  and the fill's volume from it, hold the calculated volume over the whole height; a list that
+  states another head or a support for it keeps its sizes (`cheme.stack-kept`), since the 3D
+  model would put them inside that height.
 - `cheme process stack [IDS] [--json] [--write]` is the thin command (with `cheme process
   cell` and `duty`, which it builds on). Without `--write` it writes nothing and reports each
   target that differs (`cheme.stack-outdated`); `--write` edits the equipment list in place
   (comments kept; the edit must change only those dimensions, or nothing is written) and the
   datasheets as `cheme datasheets fill` does, and only a value that is missing, TBD or written
   by `cheme process stack` before. A value written by hand is kept and reported
-  (`cheme.stack-kept`). `cheme validate` reports the stack findings that need no duty run. A
+  (`cheme.stack-kept`). A value it wrote that the design basis no longer gives (an input
+  removed, a duty no longer feasible) is `cheme.stack-outdated`, and `--write` clears it: a
+  datasheet value set TBD with the reason, the list sizes removed (left, they would read as
+  current). `cheme validate` reports the stack findings that need no duty run. A
   value out of its range (a zero rectifier current, a negative pitch, flow, density or margin)
   is a `cheme.stack-schema` error and is not used. The rest of the chain (layout build,
   datasheets draft and fill) stays the existing commands; the skill `skid-design` chains them.
+- The LCA is not fed by this tool: `cheme assess lca` reads the flowsheet's energy and material
+  streams, and the stack power and the dosing are entered there by hand (the skill names the
+  streams). Writing them into `process/flowsheet.yaml` would be a second writer of the
+  flowsheet, whose electricity stream the cell's Faraday balance already checks against the
+  cell's own power; that link is a follow-up.
 
 ## Consequences
 
@@ -126,7 +141,10 @@ design file the layout and datasheets would also read; or writing into the exist
   its volume's cylinder; the pump head is the stack's declared pressure drop plus the routed
   lines. None of these is a vendor design. Hazardous areas, gas handling and venting are not
   sized.
-- Follow-ups: the anolyte flow per area as part of a measured series; series strings of stacks
+- Negative: the stacks' power and dosing reach the LCA by hand, and nothing reports them stale
+  when the stacks change.
+- Follow-ups: the stack power and dosing into the flowsheet streams the LCA reads, with a
+  stale check; the anolyte flow per area as part of a measured series; series strings of stacks
   on a higher bus voltage; a stale check of the written values in `cheme validate` that does
   not need the duty run (the tanks' list sizes depend on the duty, so `cheme validate` does
   not report them stale yet: rerun `cheme process stack` after a duty change); the

@@ -1138,9 +1138,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   that arrangement (a duty at another current density or of another cell, or not feasible,
   gives none: `cheme.stack-duty`). Without `--write` it writes nothing and reports what
   differs (`cheme.stack-outdated`); `--write` edits the equipment-list `dimensions` in place and
-  the pumps' datasheet `type_specific`, never over a value written by hand
+  the pumps' datasheet `type_specific` (the recirculation pump's with its end points
+  `suction_from` and `discharge_to`), never over a value written by hand
   (`cheme.stack-kept`), from which `cheme layout build` and `cheme datasheets draft`/`fill`
-  take them. Exit 1 on an error finding (a `process/cells.yaml` that does not follow its
+  take them; a value it wrote that is no longer given is cleared, a tag two stacks name is
+  written by neither, and `--write --json` adds `written` (file -> tags). The LCA does not read
+  the stacks: their power and dosing go into the flowsheet streams by hand. Exit 1 on an error finding (a `process/cells.yaml` that does not follow its
   schema among them, its findings printed), 2 without the file or stacks or for an unknown id
   (`docs/framework/electrolyser-stacks.md`, ADR 0044, skill `skid-design`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces

@@ -33,9 +33,11 @@ envelope, access clearances, the replacement interval and the skid equipment a d
   campaign: the reservoir's working volume (the largest over the duty) with the stated margin
   as a vertical cylinder of the stated H/D; the recirculation pump's flow (the anolyte flow per
   active area or per cell times the cells) as a mass flow at the anolyte density, with the
-  suction and discharge pressures from the reservoir pressure and the stack's pressure drop: the
-  inputs of the existing pump sizing (``cheme datasheets fill``,
-  :func:`~chemeascode.domains.equipment.pumps.size_pump`); the dosing pump's capacity (the
+  suction and discharge pressures from the reservoir pressure and the stack's pressure drop, and
+  its end points (``suction_from`` the reservoir's tag, ``discharge_to`` the first stack's): the
+  inputs of the existing pump sizing of a pump no flowsheet stream links (``cheme datasheets
+  fill``, :func:`~chemeascode.domains.equipment.pumps.size_pump`: the head, NPSH and power along
+  the routed lines between them); the dosing pump's capacity (the
   duty's dosing rate times one plus the margin); the dosing tank (the solution dosed over the
   campaign, with the margin) and the bleed tank (the bleed over the campaign).
 
@@ -47,7 +49,12 @@ draft`` and ``fill`` take the main dimensions
 (:func:`~chemeascode.domains.equipment.outline.derived_dimensions`); the pumps' datasheet
 ``type_specific`` parameters the pump fill reads. :func:`write_stack_inputs` (``--write``)
 writes a value only where it is missing, TBD or written by this tool before (its source
-starts with :data:`STACK_MARK`), never over one written by hand.
+starts with :data:`STACK_MARK`), never over one written by hand. A value this tool wrote that
+the design basis no longer gives (an input removed, a duty no longer feasible) is reported
+outdated and cleared: a datasheet value set TBD with the reason, the list sizes removed. A tag
+two stacks or two roles name is written by neither. The electricity and dosing are not
+written into the flowsheet: the LCA (``cheme assess lca``) takes them from the flowsheet's
+energy and material streams, entered by hand from this report.
 
 Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 
@@ -57,27 +64,35 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
   density and viscosity, the reservoir pressure), below 0 (the end plates, the frame margin,
   the clearances, the operating hours, a margin, the stack's pressure drop) or a rectifier
   efficiency not in (0, 1]. The value is not used: a stated voltage or current limit refuses
-  the stack, any other leaves what rests on it TBD (or, for the rectifiers, not given);
+  the stack, any other leaves what rests on it TBD (or, for the rectifiers and the AC power,
+  not given);
 - ``stack-cell`` (error, the stack is refused): the cell is not in the file, its Faraday
   balance refuses it (outside the measured range among others), it has no active area, its
-  reaction does not form the product or the product has no molar mass, or a specified cell lies
+  reaction does not form the product, a side reaction forms or consumes it too (the Faradaic
+  efficiency is the overall reaction's), the product has no molar mass, or a specified cell lies
   outside its declared operating range; (info) a specified cell declares no current density
   range; (warning) the cell has other warnings;
 - ``stack-electrical`` (error, refused): the cell voltage is above the stack voltage limit, or
   the cell current above the stack current limit;
 - ``stack-envelope`` (info): an envelope value is missing: the stack's dimensions stay TBD;
-- ``stack-input-missing`` (info): an equipment input is missing: that value stays TBD;
+- ``stack-input-missing`` (info): an equipment input is missing: that value stays TBD (a
+  value written before is then ``stack-outdated``);
 - ``stack-unsourced`` (info): an assumed input without a source;
 - ``stack-tags`` (warning): fewer or more tags than stacks, or a tag not in the equipment list;
+  (error) a tag given twice (two stacks, or two roles): nothing is written to it;
 - ``stack-duty`` (error, the equipment inputs from the duty are not given): the duty is not in
   ``process/duties.yaml``, runs another cell than the stack's, runs the cell at another current
   density than the stack is sized at (one operating point), is refused, or is not feasible at
-  the sized arrangement over its horizon; (info) the duty states another arrangement, replaced
+  the sized arrangement over its horizon, or an earlier stack names the same duty (one duty runs
+  at one arrangement); (info) the duty states another arrangement, replaced
   by the sized one (``cheme process duty`` runs it at the sized one too:
   :func:`stack_arrangements`);
 - ``stack-outdated`` (warning): an equipment-list dimension or datasheet input this tool would
-  write differs from the file (or is not there): ``cheme process stack --write``;
-- ``stack-kept`` (warning): a value written by hand differs from the calculated one: kept;
+  write differs from the file (or is not there), or one it wrote is no longer given: ``cheme
+  process stack --write``;
+- ``stack-kept`` (warning): a value written by hand differs from the calculated one: kept; a
+  tank whose list states a head or a support (inside the height, the shell would hold less than
+  the calculated volume); sizes no longer given beside a weight: kept;
 - ``stack-target`` (info): an equipment-list item or datasheet the value would go to does not
   exist.
 """
@@ -121,7 +136,9 @@ ASSUMPTIONS = (
     "active area plus the frame margin on each side across it (the assumed envelope, not the "
     "vendor's drawing)",
     "a tank is a vertical cylinder of the stated H/D holding the working volume plus the margin "
-    "(flat ends: heads, wall thickness and supports are not added)",
+    "(flat ends, no support, written as head: flat and support: none; wall thickness not added)",
+    "the recirculation pump draws from the reservoir and discharges to the first stack's inlet "
+    "(the stacks in parallel share the header); the return line is not added",
     "the duty's horizon is the campaign: the reservoir's working volume is the largest over it, "
     "the dosing and bleed tanks hold what is dosed and bled over it",
 )
@@ -134,6 +151,9 @@ LIMITATIONS = (
     "the stack envelope, clearances and replacement interval are declared (assumed) values, not "
     "a vendor's; a tank's outline is its working volume's cylinder",
     "no hazardous area, gas handling (H2, CO) or venting of the stacks is sized here",
+    "the DC (or AC) power and the dosing are not written into the flowsheet: the LCA reads the "
+    "flowsheet's energy and material streams, entered by hand from this report, and nothing "
+    "reports them stale when the stacks change",
 )
 
 _RATE_MASS = {"kg/h": 1.0, "g/h": 1e-3, "kg/d": 1 / 24, "t/d": 1000 / 24, "t/h": 1000.0}
@@ -223,9 +243,10 @@ class CellPoint:
 class EquipmentInput:
     """What one equipment-list item or datasheet gets: ``target`` ``dimensions`` (the item's
     equipment-list sizes) or ``type_specific`` (its datasheet's parameters). ``values`` maps
-    each key to its :class:`Sized`; a TBD value is not written. ``status`` (after the files
-    were compared): ``current``, ``outdated``, ``kept`` (written by hand), ``no-target``,
-    ``tbd`` (nothing to write), ``written``."""
+    each key to its :class:`Sized`; a TBD value is not written (it only clears a value this
+    tool wrote before). ``status`` (after the files were compared): ``current``, ``outdated``,
+    ``kept`` (written by hand), ``no-target``, ``tbd`` (nothing to write), ``conflict`` (the
+    tag is given twice: nothing written), ``written``."""
 
     tag: str
     role: str
@@ -533,6 +554,28 @@ def _cell_point(
             "give its formula or molar_mass",
         )
         return None, reasons, limitations
+    # the Faradaic efficiency is the overall reaction's share of the current: the sizing holds
+    # for a product only that reaction forms (no side reaction forms or consumes it)
+    assert result.faradaic_efficiency is not None
+    share = (
+        result.faradaic_efficiency
+        * result.current_a
+        * result.cells
+        * basis.coefficient
+        / (basis.electrons * FARADAY)
+        * 3.6
+    )  # kmol/h
+    formed = result.formed_kmol_h.get(product)
+    if formed is not None and abs(formed - share) > 1e-6 * max(abs(formed), abs(share)):
+        refuse(
+            f"the cell forms {formed:.6g} kmol/h of {product} (its side reactions too), not the "
+            f"{share:.6g} kmol/h its Faradaic efficiency {result.faradaic_efficiency:.4g} gives "
+            f"through {cell.reaction}: the stack is sized on the product that efficiency "
+            "belongs to",
+            "name the cell's main product as product.component (the measured product, or a "
+            "product of the overall reaction no side reaction forms or consumes)",
+        )
+        return None, reasons, limitations
     if cell.cells != 1:
         limitations.append(
             f"cell {cell.id} states cells: {cell.cells} for its own Faraday balance; the stack "
@@ -644,6 +687,19 @@ def size_stack(
     imax = read.get(e.max_stack_current, _CURRENT, "max_stack_current", at, "positive")
     eta = read.get(e.rectifier_efficiency, _FRACTION, "rectifier_efficiency", at)
     irect = read.get(e.rectifier_max_current, _CURRENT, "rectifier_max_current", at, "positive")
+    if eta is not None and not 0 < eta[0] <= 1:
+        # only the AC power rests on it: that is not given, the DC sizing stands
+        read.invalid.append("rectifier_efficiency")
+        out.add(
+            "error",
+            "schema",
+            f"stack {sid}: rectifier_efficiency {eta[0]:g} is not in (0, 1]: the AC power is "
+            "not given",
+            [*loc, *at, "rectifier_efficiency"],
+            [sid],
+            "a fraction (0.95), or a percentage with unit '%'",
+        )
+        eta = None
     if umax is None:  # its unit or range error is reported
         return refuse("schema", "max_stack_voltage unusable", [], "", report=False)
     if e.max_stack_current is not None and imax is None:  # a limit stated is never ignored
@@ -669,13 +725,6 @@ def size_stack(
             "current",
             ["electrical", "max_stack_current"],
             "a smaller cell (active_area), a lower current density, or a stack rated for it",
-        )
-    if eta is not None and not 0 < eta[0] <= 1:
-        return refuse(
-            "schema",
-            f"rectifier_efficiency {eta[0]:g} is not in (0, 1]",
-            ["electrical", "rectifier_efficiency"],
-            "a fraction",
         )
 
     # the cells and the arrangement
@@ -998,9 +1047,11 @@ def _skid(
     out: _Out,
     read: _Inputs,
     duties: bool = True,
+    shared_with: str | None = None,
 ) -> None:
     """The equipment inputs of *stack*'s skid: the recirculation pump from the arrangement,
-    and with *duties* the reservoir, dosing and bleed from its duty run at the arrangement."""
+    and with *duties* the reservoir, dosing and bleed from its duty run at the arrangement
+    (none when *shared_with*, the stack that names the same duty first)."""
     from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE, load_duties, run_duty
     from chemeascode.foundation.provenance import value_fingerprint
 
@@ -1022,12 +1073,30 @@ def _skid(
     )
     pump = skid.recirculation_pump
     if pump is not None:
+        ends = (
+            skid.reservoir.tag if skid.reservoir is not None else None,
+            stack.tags[0] if stack.tags else None,
+        )
         result.equipment.append(
-            _recirculation(pump, point, total, arrangement, read, sid, out, loc)
+            _recirculation(pump, point, total, arrangement, read, sid, out, loc, *ends)
         )
         result.equipment[-1].fingerprint = value_fingerprint(
-            {"sizing": sizing_fp, "pump": pump.model_dump(mode="json")}
+            {"sizing": sizing_fp, "pump": pump.model_dump(mode="json"), "ends": list(ends)}
         )
+    if shared_with is not None:
+        # one duty runs at one arrangement: the first stack naming it has it
+        out.add(
+            "error",
+            "duty",
+            f"stack {sid}: duty {skid.duty} is the skid duty of stack {shared_with} too: the "
+            f"reservoir, dosing and bleed inputs of {sid} are not given",
+            [*loc, "duty"],
+            [sid],
+            f"one duty runs at one arrangement: give stack {sid}'s skid its own duty in "
+            f"process/duties.yaml (a copy of {skid.duty} under another id)",
+        )
+        _duty_tbd(stack, result, f"duty {skid.duty} is the skid duty of stack {shared_with}")
+        return
     if not duties:
         return
     loaded, _, _ = load_duties(root)
@@ -1303,7 +1372,10 @@ def _duty_tbd(stack: Stack, result: StackResult, reason: str) -> None:
             result.equipment.append(entry)
     if skid.dosing_pump is not None:
         entry = EquipmentInput(skid.dosing_pump.tag, "dosing_pump", "type_specific", "")
-        entry.values = {"mass_flow_kg_h": Sized("TBD", "kg/h", "tbd", reason)}
+        entry.values = {
+            "mass_flow_kg_h": Sized("TBD", "kg/h", "tbd", reason),
+            "density_kg_m3": Sized("TBD", "kg/m3", "tbd", reason),
+        }
         result.equipment.append(entry)
 
 
@@ -1351,8 +1423,13 @@ def _recirculation(
     sid: str,
     out: _Out,
     loc: list[Any],
+    suction: str | None = None,
+    discharge: str | None = None,
 ) -> EquipmentInput:
-    """The anolyte recirculation pump's inputs to the pump sizing."""
+    """The anolyte recirculation pump's inputs to the pump sizing (``cheme datasheets fill``
+    for a pump no flowsheet stream links): the mass flow, density, viscosity, the pressures at
+    its end points and the end points themselves, *suction* (the reservoir's tag) and
+    *discharge* (the first stack's tag)."""
     role = "recirculation_pump"
     entry = EquipmentInput(pump.tag, role, "type_specific", "")
     positive, nonnegative = "positive", "nonnegative"
@@ -1416,14 +1493,26 @@ def _recirculation(
             assumed,
         )
         entry.detail = f"{flow:.6g} L/h"
+    # the rest of the pump sizing's inputs; a missing one stays TBD with its reason
+    missing: list[str] = []
+
+    def tbd(key: str, unit: str, reason: str) -> None:
+        values[key] = Sized("TBD", unit, "tbd", reason)
+        if reason not in missing:
+            missing.append(reason)
+
     if rho is not None:
         values["density_kg_m3"] = Sized(
             rho[0], "kg/m3", rho[1].provenance, _text(rho[1], rho[0], "kg/m3"), _assumed(rho[1])
         )
+    else:
+        values["density_kg_m3"] = Sized("TBD", "kg/m3", "tbd", read.no("density"))
     if mu is not None:
         values["viscosity_mpa_s"] = Sized(
             mu[0], "mPa s", mu[1].provenance, _text(mu[1], mu[0], "mPa s"), _assumed(mu[1])
         )
+    else:
+        tbd("viscosity_mpa_s", "mPa s", read.no("viscosity", "anolyte viscosity"))
     if p_res is not None:
         values["suction_pressure_kpa"] = Sized(
             p_res[0],
@@ -1442,6 +1531,41 @@ def _recirculation(
                 "line is not added)",
                 _assumed(p_res[1], dp[1]),
             )
+        else:
+            tbd("discharge_pressure_kpa", "kPa(a)", read.no("stack_pressure_drop"))
+    else:
+        reason = read.no("reservoir_pressure")
+        tbd("suction_pressure_kpa", "kPa(a)", reason)
+        tbd("discharge_pressure_kpa", "kPa(a)", reason)
+    # the end points of the pump sizing's routed lines: the reservoir and the stacks' inlet
+    if suction is not None:
+        values["suction_from"] = Sized(
+            suction, "", "given", f"the reservoir {suction} of stack {sid}'s skid (equipment:)"
+        )
+    else:
+        tbd("suction_from", "", "no reservoir under equipment: (the pump's suction_from)")
+    if discharge is not None:
+        values["discharge_to"] = Sized(
+            discharge,
+            "",
+            "given",
+            f"the stack {discharge} (the first of stack {sid}'s tags: the stacks in parallel "
+            "share the inlet header)",
+        )
+    else:
+        tbd("discharge_to", "", f"no tags of stack {sid} (the first is the pump's discharge_to)")
+    if missing:
+        keys = [k for k, s in values.items() if s.provenance == "tbd" and k != "mass_flow_kg_h"]
+        out.add(
+            "info",
+            "input-missing",
+            f"stack {sid}: {' and '.join(missing)}: the recirculation pump {pump.tag} "
+            f"{', '.join(keys)} stay TBD",
+            [*loc, role],
+            [sid, pump.tag],
+            "give the anolyte viscosity, the reservoir pressure and the stack's pressure drop "
+            "with their source, the reservoir and the stack tags",
+        )
     entry.values = values
     entry.assumed = any(x.assumed for x in values.values())
     entry.source = f"{head}: {entry.detail}" if entry.detail else head
@@ -1525,6 +1649,7 @@ def stack_report(root: Path, ids: list[str] | None = None, duties: bool = True) 
         raise KeyError(f"no stack {', '.join(unknown)} in {CELLS_FILE}")
     out = _Out(doc)
     report = cell_report(root) if cells.stacks else None
+    owners, conflicts = _shared(cells.stacks, out, ids)
     seen: set[str] = set()
     results = []
     for index, stack in enumerate(cells.stacks):
@@ -1556,10 +1681,52 @@ def stack_report(root: Path, ids: list[str] | None = None, duties: bool = True) 
         _stack_tags(stack, index, result, out)
         if stack.equipment is not None:
             read = _Inputs(stack.id, out, ["stacks", index, "equipment"])
-            _skid(stack, index, result, root, out, read, duties)
-        _compare(root, result, out, index)
+            owner = owners[stack.equipment.duty]
+            shared = cells.stacks[owner].id if owner != index else None
+            _skid(stack, index, result, root, out, read, duties, shared)
+        _compare(root, result, out, index, conflicts)
         results.append(result)
     return StackReport(results, out.findings, source)
+
+
+#: The skid items a stack's ``equipment:`` names, by role.
+_ROLES = ("reservoir", "recirculation_pump", "dosing_pump", "dosing_tank", "bleed_tank")
+
+
+def _shared(
+    stacks: list[Stack], out: _Out, ids: list[str] | None
+) -> tuple[dict[str, int], set[str]]:
+    """The index of the first stack naming each skid duty (the one that runs it), and the tags
+    given more than once (two stacks, or two roles), with a ``stack-tags`` error per tag."""
+    owners: dict[str, int] = {}
+    uses: dict[str, list[tuple[int, str, str]]] = {}
+    for index, stack in enumerate(stacks):
+        for tag in stack.tags:
+            uses.setdefault(tag, []).append((index, stack.id, "stack"))
+        skid = stack.equipment
+        if skid is None:
+            continue
+        owners.setdefault(skid.duty, index)
+        for role in _ROLES:
+            item = getattr(skid, role)
+            if item is not None:
+                uses.setdefault(item.tag, []).append((index, stack.id, role))
+    conflicts = {tag for tag, found in uses.items() if len(found) > 1}
+    for tag in sorted(conflicts):
+        found = uses[tag]
+        if ids is not None and not any(sid in ids for _, sid, _ in found):
+            continue
+        given = ", ".join(f"stack {sid} {role.replace('_', ' ')}" for _, sid, role in found)
+        out.add(
+            "error",
+            "tags",
+            f"tag {tag} is given {len(found)} times ({given}): one item takes one size; "
+            "nothing is written to it",
+            ["stacks", found[1][0]],
+            [found[0][1], tag],
+            "give each stack and each skid item its own equipment-list tag",
+        )
+    return owners, conflicts
 
 
 def stack_findings(root: Path) -> list[Finding]:
@@ -1577,8 +1744,9 @@ def stack_arrangements(root: Path) -> dict[str, Any]:
     """The arrangement each skid duty runs at: duty id (``equipment.duty`` of a stack) to the
     :class:`~chemeascode.domains.process.electrolysis_duty.Arrangement` (cells per stack,
     stacks) the stack sizing chose, for ``cheme process duty`` to run the duty as ``cheme
-    process stack`` does. A refused stack gives none, nor a duty of another cell than the
-    stack's (``cheme process stack`` refuses that duty); the first stack naming a duty wins."""
+    process stack`` does. The first stack naming a duty runs it (``cheme process stack``
+    gives a later one no inputs from it, ``cheme.stack-duty``); a refused stack gives none, nor
+    a duty of another cell than the stack's (``cheme process stack`` refuses that duty)."""
     from chemeascode.domains.process.electrochemical_cell import load_cells
     from chemeascode.domains.process.electrolysis_duty import Arrangement, load_duties
 
@@ -1589,14 +1757,18 @@ def stack_arrangements(root: Path) -> dict[str, Any]:
     cell_of = {d.id: d.cell for d in duties.duties} if duties is not None else {}
     sized = {s.id: s for s in stack_report(Path(root), duties=False).stacks}
     found: dict[str, Any] = {}
+    claimed: set[str] = set()
     for stack in cells.stacks:
+        if stack.equipment is None or stack.equipment.duty in claimed:
+            continue
+        claimed.add(stack.equipment.duty)
         result = sized.get(stack.id)
-        if stack.equipment is None or result is None or result.refused:
+        if result is None or result.refused:
             continue
         if cell_of.get(stack.equipment.duty) != stack.cell:
             continue
         per_stack, stacks = result.number("cells_per_stack"), result.number("stacks")
-        if per_stack and stacks and stack.equipment.duty not in found:
+        if per_stack and stacks:
             found[stack.equipment.duty] = Arrangement(per_stack, stacks, f"stack {stack.id}")
     return found
 
@@ -1649,16 +1821,17 @@ def _is_tbd(entry: Any) -> bool:
 def list_dimensions(entry: EquipmentInput, old: dict[str, Any] | None) -> dict[str, Any]:
     """The equipment-list ``dimensions`` mapping *entry* gives an item whose dimensions are
     *old*: the calculated sizes with their source, marking and fingerprint, and the keys of
-    *old* that say how the item stands or what it weighs (head, support, weight, ...). A tank
-    gets ``head: flat`` unless *old* states its head, so that its shell holds the calculated
-    volume over the whole height."""
+    *old* that say how the item stands or what it weighs (weight, orientation, ...). A tank
+    gets ``head: flat`` and ``support: none``, so that its shell holds the calculated volume
+    over the whole height (:func:`_compare` keeps a tank whose list states another head or a
+    support instead)."""
     kept = {k: v for k, v in (old or {}).items() if k in _KEEP}
     new: dict[str, Any] = {k: s.value for k, s in entry.values.items()}
+    kept.pop("head", None)
     if "diameter" in entry.values:
-        # the cylinder holds the volume over its whole height (a stated head is kept)
-        new["head"] = kept.pop("head", "flat")
-    else:
-        kept.pop("head", None)
+        # the cylinder holds the volume over its whole height: no head or support inside it
+        kept.pop("support", None)
+        new["head"], new["support"] = "flat", "none"
     new.update(kept)
     new["source"] = entry.source
     if entry.assumed:
@@ -1675,7 +1848,7 @@ def type_specific(entry: EquipmentInput) -> dict[str, dict[str, Any]]:
         if s.provenance == "tbd":
             continue
         value: dict[str, Any] = {
-            "value": float(f"{s.value:.6g}"),
+            "value": s.value if isinstance(s.value, str) else float(f"{s.value:.6g}"),
             "unit": s.unit,
             "source": f"{STACK_MARK}: {s.source}",
         }
@@ -1687,136 +1860,255 @@ def type_specific(entry: EquipmentInput) -> dict[str, dict[str, Any]]:
     return found
 
 
-def _compare(root: Path, result: StackResult, out: _Out, index: int) -> None:
+def _compare(
+    root: Path,
+    result: StackResult,
+    out: _Out,
+    index: int,
+    conflicts: set[str] | frozenset[str] = frozenset(),
+) -> None:
     """Each equipment input against the file it goes to: its ``status``, and the
-    ``stack-outdated``, ``stack-kept`` and ``stack-target`` findings."""
+    ``stack-outdated``, ``stack-kept`` and ``stack-target`` findings. A tag in *conflicts* (given
+    twice) is compared with nothing (status ``conflict``)."""
     data = _equipment_data(root) or {}
     items = {
         str(i.get("tag")).strip(): i for i in data.get("equipment") or [] if isinstance(i, dict)
     }
-    sid = result.id
     for entry in result.equipment:
         loc = (
             ["stacks", index, "tags"]
             if entry.role == "stack"
             else ["stacks", index, "equipment", entry.role]
         )
-        if not entry.complete:
-            entry.status = "tbd"
-            continue
-        if entry.target == "dimensions":
-            item = items.get(entry.tag)
-            if item is None:
-                entry.status = "no-target"
-                out.add(
-                    "warning" if entry.role == "stack" else "info",
-                    "tags" if entry.role == "stack" else "target",
-                    f"stack {sid}: {entry.tag} is not in {EQUIPMENT_LIST}",
-                    loc,
-                    [sid, entry.tag],
-                    f"add {entry.tag} to the equipment list (skill lists-sync), then "
-                    "`cheme process stack --write`",
-                )
-                continue
-            old = item.get("dimensions") if isinstance(item.get("dimensions"), dict) else None
-            new = list_dimensions(entry, old)
-            if old is not None and not str(old.get("source") or "").startswith(STACK_MARK):
-                same = all(_numbers_equal(old.get(k), new.get(k)) for k in entry.values)
-                entry.status = "current" if same else "kept"
-                if not same:
-                    out.add(
-                        "warning",
-                        "kept",
-                        f"stack {sid}: {entry.tag} has dimensions written by hand "
-                        f"({_dims_text(old)}); the calculated {_dims_text(new)} is not written",
-                        loc,
-                        [sid, entry.tag],
-                        "remove them from the equipment list to let `cheme process stack "
-                        "--write` write the calculated ones, or keep them with their source",
-                    )
-                continue
-            same = old is not None and all(
-                _numbers_equal(old.get(k), new.get(k)) for k in [*_SIZE_KEYS, "source", "assumed"]
-            )
-            entry.status = (
-                "current"
-                if same and old.get("fingerprint") == new.get("fingerprint")
-                else "outdated"
-            )
-            if not same:
-                out.add(
-                    "warning",
-                    "outdated",
-                    f"stack {sid}: {EQUIPMENT_LIST} {entry.tag} dimensions "
-                    + (f"{_dims_text(old)}" if old else "missing")
-                    + f", calculated {_dims_text(new)}",
-                    loc,
-                    [sid, entry.tag],
-                    "`cheme process stack --write` writes them; then `cheme layout build` and "
-                    f"`cheme datasheets fill --tag {entry.tag}`",
-                )
-            continue
-        path = root / DATASHEET_DIR / f"{entry.tag}.yaml"
-        entry.file = f"{DATASHEET_DIR}/{entry.tag}.yaml"
-        if not path.is_file():
-            entry.status = "no-target"
-            out.add(
-                "info",
-                "target",
-                f"stack {sid}: no datasheet of {entry.tag}",
-                loc,
-                [sid, entry.tag],
-                f"`cheme datasheets draft` (with {entry.tag} in the equipment list), then "
-                "`cheme process stack --write`",
-            )
-            continue
-        try:
-            sheet = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
-            entry.status = "no-target"
-            continue
-        specific = sheet.get("type_specific") if isinstance(sheet, dict) else None
-        specific = specific if isinstance(specific, dict) else {}
-        changed, refresh, kept = [], [], []
-        for key, new in type_specific(entry).items():
-            old = specific.get(key)
-            if old is None or _is_tbd(old) or _ours(old):
-                same = (
-                    isinstance(old, dict)
-                    and _numbers_equal(old.get("value"), new["value"])
-                    and old.get("source") == new["source"]
-                    and bool(old.get("assumed")) == bool(new.get("assumed"))
-                )
-                if not same:
-                    changed.append(key)
-                elif old.get("fingerprint") != new.get("fingerprint"):
-                    refresh.append(key)
-            else:
-                value = old.get("value") if isinstance(old, dict) else old
-                if not _numbers_equal(value, new["value"]):
-                    kept.append(key)
-        entry.status = "outdated" if changed or refresh else "kept" if kept else "current"
-        if changed:
-            out.add(
-                "warning",
-                "outdated",
-                f"stack {sid}: {entry.file} type_specific {', '.join(changed)} differ from the "
-                "calculated (or are missing)",
-                loc,
-                [sid, entry.tag],
-                "`cheme process stack --write` writes them; then `cheme datasheets fill --tag "
-                f"{entry.tag}` sizes the pump",
-            )
-        if kept:
+        if entry.tag in conflicts:
+            entry.status = "conflict"
+        elif entry.target == "dimensions":
+            _compare_dimensions(entry, items.get(entry.tag), out, result.id, loc)
+        else:
+            _compare_sheet(root, entry, out, result.id, loc)
+
+
+def _reason(entry: EquipmentInput) -> str:
+    """Why *entry*'s first TBD value is TBD."""
+    return next((s.source for s in entry.values.values() if s.provenance == "tbd"), "")
+
+
+def _compare_dimensions(
+    entry: EquipmentInput, item: dict[str, Any] | None, out: _Out, sid: str, loc: list[Any]
+) -> None:
+    old = item.get("dimensions") if item is not None else None
+    old = old if isinstance(old, dict) else None
+    if not entry.complete:
+        entry.status = "tbd"
+        if old is None or not _ours(old) or not any(_number(old.get(k)) for k in _SIZE_KEYS):
+            return
+        # sizes this tool wrote before, which the design basis no longer gives
+        extra = sorted(k for k in old if k in _KEEP and k not in ("head", "support"))
+        if extra:
+            entry.status = "kept"
             out.add(
                 "warning",
                 "kept",
-                f"stack {sid}: {entry.file} type_specific {', '.join(kept)} written by hand "
-                "differ from the calculated: kept",
+                f"stack {sid}: {EQUIPMENT_LIST} {entry.tag} dimensions {_dims_text(old)} were "
+                f"calculated by {STACK_MARK}, which gives none now ({_reason(entry)}); they "
+                f"also hold {', '.join(extra)}: not removed",
                 loc,
                 [sid, entry.tag],
-                "remove them to let `cheme process stack --write` write the calculated ones",
+                "give the missing input, or remove the calculated sizes, source and "
+                "fingerprint by hand",
             )
+            return
+        entry.status = "outdated"
+        out.add(
+            "warning",
+            "outdated",
+            f"stack {sid}: {EQUIPMENT_LIST} {entry.tag} dimensions {_dims_text(old)} were "
+            f"calculated by {STACK_MARK}, which gives none now ({_reason(entry)})",
+            loc,
+            [sid, entry.tag],
+            "give the missing input; or `cheme process stack --write` removes them, then "
+            "`cheme layout build`",
+        )
+        return
+    if item is None:
+        entry.status = "no-target"
+        out.add(
+            "warning" if entry.role == "stack" else "info",
+            "tags" if entry.role == "stack" else "target",
+            f"stack {sid}: {entry.tag} is not in {EQUIPMENT_LIST}",
+            loc,
+            [sid, entry.tag],
+            f"add {entry.tag} to the equipment list (skill lists-sync), then "
+            "`cheme process stack --write`",
+        )
+        return
+    new = list_dimensions(entry, old)
+    if old is not None and not _ours(old):
+        same = all(_numbers_equal(old.get(k), new.get(k)) for k in entry.values)
+        entry.status = "current" if same else "kept"
+        if not same:
+            out.add(
+                "warning",
+                "kept",
+                f"stack {sid}: {entry.tag} has dimensions written by hand "
+                f"({_dims_text(old)}); the calculated {_dims_text(new)} is not written",
+                loc,
+                [sid, entry.tag],
+                "remove them from the equipment list to let `cheme process stack "
+                "--write` write the calculated ones, or keep them with their source",
+            )
+        return
+    if old is not None and "diameter" in entry.values:
+        stated = [
+            f"{k} {old[k]}"
+            for k, plain in (("head", "flat"), ("support", "none"))
+            if old.get(k) not in (None, plain)
+        ]
+        if stated:
+            # the 3D model puts a head and a support inside the height: the shell would no
+            # longer hold the calculated volume
+            entry.status = "kept"
+            out.add(
+                "warning",
+                "kept",
+                f"stack {sid}: {EQUIPMENT_LIST} {entry.tag} states {' and '.join(stated)}: the "
+                f"calculated {_dims_text(new)} is a flat-ended shell over the whole height "
+                f"holding {entry.detail}, which a head or support inside that height would "
+                "make smaller: not written",
+                loc,
+                [sid, entry.tag],
+                "remove head and support from its dimensions to let `cheme process stack "
+                "--write` write the calculated ones, or size the tank by hand (its own "
+                "source) with its head and support",
+            )
+            return
+    keys = [*_SIZE_KEYS, "head", "support", "source", "assumed"]
+    same = old is not None and all(_numbers_equal(old.get(k), new.get(k)) for k in keys)
+    entry.status = (
+        "current" if same and old.get("fingerprint") == new.get("fingerprint") else "outdated"
+    )
+    if not same:
+        out.add(
+            "warning",
+            "outdated",
+            f"stack {sid}: {EQUIPMENT_LIST} {entry.tag} dimensions "
+            + (f"{_dims_text(old)}" if old else "missing")
+            + f", calculated {_dims_text(new)}",
+            loc,
+            [sid, entry.tag],
+            "`cheme process stack --write` writes them; then `cheme layout build` and "
+            f"`cheme datasheets fill --tag {entry.tag}`",
+        )
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _same_value(key: str, old: Any, new: Any) -> bool:
+    """A hand-written end point naming the item's nozzle (``T-101/N2``) is the item."""
+    if key in ("suction_from", "discharge_to") and isinstance(old, str):
+        return old.strip().split("/", 1)[0] == str(new)
+    return _numbers_equal(old, new)
+
+
+def _compare_sheet(root: Path, entry: EquipmentInput, out: _Out, sid: str, loc: list[Any]) -> None:
+    path = root / DATASHEET_DIR / f"{entry.tag}.yaml"
+    entry.file = f"{DATASHEET_DIR}/{entry.tag}.yaml"
+    given = type_specific(entry)
+    if not path.is_file():
+        if not given:
+            entry.status = "tbd"
+            return
+        entry.status = "no-target"
+        out.add(
+            "info",
+            "target",
+            f"stack {sid}: no datasheet of {entry.tag}",
+            loc,
+            [sid, entry.tag],
+            f"`cheme datasheets draft` (with {entry.tag} in the equipment list), then "
+            "`cheme process stack --write`",
+        )
+        return
+    try:
+        sheet = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        entry.status = "no-target"
+        return
+    specific = sheet.get("type_specific") if isinstance(sheet, dict) else None
+    specific = specific if isinstance(specific, dict) else {}
+    changed, refresh, kept = [], [], []
+    for key, new in given.items():
+        old = specific.get(key)
+        if old is None or _is_tbd(old) or _ours(old):
+            same = (
+                isinstance(old, dict)
+                and _numbers_equal(old.get("value"), new["value"])
+                and old.get("source") == new["source"]
+                and bool(old.get("assumed")) == bool(new.get("assumed"))
+            )
+            if not same:
+                changed.append(key)
+            elif old.get("fingerprint") != new.get("fingerprint"):
+                refresh.append(key)
+        else:
+            value = old.get("value") if isinstance(old, dict) else old
+            if not _same_value(key, value, new["value"]):
+                kept.append(key)
+    # values this tool wrote before, which the design basis no longer gives
+    stale = [
+        key
+        for key, s in entry.values.items()
+        if s.provenance == "tbd" and _ours(specific.get(key)) and not _is_tbd(specific.get(key))
+    ]
+    entry.status = (
+        "outdated"
+        if changed or refresh or stale
+        else "kept"
+        if kept
+        else "current"
+        if given
+        else "tbd"
+    )
+    then = (
+        f"then `cheme datasheets fill --tag {entry.tag}` sizes the pump along the routed lines "
+        "from suction_from to discharge_to (the skid's P&ID lines, `cheme layout build`)"
+        if entry.role == "recirculation_pump"
+        else f"its end points and pressures for `cheme datasheets fill --tag {entry.tag}` are "
+        "declared by hand (the stack gives its capacity)"
+    )
+    if changed:
+        out.add(
+            "warning",
+            "outdated",
+            f"stack {sid}: {entry.file} type_specific {', '.join(changed)} differ from the "
+            "calculated (or are missing)",
+            loc,
+            [sid, entry.tag],
+            f"`cheme process stack --write` writes them; {then}",
+        )
+    if stale:
+        reasons = "; ".join(dict.fromkeys(entry.values[k].source for k in stale))
+        out.add(
+            "warning",
+            "outdated",
+            f"stack {sid}: {entry.file} type_specific {', '.join(stale)} were calculated by "
+            f"{STACK_MARK}, which gives none now ({reasons})",
+            loc,
+            [sid, entry.tag],
+            "give the missing input; or `cheme process stack --write` sets them TBD",
+        )
+    if kept:
+        out.add(
+            "warning",
+            "kept",
+            f"stack {sid}: {entry.file} type_specific {', '.join(kept)} written by hand "
+            "differ from the calculated: kept",
+            loc,
+            [sid, entry.tag],
+            "remove them to let `cheme process stack --write` write the calculated ones",
+        )
 
 
 def _dims_text(dims: dict[str, Any] | None) -> str:
@@ -1851,11 +2143,15 @@ def write_stack_inputs(root: Path, report: StackReport) -> WriteResult:
         text = path.read_text(encoding="utf-8")
         data = yaml.safe_load(text)
         new_text = text
+        changes: dict[str, dict[str, Any] | None] = {}
         for tag, entry in dims.items():
-            item = next(i for i in data["equipment"] if str(i.get("tag")).strip() == tag)
-            old = item.get("dimensions") if isinstance(item.get("dimensions"), dict) else None
-            new_text = set_dimensions(new_text, tag, list_dimensions(entry, old))
-        _check_list(text, new_text, {t: list_dimensions(e, _old(data, t)) for t, e in dims.items()})
+            if entry.complete:
+                changes[tag] = list_dimensions(entry, _old(data, tag))
+                new_text = set_dimensions(new_text, tag, changes[tag])  # type: ignore[arg-type]
+            else:  # sizes this tool wrote, which the design basis no longer gives
+                changes[tag] = None
+                new_text = remove_dimensions(new_text, tag)
+        _check_list(text, new_text, changes)
         path.write_text(new_text, encoding="utf-8")
         for entry in dims.values():
             entry.status = "written"
@@ -1871,6 +2167,15 @@ def write_stack_inputs(root: Path, report: StackReport) -> WriteResult:
                 old = specific.get(key)
                 if old is None or _is_tbd(old) or _ours(old):
                     specific[key] = new
+            for key, s in entry.values.items():
+                old = specific.get(key)
+                if s.provenance == "tbd" and _ours(old) and not _is_tbd(old):
+                    # written before, not given now: TBD with the reason
+                    specific[key] = {
+                        "value": "TBD",
+                        "unit": s.unit,
+                        "source": f"{STACK_MARK}: TBD: {s.source}",
+                    }
             entry.status = "written"
         header = "".join(line for line in text.splitlines(keepends=True)[: _header_lines(text)])
         path.write_text(
@@ -1896,15 +2201,19 @@ def _old(data: dict[str, Any], tag: str) -> dict[str, Any] | None:
     return found if isinstance(found, dict) else None
 
 
-def _check_list(old_text: str, new_text: str, changes: dict[str, dict[str, Any]]) -> None:
-    """The edited equipment list is valid and is the old one with *changes* only."""
+def _check_list(old_text: str, new_text: str, changes: dict[str, dict[str, Any] | None]) -> None:
+    """The edited equipment list is valid and is the old one with *changes* only (None: the
+    item's dimensions removed)."""
     from chemeascode.domains.equipment.schemas.equipment import EquipmentList
 
     expected = yaml.safe_load(old_text)
     for item in expected["equipment"]:
         tag = str(item.get("tag")).strip()
         if tag in changes:
-            item["dimensions"] = changes[tag]
+            if changes[tag] is None:
+                item.pop("dimensions", None)
+            else:
+                item["dimensions"] = changes[tag]
     try:
         found = yaml.safe_load(new_text)
         EquipmentList.model_validate(found)
@@ -1953,6 +2262,48 @@ def set_dimensions(text: str, tag: str, dimensions: dict[str, Any]) -> str:
     *dimensions*, in the item's own style (a block mapping, or a flow mapping on one line);
     the rest of the text, comments included, as it was. Raises ValueError when the item is not
     there."""
+    item = _item_node(text, tag)
+    found = next(((k, v) for k, v in item.value if getattr(k, "value", None) == "dimensions"), None)
+    if item.flow_style:
+        body = _flow(dimensions)
+        if found is not None:
+            key, value = found
+            return text[: key.end_mark.index] + ": " + body + text[_end(value) :]
+        close = item.end_mark.index - 1  # the closing brace
+        return text[:close].rstrip() + f", dimensions: {body}" + text[close:]
+    indent = " " * item.value[0][0].start_mark.column
+    block = "\n".join(f"{indent}  {k}: {_scalar(v)}" for k, v in dimensions.items())
+    if found is not None:
+        key, value = found
+        return text[: key.end_mark.index] + ":\n" + block + text[_line_end(text, _end(value)) :]
+    # after the item's last line, its trailing comment kept on it
+    end = _line_end(text, _end(item.value[-1][1]))
+    return text[:end] + f"\n{indent}dimensions:\n" + block + text[end:]
+
+
+def remove_dimensions(text: str, tag: str) -> str:
+    """*text* of an equipment list without item *tag*'s ``dimensions`` (the rest as it was);
+    *text* when it has none. Raises ValueError when the item is not there."""
+    item = _item_node(text, tag)
+    found = next(((k, v) for k, v in item.value if getattr(k, "value", None) == "dimensions"), None)
+    if found is None:
+        return text
+    key, value = found
+    if item.flow_style:
+        # from the comma before the key (the tag comes first) to the end of the value
+        comma = text.rfind(",", item.start_mark.index, key.start_mark.index)
+        if comma < 0:
+            raise ValueError(f"{EQUIPMENT_LIST} item {tag}: dimensions before its tag")
+        return text[:comma] + text[_end(value) :]
+    start = text.rfind("\n", 0, key.start_mark.index) + 1
+    end = _line_end(text, _end(value))
+    if end < len(text) and text[end] == "\n":
+        end += 1
+    return text[:start] + text[end:]
+
+
+def _item_node(text: str, tag: str) -> Any:
+    """The mapping node of item *tag* of an equipment list's text."""
     root = yaml.compose(text)
     if not isinstance(root, yaml.MappingNode):
         raise ValueError(f"{EQUIPMENT_LIST} is no mapping")
@@ -1973,22 +2324,7 @@ def set_dimensions(text: str, tag: str, dimensions: dict[str, Any]) -> str:
     )
     if item is None:
         raise ValueError(f"{EQUIPMENT_LIST} has no item {tag}")
-    found = next(((k, v) for k, v in item.value if getattr(k, "value", None) == "dimensions"), None)
-    if item.flow_style:
-        body = _flow(dimensions)
-        if found is not None:
-            key, value = found
-            return text[: key.end_mark.index] + ": " + body + text[_end(value) :]
-        close = item.end_mark.index - 1  # the closing brace
-        return text[:close].rstrip() + f", dimensions: {body}" + text[close:]
-    indent = " " * item.value[0][0].start_mark.column
-    block = "\n".join(f"{indent}  {k}: {_scalar(v)}" for k, v in dimensions.items())
-    if found is not None:
-        key, value = found
-        return text[: key.end_mark.index] + ":\n" + block + text[_line_end(text, _end(value)) :]
-    # after the item's last line, its trailing comment kept on it
-    end = _line_end(text, _end(item.value[-1][1]))
-    return text[:end] + f"\n{indent}dimensions:\n" + block + text[end:]
+    return item
 
 
 def _line_end(text: str, index: int) -> int:
@@ -2074,7 +2410,7 @@ def report_text(report: StackReport) -> str:
                 )
         for e in s.equipment:
             values = ", ".join(
-                f"{k} {'TBD' if x.provenance == 'tbd' else f'{x.value:.4g}'}"
+                f"{k} {'TBD' if x.provenance == 'tbd' else _g4(x.value)}"
                 + (f" {x.unit}" if x.unit and x.provenance != "tbd" else "")
                 for k, x in e.values.items()
             )
@@ -2098,3 +2434,7 @@ def report_text(report: StackReport) -> str:
 
 def _g(value: float | None) -> str:
     return "-" if value is None else f"{value:.6g}"
+
+
+def _g4(value: Any) -> str:
+    return value if isinstance(value, str) else f"{value:.4g}"

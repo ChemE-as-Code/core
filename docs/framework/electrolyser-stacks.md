@@ -83,15 +83,18 @@ series, the stacks on the one reservoir) over its horizon:
 
 | tag | gets | from |
 | --- | --- | --- |
-| reservoir | list `dimensions` (diameter, height, `head: flat`) | the largest volume over the duty times one plus the margin, a vertical cylinder of the stated H/D |
+| reservoir | list `dimensions` (diameter, height, `head: flat`, `support: none`) | the largest volume over the duty times one plus the margin, a vertical cylinder of the stated H/D |
 | dosing tank | list `dimensions` | the solution dosed over the campaign, with the margin |
 | bleed tank | list `dimensions` | the bleed over the campaign, with the margin |
-| recirculation pump | datasheet `type_specific`: `mass_flow_kg_h`, `density_kg_m3`, `viscosity_mpa_s`, `suction_pressure_kpa`, `discharge_pressure_kpa` | the anolyte flow per area (or per cell) times the cells at the density; the reservoir pressure and the stack's pressure drop |
-| dosing pump | datasheet `mass_flow_kg_h`, `density_kg_m3` | the duty's dosing rate times one plus the margin |
+| recirculation pump | datasheet `type_specific`: `mass_flow_kg_h`, `density_kg_m3`, `viscosity_mpa_s`, `suction_pressure_kpa`, `discharge_pressure_kpa`, `suction_from`, `discharge_to` | the anolyte flow per area (or per cell) times the cells at the density; the reservoir pressure and the stack's pressure drop; the reservoir's tag and the first stack's tag (the stacks in parallel share the inlet header) |
+| dosing pump | datasheet `mass_flow_kg_h`, `density_kg_m3` | the duty's dosing rate times one plus the margin (its end points and pressures are declared by hand) |
 | stack tags | list `dimensions` (length, width, height) | the envelope |
 
 Every value carries its provenance (`given`, `assumed`, `calculated`, or `tbd` with the
-reason) and its source; a value resting on an assumed input is marked ASSUMED.
+reason) and its source; a value resting on an assumed input is marked ASSUMED. A tank is a
+flat-ended cylinder over its whole height: a list that states another head or a support for it
+(which the 3D model puts inside that height, so the shell would hold less) keeps its sizes
+(`cheme.stack-kept`).
 
 ## One design basis
 
@@ -105,7 +108,10 @@ The cell's operating point, the arrangement and the duty are stated once:
   `cheme process duty` runs a duty a stack names at the same arrangement
   (`cheme.duty-arrangement`, info), so the two commands give one result for one duty id. A
   duty's own `cells_in_series` and `stacks` are then not used (`cheme.stack-duty`, info: drop
-  them).
+  them). One duty runs at one arrangement: the first stack naming it has it, and a later stack
+  naming the same duty gets no reservoir, dosing or bleed inputs (`cheme.stack-duty`, error);
+- one item, one size: a tag two stacks (or two roles of one skid) name is written by neither
+  (`cheme.stack-tags`, error).
 
 ## Where the results go
 
@@ -114,7 +120,11 @@ from the file (`cheme.stack-outdated`). `--write` edits the equipment list in pl
 and the rest of the file kept; the edit must change only the named dimensions, or nothing is
 written) and the pumps' datasheets, and only a value that is missing, TBD or written by
 `cheme process stack` before. A value written by hand is kept and reported
-(`cheme.stack-kept`).
+(`cheme.stack-kept`). A value `cheme process stack` wrote that the design basis no longer
+gives (an envelope or a pump input removed, a duty no longer feasible) is reported outdated
+too; `--write` sets a datasheet value TBD with the reason and removes the list sizes (sizes
+beside a weight are kept: `cheme.stack-kept`, clear them by hand). With `--json`, the report
+(as the files are after the write) carries `written`: each file written with its tags.
 
 The equipment list's `dimensions` take three optional fields for sizes a tool calculated:
 
@@ -128,8 +138,17 @@ The equipment list's `dimensions` take three optional fields for sizes a tool ca
 dimensions (`derived_dimensions`); the fingerprint stays in the list. Then rerun:
 
 1. `cheme layout build`: the 3D model's body of each tag from its list dimensions;
-2. `cheme datasheets draft` / `cheme datasheets fill --tag TAG`: the tanks' volume, the pumps'
-   head, NPSH and power along the routed lines.
+2. `cheme datasheets draft` / `cheme datasheets fill --tag TAG`: the tanks' volume, and the
+   recirculation pump as a pump no flowsheet stream links: its flow from the mass flow and
+   density, its head, NPSH and power along the routed lines from `suction_from` (the
+   reservoir) to `discharge_to` (the stack). Those lines come from the skid's P&ID routed in
+   the layout model; until they exist the head, NPSH and power stay TBD with that reason. The
+   dosing pump gets its capacity only: declare its end points and pressures by hand.
+3. `cheme assess lca`: it reads the flowsheet's energy and material streams, not the stacks.
+   Enter the stacks' DC power (or the AC power, with the rectifier inside the boundary) as the
+   duty of the electricity stream into the electrolysis step (the stream a cell's
+   `flowsheet.electricity` names) and the dosing as the stream into the reservoir. Nothing
+   reports those stale when the stacks change: compare them after each change.
 
 The skill `skid-design` chains the whole sequence.
 
@@ -137,15 +156,15 @@ The skill `skid-design` chains the whole sequence.
 
 | rule | level | when |
 | --- | --- | --- |
-| `cheme.stack-schema` | error | a unit a quantity does not take, a duplicate stack id, a value out of its range (not above 0: product rate, voltage and current limits, rectifier current, cell pitch, replacement interval, H/D, anolyte flow, density, viscosity, reservoir pressure; below 0: end plates, frame margin, clearances, operating hours, a margin, the stack's pressure drop; a rectifier efficiency not in (0, 1]): the value is not used |
-| `cheme.stack-cell` | error | the cell is missing, refused by its Faraday balance (outside the measured range among others), has no active area, does not form the product, or a specified cell is outside its declared operating range: the stack is refused, never extrapolated |
+| `cheme.stack-schema` | error | a unit a quantity does not take, a duplicate stack id, a value out of its range (not above 0: product rate, voltage and current limits, rectifier current, cell pitch, replacement interval, H/D, anolyte flow, density, viscosity, reservoir pressure; below 0: end plates, frame margin, clearances, operating hours, a margin, the stack's pressure drop; a rectifier efficiency not in (0, 1]): the value is not used (a stated voltage or current limit refuses the stack; a rectifier efficiency leaves only the AC power out) |
+| `cheme.stack-cell` | error | the cell is missing, refused by its Faraday balance (outside the measured range among others), has no active area, does not form the product, a side reaction forms or consumes the product too (the Faradaic efficiency is the overall reaction's: name the main product), or a specified cell is outside its declared operating range: the stack is refused, never extrapolated |
 | `cheme.stack-electrical` | error | the cell voltage above the stack voltage limit, or the cell current above the stack current limit |
-| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement (no tank and dosing inputs); info: the duty states another arrangement |
+| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement, or an earlier stack names it (no tank and dosing inputs); info: the duty states another arrangement |
 | `cheme.stack-envelope`, `stack-input-missing` | info | an envelope or equipment input is missing: that value stays TBD |
 | `cheme.stack-unsourced` | info | an assumed input without a source |
-| `cheme.stack-tags` | warning | fewer or more tags than stacks, or a tag not in the equipment list |
-| `cheme.stack-outdated` | warning | a list dimension or datasheet input differs from the calculated one: `--write` |
-| `cheme.stack-kept` | warning | a value written by hand differs: kept |
+| `cheme.stack-tags` | warning / error | fewer or more tags than stacks, or a tag not in the equipment list; error: a tag given twice (two stacks, or two roles), written by neither |
+| `cheme.stack-outdated` | warning | a list dimension or datasheet input differs from the calculated one, or one `cheme process stack` wrote is no longer given: `--write` |
+| `cheme.stack-kept` | warning | a value written by hand differs: kept; a tank stating a head or a support; sizes no longer given beside a weight |
 | `cheme.stack-target` | info | the item or datasheet a value goes to does not exist |
 
 `cheme validate` reports the findings that need no duty run (the sizing, the cell, the tags
@@ -158,9 +177,11 @@ and the stacks' list dimensions). A `process/cells.yaml` that does not follow it
   is an efficiency and a current rating, not a design. Stacks are in parallel on one bus;
   series strings of stacks are not sized.
 - The envelope is a square active area with an assumed pitch and margins, not a vendor's
-  drawing; a tank is its working volume's cylinder (heads, wall and supports not added).
+  drawing; a tank is its working volume's cylinder (flat ends, no support, wall not added).
 - The anolyte flow per area or per cell is declared (the measured series states none); the
   pump head is the stack's declared pressure drop plus the routed lines of the pump sizing.
 - No hazardous area, gas handling (H2, CO) or venting is sized.
+- The LCA does not read the stacks: their power and the dosing go into the flowsheet streams
+  by hand, and nothing reports those stale.
 - `cheme validate` does not yet check the duty-dependent list sizes (tanks) for staleness;
   rerun `cheme process stack` after a duty change.

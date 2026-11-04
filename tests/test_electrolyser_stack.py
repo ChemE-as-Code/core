@@ -557,7 +557,8 @@ def test_values_out_of_range_are_schema_errors(tmp_path):
     report = stack_report(root)
     s = _stack(report)
     assert _entry(s, "P-101").values["mass_flow_kg_h"].provenance == "tbd"
-    assert "density_kg_m3" not in _entry(s, "P-101").values
+    assert _entry(s, "P-101").values["density_kg_m3"].provenance == "tbd"
+    assert _entry(s, "P-101").values["density_kg_m3"].source == "no valid density"
     assert _entry(s, "P-102").values["mass_flow_kg_h"].provenance == "tbd"
     assert "no valid dosing_pump margin" in _entry(s, "P-102").values["mass_flow_kg_h"].source
     assert _entry(s, "T-101").values["diameter"].provenance == "tbd"
@@ -628,6 +629,258 @@ def test_the_duty_command_runs_a_skid_duty_at_the_sized_arrangement(tmp_path, mo
     assert (payload["duties"][0]["cells_in_series"], payload["duties"][0]["stacks"]) == (1, 1)
 
 
+# -- review follow-ups: the pump fill, stale values, shared tags, the checks --------------------
+
+
+def _list(root):
+    data = yaml.safe_load((root / "equipment/equipment-list.yaml").read_text())
+    return {i["tag"]: i for i in data["equipment"]}
+
+
+def _specific(root, tag):
+    return yaml.safe_load((root / f"equipment/datasheets/{tag}.yaml").read_text())["type_specific"]
+
+
+def test_the_pump_inputs_reach_the_pump_fill(tmp_path, monkeypatch):
+    """--write gives the recirculation pump its end points (the reservoir, the first stack) with
+    the flow and pressures, so `cheme datasheets fill` sizes it as a declared pump: the flow
+    from the mass flow and density, the head along the routed lines (none in this fixture: TBD
+    with that reason, not 'no flowsheet node links')."""
+    from chemeascode.domains.equipment.fill import fill_datasheets
+
+    root = _plant(tmp_path)
+    write_stack_inputs(root, stack_report(root))
+    spec = _specific(root, "P-101")
+    assert spec["suction_from"]["value"] == "T-101"
+    assert spec["discharge_to"]["value"] == "E-101A"
+    assert spec["suction_from"]["source"].startswith(STACK_MARK)
+    assert _entry(_stack(stack_report(root)), "P-101").status == "current"
+    monkeypatch.chdir(root)
+    assert runner.invoke(app, ["layout", "build"]).exit_code == 0
+    fill_datasheets(root, ["P-101"])
+    spec = _specific(root, "P-101")
+    assert spec["flow_m3_h"]["value"] == pytest.approx(63 / 1050)
+    assert "Q = m / rho" in spec["flow_m3_h"]["source"]
+    head = spec["differential_head_m"]
+    assert head["value"] == "TBD" and "no flowsheet node links" not in head["source"]
+    assert "T-101" in head["source"]
+    # a hand-written end point at the item's nozzle is the same item: no stack-kept
+    spec["suction_from"] = {"value": "T-101/N2", "source": "the P&ID"}
+    _edit(root, "equipment/datasheets/P-101.yaml", lambda d: d.update(type_specific=spec))
+    report = stack_report(root)
+    assert "cheme.stack-kept" not in _rules(report.findings)
+
+
+def test_a_missing_pump_input_is_tbd_and_its_old_value_cleared(tmp_path):
+    root = _plant(tmp_path)
+    write_stack_inputs(root, stack_report(root))
+    assert _specific(root, "P-101")["discharge_pressure_kpa"]["value"] == pytest.approx(151.3)
+    pump = "recirculation_pump"
+    _edit(root, "process/cells.yaml", lambda c: c["stacks"][0]["equipment"][pump].pop("viscosity"))
+    _edit(
+        root,
+        "process/cells.yaml",
+        lambda c: c["stacks"][0]["equipment"][pump].pop("stack_pressure_drop"),
+    )
+    report = stack_report(root)
+    entry = _entry(_stack(report), "P-101")
+    assert entry.values["discharge_pressure_kpa"].provenance == "tbd"
+    assert entry.values["discharge_pressure_kpa"].source == "no stack_pressure_drop"
+    assert entry.values["viscosity_mpa_s"].provenance == "tbd"
+    assert entry.status == "outdated"
+    missing = [f for f in report.findings if f.rule == "cheme.stack-input-missing"]
+    assert any("discharge_pressure_kpa" in f.message for f in missing)
+    stale = [f for f in report.findings if f.rule == "cheme.stack-outdated"]
+    assert any("viscosity_mpa_s, discharge_pressure_kpa" in f.message for f in stale), stale
+    write_stack_inputs(root, report)
+    spec = _specific(root, "P-101")
+    for key in ("discharge_pressure_kpa", "viscosity_mpa_s"):
+        assert spec[key]["value"] == "TBD" and spec[key]["source"].startswith(STACK_MARK)
+    assert spec["suction_pressure_kpa"]["value"] == pytest.approx(101.3)  # still given
+    after = stack_report(root)
+    assert _entry(_stack(after), "P-101").status == "current"
+    assert "cheme.stack-outdated" not in _rules(after.findings)
+
+
+def test_sizes_written_before_are_flagged_and_removed_once_tbd(tmp_path):
+    """An envelope or a tank input removed: the list sizes this tool wrote are outdated, and
+    --write removes them (the layout falls back to the placement or the defaults); sizes it
+    cannot remove alone (a weight beside them) are kept with a warning."""
+    from chemeascode.domains.spatial.model import build_model
+    from chemeascode.foundation.workspace import Workspace
+
+    root = _plant(tmp_path)
+    write_stack_inputs(root, stack_report(root))
+    assert {"E-101A", "T-101"} <= {t for t, i in _list(root).items() if "dimensions" in i}
+
+    def strip(data):
+        del data["stacks"][0]["envelope"]
+        del data["stacks"][0]["equipment"]["reservoir"]["aspect_ratio"]
+
+    _edit(root, "process/cells.yaml", strip)
+    report = stack_report(root)
+    s = _stack(report)
+    for tag in ("E-101A", "E-101B", "T-101"):
+        assert _entry(s, tag).status == "outdated", tag
+    outdated = {f.ids[1] for f in report.findings if f.rule == "cheme.stack-outdated"}
+    assert {"E-101A", "E-101B", "T-101"} <= outdated
+    assert "cheme.stack-outdated" in _rules(stack_findings(root))  # cheme validate too
+    written = write_stack_inputs(root, report)
+    assert {"E-101A", "E-101B", "T-101"} <= set(written.written["equipment/equipment-list.yaml"])
+    listed = _list(root)
+    assert "dimensions" not in listed["E-101A"] and "dimensions" not in listed["T-101"]
+    assert listed["T-101"]["material"] == "PP" and "dimensions" in listed["T-102"]
+    after = stack_report(root)
+    assert {_entry(_stack(after), t).status for t in ("E-101A", "T-101")} == {"tbd"}
+    assert not {"E-101A", "T-101"} & {
+        f.ids[1] for f in after.findings if f.rule == "cheme.stack-outdated"
+    }
+    placed = {e["tag"]: e for e in build_model(Workspace(root)).document["equipment"]}
+    assert placed["E-101A"]["size_from"] != "list"
+    # a weight beside the calculated sizes: kept, with a warning to clear them by hand
+    root = _plant(tmp_path / "weight")
+    write_stack_inputs(root, stack_report(root))
+    path = root / "equipment/equipment-list.yaml"
+    path.write_text(
+        path.read_text().replace("      head: flat\n", "      head: flat\n      weight: 0.1\n", 1)
+    )
+    _edit(root, "process/cells.yaml", strip)
+    report = stack_report(root)
+    tank = _entry(_stack(report), "T-101")
+    assert tank.status == "kept"
+    assert any(
+        f.rule == "cheme.stack-kept" and "weight" in f.message and "T-101" in f.ids
+        for f in report.findings
+    )
+    write_stack_inputs(root, report)
+    assert _list(root)["T-101"]["dimensions"]["weight"] == 0.1
+
+
+def test_a_stated_head_or_support_keeps_the_tank(tmp_path):
+    root = _plant(tmp_path)
+    write_stack_inputs(root, stack_report(root))
+    listed = _list(root)
+    assert (listed["T-101"]["dimensions"]["head"], listed["T-101"]["dimensions"]["support"]) == (
+        "flat",
+        "none",
+    )
+
+    def legs(data):
+        for item in data["equipment"]:
+            if item["tag"] == "T-101":
+                item["dimensions"].update(head="ellipsoidal_2_1", support="legs")
+
+    _edit(root, "equipment/equipment-list.yaml", legs)
+    before = (root / "equipment/equipment-list.yaml").read_text()
+    report = stack_report(root)
+    tank = _entry(_stack(report), "T-101")
+    assert tank.status == "kept"
+    kept = [f for f in report.findings if f.rule == "cheme.stack-kept"]
+    assert any("head ellipsoidal_2_1 and support legs" in f.message for f in kept), kept
+    write_stack_inputs(root, report)
+    assert (root / "equipment/equipment-list.yaml").read_text() == before
+
+
+def test_two_stacks_naming_one_duty_or_tag(tmp_path):
+    """The first stack naming a duty runs it, in both commands; a second gets no inputs from
+    it, and a tag given twice is written by neither (cheme.stack-duty, cheme.stack-tags)."""
+    from chemeascode.domains.equipment.electrolyser_stack import stack_arrangements
+
+    root = _plant(tmp_path)
+
+    def second(data):
+        other = json.loads(json.dumps(data["stacks"][0]))
+        other["id"], other["tags"] = "STK-2", ["E-201"]
+        other["product"]["rate"]["value"] = 0.04
+        other["equipment"]["recirculation_pump"]["tag"] = "P-201"
+        other["equipment"]["dosing_pump"]["tag"] = "P-202"
+        other["equipment"]["dosing_tank"]["tag"] = "T-202"
+        data["stacks"].append(other)  # the same duty SKID-150 and the same reservoir T-101
+
+    _edit(root, "process/cells.yaml", second)
+    report = stack_report(root)
+    one, two = _stack(report), _stack(report, "STK-2")
+    assert (one.number("stacks"), one.number("cells_per_stack")) == (2, 10)
+    assert (two.number("stacks"), two.number("cells_per_stack")) != (2, 10)
+    assert one.duty is not None and two.duty is None
+    assert any(
+        f.rule == "cheme.stack-duty" and f.level == "error" and "STK-2" in f.ids
+        for f in report.findings
+    )
+    assert _entry(two, "T-202").values["diameter"].provenance == "tbd"
+    arrangement = stack_arrangements(root)["SKID-150"]
+    assert (arrangement.cells_in_series, arrangement.stacks, arrangement.by) == (
+        10,
+        2,
+        "stack STK-1",
+    )
+    tags = [f for f in report.findings if f.rule == "cheme.stack-tags" and f.level == "error"]
+    assert len(tags) == 1 and "T-101" in tags[0].message
+    assert {e.status for e in (one.equipment + two.equipment) if e.tag == "T-101"} == {"conflict"}
+    written = write_stack_inputs(root, report)
+    assert "T-101" not in written.written["equipment/equipment-list.yaml"]
+    assert "dimensions" not in _list(root)["T-101"]
+    assert "cheme.stack-duty" in _rules(stack_findings(root))  # cheme validate too
+
+
+def test_a_rectifier_efficiency_out_of_range_drops_only_the_ac_power(tmp_path):
+    point = CellPoint("C-100", "specified", 20.0, 2000.0, 0.01, 3.5, 0.9, 2, 1, M_CO)
+    for value, unit in ((1.05, None), (95, "-"), (0, None)):
+        bad = {
+            **HAND,
+            "electrical": {
+                **HAND["electrical"],
+                "rectifier_efficiency": {"value": value, "unit": unit, "provenance": "given"},
+            },
+        }
+        out = _Out(None)
+        result = size_stack(Stack.model_validate(bad), point, out)
+        assert not result.refused
+        assert "ac_power_kw" not in result.values
+        assert result.number("dc_power_kw") == pytest.approx(7.56)
+        assert any(
+            f.rule == "cheme.stack-schema" and f.level == "error" and "rectifier" in f.message
+            for f in out.findings
+        )
+    percent = {
+        **HAND,
+        "electrical": {
+            **HAND["electrical"],
+            "rectifier_efficiency": {"value": 95, "unit": "%", "provenance": "given"},
+        },
+    }
+    result = size_stack(Stack.model_validate(percent), point)
+    assert result.number("ac_power_kw") == pytest.approx(7.56 / 0.95)
+
+
+def test_a_product_a_side_reaction_forms_too_is_refused(tmp_path):
+    """O2 is a product of CO2R, but the WS side reaction forms it too: the cell's Faradaic
+    efficiency (of CO2R) does not give its rate, and the stack is not sized on it."""
+    root = _plant(tmp_path)
+    _edit(root, "process/cells.yaml", lambda c: c["stacks"][0]["product"].update(component="O2"))
+    report = stack_report(root)
+    s = _stack(report)
+    assert s.refused and "side reactions" in s.reasons[0]
+    assert any(f.rule == "cheme.stack-cell" and f.level == "error" for f in report.findings)
+
+
+def test_set_and_remove_dimensions_keep_the_rest_of_the_file():
+    from chemeascode.domains.equipment.electrolyser_stack import remove_dimensions
+
+    text = LIST
+    for tag in ("T-2", "T-4", "T-1"):
+        text = remove_dimensions(text, tag)
+    data = yaml.safe_load(text)
+    assert all("dimensions" not in i for i in data["equipment"])
+    assert "    notes: after\n" in text and "    material: PP  # kept\n" in text
+    assert "  - {tag: T-4, type: Tank}\n" in text
+    assert text == LIST.replace(
+        "    dimensions:\n      diameter: 1\n      height: 2\n      weight: 0.4\n", ""
+    ).replace(
+        "{tag: T-4, type: Tank, dimensions: {diameter: 1, height: 1}}", "{tag: T-4, type: Tank}"
+    )
+
+
 # -- editing the equipment list -----------------------------------------------------------------
 
 LIST = """\
@@ -692,6 +945,20 @@ def test_cli_json_is_the_report_and_write(tmp_path, monkeypatch):
     assert runner.invoke(app, ["process", "stack", "--write"]).stdout.startswith("nothing to write")
     monkeypatch.chdir(tmp_path)  # the function from elsewhere
     assert not stack_report(root).findings
+    # --write --json: the report as the files are then, and what was written
+    fresh = _plant(tmp_path / "json")
+    monkeypatch.chdir(fresh)
+    result = runner.invoke(app, ["process", "stack", "--write", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["written"] == {
+        "equipment/equipment-list.yaml": ["E-101A", "E-101B", "T-101", "T-102"],
+        "equipment/datasheets/P-101.yaml": ["P-101"],
+        "equipment/datasheets/P-102.yaml": ["P-102"],
+    }
+    assert {e["status"] for e in payload["stacks"][0]["equipment"]} == {"current"}
+    payload = json.loads(runner.invoke(app, ["process", "stack", "--write", "--json"]).stdout)
+    assert payload["written"] == {}
 
 
 def test_cli_exit_codes(tmp_path, monkeypatch):

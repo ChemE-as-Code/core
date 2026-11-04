@@ -1820,10 +1820,16 @@ def _pump(sheet: _Sheet, context: _Context) -> None:
     try:
         try:
             node, inlet, outlet = context.one_in_one_out(sheet.tag)
-        except _Refused:
+        except _Refused as refusal:
             if sheet.param("suction_from") and sheet.param("discharge_to"):
                 _pump_declared(sheet, context)
                 return
+            if sheet.param("mass_flow_kg_h") is not None:  # meant as a declared pump
+                raise _Refused(
+                    f"{refusal.reason}; for a pump no stream links declare "
+                    "type_specific.suction_from and discharge_to (its end points in the layout "
+                    "model)"
+                ) from refusal
             raise
         if inlet.mass_flow is None:
             raise _Refused(f"stream {inlet.id}: no flow in case {context.case}")
@@ -2106,13 +2112,14 @@ def _pump_declared(sheet: _Sheet, context: _Context) -> None:
             roughness=str(rough.value) if rough else None,
             inputs_assumed=any(p.assumed for p in (schedule, rough) if p is not None),
         )
-    except pumps.SizingError as failure:
-        refusal = _Refused(str(failure))
+    except (pumps.SizingError, _Refused) as failure:
+        refusal = failure if isinstance(failure, _Refused) else _Refused(str(failure))
+        flow = _declared_flow(sheet)
         for key, unit in keys:
-            sheet.tbd_value(key, unit, refusal)
-        return
-    except _Refused as refusal:
-        for key, unit in keys:
+            if key == "flow_m3_h" and flow is not None:
+                # the flow needs no routed line: Q = m / rho from the declared values
+                sheet.put(key, flow[0], unit, flow[1], flow[2], inputs=[], reads=flow[3])
+                continue
             sheet.tbd_value(key, unit, refusal)
         return
     inputs = "; ".join(f"{p.text()}" for p in used)
@@ -2159,6 +2166,28 @@ def _pump_declared(sheet: _Sheet, context: _Context) -> None:
             inputs=depends[key][0],
             reads=depends[key][1],
         )
+
+
+def _declared_flow(sheet: _Sheet) -> tuple[float, str, bool, list[str]] | None:
+    """A declared pump's volume flow from its declared mass flow and density: (m3/h, basis,
+    assumed, the parameters read); None when either is missing or not a positive number."""
+    m, rho = sheet.param("mass_flow_kg_h"), sheet.param("density_kg_m3")
+    if m is None or rho is None:
+        return None
+    try:
+        mass, density = m.number(), rho.number()
+    except _Refused:
+        return None
+    if not (mass > 0 and density > 0):
+        return None
+    return (
+        mass / density,
+        f"Q = m / rho = {mass:.6g} kg/h / {density:.6g} kg/m3 (declared mass_flow_kg_h "
+        f"{m.text()}; density_kg_m3 {rho.text()}); the head, NPSH and power need the routed "
+        "lines",
+        m.assumed or rho.assumed,
+        ["param:mass_flow_kg_h", "param:density_kg_m3"],
+    )
 
 
 def _ends(context: _Context, stream: _Stream, end: str) -> list[str]:

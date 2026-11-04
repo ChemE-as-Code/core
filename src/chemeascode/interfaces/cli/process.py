@@ -432,7 +432,9 @@ def stack(
     output and its margin, kWh per kg, the stack envelope; and the skid equipment inputs from
     the duty named, run at the sized arrangement over its horizon: reservoir and tank
     dimensions, the recirculation and dosing pumps' flows. Without --write it writes nothing
-    and reports what differs from the equipment list and datasheets (cheme.stack-outdated).
+    and reports what differs from the equipment list and datasheets (cheme.stack-outdated);
+    with --write --json the report (as the files are then) carries `written`, each file
+    written with its tags.
     Exit 1 on an error finding (process/cells.yaml not following its schema among them: its
     findings are printed), 2 without process/cells.yaml or stacks, or for an unknown id."""
     from chemeascode.domains.equipment.electrolyser_stack import (
@@ -466,11 +468,17 @@ def stack(
             typer.echo(str(failure), err=True)
             raise typer.Exit(1) from failure
         report = stack_report(workspace.root, ids or None)  # as the files are now
-        if not as_json:
-            for name, tags in written.written.items():
-                typer.echo(f"wrote {name}: {', '.join(tags)}")
-            if not written.written:
-                typer.echo("nothing to write")
+        if as_json:
+            # the report as the files are now, and what this run wrote (file -> tags)
+            payload = {**report.as_dict(), "written": written.written}
+            typer.echo(json.dumps(payload, indent=2))
+            if report.errors:
+                raise typer.Exit(1)
+            return
+        for name, tags in written.written.items():
+            typer.echo(f"wrote {name}: {', '.join(tags)}")
+        if not written.written:
+            typer.echo("nothing to write")
     typer.echo(report.to_json() if as_json else report_text(report))
     if report.errors:
         raise typer.Exit(1)
