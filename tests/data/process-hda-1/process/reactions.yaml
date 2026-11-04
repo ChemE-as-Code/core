@@ -1,0 +1,44 @@
+# Reactions of thermal toluene hydrodealkylation (DESIGN.md D-005). Schema cheme/reactions/v1.
+# Heats of reaction from the ideal-gas formation enthalpies of process/materials.yaml (298.15 K).
+# No rate law: the reactor R-101 is a conversion reactor with a per-pass toluene conversion
+# (ASSUMED design choice) and a benzene selectivity from a correlation recalled, not verified (D-005).
+# D-014: R-101 runs HDA and HDABP, both keyed on toluene, so that the DWSIM conversion reactor
+# (one conversion per reaction) reproduces the D-005 selectivity exactly: HDA converts
+# X * S = 0.75 * 0.9693886 and HDABP X * (1 - S) of the inlet toluene. HDABP is HDA twice plus
+# BIPH (2 TOL + H2 -> BIPH + 2 CH4), written per kmol toluene. BIPH stays declared as the
+# reversible step behind it (its equilibrium is the D-005 check).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: HDA
+    equation: C7H8 + H2 -> C6H6 + CH4
+    stoichiometry: {TOL: -1.0, H2: -1.0, BZ: 1.0, CH4: 1.0}
+    reversible: false
+    conversion: {key: TOL, value: 0.7270415, provenance: assumed, source: "D-005, D-014: X * S with X = 0.75 per pass (ASSUMED) and S = 1 - 0.0036/(1 - X)^1.544 = 0.9693886 (Douglas 1988 correlation, recalled, I-06)"}
+    heat_of_reaction:
+      value: -41764.0
+      provenance: calculated
+      source: "ideal-gas formation enthalpies of process/materials.yaml at 298.15 K (83180 - 74534 - 50410 kJ/kmol)"
+    catalyst: none (thermal, homogeneous gas phase)
+    sources: ["Douglas, J.M. (1988) Conceptual Design of Chemical Processes, McGraw-Hill (HDA case study)"]
+  - id: BIPH
+    equation: 2 C6H6 <=> C12H10 + H2
+    stoichiometry: {BZ: -2.0, BIPH: 1.0, H2: 1.0}
+    reversible: true
+    heat_of_reaction:
+      value: 15040.0
+      provenance: calculated
+      source: "ideal-gas formation enthalpies of process/materials.yaml at 298.15 K (181400 - 2 x 83180 kJ/kmol)"
+    catalyst: none (thermal)
+    sources: ["Douglas, J.M. (1988) Conceptual Design of Chemical Processes, McGraw-Hill (HDA case study)"]
+  - id: HDABP
+    equation: C7H8 + 0.5 H2 -> 0.5 C12H10 + CH4
+    stoichiometry: {TOL: -1.0, H2: -0.5, BIPH: 0.5, CH4: 1.0}
+    reversible: false
+    conversion: {key: TOL, value: 0.0229585, provenance: assumed, source: "D-005, D-014: X * (1 - S) with X = 0.75 per pass (ASSUMED) and S = 0.9693886 (Douglas 1988 correlation, recalled, I-06)"}
+    heat_of_reaction:
+      value: -34244.0
+      provenance: calculated
+      source: "ideal-gas formation enthalpies of process/materials.yaml at 298.15 K (0.5 x 181400 - 74534 - 50410 kJ/kmol); equals (2 HDA + BIPH) / 2"
+    catalyst: none (thermal)
+    sources: ["Douglas, J.M. (1988) Conceptual Design of Chemical Processes, McGraw-Hill (HDA case study): the overall toluene-to-biphenyl route of HDA followed by BIPH"]

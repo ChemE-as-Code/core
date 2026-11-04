@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- `cheme process pinch --dt-min X` (#134, ADR 0040): whole-plant pinch targets of the case's
+  recorded simulation run. One thermal stream per duty with class (utility, recovery,
+  constrained, excluded) and quality (linearised or insufficient), reconciled against the run's
+  duties; the current utility demand, the theoretical minimum utility demand at dTmin and the
+  theoretical energy-saving potential, the hot-side, cold-side and shifted pinch, utility-use
+  pinch violations apart from cross-pinch transfer, `--json`, `--md`, `--include-constrained`
+  for the reactors, and `--write` to `process/pinch-run.json`, refused while the reconciliation
+  has a finding. The extraction (`heat_integration/streams.py`) also serves the simulation's
+  energy audit, which is unchanged.
+
 ### Fixed
 
 - IDAES runs: the energy audit labelled the enthalpy reference as DWSIM's

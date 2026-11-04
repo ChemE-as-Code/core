@@ -234,6 +234,7 @@
   },
   "heat-integration": {
    "SKILL.md": [
+    "b4501bae6311d50624d78a093c72fd7a3e12a53a14b405070dc458c2c58f1afc",
     "eea3ab65d00323ba7500b36ab4a627f44ba7b591e9bc37299b0c6b55f6c81a31"
    ]
   },
@@ -244,6 +245,7 @@
   },
   "heat-integration-minimum-utility-targets": {
    "SKILL.md": [
+    "29b03c18b5743dea91f8d54e3ff0d0ef9020c8f2043736a88e7808a3b8204092",
     "c7c1ba10555ed324ee0c7d351bc4ad37fab6aae12bf96d8139e1caa67695e189"
    ]
   },
@@ -264,6 +266,7 @@
   },
   "heat-integration-stream-data": {
    "SKILL.md": [
+    "1dca44118c5a137e2683edca25bec10283945cd0f40a7e1f0a758f52508013a3",
     "fdc64e8b9f47488630efa808c601cefe8fdebe526f1cb7cac2927eb2d353515c"
    ]
   },

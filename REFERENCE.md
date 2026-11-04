@@ -123,6 +123,7 @@ cheme process propagate --fill                # compositions/flows through compr
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
+cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
 cheme chemistry thermo ammonia                # ideal-gas formation data for materials.yaml (extra props)
 cheme process props --fill                    # phase, density, enthalpy (extra props), in range only
@@ -1306,6 +1307,36 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   terminals without `category` (`raw_material`, `product`, `by_product`, `utility`,
   `wastewater`, `off_gas`, `solid_waste`, `emission`; `cheme.boundary-unclassified`) and utility
   terminals without levels. Exit 1 on a warning.
+- **`cheme process pinch --dt-min X [--dt-min-source S] [--case C] [--include-constrained]
+  [--json|--md] [--write]`** takes whole-plant pinch targets (problem table,
+  `heat_integration/pinch.py`) from the case's recorded simulation run
+  (`process/simulation-run.json`; it never runs the simulator: a missing, stale or unconverged
+  run is an error, `cheme.process-pinch-run-missing`, `-run-stale`, `-run-not-converged`).
+  dTmin is required, its source recorded (default `ASSUMED`). `heat_integration/streams.py`
+  extracts one stream per thermal duty and side, each in one class: `utility` (heaters, coolers,
+  flashes, condensers, reboilers, the process side of an exchanger against a utility terminal's
+  stream such as a waste-heat boiler, whose steam is the utility and no second stream),
+  `recovery` (both sides of a process/process exchanger, counted once; every side of a
+  multi-stream exchanger; a condenser heating another column's reboiler), `constrained`
+  (reactors, with the reason; out of the targets unless `--include-constrained`) or `excluded`
+  (with the reason). Quality: the simulators report end temperatures only, so a stream is
+  `linearised` (one constant-CP or isothermal segment; a phase change is not split at dew or
+  bubble points, `cheme.process-pinch-stream-linearised`) or `insufficient` (excluded,
+  `cheme.process-pinch-stream-excluded`). The reconciliation lists every thermal duty of the
+  run from the units' results and checks the streams give each back within 0.1 kW + 1 %;
+  heat left over is `cheme.process-pinch-reconciliation` (warning). It prints the **current
+  utility demand** (of the targeted streams; recovered heat is not utility), the **theoretical
+  minimum utility demand at dTmin** and the **theoretical energy-saving potential** (their
+  difference; it ignores pressure, distance, fouling, control, safety and cost and is not a
+  saving), the hot-side, cold-side and shifted pinch or a threshold problem, utility-use pinch
+  violations (a utility heater below, a cooler above the pinch) apart from cross-pinch
+  process-to-process transfer of the existing exchangers whose sides are all known (with their
+  least approach), the stream table and the reconciliation. `--write` records settings, core
+  version, the simulation run (model and content fingerprints), the inputs and the results in
+  `process/pinch-run.json` (schema `cheme/pinch-run/v1`, one entry per case, generated) and
+  refuses with exit 3 while the reconciliation has a finding. Exit 1 on an error or a warning,
+  2 on invalid input (no or a negative `--dt-min`, an unknown case, `--json` with `--md`).
+  Python: `heat_integration.report`; ADR 0040.
 - **`cheme process furnace [ID] [--json]`** gives the energy basis of a solid-reaction furnace
   declared in `process/furnaces.yaml` (schema `cheme/furnaces/v1`; today limestone calcination
   only): the element balance, the product and off-gas composition (calcination and fuel CO2

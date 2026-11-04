@@ -25,9 +25,12 @@ design conditions.
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this. Stream temperatures, flows and
-enthalpies of a solved case can be read with `cheme process streams`; deciding which become
-pinch streams is yours.
+`cheme process pinch --dt-min X` extracts a first table from a solved case's recorded run: one
+stream per thermal duty, each with its class and quality, reconciled against the run's duties
+(`--json` lists them). Its streams are linearised between inlet and outlet temperature, not on
+the safe side, and it takes mixing points as the flowsheet gives them: check them against the
+rules below. Stream temperatures, flows and enthalpies of a solved case can be read with
+`cheme process streams`; deciding which become pinch streams is yours.
 
 Four rules (Ray and Das §5.8):
 

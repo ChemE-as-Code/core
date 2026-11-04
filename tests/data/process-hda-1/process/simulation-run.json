@@ -1,0 +1,1831 @@
+{
+  "schema": "cheme/simulation-run/v1",
+  "kind": "simulation-run",
+  "cases": {
+    "design": {
+      "case": "design",
+      "run_at": "2026-11-01T17:23:53Z",
+      "tool": "cheme-as-code 1.2.1",
+      "simulator": {
+        "name": "dwsim",
+        "version": "9.0.5.0",
+        "method": "Peng-Robinson (PR)"
+      },
+      "property_package": "Peng-Robinson (PR)",
+      "model_fingerprint": "2e24db8a18b4fb2a",
+      "inputs": {
+        "commit": "4385a2da2e986b930f19899da3f559151ea83539",
+        "dirty": [
+          "process/flowsheet.yaml",
+          "process/reactions.yaml",
+          "process/simulation.yaml"
+        ],
+        "fingerprints": {
+          "process/flowsheet.yaml": "sha256:4f85735ef6c641db707fe5f5c80dd9d476221ebd8b41743bac031e6ede615f1e",
+          "process/materials.yaml": "sha256:76ec0e4c5a74d4eba2bf2c3ca25f949fd181908061ea448ed833dbecc956de3a",
+          "process/reactions.yaml": "sha256:567fbe35de346d4eaa5bfbde92df8f72e0db94bd4a995578ebb9ca13c25b6ae2",
+          "process/simulation.yaml": "sha256:60b7b26327cc671513ad1f43a206b5f35eabb6475d5a47857ea8e260f9930865"
+        }
+      },
+      "converged": true,
+      "status": "converged",
+      "iterations": 11,
+      "messages": [],
+      "units": [
+        {
+          "id": "M100",
+          "unit": "mixer",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {},
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "P101",
+          "unit": "pump",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": 36.71710444061587
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "M101",
+          "unit": "mixer",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {},
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "E101",
+          "unit": "heat_exchanger",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": 24388.010496696672
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "H101",
+          "unit": "heater",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": 2914.63539841032
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "R101",
+          "unit": "conversion_reactor",
+          "status": "simulated",
+          "basis": "specified",
+          "converged": true,
+          "results": {
+            "duty_kW": 0.0,
+            "extents_kmol_h": {
+              "HDA": 162.73392560965942,
+              "HDABP": 5.1388306951324925
+            },
+            "conversions": {
+              "HDA": 0.727041463262462,
+              "HDABP": 0.022958599284385574
+            }
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "Q101",
+          "unit": "mixer",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {},
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "E102",
+          "unit": "cooler",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": -4891.176669829966
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "V101",
+          "unit": "flash",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": -12.404950072236261
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "SPL1",
+          "unit": "splitter",
+          "status": "simulated",
+          "basis": "specified",
+          "converged": true,
+          "results": {},
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "K101",
+          "unit": "compressor",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "duty_kW": 229.48159650015762
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "SPL2",
+          "unit": "splitter",
+          "status": "simulated",
+          "basis": "specified",
+          "converged": true,
+          "results": {},
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "C201",
+          "unit": "shortcut_column",
+          "status": "simulated",
+          "basis": "shortcut",
+          "converged": true,
+          "results": {
+            "condenser_kW": 23.66957714495602,
+            "reboiler_kW": 1283.5122002401201,
+            "min_reflux": -0.017362271925842256,
+            "min_stages": 2.057796002644973,
+            "stages": 3.0165524975070332
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "C202",
+          "unit": "shortcut_column",
+          "status": "simulated",
+          "basis": "shortcut",
+          "converged": true,
+          "results": {
+            "condenser_kW": 4202.662650069452,
+            "reboiler_kW": 3481.7562595083245,
+            "min_reflux": 1.6742706856462455,
+            "min_stages": 19.061543026708186,
+            "stages": 37.99043095776256
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        },
+        {
+          "id": "C203",
+          "unit": "distillation_column",
+          "status": "simulated",
+          "basis": "predictive",
+          "converged": true,
+          "results": {
+            "condenser_kW": 790.4971632081914,
+            "reboiler_kW": 649.2259678241351,
+            "reflux_ratio": 0.4999999999966475,
+            "top_temperature_K": 344.8881128552858,
+            "bottom_temperature_K": 473.0755125916519
+          },
+          "messages": [],
+          "warnings": [],
+          "coupling": "native"
+        }
+      ],
+      "streams": [
+        {
+          "id": "S2",
+          "values": {
+            "temperature": {
+              "value": 313.751,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 30.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 20454.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 8.41389e-46,
+                "CH4": 7.87089e-40,
+                "TOL": 0.996384,
+                "BZ": 0.00361551,
+                "BIPH": 1.13136e-09
+              }
+            }
+          },
+          "filled": [
+            "temperature"
+          ],
+          "kept": {
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S3",
+          "values": {
+            "temperature": {
+              "value": 315.846,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3600.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 20454.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 8.41389e-46,
+                "CH4": 7.87089e-40,
+                "TOL": 0.996384,
+                "BZ": 0.00361551,
+                "BIPH": 1.13136e-09
+              }
+            }
+          },
+          "filled": [
+            "temperature"
+          ],
+          "kept": {
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S5",
+          "values": {
+            "temperature": {
+              "value": 321.869,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3600.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 47296.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.426537,
+                "CH4": 0.488107,
+                "TOL": 0.077848,
+                "BZ": 0.00750756,
+                "BIPH": 1.80328e-07
+              }
+            }
+          },
+          "filled": [
+            "temperature"
+          ],
+          "kept": {
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S6",
+          "values": {
+            "temperature": {
+              "value": 840.0,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3520.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 47296.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.426537,
+                "CH4": 0.488107,
+                "TOL": 0.077848,
+                "BZ": 0.00750756,
+                "BIPH": 1.80328e-07
+              }
+            }
+          },
+          "filled": [
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S7",
+          "values": {
+            "temperature": {
+              "value": 895.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3450.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 47296.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.426537,
+                "CH4": 0.488107,
+                "TOL": 0.077848,
+                "BZ": 0.00750756,
+                "BIPH": 1.80328e-07
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S8",
+          "values": {
+            "temperature": {
+              "value": 937.916,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3380.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 47296.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.369045,
+                "CH4": 0.546493,
+                "TOL": 0.019462,
+                "BZ": 0.0641063,
+                "BIPH": 0.000893817
+              }
+            }
+          },
+          "filled": [
+            "temperature"
+          ],
+          "kept": {
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S9",
+          "values": {
+            "temperature": {
+              "value": 893.505,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 52790.4,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.360549,
+                "CH4": 0.534535,
+                "TOL": 0.0245076,
+                "BZ": 0.0792698,
+                "BIPH": 0.00113896
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S10",
+          "values": {
+            "temperature": {
+              "value": 393.481,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3180.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 52790.4,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.360548,
+                "CH4": 0.534535,
+                "TOL": 0.0245076,
+                "BZ": 0.0792699,
+                "BIPH": 0.00113896
+              }
+            }
+          },
+          "filled": [
+            "temperature",
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S11",
+          "values": {
+            "temperature": {
+              "value": 313.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3120.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 52790.4,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.360548,
+                "CH4": 0.534535,
+                "TOL": 0.0245076,
+                "BZ": 0.0792699,
+                "BIPH": 0.00113896
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S12",
+          "values": {
+            "temperature": {
+              "value": 313.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 29287.7,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.400013,
+                "CH4": 0.590084,
+                "TOL": 0.00107014,
+                "BZ": 0.00883287,
+                "BIPH": 2.20256e-07
+              }
+            }
+          },
+          "filled": [
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S13",
+          "values": {
+            "temperature": {
+              "value": 313.155,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 3261.46,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.400013,
+                "CH4": 0.590084,
+                "TOL": 0.00107014,
+                "BZ": 0.00883287,
+                "BIPH": 2.20256e-07
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S14",
+          "values": {
+            "temperature": {
+              "value": 313.155,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 26026.2,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.400013,
+                "CH4": 0.590084,
+                "TOL": 0.00107014,
+                "BZ": 0.00883287,
+                "BIPH": 2.20256e-07
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S15",
+          "values": {
+            "temperature": {
+              "value": 323.773,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3600.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 26026.2,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.400013,
+                "CH4": 0.590084,
+                "TOL": 0.00107014,
+                "BZ": 0.00883287,
+                "BIPH": 2.20256e-07
+              }
+            }
+          },
+          "filled": [
+            "temperature"
+          ],
+          "kept": {
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S16",
+          "values": {
+            "temperature": {
+              "value": 313.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 23502.6,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.00857567,
+                "CH4": 0.0391104,
+                "TOL": 0.23354,
+                "BZ": 0.707479,
+                "BIPH": 0.0112951
+              }
+            }
+          },
+          "filled": [
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S17",
+          "values": {
+            "temperature": {
+              "value": 313.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 5494.29,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.00857567,
+                "CH4": 0.0391104,
+                "TOL": 0.23354,
+                "BZ": 0.707479,
+                "BIPH": 0.0112951
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S18",
+          "values": {
+            "temperature": {
+              "value": 313.15,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 3250.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 18008.3,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.00857567,
+                "CH4": 0.0391104,
+                "TOL": 0.23354,
+                "BZ": 0.707479,
+                "BIPH": 0.0112951
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "calculated",
+            "composition": "calculated"
+          }
+        },
+        {
+          "id": "S19",
+          "values": {
+            "temperature": {
+              "value": 201.428,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 800.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 171.23,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 0.17483,
+                "CH4": 0.79716,
+                "TOL": 0.00113062,
+                "BZ": 0.0269,
+                "BIPH": 7.22558e-10
+              }
+            }
+          },
+          "filled": [
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S20",
+          "values": {
+            "temperature": {
+              "value": 447.908,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 800.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 17837.1,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 2.14968e-07,
+                "CH4": 1e-05,
+                "TOL": 0.245528,
+                "BZ": 0.742583,
+                "BIPH": 0.0118777
+              }
+            }
+          },
+          "filled": [
+            "temperature",
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S21",
+          "values": {
+            "temperature": {
+              "value": 366.164,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 150.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 12498.5,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 2.90629e-07,
+                "CH4": 1.35196e-05,
+                "TOL": 0.001,
+                "BZ": 0.998926,
+                "BIPH": 8.9676e-30
+              }
+            }
+          },
+          "filled": [],
+          "kept": {
+            "temperature": "assumed",
+            "pressure": "assumed",
+            "flow": "assumed",
+            "composition": "assumed"
+          }
+        },
+        {
+          "id": "S22",
+          "values": {
+            "temperature": {
+              "value": 404.396,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 170.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 5337.79,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 3.31914e-45,
+                "CH4": 3.10495e-39,
+                "TOL": 0.94028,
+                "BZ": 0.0142627,
+                "BIPH": 0.0456245
+              }
+            }
+          },
+          "filled": [
+            "temperature",
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S23",
+          "values": {
+            "temperature": {
+              "value": 344.888,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 30.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 4935.82,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 3.48069e-45,
+                "CH4": 3.25609e-39,
+                "TOL": 0.985043,
+                "BZ": 0.0149569,
+                "BIPH": 4.67957e-09
+              }
+            }
+          },
+          "filled": [
+            "temperature",
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "S24",
+          "values": {
+            "temperature": {
+              "value": 473.076,
+              "unit": "K"
+            },
+            "pressure": {
+              "value": 45.0,
+              "unit": "kPa(a)"
+            },
+            "flow": {
+              "value": 401.05,
+              "unit": "kg/h"
+            },
+            "composition": {
+              "basis": "mole_fraction",
+              "values": {
+                "H2": 1.43784e-65,
+                "CH4": 6.86929e-58,
+                "TOL": 0.0205812,
+                "BZ": 1.52513e-06,
+                "BIPH": 0.979417
+              }
+            }
+          },
+          "filled": [
+            "temperature",
+            "flow",
+            "composition"
+          ],
+          "kept": {
+            "pressure": "assumed"
+          }
+        },
+        {
+          "id": "Q1",
+          "values": {
+            "duty": {
+              "value": 36.7171,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q2",
+          "values": {
+            "duty": {
+              "value": 229.482,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q3",
+          "values": {
+            "duty": {
+              "value": 2914.64,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q4",
+          "values": {
+            "duty": {
+              "value": 4891.18,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q5",
+          "values": {
+            "duty": {
+              "value": 1283.51,
+              "unit": "kW"
+            }
+          },
+          "filled": [],
+          "kept": {
+            "duty": "assumed"
+          }
+        },
+        {
+          "id": "Q6",
+          "values": {
+            "duty": {
+              "value": 23.6696,
+              "unit": "kW"
+            }
+          },
+          "filled": [],
+          "kept": {
+            "duty": "assumed"
+          }
+        },
+        {
+          "id": "Q7",
+          "values": {
+            "duty": {
+              "value": 3481.76,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q8",
+          "values": {
+            "duty": {
+              "value": 4202.66,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q9",
+          "values": {
+            "duty": {
+              "value": 649.226,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        },
+        {
+          "id": "Q10",
+          "values": {
+            "duty": {
+              "value": 790.497,
+              "unit": "kW"
+            }
+          },
+          "filled": [
+            "duty"
+          ],
+          "kept": {}
+        }
+      ],
+      "findings": [
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 371,
+          "level": "info",
+          "rule": "cheme.process-sim-recycle",
+          "message": "recycle loop torn at stream S9: solved iteratively (DWSIM Recycle), chosen by cheme-as-code",
+          "ids": [
+            "S9"
+          ],
+          "hint": "its values in the flowsheet, if any, are the first guess; tear_streams chooses another stream",
+          "id": "process/flowsheet.yaml#process-sim-recycle:S9"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 437,
+          "level": "info",
+          "rule": "cheme.process-sim-recycle",
+          "message": "recycle loop torn at stream S15: solved iteratively (DWSIM Recycle), chosen by cheme-as-code",
+          "ids": [
+            "S15"
+          ],
+          "hint": "its values in the flowsheet, if any, are the first guess; tear_streams chooses another stream",
+          "id": "process/flowsheet.yaml#process-sim-recycle:S15"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 525,
+          "level": "info",
+          "rule": "cheme.process-sim-recycle",
+          "message": "recycle loop torn at stream S23: solved iteratively (DWSIM Recycle), chosen by cheme-as-code",
+          "ids": [
+            "S23"
+          ],
+          "hint": "its values in the flowsheet, if any, are the first guess; tear_streams chooses another stream",
+          "id": "process/flowsheet.yaml#process-sim-recycle:S23"
+        },
+        {
+          "file": "process/simulation.yaml",
+          "line": 28,
+          "level": "info",
+          "rule": "cheme.process-sim-approach-undeclared",
+          "message": "E101: least approach 53.5 K; no min_approach declared, only temperature crosses are checked",
+          "ids": [
+            "E101"
+          ],
+          "hint": "give specs.E101.min_approach (or min_approach for all exchangers) in process/simulation.yaml",
+          "id": "process/simulation.yaml#process-sim-approach-undeclared:E101"
+        },
+        {
+          "file": "process/simulation.yaml",
+          "line": 28,
+          "level": "info",
+          "rule": "cheme.process-sim-exchanger-zones",
+          "message": "E101: S5, S9 change phase; the internal approach is not checked (no zone temperatures), only the composites at constant heat capacity flow",
+          "ids": [
+            "E101"
+          ],
+          "hint": "check the zones (condensing, boiling) in a rating tool or split the exchanger at the phase change",
+          "id": "process/simulation.yaml#process-sim-exchanger-zones:E101"
+        },
+        {
+          "file": "process/simulation.yaml",
+          "line": 36,
+          "level": "info",
+          "rule": "cheme.process-sim-formation-data",
+          "message": "R101: the simulated reaction heat differs by 1.226 kW from the project's formation enthalpies, within the data tolerance 19.4 kW: CH4 -74534 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.22%)), -74520 in DWSIM (ChemSep): -14 kJ/kmol, -0.6528 kW; TOL 50410 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.47%)), 50170 in DWSIM (ChemSep): +240 kJ/kmol, -11.19 kW; BZ 83180 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.26%)), 82880 in DWSIM (ChemSep): +300 kJ/kmol, +13.56 kW; BIPH 181400 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 CRC, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.34%)), 182088 in DWSIM (ChemSep): -688 kJ/kmol, -0.491 kW",
+          "ids": [
+            "R101"
+          ],
+          "hint": "declare ideal_gas.dHf_298 with its source in process/materials.yaml; a difference within the tolerance is a limitation of the simulated reaction heat, say so in the review",
+          "id": "process/simulation.yaml#process-sim-formation-data:R101"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 301,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S2 (design): pressure simulated 30 kPa(a), assumed 150 kPa(a)",
+          "ids": [
+            "S2"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S2"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 378,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S9 (design): pressure simulated 3250 kPa(a), assumed 3380 kPa(a)",
+          "ids": [
+            "S9"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S9"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 389,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S10 (design): pressure simulated 3180 kPa(a), assumed 3310 kPa(a)",
+          "ids": [
+            "S10"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S10"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 400,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S11 (design): pressure simulated 3120 kPa(a), assumed 3250 kPa(a)",
+          "ids": [
+            "S11"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S11"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 466,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S17 (design): pressure simulated 3250 kPa(a), assumed 3450 kPa(a)",
+          "ids": [
+            "S17"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S17"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 488,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S19 (design): temperature simulated 201.43 K, assumed 313.15 K",
+          "ids": [
+            "S19"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S19"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 510,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S21 (design): temperature simulated 366.16 K, assumed 313.15 K",
+          "ids": [
+            "S21"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S21"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 532,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream S23 (design): pressure simulated 30 kPa(a), assumed 150 kPa(a)",
+          "ids": [
+            "S23"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:S23"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 589,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream Q5 (design): duty simulated 1283.51 kW, assumed 1431.4 kW",
+          "ids": [
+            "Q5"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:Q5"
+        },
+        {
+          "file": "process/flowsheet.yaml",
+          "line": 597,
+          "level": "warning",
+          "rule": "cheme.process-sim-deviation",
+          "message": "stream Q6 (design): duty simulated 23.6696 kW, assumed 156.8 kW",
+          "ids": [
+            "Q6"
+          ],
+          "hint": "review the assumed value against the simulation (or the specs in process/simulation.yaml); simulate never overwrites it",
+          "id": "process/flowsheet.yaml#process-sim-deviation:Q6"
+        }
+      ],
+      "energy": {
+        "reference": {
+          "source": "simulator (DWSIM mass enthalpy, kJ/kg, its own reference state)",
+          "formation_enthalpy_included": false,
+          "comparable_with": "values of the same run only",
+          "formation_basis": "reacting units, and the plant with a reactor: plus sum n_i dHf_i (ideal gas, 298.15 K, DWSIM's database) of the reacting components whose flow changes (energy.formation)"
+        },
+        "tolerance": {
+          "abs_kW": 0.1,
+          "rel_duty": 0.01,
+          "rel_enthalpy": 0.0001
+        },
+        "closure": {
+          "units": [
+            {
+              "id": "M100",
+              "unit": "mixer",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -2150.8778161429486,
+              "enthalpy_out_kW": -2150.747773752542,
+              "residual_kW": 0.13004239040674292,
+              "tolerance_kW": 0.31508778161429485
+            },
+            {
+              "id": "P101",
+              "unit": "pump",
+              "heat_in_kW": -0.0,
+              "work_in_kW": 36.71710444061587,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -2150.747773752542,
+              "enthalpy_out_kW": -2114.030669310833,
+              "residual_kW": 1.0928005167443189e-09,
+              "tolerance_kW": 0.6822458217814129
+            },
+            {
+              "id": "M101",
+              "unit": "mixer",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -1694.8875803837334,
+              "enthalpy_out_kW": -1694.8866051188786,
+              "residual_kW": 0.0009752648547873832,
+              "tolerance_kW": 0.3533173758237933
+            },
+            {
+              "id": "E101",
+              "unit": "heat_exchanger",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 25265.07830550315,
+              "enthalpy_out_kW": 25265.057644871376,
+              "residual_kW": -0.02066063177335309,
+              "tolerance_kW": 2.9654851515740908
+            },
+            {
+              "id": "H101",
+              "unit": "heater",
+              "heat_in_kW": 2914.63539841032,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 22693.123891577794,
+              "enthalpy_out_kW": 25607.759289988113,
+              "residual_kW": -9.094947017729282e-13,
+              "tolerance_kW": 31.807129913102013
+            },
+            {
+              "id": "R101",
+              "unit": "conversion_reactor",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "formation",
+              "formation_kW": -1938.0026725015055,
+              "changes_mol_s": {
+                "H2": -45.9175834462676,
+                "CH4": 46.63133279896351,
+                "TOL": -46.63131675520886,
+                "BZ": 45.20387232635696,
+                "BIPH": 0.7137234242652947
+              },
+              "status": "ok",
+              "enthalpy_in_kW": 25607.759289988113,
+              "enthalpy_out_kW": 27545.761012065133,
+              "residual_kW": -0.0009504244849267707,
+              "tolerance_kW": 3.048376368456664,
+              "formation_data": {
+                "difference_kW": 1.2257653015769499,
+                "declared_difference_kW": 1.2257653015769499,
+                "fallback_difference_kW": 0,
+                "data_tolerance_kW": 19.380026725015053,
+                "components": [
+                  {
+                    "id": "H2",
+                    "origin": "declared",
+                    "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.19%))",
+                    "dHf_298_kJ_kmol": 0.0,
+                    "simulator_dHf_298_kJ_kmol": 0.0,
+                    "simulator_database": "ChemSep",
+                    "difference_kJ_kmol": 0.0,
+                    "share_kW": -0.0
+                  },
+                  {
+                    "id": "CH4",
+                    "origin": "declared",
+                    "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.22%))",
+                    "dHf_298_kJ_kmol": -74534.0,
+                    "simulator_dHf_298_kJ_kmol": -74520.0,
+                    "simulator_database": "ChemSep",
+                    "difference_kJ_kmol": -14.0,
+                    "share_kW": -0.6528386591854892
+                  },
+                  {
+                    "id": "TOL",
+                    "origin": "declared",
+                    "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.47%))",
+                    "dHf_298_kJ_kmol": 50410.0,
+                    "simulator_dHf_298_kJ_kmol": 50170.0,
+                    "simulator_database": "ChemSep",
+                    "difference_kJ_kmol": 240.0,
+                    "share_kW": -11.191516021250125
+                  },
+                  {
+                    "id": "BZ",
+                    "origin": "declared",
+                    "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.26%))",
+                    "dHf_298_kJ_kmol": 83180.0,
+                    "simulator_dHf_298_kJ_kmol": 82880.0,
+                    "simulator_database": "ChemSep",
+                    "difference_kJ_kmol": 300.0,
+                    "share_kW": 13.561161697907087
+                  },
+                  {
+                    "id": "BIPH",
+                    "origin": "declared",
+                    "source": "declared in process/materials.yaml (given; chemicals: dHf_298 CRC, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.34%))",
+                    "dHf_298_kJ_kmol": 181400.0,
+                    "simulator_dHf_298_kJ_kmol": 182088.0,
+                    "simulator_database": "ChemSep",
+                    "difference_kJ_kmol": -688.0,
+                    "share_kW": -0.4910417158945227
+                  }
+                ],
+                "missing": [],
+                "limitations": [
+                  "R101: the simulated reaction heat differs by 1.226 kW from the project's formation enthalpies, within the data tolerance 19.4 kW: CH4 -74534 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.22%)), -74520 in DWSIM (ChemSep): -14 kJ/kmol, -0.6528 kW; TOL 50410 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.47%)), 50170 in DWSIM (ChemSep): +240 kJ/kmol, -11.19 kW; BZ 83180 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.26%)), 82880 in DWSIM (ChemSep): +300 kJ/kmol, +13.56 kW; BIPH 181400 kJ/kmol declared in process/materials.yaml (given; chemicals: dHf_298 CRC, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.34%)), 182088 in DWSIM (ChemSep): -688 kJ/kmol, -0.491 kW"
+                ],
+                "project_formation_kW": -1936.7769071999285,
+                "status": "within-tolerance"
+              }
+            },
+            {
+              "id": "Q101",
+              "unit": "mixer",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 26959.96484207341,
+              "enthalpy_out_kW": 26959.964910622028,
+              "residual_kW": 6.854861931060441e-05,
+              "tolerance_kW": 2.913155718205686
+            },
+            {
+              "id": "E102",
+              "unit": "cooler",
+              "heat_in_kW": -4891.176669829966,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 2571.933753293584,
+              "enthalpy_out_kW": -2319.242916536383,
+              "residual_kW": -9.094947017729282e-13,
+              "tolerance_kW": 49.268960073629025
+            },
+            {
+              "id": "V101",
+              "unit": "flash",
+              "heat_in_kW": -12.404950072236261,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -2319.242916536383,
+              "enthalpy_out_kW": -2331.6446179586537,
+              "residual_kW": 0.003248649965371442,
+              "tolerance_kW": 0.49204984758128933
+            },
+            {
+              "id": "SPL1",
+              "unit": "splitter",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 174.1794253153064,
+              "enthalpy_out_kW": 174.17935567469476,
+              "residual_kW": -6.964061162761936e-05,
+              "tolerance_kW": 0.11741794253153065
+            },
+            {
+              "id": "K101",
+              "unit": "compressor",
+              "heat_in_kW": -0.0,
+              "work_in_kW": 229.48159650015762,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": 154.78281856895984,
+              "enthalpy_out_kW": 384.2644151218004,
+              "residual_kW": 5.2682963769257185e-08,
+              "tolerance_kW": 2.4332424065137563
+            },
+            {
+              "id": "SPL2",
+              "unit": "splitter",
+              "heat_in_kW": 0.0,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -2505.8240432739603,
+              "enthalpy_out_kW": -2505.824047087338,
+              "residual_kW": -3.8133775888127275e-06,
+              "tolerance_kW": 0.3505824047087338
+            },
+            {
+              "id": "C201",
+              "unit": "shortcut_column",
+              "heat_in_kW": 1259.842623095164,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -1920.027877095613,
+              "enthalpy_out_kW": -660.1852540004492,
+              "residual_kW": -4.547473508864641e-13,
+              "tolerance_kW": 12.890429018661203
+            },
+            {
+              "id": "C202",
+              "unit": "shortcut_column",
+              "heat_in_kW": -720.9063905611274,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -646.1460221548148,
+              "enthalpy_out_kW": -1367.052412715942,
+              "residual_kW": 2.2737367544323206e-13,
+              "tolerance_kW": 7.445769146882868
+            },
+            {
+              "id": "C203",
+              "unit": "distillation_column",
+              "heat_in_kW": -141.27119538405634,
+              "work_in_kW": 0.0,
+              "basis": "simulator",
+              "status": "ok",
+              "enthalpy_in_kW": -314.8119793277413,
+              "enthalpy_out_kW": -456.0831747123124,
+              "residual_kW": -5.147740012034774e-10,
+              "tolerance_kW": 1.5583202713117947
+            }
+          ],
+          "plant": {
+            "feeds": [
+              "S1",
+              "S4"
+            ],
+            "products": [
+              "S13",
+              "S19",
+              "S21",
+              "S24"
+            ],
+            "heat_in_kW": -1591.2811843419022,
+            "work_in_kW": 266.1987009407735,
+            "basis": "formation",
+            "reasons": [],
+            "status": "ok",
+            "enthalpy_in_kW": -1669.6222689328838,
+            "enthalpy_out_kW": -1056.589429435647,
+            "residual_kW": -0.31634942047207915,
+            "tolerance_kW": 19.04257998171299,
+            "formation_kW": -1938.4316723188376,
+            "project_formation_kW": -1937.2072084571741
+          }
+        },
+        "formation": {
+          "property_package": "Peng-Robinson (PR)",
+          "reference_verified": true,
+          "reference": "each component's ideal gas at 298.15 K = 0, without formation enthalpies, a liquid below it by its departure function (verified live for DWSIM 9.0.5: Peng-Robinson (PR), Peng-Robinson 1978 (PR78), Soave-Redlich-Kwong (SRK))",
+          "closure_basis": "DWSIM's formation enthalpies (simulator_dHf_298_kJ_kmol)",
+          "components": {
+            "H2": {
+              "dHf_298_kJ_kmol": 0.0,
+              "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.19%))",
+              "origin": "declared",
+              "molar_mass": 2.0159,
+              "simulator_dHf_298_kJ_kmol": 0.0,
+              "simulator_database": "ChemSep"
+            },
+            "CH4": {
+              "dHf_298_kJ_kmol": -74534.0,
+              "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.22%))",
+              "origin": "declared",
+              "molar_mass": 16.042,
+              "simulator_dHf_298_kJ_kmol": -74520.0,
+              "simulator_database": "ChemSep"
+            },
+            "TOL": {
+              "dHf_298_kJ_kmol": 50410.0,
+              "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.47%))",
+              "origin": "declared",
+              "molar_mass": 92.138,
+              "simulator_dHf_298_kJ_kmol": 50170.0,
+              "simulator_database": "ChemSep"
+            },
+            "BZ": {
+              "dHf_298_kJ_kmol": 83180.0,
+              "source": "declared in process/materials.yaml (given; chemicals: dHf_298 ATCT_G, S_298 CRC, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.26%))",
+              "origin": "declared",
+              "molar_mass": 78.112,
+              "simulator_dHf_298_kJ_kmol": 82880.0,
+              "simulator_database": "ChemSep"
+            },
+            "BIPH": {
+              "dHf_298_kJ_kmol": 181400.0,
+              "source": "declared in process/materials.yaml (given; chemicals: dHf_298 CRC, S_298 YAWS, cp_R fitted to thermo TRCIG 298.15-1100 K (max deviation 0.34%))",
+              "origin": "declared",
+              "molar_mass": 154.21,
+              "simulator_dHf_298_kJ_kmol": 182088.0,
+              "simulator_database": "ChemSep"
+            }
+          }
+        },
+        "exchangers": [
+          {
+            "id": "E101",
+            "unit": "heat_exchanger",
+            "min_approach_K": null,
+            "status": "ok",
+            "approach_K": 53.504492,
+            "at": {
+              "hot_K": 893.504492,
+              "cold_K": 840.0,
+              "heat_kW": 24388.010497
+            },
+            "phase_change": [
+              "S5",
+              "S9"
+            ],
+            "utility_sides": []
+          }
+        ],
+        "utility_levels": [
+          {
+            "id": "H101",
+            "role": "energy",
+            "terminal": "FUEL",
+            "utility": "fired_heat",
+            "supply_K": 1200.0,
+            "return_K": 1200.0,
+            "min_approach_K": 50.0,
+            "approach_K": 304.85,
+            "status": "ok"
+          },
+          {
+            "id": "E102",
+            "role": "energy",
+            "terminal": "CW",
+            "utility": "cooling_water",
+            "supply_K": 298.15,
+            "return_K": 308.15,
+            "min_approach_K": 5.0,
+            "approach_K": 15.0,
+            "status": "ok"
+          },
+          {
+            "id": "C203",
+            "role": "condenser",
+            "terminal": "CW",
+            "utility": "cooling_water",
+            "supply_K": 298.15,
+            "return_K": 308.15,
+            "min_approach_K": 5.0,
+            "approach_K": 36.738113,
+            "status": "ok"
+          },
+          {
+            "id": "C203",
+            "role": "reboiler",
+            "terminal": "HPS",
+            "utility": "steam",
+            "supply_K": 526.4,
+            "return_K": 526.4,
+            "min_approach_K": 10.0,
+            "approach_K": 53.324487,
+            "status": "ok"
+          }
+        ],
+        "utilities": {
+          "totals_kW": {
+            "hot_utility": 8329.1298259829,
+            "cold_utility": 9920.411010324802,
+            "power_in": 266.1987009407735,
+            "power_out": 0.0,
+            "recovered": 24388.010496696672
+          },
+          "duties": [
+            {
+              "id": "P101",
+              "role": "power",
+              "class": "power_in",
+              "kW": 36.71710444061587,
+              "terminal": "POWER"
+            },
+            {
+              "id": "E101",
+              "role": "exchange",
+              "class": "recovered",
+              "kW": 24388.010496696672,
+              "terminal": null
+            },
+            {
+              "id": "H101",
+              "role": "heat",
+              "class": "hot_utility",
+              "kW": 2914.63539841032,
+              "terminal": "FUEL"
+            },
+            {
+              "id": "E102",
+              "role": "heat",
+              "class": "cold_utility",
+              "kW": 4891.176669829966,
+              "terminal": "CW"
+            },
+            {
+              "id": "V101",
+              "role": "heat",
+              "class": "cold_utility",
+              "kW": 12.404950072236261,
+              "terminal": null
+            },
+            {
+              "id": "K101",
+              "role": "power",
+              "class": "power_in",
+              "kW": 229.48159650015762,
+              "terminal": "POWER"
+            },
+            {
+              "id": "C201",
+              "role": "reboiler",
+              "class": "hot_utility",
+              "kW": 1283.5122002401201,
+              "terminal": "MPS"
+            },
+            {
+              "id": "C201",
+              "role": "condenser",
+              "class": "cold_utility",
+              "kW": 23.66957714495602,
+              "terminal": "CW"
+            },
+            {
+              "id": "C202",
+              "role": "reboiler",
+              "class": "hot_utility",
+              "kW": 3481.7562595083245,
+              "terminal": "LPS"
+            },
+            {
+              "id": "C202",
+              "role": "condenser",
+              "class": "cold_utility",
+              "kW": 4202.662650069452,
+              "terminal": "CW"
+            },
+            {
+              "id": "C203",
+              "role": "reboiler",
+              "class": "hot_utility",
+              "kW": 649.2259678241351,
+              "terminal": "HPS"
+            },
+            {
+              "id": "C203",
+              "role": "condenser",
+              "class": "cold_utility",
+              "kW": 790.4971632081914,
+              "terminal": "CW"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

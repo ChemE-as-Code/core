@@ -37,3 +37,13 @@ kPa, the reference of the DWSIM NRTL benchmark
 (`tests/test_process_simulate_property_package_nrtl.py`): two isobaric data sets (Kamihama et
 al., J. Chem. Eng. Data 57 (2012) 339; Lai et al., J. Chem. Thermodyn. 68 (2014) 13) with the
 combined expanded uncertainties, copied unchanged from the NIST TRC ThermoML files named in it.
+
+`process-hda-1/` is the toluene hydrodealkylation plant of the ChemE-as-Code process library
+(`processes/hda-1`, CC BY 4.0, (c) 2026 Artur Schweidtmann), cut to what `cheme process pinch`
+reads: `plant.yaml` and `process/{flowsheet,materials,reactions,simulation}.yaml` unchanged, and
+its recorded DWSIM 9.0.5 run `process/simulation-run.json` (simulated from library commit
+4385a2d, written by cheme-as-code 1.2.1), so the end-to-end pinch tests
+(`tests/test_process_pinch.py`) need no DWSIM. The sheets `plant.yaml` names are not copied.
+The tests renew the record's model fingerprint to the one this core translates the inputs to
+(the duties stay DWSIM's), so a change to the translation does not make them stale; copy a run
+simulated with the new core from the library when the translation changes what DWSIM computes.
