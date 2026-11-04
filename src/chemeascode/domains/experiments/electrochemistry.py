@@ -570,7 +570,7 @@ class _Context:
     flow_mol_s: float | None
     #: mol/s per unit of the inlet flow (no meter correction)
     inlet_mol_s: float | None
-    #: mol of titrant per unit titrant volume x (anolyte / aliquot): mol per mL of titrant
+    #: c V_anolyte / V_aliquot: mol in the anolyte per L of titrant used on the aliquot
     titration_mol: float | None
     thermoneutral: dict[str, float | None]
     products: dict[str, Product]
@@ -1000,6 +1000,26 @@ def evaluate(
             elif density is not None:
                 current = density * ctx.area_m2
         duration = out.value(point.duration, _DURATION, "duration", [*loc, "duration"], [point.id])
+        if current is not None and current <= 0:
+            out.add(
+                "error",
+                "schema",
+                f"point {point.id}: the current is not positive",
+                loc,
+                [point.id],
+                "give the electrolysis current (or current density), > 0",
+            )
+            current = density = None
+        if duration is not None and duration <= 0:
+            out.add(
+                "error",
+                "schema",
+                f"point {point.id}: the duration is not positive",
+                [*loc, "duration"],
+                [point.id],
+                "give the run time, > 0",
+            )
+            duration = None
         result = PointResult(
             point.id, _yaml_line(out.doc, loc), current, density, duration, replicates=[]
         )

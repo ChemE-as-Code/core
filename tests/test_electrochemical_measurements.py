@@ -386,6 +386,8 @@ def test_one_way_per_quantity(edit):
             "cheme.electrochem-schema",
         ),
         (lambda d: d["points"][0]["current"].update(unit="mA/m2"), "cheme.electrochem-unit"),
+        (lambda d: d["points"][0]["current"].update(value=-0.5), "cheme.electrochem-schema"),
+        (lambda d: d["points"][0]["duration"].update(value=0), "cheme.electrochem-schema"),
         (lambda d: _rep(d)["voltage"].update(unit="kV"), "cheme.electrochem-unit"),
         (
             lambda d: (
