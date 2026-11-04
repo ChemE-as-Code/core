@@ -1524,6 +1524,17 @@ def validate_workspace(
         report.findings += cell_report(workspace.root).findings
         report.files.append(CELLS_FILE)
 
+    # Measured electrochemical series: schema, units, Faradaic and charge balances.
+    from chemeascode.domains.experiments.electrochemistry import (
+        measurement_files,
+        measurement_report,
+    )
+
+    for name in measurement_files(workspace.root):
+        if targets is None or (workspace.root / name).resolve() in targets:
+            report.findings += measurement_report(workspace.root, name).findings
+            report.files.append(name)
+
     # Liquid-liquid extractors: the schema only; `cheme process extract` solves them.
     from chemeascode.domains.process.separations import extraction
 
