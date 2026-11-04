@@ -287,6 +287,171 @@ def test_a_line_through_an_equipment_body():
     assert [f for f in _lint(to_internal, context) if "through-symbol" in f.rule] == []
 
 
+# -- line-through-valve, line-on-pipe, line-not-orthogonal --------------------------------------
+
+SEGMENT = "Plant/Piping.PipingNetworkSegment"
+GLOBE = "Plant/Piping.GlobeValve"
+ACTUATOR = "Plant/Instrumentation.ControlledActuator"
+SIGNAL = "Plant/Instrumentation.SignalConveyingFunction"
+MEASURING = "Plant/Instrumentation.MeasuringLineFunction"
+
+
+def _shape(object_id: str, svg: str) -> str:
+    """An object drawn by a shape (a ShapeUsage: its strokes are symbol outlines)."""
+    return (
+        f'<g id="{object_id}" class="representation-group"><g class="static"><g>'
+        f'<g transform="translate(0,0)">{svg}</g></g></g></g>'
+    )
+
+
+def _valve_line(line: str, x: float, y: float, vertical: bool = False) -> str:
+    """Line *line* through a globe valve ``V_<line>`` at x, y (horizontal or vertical): its
+    two pipes end at the valve's nodes, 2 mm either side."""
+    if vertical:
+        body = f"{x + 1},{y - 2} {x - 1},{y + 2} {x + 1},{y + 2} {x - 1},{y - 2} {x + 1},{y - 2}"
+        pipes = {
+            f"{line}_P1": f"{x},{y - 40} {x},{y - 2}",
+            f"{line}_P2": f"{x},{y + 2} {x},{y + 40}",
+        }
+    else:
+        body = f"{x + 2},{y + 1} {x - 2},{y - 1} {x - 2},{y + 1} {x + 2},{y - 1} {x + 2},{y + 1}"
+        pipes = {
+            f"{line}_P1": f"{x - 50},{y} {x - 2},{y}",
+            f"{line}_P2": f"{x + 2},{y} {x + 50},{y}",
+        }
+    drawn = "".join(
+        f'<g id="{p}" class="representation-group"><g class="static">{_polyline(pts)}</g></g>'
+        for p, pts in pipes.items()
+    )
+    valve = _shape(f"V_{line}", f'<polygon points="{body}" fill="none" stroke="black"/>')
+    return (
+        f'<g id="{line}" class="representation-group">'
+        f'<g id="{line}_S1" class="representation-group">{drawn}{valve}</g></g>'
+    )
+
+
+def _actuator(object_id: str, x: float, y: float) -> str:
+    """An actuator on the valve at x, y: its head 3.6 mm across, 3.6 mm up its stem."""
+    return _shape(object_id, f"{_circle(x, y - 5.4, 1.8)}{_polyline(f'{x},{y - 3.6} {x},{y}')}")
+
+
+def _loop(object_id: str, x: float, y: float, signal: str = "", measuring: str = "") -> str:
+    """Instrument *object_id* (bubble at x, y) with its signal and measuring lines."""
+    parts = _bubble(object_id, x, y).removesuffix("</g>")
+    for suffix, points in (("Signal", signal), ("MeasuringLine", measuring)):
+        if points:
+            parts += (
+                f'<g id="{object_id}_{suffix}" class="representation-group"><g class="static">'
+                f"{_polyline(points, dashed=suffix == 'Signal')}</g></g>"
+            )
+    return parts + "</g>"
+
+
+def _valve_context(**more: str) -> Context:
+    kinds = {
+        "L1": SYSTEM,
+        "L1_S1": SEGMENT,
+        "L1_P1": PIPE,
+        "L1_P2": PIPE,
+        "V_L1": GLOBE,
+        "A1": ACTUATOR,
+        "I1": INSTRUMENT,
+        "I1_Signal": SIGNAL,
+        "I1_MeasuringLine": MEASURING,
+        **more,
+    }
+    context = Context(kinds=kinds, names={"V_L1": "UV-1703", "I1": "UIC-1703", "L1": "PG-1089"})
+    context.parents = {"L1_P1": "L1", "L1_P2": "L1"}
+    context.actuated = {"A1": "V_L1"}
+    return context
+
+
+def _through_valve(sheet, context):
+    return [f for f in _lint(sheet, context) if f.rule == "cheme.line-through-valve"]
+
+
+def test_a_signal_line_through_its_control_valve_to_the_actuator():
+    """ammonia-1 P-108: UIC-1703 below the pipe, its signal drawn straight up through UV-1703
+    and the actuator to the actuator's top. From above, ending on the actuator, it is fine; so
+    are the valve's own pipes and its actuator's stem."""
+    context = _valve_context()
+    valve = _valve_line("L1", 190, 80) + _actuator("A1", 190, 80)
+    through = _svg(valve, _loop("I1", 160, 100, signal="163.75,100 190,100 190,72.8"))
+    (found,) = _through_valve(through, context)
+    assert "signal line I1_Signal runs through the body and the actuator of UV-1703 (V_L1)" in (
+        found.message
+    )
+    assert found.ids == ["I1_Signal", "V_L1", "A1"] and found.key == "I1_Signal+V_L1"
+    assert "away from the pipe" in found.hint
+    above = _svg(valve, _loop("I1", 160, 60, signal="163.75,60 190,60 190,72.8"))
+    assert _lint(above, context) == []
+    # From the side, into the actuator's centre: it ends on the actuator.
+    centre = _svg(valve, _loop("I1", 160, 74.6, signal="163.75,74.6 190,74.6"))
+    assert _through_valve(centre, context) == []
+
+
+def test_a_signal_line_along_the_pipe_through_a_valve():
+    """A signal line drawn on the pipe, through the valve: through the valve, and on the pipe."""
+    context = _valve_context()
+    sheet = _svg(
+        _valve_line("L1", 190, 80),
+        _actuator("A1", 190, 80),
+        _loop("I1", 230, 100, signal="226.25,100 220,100 220,80 170,80 170,60"),
+    )
+    found = _lint(sheet, context)
+    (valve,) = [f for f in found if f.rule == "cheme.line-through-valve"]
+    assert "runs through the body of UV-1703" in valve.message
+    (on_pipe,) = [f for f in found if f.rule == "cheme.line-on-pipe"]
+    assert on_pipe.ids == ["I1_Signal", "L1_P1", "L1_P2"] and on_pipe.key == "I1_Signal+L1"
+    assert "on top of it, for 50.0 mm" in on_pipe.message
+
+
+def test_an_actuator_drawn_on_the_pipe_and_a_pipe_through_a_valve():
+    """A valve on a vertical pipe with its actuator up the pipe (ammonia-1 P-104 TV-1306): the
+    pipe runs through the actuator. Another line's pipe across the valve runs through it."""
+    context = _valve_context(
+        L2=SYSTEM, L2_S1=SEGMENT, L2_P1=PIPE, L2_P2=PIPE, V_L2=GLOBE, A2=ACTUATOR
+    )
+    context.actuated["A2"] = "V_L2"
+    context.names["V_L2"] = "TV-1306"
+    sheet = _svg(_valve_line("L2", 300, 120, vertical=True), _actuator("A2", 300, 120))
+    (found,) = _through_valve(sheet, context)
+    assert found.message == "pipe L2_P1 runs through the actuator of TV-1306 (V_L2)"
+    assert "turn the actuator off the pipe" in found.hint
+    across = _svg(_valve_line("L1", 190, 80), _line("L3", {"L3_P1": "190,40 190,120"}))
+    context.kinds.update(L3=SYSTEM, L3_P1=PIPE)
+    (found,) = _through_valve(across, context)
+    assert found.message == "pipe L3_P1 runs through the body of UV-1703 (V_L1)"
+
+
+def test_a_slanted_measuring_line():
+    """A measuring line straight from its tap to the bubble (diagonal) is reported (info); a
+    hop over another line, with short slanted legs, is not."""
+    context = _valve_context()
+    slanted = _svg(_loop("I1", 160, 100, measuring="165,130 160,103.75"))
+    (found,) = [f for f in _lint(slanted, context) if f.rule == "cheme.line-not-orthogonal"]
+    assert found.level == "info" and found.ids == ["I1_MeasuringLine"]
+    assert "(165.0,130.0)-(160.0,103.8)" in found.message
+    hop = "160,130 160,120 159.5,119 159.5,117 160,116 160,103.75"
+    assert _lint(_svg(_loop("I1", 160, 100, measuring=hop)), context) == []
+
+
+def test_context_knows_the_valve_an_actuator_operates():
+    from chemeascode.domains.piping.drawing import context_from_xml
+
+    root = etree.fromstring(
+        '<PlantModel><Object id="S" type="Plant/Instrumentation.ActuatingSystem">'
+        '<Components property="ControlledActuator">'
+        '<Object id="A" type="Plant/Instrumentation.ControlledActuator"/></Components>'
+        '<Components property="OperatedValveReference">'
+        '<Object id="R" type="Plant/Instrumentation.OperatedValveReference">'
+        '<References objects="#UV1" property="Valve"/></Object></Components></Object>'
+        "</PlantModel>"
+    )
+    context = context_from_xml(root)
+    assert context.actuated == {"A": "UV1"} and context.is_actuator("A")
+
+
 # -- label-far-from-owner ---------------------------------------------------------------------
 
 
