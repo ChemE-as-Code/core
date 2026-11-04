@@ -37,7 +37,7 @@ ee62d07aff399d88982af65c0f3f9c8eb4e6fd64f0db252af7382818f30306b1  .claude/skills
 c196775e34772236f78fe828160ff6310e4c036e6f9cf9ed769500ccc09a41b1  .claude/skills/hazop-node-breakdown/SKILL.md
 d779d298ece32016846565eb9b469d8305c1d904fbf7ce4003140e8f3e6ac7a7  .claude/skills/hazop-review/SKILL.md
 0fa73ca1d6e5d5885cf4e2a938752df97336e1aa74a99b7e5644618994853f2f  .claude/skills/hazop-risk-classification/SKILL.md
-25df48ab1cdc20945323f88adede4e2ced117e4299412e4488904087ddfd85df  .claude/skills/hazop-scenario-propagation/SKILL.md
+08e059e62384dd794dbff8b5d5740b3361d0525817f2858806f29d38c875fe53  .claude/skills/hazop-scenario-propagation/SKILL.md
 ff40ba0f64a9c20f42753dd0c7dabee97098e0b3750afbd568db34fde6101065  .claude/skills/hazop-study/SKILL.md
 08797f8d624d972a69c898a4c3d29d097c6dd49923b1486f9ed94721c3c8522d  .claude/skills/hazop-study/examples/study.yaml
 b597327e86cf310b483c4d7f1602ed507aadd36ee6da37b029bd4b869628c0f0  .claude/skills/heat-integration-flowsheet-review/SKILL.md
