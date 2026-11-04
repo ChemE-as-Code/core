@@ -13,9 +13,10 @@ envelope, access clearances, the replacement interval and the skid equipment a d
   ``j = I / A_cell``, the voltage ``U`` and the Faradaic efficiency ``FE`` of the product (a
   measured cell's looked up at ``j`` and refused outside its validity range; a specified cell
   outside its declared operating range is not sized on): nothing is extrapolated;
-- the total active area ``A = n F Ndot / (nu FE j)`` for the product duty ``Ndot`` (mol/s),
-  ``nu`` the product's coefficient and ``n`` the electrons per extent of the cell's reaction;
-  the cells required ``ceil(A / A_cell)``;
+- the total active area ``A = n F Ndot / (nu FE j)`` for the product formed ``Ndot`` (mol/s:
+  the duty over the product's ``recovery``, default 1), ``nu`` the product's coefficient and
+  ``n`` the electrons per extent of the cell's reaction; the cells required ``ceil(A /
+  A_cell)``;
 - at most ``floor(U_max / U)`` cells in series per stack, the stacks
   ``ceil(cells / that)``, the cells shared evenly (``ceil(cells / stacks)`` per stack): the
   cells of a stack in series, the stacks in parallel on the DC bus;
@@ -39,7 +40,10 @@ envelope, access clearances, the replacement interval and the skid equipment a d
   fill``, :func:`~chemeascode.domains.equipment.pumps.size_pump`: the head, NPSH and power along
   the routed lines between them); the dosing pump's capacity (the
   duty's dosing rate times one plus the margin); the dosing tank (the solution dosed over the
-  campaign, with the margin) and the bleed tank (the bleed over the campaign).
+  campaign, or the most dosed in any ``refill_interval`` of it, with the margin) and the bleed
+  tank (the bleed over the campaign, or the most in any ``empty_interval``), with the fills or
+  emptyings per campaign; with the duty's ``reservoir.size: to_horizon``, the duty's
+  reservoir volume that reaches its horizon (``process/duties.yaml``, written rounded up).
 
 Every value carries its provenance (``given``, ``assumed``, ``calculated``, or ``tbd`` with the
 reason) and its source. The equipment inputs go where the existing tools read them: the
@@ -61,7 +65,8 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 - ``stack-schema`` (error): a unit a quantity does not take, a duplicate stack id, a value out
   of its range: not above 0 (the product rate, the stack voltage and current limits, the
   rectifier current, the cell pitch, the replacement interval, an H/D, the anolyte flow,
-  density and viscosity, the reservoir pressure), below 0 (the end plates, the frame margin,
+  density and viscosity, the reservoir pressure, a refill or emptying interval), a product
+  recovery not in (0, 1] (the stack is refused), below 0 (the end plates, the frame margin,
   the clearances, the operating hours, a margin, the stack's pressure drop) or a rectifier
   efficiency not in (0, 1]. The value is not used: a stated voltage or current limit refuses
   the stack, any other leaves what rests on it TBD (or, for the rectifiers and the AC power,
@@ -83,13 +88,13 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 - ``stack-duty`` (error, the equipment inputs from the duty are not given): the duty is not in
   ``process/duties.yaml``, runs another cell than the stack's, runs the cell at another current
   density than the stack is sized at (one operating point), is refused, or is not feasible at
-  the sized arrangement over its horizon, or an earlier stack names the same duty (one duty runs
-  at one arrangement); (info) the duty states another arrangement, replaced
-  by the sized one (``cheme process duty`` runs it at the sized one too:
+  the sized arrangement over its horizon, names another stack (``stack:``), or an earlier stack
+  names the same duty (one duty runs at one arrangement); (info) the duty states another
+  arrangement, replaced by the sized one (``cheme process duty`` runs it at the sized one too:
   :func:`stack_arrangements`);
-- ``stack-outdated`` (warning): an equipment-list dimension or datasheet input this tool would
-  write differs from the file (or is not there), or one it wrote is no longer given: ``cheme
-  process stack --write``;
+- ``stack-outdated`` (warning): an equipment-list dimension, datasheet input or a duty's
+  reservoir volume (``reservoir.size: to_horizon``) this tool would write differs from the
+  file (or is not there), or one it wrote is no longer given: ``cheme process stack --write``;
 - ``stack-kept`` (warning): a value written by hand differs from the calculated one: kept; a
   tank whose list states a head or a support (inside the height, the shell would hold less than
   the calculated volume); sizes no longer given beside a weight: kept;
@@ -99,6 +104,7 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 
 from __future__ import annotations
 
+import bisect
 import json
 import math
 from dataclasses import dataclass, field
@@ -449,6 +455,16 @@ def _assumed(*qs: Quantity | None) -> bool:
     return any(q is not None and q.provenance == "assumed" for q in qs)
 
 
+def _dump(stack: Stack, exclude: set[str]) -> dict[str, Any]:
+    """*stack* as fingerprinted: its fields as JSON without *exclude*, and without the optional
+    fields added later when they are not given (a stack that does not state them keeps the
+    fingerprint it had)."""
+    data = stack.model_dump(mode="json", exclude=exclude)
+    if data.get("product", {}).get("recovery") is None:
+        data.get("product", {}).pop("recovery", None)
+    return data
+
+
 def _ceil(x: float) -> int:
     return max(1, math.ceil(x - _TOL * max(abs(x), 1.0)))
 
@@ -675,6 +691,41 @@ def size_stack(
     v["product_duty_mol_s"] = Sized(
         mol_s, "mol/s", "calculated", f"{kg_h:.6g} kg/h / M {kmol:.6g} g/mol", _assumed(rate)
     )
+    # the recovery: the stacks form rate / recovery, the boundary gets the rate
+    rq: Quantity | None = None
+    recovery = 1.0
+    if p.recovery is not None:
+        got = read.get(
+            p.recovery, _FRACTION, "product recovery", ["product", "recovery"], "positive"
+        )
+        if got is None:  # its unit or range error is reported; a stated recovery is never ignored
+            return refuse("schema", "product recovery unusable", [], "", report=False)
+        if got[0] > 1 + _TOL:
+            return refuse(
+                "schema",
+                f"the product recovery {got[0]:g} is above 1",
+                ["product", "recovery"],
+                "the share of the product formed that is delivered: 0 < recovery <= 1 (or %)",
+            )
+        recovery, rq = got[0], got[1]
+        v["product_recovery"] = Sized(
+            recovery, "", rq.provenance, _text(rq, recovery, ""), _assumed(rq)
+        )
+        v["product_formed_duty_kg_h"] = Sized(
+            kg_h / recovery,
+            "kg/h",
+            "calculated",
+            f"the duty {kg_h:.6g} kg/h delivered / recovery {_text(rq, recovery, '')}",
+            _assumed(rate, rq),
+        )
+        v["product_formed_duty_mol_s"] = Sized(
+            mol_s / recovery,
+            "mol/s",
+            "calculated",
+            f"{kg_h / recovery:.6g} kg/h formed / M {kmol:.6g} g/mol",
+            _assumed(rate, rq),
+        )
+    formed_mol_s = mol_s / recovery
     for name in ("purity", "pressure"):
         q = getattr(p, name)
         if q is not None:
@@ -738,17 +789,18 @@ def size_stack(
         )
         + f"): j {j:.6g} A/m2, U {u:.6g} V, FE({p.component}) {fe:.6g}, n {n:g}, nu {nu:g}"
     )
-    current_total = n * FARADAY * mol_s / (nu * fe)
+    current_total = n * FARADAY * formed_mol_s / (nu * fe)
     area = current_total / j
+    formed_text = " formed (the duty over the recovery)" if rq is not None else ""
     v["total_current_a"] = Sized(
         current_total,
         "A",
         "calculated",
-        f"I = n F Ndot / (nu FE): {cell_text}; Ndot {mol_s:.6g} mol/s",
-        _assumed(rate),
+        f"I = n F Ndot / (nu FE): {cell_text}; Ndot {formed_mol_s:.6g} mol/s{formed_text}",
+        _assumed(rate, rq),
     )
     v["total_active_area_m2"] = Sized(
-        area, "m2", "calculated", f"A = n F Ndot / (nu FE j): {cell_text}", _assumed(rate)
+        area, "m2", "calculated", f"A = n F Ndot / (nu FE j): {cell_text}", _assumed(rate, rq)
     )
     required = _ceil(area / point.area_m2)
     v["cells_required"] = Sized(
@@ -756,7 +808,7 @@ def size_stack(
         "",
         "calculated",
         f"ceil(A / A_cell) = ceil({area:.6g} / {point.area_m2:.6g} m2)",
-        _assumed(rate),
+        _assumed(rate, rq),
     )
     most = _floor(umax[0] / u)
     v["max_cells_per_stack"] = Sized(
@@ -769,7 +821,7 @@ def size_stack(
     stacks = _ceil(required / most)
     per_stack = _ceil(required / stacks)
     total = stacks * per_stack
-    basis = _assumed(rate, umax[1])
+    basis = _assumed(rate, rq, umax[1])
     v["stacks"] = Sized(
         stacks, "", "calculated", f"ceil({required} cells / {most} per stack)", basis
     )
@@ -807,7 +859,7 @@ def size_stack(
             "kW",
             "calculated",
             f"P / eta_rectifier {_text(eta[1], eta[0], '')}",
-            _assumed(rate, umax[1], eta[1]),
+            _assumed(rate, rq, umax[1], eta[1]),
         )
     if irect is not None:
         v["rectifiers"] = Sized(
@@ -815,7 +867,7 @@ def size_stack(
             "",
             "calculated",
             f"ceil(bus current {stacks * i:.6g} A / {_text(irect[1], irect[0], 'A')})",
-            _assumed(rate, umax[1], irect[1]),
+            _assumed(rate, rq, umax[1], irect[1]),
         )
     output_mol_s = total * fe * i * nu / (n * FARADAY)
     output = output_mol_s * kmol * 3600 / 1000
@@ -827,17 +879,51 @@ def size_stack(
         f"{kmol:.6g} g/mol",
         basis,
     )
-    v["output_margin"] = Sized(
-        output / kg_h - 1, "", "calculated", f"{output:.6g} / {kg_h:.6g} kg/h - 1", basis
-    )
-    v["electricity_kwh_per_kg"] = Sized(
-        power / output,
-        "kWh/kg",
-        "calculated",
-        f"P / output: the stacks' DC power over the {p.component} delivered (not allocated "
-        "to side products)",
-        False,
-    )
+    if rq is None:
+        v["output_margin"] = Sized(
+            output / kg_h - 1, "", "calculated", f"{output:.6g} / {kg_h:.6g} kg/h - 1", basis
+        )
+        v["electricity_kwh_per_kg"] = Sized(
+            power / output,
+            "kWh/kg",
+            "calculated",
+            f"P / output: the stacks' DC power over the {p.component} delivered (not allocated "
+            "to side products)",
+            False,
+        )
+    else:
+        delivered = output * recovery
+        v["product_delivered_kg_h"] = Sized(
+            delivered,
+            "kg/h",
+            "calculated",
+            f"the output formed {output:.6g} kg/h x recovery {_text(rq, recovery, '')}",
+            basis,
+        )
+        v["output_margin"] = Sized(
+            delivered / kg_h - 1,
+            "",
+            "calculated",
+            f"{delivered:.6g} kg/h delivered / {kg_h:.6g} kg/h - 1 (formed {output:.6g} / "
+            f"{kg_h / recovery:.6g} kg/h - 1)",
+            basis,
+        )
+        v["electricity_kwh_per_kg"] = Sized(
+            power / output,
+            "kWh/kg",
+            "calculated",
+            f"P / output: the stacks' DC power over the {p.component} formed (not allocated "
+            "to side products)",
+            False,
+        )
+        v["electricity_kwh_per_kg_delivered"] = Sized(
+            power / delivered,
+            "kWh/kg",
+            "calculated",
+            f"P / (output x recovery): the stacks' DC power over the {p.component} delivered "
+            "(not allocated to side products; the recovery's own energy not added)",
+            _assumed(rq),
+        )
     if point.heat_kw is not None:
         v["heat_duty_kw"] = Sized(
             point.heat_kw * total,
@@ -1067,7 +1153,7 @@ def _skid(
     sizing_fp = value_fingerprint(
         {
             "model": MODEL,
-            "stack": stack.model_dump(mode="json", exclude={"equipment"}),
+            "stack": _dump(stack, {"equipment"}),
             "point": point.as_dict(),
         }
     )
@@ -1126,6 +1212,19 @@ def _skid(
             "a duty that does",
         )
         _duty_tbd(stack, result, f"duty {duty.id} runs cell {duty.cell}, not {stack.cell}")
+        return
+    if duty.stack is not None and duty.stack != sid:
+        out.add(
+            "error",
+            "duty",
+            f"stack {sid}: duty {duty.id} names stack {duty.stack} (stack:): the reservoir, "
+            "dosing and bleed inputs are not given",
+            [*loc, "duty"],
+            [sid],
+            f"one duty runs at one arrangement: drop stack: from duty {duty.id}, set it to "
+            f"{sid}, or give stack {sid}'s skid its own duty",
+        )
+        _duty_tbd(stack, result, f"duty {duty.id} names stack {duty.stack}")
         return
     stated = (duty.cells_in_series, duty.stacks)
     if stated != (per_stack, stacks) and stated != (None, 1):
@@ -1186,6 +1285,9 @@ def _skid(
                 f"{point.current_density_a_m2:.6g} A/m2",
             )
             return
+    head = f"{STACK_MARK}: stack {sid}, duty {duty.id} at {arrangement}"
+    if run is not None and not run.refused and duty.reservoir.size == "to_horizon":
+        result.equipment.append(_reservoir_volume(duty, run, head, run_fp, result))
     if run is None or run.refused or not run.feasible:
         if run is None:
             why = "no result"
@@ -1201,7 +1303,14 @@ def _skid(
                     why += f", {hours:.4g} h outside {where}"
         hint = "make the duty feasible at the sized arrangement (`cheme process duty`)"
         need = _volume_needed(duty, run)
-        if need is not None:
+        sized = next((e for e in result.equipment if e.role == "reservoir_volume"), None)
+        if sized is not None and sized.complete:
+            hint = (
+                f"`cheme process stack --write` writes the reservoir volume "
+                f"{sized.values['volume'].value:.6g} L into {DUTIES_FILE} (reservoir.size: "
+                "to_horizon); the tanks follow from the duty at that volume"
+            )
+        elif need is not None:
             hint = (
                 f"a reservoir of {need:.4g} L reaches the horizon without dosing (the time to "
                 "the threshold scales with the volume at these fluxes); or dose"
@@ -1221,7 +1330,7 @@ def _skid(
     series = run.series
     totals = run.totals
     campaign = run.horizon_h
-    head = f"{STACK_MARK}: stack {sid}, duty {duty.id} at {arrangement}, campaign {campaign:.6g} h"
+    head = f"{head}, campaign {campaign:.6g} h"
     if skid.reservoir is not None:
         working = max(x for x in series.get("volume_l", []) if x is not None)
         entry = _tank(
@@ -1309,7 +1418,12 @@ def _skid(
         if tank is None:
             continue
         volume = totals.get(key) or 0.0
-        if volume <= 0:
+        interval = getattr(tank, "refill_interval" if role == "dosing_tank" else "empty_interval")
+        if volume > 0 and interval is not None:
+            entry = _interval_tank(
+                tank, role, interval, series, campaign, duty.id, result, read, sid, out, loc
+            )
+        elif volume <= 0:
             entry = EquipmentInput(tank.tag, role, "dimensions", EQUIPMENT_LIST)
             reason = f"duty {duty.id} has no {what.split(' over')[0]} (0 L)"
             entry.values = {k: Sized("TBD", "m", "tbd", reason) for k in ("diameter", "height")}
@@ -1353,6 +1467,153 @@ def _skid(
             f"{DUTIES_FILE} duty {duty.id} bleed.rate",
             False,
         )
+
+
+#: per tank role: its interval field, the series of what it holds, the words, the result keys
+_INTERVALS = {
+    "dosing_tank": (
+        "refill_interval",
+        "dosing_l",
+        "solution dosed",
+        "refilled",
+        "dosing_tank_fills_per_campaign",
+        "dosing_solution_per_fill_l",
+    ),
+    "bleed_tank": (
+        "empty_interval",
+        "bleed_l",
+        "bleed",
+        "emptied",
+        "bleed_tank_empties_per_campaign",
+        "bleed_per_empty_l",
+    ),
+}
+
+
+def _interval_tank(
+    tank: SkidTank,
+    role: str,
+    interval: Quantity,
+    series: dict[str, Any],
+    campaign: float,
+    did: str,
+    result: StackResult,
+    read: _Inputs,
+    sid: str,
+    out: _Out,
+    loc: list[Any],
+) -> EquipmentInput:
+    """A dosing or bleed tank refilled or emptied every *interval*: it holds the most dosed (or
+    bled) in any window of min(campaign, interval) of the duty, with its margin; the fills (or
+    emptyings) per campaign are ``ceil(campaign / interval)``."""
+    name, key, what, verb, count_key, per_key = _INTERVALS[role]
+    got = read.get(interval, _HOURS, f"{role} {name}", [role, name], "positive")
+    if got is None:  # its unit or range error is reported: not used
+        entry = EquipmentInput(tank.tag, role, "dimensions", EQUIPMENT_LIST)
+        reason = f"no valid {name} for the {role.replace('_', ' ')}"
+        entry.values = {k: Sized("TBD", "m", "tbd", reason) for k in ("diameter", "height")}
+        return entry
+    hours, q = got
+    window = min(hours, campaign)
+    largest = _largest_over(series.get("t_h") or [], series.get(key) or [], window)
+    text = (
+        f"{what} in any {window:.6g} h of the campaign ({name} {_text(q, hours, 'h')}, campaign "
+        f"{campaign:.6g} h)"
+    )
+    entry = _tank(tank, role, largest, text, read, sid, out, loc)
+    count = _ceil(campaign / hours)
+    result.values[count_key] = Sized(
+        count,
+        "",
+        "calculated",
+        f"ceil(campaign {campaign:.6g} h / {name} {_text(q, hours, 'h')}): the tank {verb} "
+        f"{count} time(s) over duty {did}",
+        _assumed(q),
+    )
+    result.values[per_key] = Sized(
+        largest,
+        "L",
+        "calculated",
+        f"the most {what} in any {window:.6g} h of duty {did} (exact on its transient: the rate "
+        "is constant between its samples)",
+        _assumed(q),
+    )
+    return entry
+
+
+def _largest_over(times: list[Any], cumulative: list[Any], window: float) -> float:
+    """The largest increase of the piecewise linear *cumulative* (over *times*, h) in any
+    window of *window* h: the whole increase when the window spans the times."""
+    points = [
+        (t, v) for t, v in zip(times, cumulative, strict=False) if t is not None and v is not None
+    ]
+    if not points:
+        return 0.0
+    ts = [t for t, _ in points]
+    vs = [v for _, v in points]
+    start, end = ts[0], ts[-1]
+    if window >= (end - start) * (1 - 1e-12):
+        return vs[-1] - vs[0]
+
+    def at(t: float) -> float:
+        i = bisect.bisect_right(ts, t) - 1
+        if i < 0:
+            return vs[0]
+        if i >= len(ts) - 1:
+            return vs[-1]
+        a, b = ts[i], ts[i + 1]
+        return vs[i + 1] if b <= a else vs[i] + (vs[i + 1] - vs[i]) * (t - a) / (b - a)
+
+    # a piecewise linear function's largest window increase starts or ends at a breakpoint
+    starts = {t for t in ts if t <= end - window} | {t - window for t in ts if t - window >= start}
+    return max(at(t + window) - at(t) for t in starts)
+
+
+def _reservoir_volume(
+    duty: Any, run: Any, head: str, fingerprint: str, result: StackResult
+) -> EquipmentInput:
+    """The duty's reservoir volume with ``reservoir.size: to_horizon``: the exact volume that
+    reaches the horizon plus the time margin (the duty's ``required_volume``), written rounded
+    up to :data:`_VOLUME_DIGITS` significant figures (above the exact one by at least 1e-6 of
+    it, so that the duty at the written volume does not reach the threshold before the target
+    within the integration's tolerance)."""
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE
+
+    entry = EquipmentInput(duty.id, "reservoir_volume", "duty", DUTIES_FILE)
+    need = run.required_volume or {}
+    exact = need.get("volume_l")
+    if exact is None:
+        reason = f"reservoir.size to_horizon gives no volume: {need.get('reason') or 'no run'}"
+        entry.values = {"volume": Sized("TBD", "L", "tbd", reason)}
+        return entry
+    written = _round_up(exact * (1 + 1e-6), _VOLUME_DIGITS)
+    result.values["reservoir_required_volume_l"] = Sized(
+        exact, "L", "calculated", f"duty {duty.id} reservoir.size to_horizon: {need['basis']}"
+    )
+    entry.values = {
+        "volume": Sized(
+            written,
+            "L",
+            "calculated",
+            f"{need['basis']}; rounded up to {_VOLUME_DIGITS} significant figures",
+        )
+    }
+    entry.detail = (
+        f"reservoir.size to_horizon: the volume that reaches {need['target']} at the pH "
+        f"threshold (exact {exact:.6g} L, rounded up to {_VOLUME_DIGITS} significant figures)"
+    )
+    _finish(entry, head, fingerprint)
+    return entry
+
+
+#: significant figures of a reservoir volume written into process/duties.yaml
+_VOLUME_DIGITS = 4
+
+
+def _round_up(x: float, digits: int) -> float:
+    """*x* > 0 rounded up to *digits* significant figures."""
+    exponent = math.floor(math.log10(x)) - (digits - 1)
+    return float(f"{math.ceil(x / 10.0**exponent - 1e-9)}e{exponent}")
 
 
 def _finish(entry: EquipmentInput, head: str, fingerprint: str) -> None:
@@ -1600,7 +1861,7 @@ def _stack_tags(stack: Stack, index: int, result: StackResult, out: _Out) -> Non
     fp = value_fingerprint(
         {
             "model": MODEL,
-            "stack": stack.model_dump(mode="json", exclude={"equipment", "tags"}),
+            "stack": _dump(stack, {"equipment", "tags"}),
             "point": result.point.as_dict() if result.point else None,
         }
     )
@@ -1743,33 +2004,57 @@ def stack_findings(root: Path) -> list[Finding]:
 def stack_arrangements(root: Path) -> dict[str, Any]:
     """The arrangement each skid duty runs at: duty id (``equipment.duty`` of a stack) to the
     :class:`~chemeascode.domains.process.electrolysis_duty.Arrangement` (cells per stack,
-    stacks) the stack sizing chose, for ``cheme process duty`` to run the duty as ``cheme
-    process stack`` does. The first stack naming a duty runs it (``cheme process stack``
-    gives a later one no inputs from it, ``cheme.stack-duty``); a refused stack gives none, nor
-    a duty of another cell than the stack's (``cheme process stack`` refuses that duty)."""
+    stacks, the stack's id) the stack sizing chose, for ``cheme process duty`` to run the duty
+    as ``cheme process stack`` does. The first stack naming a duty runs it (``cheme process
+    stack`` gives a later one no inputs from it, ``cheme.stack-duty``); a refused stack gives
+    none, nor a duty of another cell than the stack's (``cheme process stack`` refuses that
+    duty). A duty that names a stack itself (``stack:``, such as a comparison duty on the
+    skid's hardware) gets that stack's arrangement in the same way, unless a stack's equipment
+    runs it (that stack's arrangement is given: a duty naming another stack is then refused,
+    ``cheme.duty-arrangement``)."""
     from chemeascode.domains.process.electrochemical_cell import load_cells
     from chemeascode.domains.process.electrolysis_duty import Arrangement, load_duties
 
     cells, _, _ = load_cells(Path(root))
-    if cells is None or not any(s.equipment is not None for s in cells.stacks):
+    if cells is None or not cells.stacks:
         return {}
     duties, _, _ = load_duties(Path(root))
     cell_of = {d.id: d.cell for d in duties.duties} if duties is not None else {}
+    named = [d for d in duties.duties if d.stack is not None] if duties is not None else []
+    if not any(s.equipment is not None for s in cells.stacks) and not named:
+        return {}
     sized = {s.id: s for s in stack_report(Path(root), duties=False).stacks}
     found: dict[str, Any] = {}
     claimed: set[str] = set()
+
+    def arrangement(stack: Stack) -> Any:
+        result = sized.get(stack.id)
+        if result is None or result.refused:
+            return None
+        per_stack, stacks = result.number("cells_per_stack"), result.number("stacks")
+        if not (per_stack and stacks):
+            return None
+        return Arrangement(per_stack, stacks, f"stack {stack.id}", stack.id)
+
     for stack in cells.stacks:
         if stack.equipment is None or stack.equipment.duty in claimed:
             continue
         claimed.add(stack.equipment.duty)
-        result = sized.get(stack.id)
-        if result is None or result.refused:
-            continue
         if cell_of.get(stack.equipment.duty) != stack.cell:
             continue
-        per_stack, stacks = result.number("cells_per_stack"), result.number("stacks")
-        if per_stack and stacks:
-            found[stack.equipment.duty] = Arrangement(per_stack, stacks, f"stack {stack.id}")
+        given = arrangement(stack)
+        if given is not None:
+            found[stack.equipment.duty] = given
+    # a duty that names a stack (a comparison duty at the skid's arrangement), when no stack's
+    # equipment runs it (one that does keeps it: the duty is then refused, cheme.duty-arrangement)
+    by_id = {s.id: s for s in cells.stacks}
+    for duty in named:
+        stack = by_id.get(duty.stack)  # type: ignore[arg-type]
+        if duty.id in claimed or stack is None or stack.cell != duty.cell:
+            continue
+        given = arrangement(stack)
+        if given is not None:
+            found[duty.id] = given
     return found
 
 
@@ -1878,9 +2163,13 @@ def _compare(
         loc = (
             ["stacks", index, "tags"]
             if entry.role == "stack"
+            else ["stacks", index, "equipment", "duty"]
+            if entry.target == "duty"
             else ["stacks", index, "equipment", entry.role]
         )
-        if entry.tag in conflicts:
+        if entry.target == "duty":
+            _compare_duty(root, entry, out, result.id, loc)
+        elif entry.tag in conflicts:
             entry.status = "conflict"
         elif entry.target == "dimensions":
             _compare_dimensions(entry, items.get(entry.tag), out, result.id, loc)
@@ -1999,6 +2288,64 @@ def _compare_dimensions(
             "`cheme process stack --write` writes them; then `cheme layout build` and "
             f"`cheme datasheets fill --tag {entry.tag}`",
         )
+
+
+#: the duty's volume units (process/duties.yaml), to L
+_DUTY_VOLUME = {"L": 1.0, "mL": 1e-3, "m3": 1e3}
+
+
+def _duty_volume(root: Path, did: str) -> tuple[float, str] | None:
+    """Duty *did*'s stated reservoir volume in L, and as written (``20 L``); None when the duty
+    or a usable volume is not there."""
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE
+
+    try:
+        data = yaml.safe_load((root / DUTIES_FILE).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    duty = next(
+        (d for d in data.get("duties") or [] if isinstance(d, dict) and d.get("id") == did), None
+    )
+    volume = ((duty or {}).get("reservoir") or {}).get("volume")
+    if not isinstance(volume, dict) or not _number(volume.get("value")):
+        return None
+    factor = _DUTY_VOLUME.get(volume.get("unit"))  # type: ignore[arg-type]
+    if factor is None:
+        return None
+    return volume["value"] * factor, f"{volume['value']:g} {volume.get('unit')}"
+
+
+def _compare_duty(root: Path, entry: EquipmentInput, out: _Out, sid: str, loc: list[Any]) -> None:
+    """The duty's reservoir volume (reservoir.size: to_horizon) against process/duties.yaml."""
+    if not entry.complete:
+        entry.status = "tbd"
+        return
+    stated = _duty_volume(root, entry.tag)
+    new = entry.values["volume"].value
+    if stated is None:
+        entry.status = "no-target"
+        out.add(
+            "info",
+            "target",
+            f"stack {sid}: duty {entry.tag} has no reservoir volume in L, mL or m3 in {entry.file}",
+            loc,
+            [sid, entry.tag],
+            "give reservoir.volume {value, unit: L}; `cheme process stack --write` then sets it",
+        )
+        return
+    if _numbers_equal(stated[0], new):
+        entry.status = "current"
+        return
+    entry.status = "outdated"
+    out.add(
+        "warning",
+        "outdated",
+        f"stack {sid}: {entry.file} duty {entry.tag} reservoir volume {stated[1]}, calculated "
+        f"{new:g} L (reservoir.size: to_horizon)",
+        loc,
+        [sid, entry.tag],
+        "`cheme process stack --write` writes it (and then the tanks from the duty at that volume)",
+    )
 
 
 def _number(value: Any) -> bool:
@@ -2130,14 +2477,36 @@ def write_stack_inputs(root: Path, report: StackReport) -> WriteResult:
     written = WriteResult()
     dims: dict[str, EquipmentInput] = {}
     sheets: dict[str, list[EquipmentInput]] = {}
+    volumes: dict[str, EquipmentInput] = {}
     for result in report.stacks:
         for entry in result.equipment:
             if entry.status != "outdated":
                 continue
             if entry.target == "dimensions":
                 dims[entry.tag] = entry
+            elif entry.target == "duty":
+                volumes[entry.tag] = entry
             else:
                 sheets.setdefault(entry.tag, []).append(entry)
+    if volumes:
+        from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE
+
+        path = root / DUTIES_FILE
+        text = path.read_text(encoding="utf-8")
+        new_text = text
+        changes = {}
+        for did, entry in volumes.items():
+            changes[did] = {
+                "value": entry.values["volume"].value,
+                "unit": "L",
+                "source": entry.source,
+            }
+            new_text = set_duty_volume(new_text, did, changes[did])
+        _check_duties(text, new_text, changes)
+        path.write_text(new_text, encoding="utf-8")
+        for entry in volumes.values():
+            entry.status = "written"
+        written.written[DUTIES_FILE] = sorted(volumes)
     if dims:
         path = root / EQUIPMENT_LIST
         text = path.read_text(encoding="utf-8")
@@ -2226,6 +2595,72 @@ def _check_list(old_text: str, new_text: str, changes: dict[str, dict[str, Any] 
             f"{EQUIPMENT_LIST}: the edit changes more than the dimensions of "
             f"{', '.join(sorted(changes))}; nothing written (write them by hand)"
         )
+
+
+def _check_duties(old_text: str, new_text: str, changes: dict[str, dict[str, Any]]) -> None:
+    """The edited process/duties.yaml is valid and is the old one with only the reservoir
+    volumes of *changes* (duty id -> volume) replaced."""
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE, Duties
+
+    expected = yaml.safe_load(old_text)
+    for duty in expected["duties"]:
+        if duty.get("id") in changes:
+            duty["reservoir"]["volume"] = changes[duty["id"]]
+    try:
+        found = yaml.safe_load(new_text)
+        Duties.model_validate(found)
+    except (yaml.YAMLError, ValueError) as failure:
+        raise ValueError(
+            f"{DUTIES_FILE}: the edit does not give a valid file ({failure})"
+        ) from failure
+    if found != expected:
+        raise ValueError(
+            f"{DUTIES_FILE}: the edit changes more than the reservoir volume of "
+            f"{', '.join(sorted(changes))}; nothing written (write it by hand)"
+        )
+
+
+def set_duty_volume(text: str, duty_id: str, volume: dict[str, Any]) -> str:
+    """*text* of process/duties.yaml with duty *duty_id*'s ``reservoir.volume`` replaced by
+    *volume* (a flow mapping); the rest of the text, comments included, as it was. Raises
+    ValueError when the duty, its reservoir or its volume is not there."""
+    root = yaml.compose(text)
+    seq = (
+        next((v for k, v in root.value if getattr(k, "value", None) == "duties"), None)
+        if isinstance(root, yaml.MappingNode)
+        else None
+    )
+    if not isinstance(seq, yaml.SequenceNode):
+        raise ValueError("process/duties.yaml has no duties: list")
+    item = next(
+        (
+            node
+            for node in seq.value
+            if isinstance(node, yaml.MappingNode)
+            and any(
+                getattr(k, "value", None) == "id" and getattr(v, "value", None) == duty_id
+                for k, v in node.value
+            )
+        ),
+        None,
+    )
+    reservoir = (
+        next((v for k, v in item.value if getattr(k, "value", None) == "reservoir"), None)
+        if item is not None
+        else None
+    )
+    found = (
+        next(((k, v) for k, v in reservoir.value if getattr(k, "value", None) == "volume"), None)
+        if isinstance(reservoir, yaml.MappingNode)
+        else None
+    )
+    if found is None:
+        raise ValueError(f"process/duties.yaml: duty {duty_id} has no reservoir.volume")
+    key, value = found
+    body = _flow(volume)
+    if isinstance(value, yaml.ScalarNode) or value.flow_style:
+        return text[: value.start_mark.index] + body + text[_end(value) :]
+    return text[: key.end_mark.index] + ": " + body + text[_line_end(text, _end(value)) :]
 
 
 # -- editing the equipment list as text ---------------------------------------------------------
@@ -2359,6 +2794,12 @@ def report_text(report: StackReport) -> str:
         assert p is not None
         where = f", {p.measurement['file']}" if p.measurement and p.measurement.get("file") else ""
         product = s.values["product_duty_kg_h"]
+        formed = (
+            f" delivered (formed {_v(s, 'product_formed_duty_kg_h', '.6g')} at recovery "
+            f"{_v(s, 'product_recovery')})"
+            if "product_recovery" in s.values
+            else ""
+        )
         lines.append(
             f"{s.id}: cell {p.cell} ({p.performance}{where}) at {p.current_density_a_m2:.6g} A/m2,"
             f" U {p.voltage_v:.4g} V, FE {p.faradaic_efficiency:.4g}, {p.area_m2 * 1e4:.6g} cm2"
@@ -2367,7 +2808,8 @@ def report_text(report: StackReport) -> str:
             lo, hi = p.measurement["current_density_range_a_m2"]
             lines.append(f"  inside the {'measured' if where else 'declared'} {lo:g}-{hi:g} A/m2")
         lines.append(
-            f"  duty {product.value:.6g} kg/h: active area {_v(s, 'total_active_area_m2')}, "
+            f"  duty {product.value:.6g} kg/h{formed}: active area "
+            f"{_v(s, 'total_active_area_m2')}, "
             f"{_v(s, 'cells_required')} cells required, at most {_v(s, 'max_cells_per_stack')} "
             "per stack"
         )
@@ -2378,7 +2820,13 @@ def report_text(report: StackReport) -> str:
         lines.append(
             f"  DC power {_v(s, 'dc_power_kw')}"
             + (f" (AC {_v(s, 'ac_power_kw')})" if "ac_power_kw" in s.values else "")
-            + f", output {_v(s, 'product_output_kg_h')} (margin "
+            + f", output {_v(s, 'product_output_kg_h')}"
+            + (
+                f" formed, {_v(s, 'product_delivered_kg_h')} delivered"
+                if "product_delivered_kg_h" in s.values
+                else ""
+            )
+            + " (margin "
             f"{s.values['output_margin'].value:+.2%}), {_v(s, 'electricity_kwh_per_kg')}"
             + (f", heat to remove {_v(s, 'heat_duty_kw')}" if "heat_duty_kw" in s.values else "")
         )
@@ -2403,11 +2851,26 @@ def report_text(report: StackReport) -> str:
                 f"{d['ended']} at {_g(d['simulated_h'])} h of {_g(d['campaign_h'])} h, "
                 f"feasible: {'yes' if d['feasible'] else 'no'}"
             )
+            if "reservoir_required_volume_l" in s.values:
+                lines.append(
+                    f"  reservoir.size to_horizon: {_v(s, 'reservoir_required_volume_l', '.6g')} "
+                    "reaches the target (exact; written rounded up)"
+                )
             if d.get("inputs_given"):
                 lines.append(
                     f"  reservoir working volume {_v(s, 'reservoir_working_volume_l')}, dosed "
                     f"{_v(s, 'dosing_solution_l')}, bled {_v(s, 'bleed_l')} over the campaign"
                 )
+                for count, per, verb in (
+                    ("dosing_tank_fills_per_campaign", "dosing_solution_per_fill_l", "filled"),
+                    ("bleed_tank_empties_per_campaign", "bleed_per_empty_l", "emptied"),
+                ):
+                    if count in s.values:
+                        lines.append(
+                            f"  {'dosing' if 'dosing' in count else 'bleed'} tank {verb} "
+                            f"{_v(s, count, 'd')} time(s) over the campaign, at most "
+                            f"{_v(s, per)} each"
+                        )
         for e in s.equipment:
             values = ", ".join(
                 f"{k} {'TBD' if x.provenance == 'tbd' else _g4(x.value)}"
@@ -2417,6 +2880,8 @@ def report_text(report: StackReport) -> str:
             target = (
                 f"{EQUIPMENT_LIST} dimensions"
                 if e.target == "dimensions"
+                else f"{e.file} duty {e.tag} reservoir"
+                if e.target == "duty"
                 else f"{DATASHEET_DIR}/{e.tag}.yaml type_specific"
             )
             mark = " ASSUMED" if e.assumed else ""
