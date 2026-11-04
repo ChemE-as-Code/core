@@ -735,6 +735,15 @@ class Step(Node, Reacting, Solids):
         description="Splitters (SplittingMaterial): outlet port -> fraction of the inlet flow, "
         "for cheme process propagate.",
     )
+    symbol: str | None = Field(
+        default=None,
+        description="PFD drawing only: the ISO 10628-2 symbol to draw the step with (a symbol "
+        "name as `cheme fragment shape` takes it, e.g. TANK_CONE_ROOF_SHAPE, MIXER_SHAPE), "
+        "`junction` (a mixing or splitting tee) or `box`; default: its class's symbol.",
+        exclude_if=lambda value: (
+            value is None
+        ),  # fingerprints of steps without one stay as they were
+    )
 
 
 class Quantity(Strict):

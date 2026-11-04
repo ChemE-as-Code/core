@@ -50,6 +50,10 @@ class LNode:
     ghost: bool = False
     #: Keep the order of ins and outs (a block whose ports were ordered for its inside).
     fixed_ports: bool = False
+    #: The part of the sides the ports are spread on: from ``port_top`` below the top to
+    #: ``port_bottom`` above the bottom (a symbol between a stub band and its labels).
+    port_top: float = 0.0
+    port_bottom: float = 0.0
 
     def fraction(self, port: str) -> float:
         """Where *port* sits along its side, 0 (top) to 1 (bottom)."""
@@ -57,11 +61,12 @@ class LNode:
         return spread(len(side))[side.index(port)] if port in side else 0.5
 
     def port_point(self, port: str) -> tuple[float, float]:
+        span = self.height - self.port_top - self.port_bottom
         if port in self.ins:
             fraction = spread(len(self.ins))[self.ins.index(port)]
-            return (self.x, self.y + self.height * fraction)
+            return (self.x, self.y + self.port_top + span * fraction)
         fraction = spread(len(self.outs))[self.outs.index(port)]
-        return (self.x + self.width, self.y + self.height * fraction)
+        return (self.x + self.width, self.y + self.port_top + span * fraction)
 
 
 @dataclass
@@ -195,6 +200,7 @@ def layout(
         _coordinates(layers, count, by_id, column_x, widths, origin, gap_y)
         if order_ports:
             _order_ports(nodes, by_id, edges)
+    _align_inlets(layers, count, by_id, forward, origin, gap_y)
     real = [n for n in nodes if not n.ghost] or nodes
     x0 = min(n.x for n in real)
     y0 = min(n.y for n in real)
@@ -320,6 +326,44 @@ def _coordinates(
                 node.x = column_x[k] + (widths[k] - node.width) / 2
                 node.y = y
             y += node.height + gap_y
+
+
+#: The furthest :func:`_align_inlets` moves a node to line its inlet up with its source, mm.
+ALIGN_SHIFT = 14.0
+
+
+def _align_inlets(
+    layers: dict[int, list[str]],
+    count: int,
+    by_id: dict[str, LNode],
+    forward: list[LEdge],
+    origin: tuple[float, float],
+    gap_y: float,
+) -> None:
+    """Remove small jogs: column by column, left to right, move each unpinned node up or down
+    (at most :data:`ALIGN_SHIFT`, keeping the gap to its neighbours and inside the columns'
+    height) so the in port whose line would jog least runs straight from its source port."""
+    real = [n for n in by_id.values() if not n.ghost]
+    if not real:
+        return
+    top = origin[1]
+    bottom = max(n.y + n.height for n in real)
+    for k in range(count):
+        column = [by_id[n] for n in layers.get(k, []) if not by_id[n].ghost]
+        for i, node in enumerate(column):
+            if node.pinned:
+                continue
+            low = column[i - 1].y + column[i - 1].height + gap_y if i else top
+            high = (column[i + 1].y - gap_y if i + 1 < len(column) else bottom) - node.height
+            shifts = []
+            for e in forward:
+                if e.dst != node.id or e.src == node.id or by_id[e.src].layer >= node.layer:
+                    continue
+                dy = by_id[e.src].port_point(e.src_port)[1] - node.port_point(e.dst_port)[1]
+                if 1e-6 < abs(dy) <= ALIGN_SHIFT and low - 1e-6 <= node.y + dy <= high + 1e-6:
+                    shifts.append(dy)
+            if shifts:
+                node.y = round(node.y + min(shifts, key=abs), 3)
 
 
 def _order_ports(nodes: list[LNode], by_id: dict[str, LNode], edges: list[LEdge]) -> None:

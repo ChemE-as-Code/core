@@ -84,12 +84,25 @@ def symbols() -> dict[str, Symbol]:
     }
 
 
+#: The PFD's drawing of a stream junction (a mixing or splitting tee): its streams meet on a
+#: short header, no equipment symbol. A step's ``symbol:`` names it as ``junction``.
+JUNCTION = "junction"
+#: A step's ``symbol: box``: the plain box (a lumped section or package).
+BOX = "box"
+
 #: DEXPI process step class -> the symbol the PFD draws it with. A step class not listed takes
-#: its nearest listed base class's; ``None`` keeps the plain box (junctions, generic steps).
+#: its nearest listed base class's; ``None`` keeps the plain box (generic steps), :data:`JUNCTION`
+#: the junction drawing. Mixing in a vessel or a rotary mixer takes a ``symbol:`` of its own.
 STEP_SYMBOLS: dict[str, str | None] = {
     "ProcessStep": None,
-    "SplittingMaterial": None,
-    "MixingSimple": None,
+    "SplittingMaterial": JUNCTION,
+    "Splitting": JUNCTION,
+    "MixingSimple": JUNCTION,
+    "GeneratingFlow": "PUMP_CENTRIFUGAL_SHAPE",
+    "TransportingFluids": "PUMP_CENTRIFUGAL_SHAPE",
+    "SteeringFlow": "CONTROL_VALVE_SHAPE",
+    "Crystallizing": "VESSEL_DISHED_ENDS_JACKET_SHAPE",
+    "SeparatingMechanically": "SEPARATOR_SHAPE",
     "Pumping": "PUMP_CENTRIFUGAL_SHAPE",
     "Compressing": "COMPRESSOR_SHAPE",
     "DrivingByTurbine": "TURBINE_SHAPE",
@@ -115,7 +128,7 @@ STEP_SYMBOLS: dict[str, str | None] = {
     "Filtering": "LIQUID_FILTER_SHAPE",
     "Drying": "DRYER_SHAPE",
     "ReactingChemicals": "VESSEL_DISHED_ENDS_SHAPE",
-    "Mixing": "MIXER_SHAPE",
+    "Mixing": JUNCTION,
     "StaticMixing": "STATIC_MIXER_SHAPE",
     "StoringMaterial": "TANK_CONE_ROOF_SHAPE",
     "StoringInPressureVessel": "VESSEL_DISHED_ENDS_SHAPE",
@@ -129,14 +142,31 @@ STEP_SYMBOLS: dict[str, str | None] = {
 }
 
 
-def step_symbol(class_name: str) -> Symbol | None:
-    """The symbol of DEXPI step class *class_name* (through its base classes), if any."""
+def _class_drawing(class_name: str) -> str | None:
     import pydexpi.pydexpi_classes.pydexpi_classes as C
 
     cls = getattr(C, class_name, None)
     chain = cls.__mro__ if inspect.isclass(cls) else ()
     for base in chain:
         if base.__name__ in STEP_SYMBOLS:
-            name = STEP_SYMBOLS[base.__name__]
-            return symbols()[name] if name else None
+            return STEP_SYMBOLS[base.__name__]
     return None
+
+
+def step_drawing(class_name: str, symbol: str | None = None) -> Symbol | str | None:
+    """How the PFD draws a step of DEXPI class *class_name*: its ``symbol:`` (a symbol name,
+    :data:`JUNCTION` or :data:`BOX`) where given and known (``cheme.process-symbol`` reports
+    an unknown one), else its class's (:data:`STEP_SYMBOLS`).
+    A :class:`Symbol`, :data:`JUNCTION`, or None for the plain box."""
+    known = symbol in (JUNCTION, BOX) or symbol in symbols()
+    name = symbol if known else _class_drawing(class_name)  # an unknown one: the class's
+    if name in (None, BOX) or (name != JUNCTION and name not in symbols()):
+        return None
+    return JUNCTION if name == JUNCTION else symbols()[name]
+
+
+def step_symbol(class_name: str, symbol: str | None = None) -> Symbol | None:
+    """The equipment symbol a step of DEXPI class *class_name* is drawn with, if any (None for
+    the plain box and a junction)."""
+    drawing = step_drawing(class_name, symbol)
+    return drawing if isinstance(drawing, Symbol) else None

@@ -1330,6 +1330,7 @@ def _id_rules(out: _Out) -> None:
         _known_class(out, block.class_, block.method, ["blocks", i], block.id)
     for i, step in enumerate(fs.steps):
         _known_class(out, step.class_, step.method, ["steps", i], step.id)
+        _known_symbol(out, step.symbol, ["steps", i, "symbol"], step.id)
     ids = [c.id for c in fs.cases]
     defaults = [c.id for c in fs.cases if c.default]
     if not fs.cases:
@@ -1341,6 +1342,22 @@ def _id_rules(out: _Out) -> None:
             "case ids must be unique and at most one case the default",
             ["cases"],
         )
+
+
+def _known_symbol(out: _Out, name: str | None, loc: list[Any], owner: str) -> None:
+    from chemeascode.domains.process.symbols import BOX, JUNCTION, symbols
+
+    if name is None or name in (JUNCTION, BOX) or name in symbols():
+        return
+    out.add(
+        "warning",
+        "symbol",
+        f"{owner}: symbol {name} is not in the symbol library; the PFD draws its class's",
+        loc,
+        [owner],
+        hint=f"{JUNCTION}, {BOX} or a symbol name, e.g. TANK_CONE_ROOF_SHAPE, MIXER_SHAPE "
+        "(the list: src/chemeascode/domains/process/data/iso_shapes.json)",
+    )
 
 
 def _known_class(out: _Out, name: str, method: str | None, loc: list[Any], owner: str) -> None:
