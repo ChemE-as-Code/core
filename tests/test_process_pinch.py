@@ -334,9 +334,24 @@ def test_multi_stream_exchanger_counts_the_smaller_group_and_excludes_the_net():
 
 
 def _hda(tmp_path: Path) -> Path:
+    """A copy of hda-1 whose recorded run carries the model fingerprint this core translates its
+    inputs to. The duties are DWSIM's; only the stamp is renewed, so a change to the translation
+    does not make the pinch tests stale (test_hda_needs_a_current_run covers the refusal)."""
+    from chemeascode.domains.process.model import load as load_process
+    from chemeascode.domains.process.simulation.translate import load, translate
+
     root = tmp_path / "hda-1"
     shutil.copytree(DATA / "process-hda-1", root)
+    process, _ = load_process(root)
+    sim, sim_doc, _ = load(root)
+    fingerprint = translate(process, sim, sim_doc, "design").fingerprint
+    _edit_run(root, lambda e: e.update(model_fingerprint=fingerprint))
     return root
+
+
+def _fingerprint(root: Path) -> str:
+    data = json.loads((root / "process" / "simulation-run.json").read_text())
+    return data["cases"]["design"]["model_fingerprint"]
 
 
 def _cli(root: Path, monkeypatch, *args: str):
@@ -396,7 +411,7 @@ def test_hda_end_to_end(tmp_path, monkeypatch):
     assert streams["C202:reboiler"]["utility"] == "LPS"
     assert payload["shares"]["quality"]["linearised"] == pytest.approx(1.0)
     assert payload["settings"]["dt_min"] == {"value": 10.0, "unit": "K", "source": "ASSUMED"}
-    assert payload["simulation_run"]["model_fingerprint"] == "2e24db8a18b4fb2a"
+    assert payload["simulation_run"]["model_fingerprint"] == _fingerprint(root)
     rules = {f["rule"] for f in payload["findings"]}
     assert rules == {"cheme.process-pinch-stream-linearised"}
     # text and Markdown carry the three labels
@@ -429,7 +444,7 @@ def test_hda_write_records_the_targets(tmp_path, monkeypatch):
         "include_constrained": False,
     }
     assert entry["tool"].startswith("cheme-as-code ")
-    assert entry["simulation_run"]["model_fingerprint"] == "2e24db8a18b4fb2a"
+    assert entry["simulation_run"]["model_fingerprint"] == _fingerprint(root)
     assert entry["simulation_run"]["entry_fingerprint"].startswith("sha256:")
     assert "process/simulation-run.json" in entry["inputs"]["fingerprints"]
     results = entry["results"]

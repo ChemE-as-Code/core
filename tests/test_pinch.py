@@ -213,7 +213,10 @@ def smith():
     four-stream example (duties in MW there, kW/K and kW here): H1 250 -> 40 degC at 0.15,
     H2 200 -> 80 degC at 0.25, C3 20 -> 180 degC at 0.20, C4 140 -> 230 degC at 0.30. At
     dTmin 10 K the book gives minimum hot utility 7.5, cold utility 10.0 and the pinch at
-    150 degC (hot) / 140 degC (cold)."""
+    150 degC (hot) / 140 degC (cold). Checked against the stream table and problem-table
+    cascade reproduced in the University of Oklahoma ChE design course notes "Pinch and minimum
+    utility usage" (ou.edu/class/che-design/a-design/Minimum Utility.pdf): the same streams,
+    7.5 MW heating and 10.0 MW cooling."""
     return [
         PinchStream(250 + C, 40 + C, 0.15, "H1"),
         PinchStream(200 + C, 80 + C, 0.25, "H2"),

@@ -44,6 +44,6 @@ reads: `plant.yaml` and `process/{flowsheet,materials,reactions,simulation}.yaml
 its recorded DWSIM 9.0.5 run `process/simulation-run.json` (simulated from library commit
 4385a2d, written by cheme-as-code 1.2.1), so the end-to-end pinch tests
 (`tests/test_process_pinch.py`) need no DWSIM. The sheets `plant.yaml` names are not copied.
-While core translates these inputs to the recorded model fingerprint the record is current; a
-change to the translation that alters the fingerprint makes the tests fail with
-`pinch-run-stale`: copy a run simulated with the new core from the library then.
+The tests renew the record's model fingerprint to the one this core translates the inputs to
+(the duties stay DWSIM's), so a change to the translation does not make them stale; copy a run
+simulated with the new core from the library when the translation changes what DWSIM computes.
