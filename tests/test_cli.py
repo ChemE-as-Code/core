@@ -384,6 +384,7 @@ def test_schema_lists_kinds(plant: Path, monkeypatch):
         "hazop-study",
         "failure-modes",
         "hazop-coverage",
+        "hazop-deviation-matrix",
         "frequencies",
         "narrative",
         "control_philosophy",

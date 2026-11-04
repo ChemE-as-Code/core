@@ -258,15 +258,31 @@ COVERAGE_FILE = "coverage.yaml"
 COVERAGE_WRITER = "cheme safety hazop propagate --coverage --write"
 
 
+#: A project's own deviation matrix (``cheme/hazop-deviation-matrix/v1``), replacing the default.
+DEVIATION_MATRIX_FILE = "safety/deviation-matrix.yaml"
+
+
 @dataclass
 class StudyCoverage:
-    """``propagate --coverage``: each node's coverage and the state of the triage file."""
+    """``propagate --coverage``: each node's walk coverage and completeness, and the state of
+    the triage file."""
 
     path: str
     found: list[NodePropagation]
     #: The library or an analysed sheet changed since the triage file was written.
     stale: bool
     written: bool
+    study: str = ""
+    #: The failure-mode library walked, or None: there is none and the walk was skipped.
+    library: str | None = None
+    #: Node id -> its deviation and cause checks, every node with members (or the one asked).
+    complete: list[tuple[str, Any]] = field(default_factory=list)
+    #: The deviation matrix used: the project's file, or cheme-as-code's default.
+    matrix: str = "default"
+
+    def open_gaps(self) -> int:
+        walk = sum(len(f.coverage.gaps) for f in self.found if f.coverage is not None)
+        return walk + sum(len(c.deviations) + len(c.causes) for _, c in self.complete)
 
 
 def study_coverage(
@@ -276,30 +292,56 @@ def study_coverage(
     library_file: str = LIBRARY_FILE,
     write: bool = False,
 ) -> StudyCoverage:
-    """Every node's (or one node's) scenarios against the walk, the triage file's decisions
-    applied; *write* brings the triage file up to date (open outcomes only, decisions kept)."""
-    from chemeascode.domains.safety.propagation import triage
+    """Every node's (or one node's) scenarios against the walk (when the project has a
+    failure-mode library), the deviations its equipment calls for and the cause families it
+    has to consider, the triage file's decisions applied; *write* brings the triage file up to
+    date (open outcomes only, decisions kept)."""
+    from chemeascode.domains.safety.completeness import (
+        check_decisions,
+        completeness,
+        wanted,
+    )
+    from chemeascode.domains.safety.propagation import _index, triage
     from chemeascode.domains.safety.schemas import COVERAGE_SCHEMA, HazopCoverage, Walk
     from chemeascode.foundation import provenance
 
-    inputs = _propagation_inputs(workspace, study_id, library_file)
+    inputs = _propagation_inputs(workspace, study_id, library_file, need_library=False)
     nodes = [n for n in inputs.study.nodes if n.members and node_id in (None, n.id)]
     if node_id is not None and not nodes:
         raise ValueError(f"{inputs.path}: no node {node_id} with members")
-    found = [_walk_node(inputs, node, None) for node in nodes]
+    recorded = inputs.triage
+    outcomes_before = recorded.outcomes if recorded else []
+    problems = check_decisions(inputs.study.nodes, outcomes_before)
+    if problems:
+        raise ValueError(f"{COVERAGE_FILE} of {study_id}: " + "; ".join(problems))
+    found = [_walk_node(inputs, node, None) for node in nodes] if inputs.library else []
+    index = _index(inputs.models)
+    complete = [
+        (node.id, completeness(index, node, inputs.plant, outcomes_before, inputs.matrix))
+        for node in nodes
+    ]
     root = workspace.root
     walk = Walk(
-        library=provenance.file_fingerprint(root / library_file),
+        library=provenance.file_fingerprint(root / library_file) if inputs.library else "",
         sheets={p: provenance.file_fingerprint(root / p) for p in inputs.sheet_files},
+        inputs={p: provenance.file_fingerprint(root / p) for p in inputs.other_files},
     )
-    recorded = inputs.triage
-    stale = recorded is not None and recorded.walk is not None and recorded.walk != walk
+    before = recorded.walk if recorded is not None else None
+    # A triage file written before the other checks existed records no inputs: only the walk's.
+    stale = before is not None and (
+        (before.library, before.sheets) != (walk.library, walk.sheets)
+        or (bool(before.inputs) and before.inputs != walk.inputs)
+    )
     path = str(PurePosixPath(inputs.path).parent / COVERAGE_FILE)
     if write:
         outcomes = triage(
             [(f.node, f.coverage) for f in found if f.coverage is not None],
-            recorded.outcomes if recorded else [],
+            outcomes_before,
             COVERAGE_WRITER,
+            [
+                (node_id_, wanted(node_id_, result, COVERAGE_WRITER))
+                for node_id_, result in complete
+            ],
         )
         data = HazopCoverage.model_validate(
             {
@@ -311,16 +353,26 @@ def study_coverage(
             }
         )
         dumped = data.model_dump(mode="json", by_alias=True)
-        # Empty reason, by or causes are left out: the file is edited by hand.
+        # Empty fields (reason, by, causes, those of another kind) are left out: the file is
+        # edited by hand.
         dumped["outcomes"] = [
-            {k: v for k, v in o.items() if v not in ("", [])} for o in dumped["outcomes"]
+            {k: v for k, v in o.items() if v not in ("", [], None)} for o in dumped["outcomes"]
         ]
         text = yaml.safe_dump(dumped, sort_keys=False)
         with (root / path).open("w", encoding="utf-8", newline="") as handle:
             handle.write(text)
         inputs.triage = data
         stale = False
-    return StudyCoverage(path, found, stale, write)
+    return StudyCoverage(
+        path,
+        found,
+        stale,
+        write,
+        inputs.study.id,
+        library_file if inputs.library else None,
+        complete,
+        DEVIATION_MATRIX_FILE if inputs.matrix_file else "default",
+    )
 
 
 @dataclass
@@ -328,22 +380,39 @@ class _PropagationInputs:
     path: str
     study: Any
     library_file: str
+    #: None: no library (only under --coverage, where the walk is then skipped).
     library: Any
     models: list[tuple[str, Any]]
     context: Context
     sheet_files: list[str] = field(default_factory=list)
     #: The study's coverage.yaml, if it has one.
     triage: Any = None
+    #: What the deviation and cause checks read besides the sheets.
+    plant: Any = None
+    matrix: Any = None
+    matrix_file: bool = False
+    other_files: list[str] = field(default_factory=list)
+
+
+def _load(workspace: Workspace, name: str, model: Any) -> Any:
+    """*name* (a YAML file from the repository root) parsed into *model*; ValueError if not."""
+    from pydantic import ValidationError
+
+    try:
+        return model.model_validate(
+            yaml.safe_load((workspace.root / name).read_text(encoding="utf-8")) or {}
+        )
+    except (yaml.YAMLError, ValidationError) as failure:
+        raise ValueError(f"{name} does not load: {failure}") from failure
 
 
 def _propagation_inputs(
-    workspace: Workspace, study_id: str, library_file: str
+    workspace: Workspace, study_id: str, library_file: str, need_library: bool = True
 ) -> _PropagationInputs:
-    from pydantic import ValidationError
-
     from chemeascode.domains.piping.sheet_query import load_sheets, sheet_id_of
+    from chemeascode.domains.safety.completeness import DEFAULT_MATRIX, Plant
     from chemeascode.domains.safety.hazop import load_study
-    from chemeascode.domains.safety.schemas import FailureModeLibrary
+    from chemeascode.domains.safety.schemas import DeviationMatrix, FailureModeLibrary
 
     path = study_path(study_id)
     if not (workspace.root / path).is_file():
@@ -352,18 +421,14 @@ def _propagation_inputs(
     if loaded.model is None:
         raise ValueError(f"{path} does not load: cheme safety hazop check {study_id}")
 
-    library_path = workspace.root / library_file
-    if not library_path.is_file():
+    library = None
+    if (workspace.root / library_file).is_file():
+        library = _load(workspace, library_file, FailureModeLibrary)
+    elif need_library:
         raise ValueError(
             f"no failure-mode library {library_file}: the team writes it "
             "(cheme schema failure-modes; skill hazop-scenario-propagation)"
         )
-    try:
-        library = FailureModeLibrary.model_validate(
-            yaml.safe_load(library_path.read_text(encoding="utf-8")) or {}
-        )
-    except (yaml.YAMLError, ValidationError) as failure:
-        raise ValueError(f"{library_file} does not load: {failure}") from failure
 
     analysed = {basis.path for basis in loaded.model.analysed}
     models = []
@@ -381,30 +446,64 @@ def _propagation_inputs(
         )
 
     context = Context()
-    parsed = workspace.parsed_lists(("interlocks", "loops"))
+    plant = Plant()
+    parsed = workspace.parsed_lists(("interlocks", "loops", "design_basis"))
     if "interlocks" in parsed:
         for interlock in parsed["interlocks"].interlocks:
             context.interlocks.setdefault(str(interlock.cause.tag), []).append(str(interlock.id))
+            plant.interlocks[str(interlock.id)] = _tags(interlock.model_dump())
     if "loops" in parsed:
         for loop in parsed["loops"].loops:
             for element in loop.final_elements:
                 if element.fail:
                     context.fail[str(element.tag)] = element.fail
+    if "design_basis" in parsed:
+        plant.utilities = parsed["design_basis"].utilities
+        plant.site = parsed["design_basis"].site
+    other_files = [
+        name
+        for name in (
+            "process/design-basis.yaml",
+            "control/cause-effect.yaml",
+            DEVIATION_MATRIX_FILE,
+        )
+        if (workspace.root / name).is_file()
+    ]
+    matrix_file = (workspace.root / DEVIATION_MATRIX_FILE).is_file()
+    matrix = (
+        _load(workspace, DEVIATION_MATRIX_FILE, DeviationMatrix) if matrix_file else DEFAULT_MATRIX
+    )
 
     from chemeascode.domains.safety.schemas import HazopCoverage
 
-    triage_file = workspace.root / PurePosixPath(path).parent / COVERAGE_FILE
+    triage_file = PurePosixPath(path).parent / COVERAGE_FILE
     recorded = None
-    if triage_file.is_file():
-        try:
-            recorded = HazopCoverage.model_validate(
-                yaml.safe_load(triage_file.read_text(encoding="utf-8")) or {}
-            )
-        except (yaml.YAMLError, ValidationError) as failure:
-            raise ValueError(f"{COVERAGE_FILE} of {study_id} does not load: {failure}") from failure
+    if (workspace.root / triage_file).is_file():
+        recorded = _load(workspace, str(triage_file), HazopCoverage)
     return _PropagationInputs(
-        path, loaded.model, library_file, library, models, context, sheet_files, recorded
+        path,
+        loaded.model,
+        library_file,
+        library,
+        models,
+        context,
+        sheet_files,
+        recorded,
+        plant,
+        matrix,
+        matrix_file,
+        other_files,
     )
+
+
+def _tags(data: Any) -> set[str]:
+    """Every ``tag`` value in *data* (an interlock dumped: cause, logic, effects)."""
+    if isinstance(data, dict):
+        found = {str(data["tag"])} if data.get("tag") is not None else set()
+        return found.union(*(_tags(v) for v in data.values()))
+    if isinstance(data, list):
+        return set().union(*(_tags(v) for v in data))
+    return set()
 
 
 def _walk_node(inputs: _PropagationInputs, node: Any, wanted: Deviation | None) -> NodePropagation:

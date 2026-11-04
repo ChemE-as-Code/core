@@ -27,8 +27,10 @@ nobody followed far enough. You propose; the team decides what is credible.
   guess.
 - The operating modes of the study: a cause may belong to start-up or shutdown only.
 - Optional: the project's failure-mode library `safety/failure-modes.yaml` (`cheme schema
-  failure-modes`, written by the team with its sources), which `cheme safety hazop propagate`
-  needs. Without it, trace by hand; never write the library yourself to have one.
+  failure-modes`, written by the team with its sources), which the walk of `cheme safety hazop
+  propagate` needs. Without it, trace by hand; never write the library yourself to have one.
+  `--coverage` runs its deviation and cause checks without it, from the P&IDs, the design
+  basis (`utilities`, `site`) and the cause and effect.
 
 ## Workflow and tools
 
@@ -165,9 +167,42 @@ outcomes:
      causes: [MOV-411A], status: dismissed, reason: "covered by S19 for the pump train", by: agent}
 ```
 Edit only `status`, `reason`, `by` (and `causes` to split an outcome); `judgement: accepted` is
-the team's. A later `--write` keeps every dismissed and question outcome, adds the new gaps and
-drops open ones no gap needs; when the library or an analysed sheet changed since, the command
-says so: check the decisions. Never dismiss what you have not traced.
+the team's. A later `--write` keeps every decided outcome, adds the new gaps and
+drops open ones no gap needs; when the library, an analysed sheet or another input changed
+since, the command says so: check the decisions. Never dismiss what you have not traced.
+
+**Completeness: deviations and cause families.** The walk follows equipment failures only.
+`--coverage` also runs two checks that need no library (without one the walk is skipped and
+they still run), each a gap kind of the same triage file:
+- **deviations** (`kind: deviation`): the deviations the node's members call for by their DEXPI
+  class (lines and piping, vessels, heat exchangers, pumps and compressors, relief devices,
+  filters and strainers; ADR 0036; a project's `safety/deviation-matrix.yaml`, `cheme schema
+  hazop-deviation-matrix`, replaces the default matrix). A deviation is considered when the
+  node has it with a scenario or with `notes:` saying why no cause is credible. Close a gap by
+  developing the deviation (step 1 onwards), or in the triage: `dismissed` or `question` with
+  the reason. Leave `guide_word` out to decide every guide word of a parameter at once
+  (`{kind: deviation, node: N3, parameter: composition, status: dismissed, reason: "one crude
+  stream, no other fluid connected to the node"}`);
+- **cause families** (`kind: cause`), one prompt per node and family that applies, listing the
+  items that make it concrete: `utility` (the design basis utilities), `external` (the design
+  basis site entries, and fire), `boundary` (the off-page connectors at the node: what the
+  plant beyond the boundary can send in), `operator` (manual valves, filters, strainers,
+  blinds, hand switches: wrong line-up, left open, maintenance) and `control` (the node's
+  controllers and the C&E interlocks naming its members: spurious action, failure to act, wrong
+  set point). A scenario of the node whose `refs` name one of the listed tags or object ids
+  covers a boundary, operator or control prompt. Otherwise write the scenario, or decide it:
+  `covered` with the ids of the node's scenarios that answer it (`scenarios: [S12]`; the tool
+  refuses an id that is no scenario of that node), `dismissed` or `question` with the reason.
+  A utility or external cause analysed once in a global node is `dismissed` here with the
+  reason naming that node's scenario.
+```yaml
+  - {kind: cause, node: N4, family: utility, status: covered, scenarios: [S19], by: agent}
+  - {kind: cause, node: N9, family: external, status: dismissed, by: agent,
+     reason: "buried header, no exposed small bore; fire at the station: N18 S40"}
+```
+A decision is a judgement about this node, never boilerplate: the same reason pasted into every
+node is not a decision. Consider each prompt with the items it lists; when none of them can
+give a credible cause here, say why in the reason.
 
 **Revise one row.** Change only that scenario's `cause`, `consequence`, `refs`, `safeguards` and
 `notes`, keeping its id; a different cause or outcome is a new scenario with a new id.
@@ -201,7 +236,8 @@ safeguard, and never present a traced path as the team's conclusion.
 ## References
 
 - `safety/README.md`; `cheme schema hazop-study`; `cheme show --help`.
-- `cheme safety hazop propagate --help`, `cheme schema failure-modes` (the optional walk).
+- `cheme safety hazop propagate --help`, `cheme schema failure-modes` (the optional walk),
+  `cheme schema hazop-coverage` (the triage), `cheme schema hazop-deviation-matrix`.
 - IEC 61882:2016, Hazard and operability studies (HAZOP studies) - Application guide.
 - Skills `hazop-node-breakdown` (the nodes), `hazop-equipment-causes` (credible deviations and
   causes per equipment type), `safeguard-crediting`, `relief-scenarios`,

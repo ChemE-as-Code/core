@@ -811,7 +811,7 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
     deviation it was written (a blocked outlet may be recorded as more pressure, not no flow),
     a train's tag standing for its parallel trains. A ``dismissed`` or ``question`` outcome of
     the triage (coverage.yaml) handles its causes."""
-    decided = [o for o in triage if o.node == node.id and o.status != "open"]
+    decided = [o for o in triage if o.kind == "walk" and o.node == node.id and o.status != "open"]
     rows = [
         ((d.guide_word, d.parameter), {str(r.tag or r.object) for r in s.refs}, s.id)
         for d in node.deviations
@@ -885,37 +885,52 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
     )
 
 
+def _triage_key(o: Outcome) -> tuple[Any, ...]:
+    """What identifies an outcome of its kind in the triage file."""
+    if o.kind == "walk":
+        return (o.node, o.kind, o.guide_word, o.parameter, o.top_event, o.at)
+    if o.kind == "deviation":
+        return (o.node, o.kind, o.guide_word, o.parameter)
+    return (o.node, o.kind, o.family)
+
+
 def triage(
-    found: Iterable[tuple[str, Coverage]], outcomes: list[Outcome], by: str
+    found: Iterable[tuple[str, Coverage]],
+    outcomes: list[Outcome],
+    by: str,
+    checked: Iterable[tuple[str, list[Outcome]]] = (),
 ) -> list[Outcome]:
-    """*outcomes* brought up to date with the gaps *found* (node id, its coverage): decided
-    outcomes kept as they are, an ``open`` one per gap with the causes still open (new ones
-    appended, *by* naming the tool), ``open`` ones of the walked nodes no gap needs dropped."""
-    walked: dict[str, Coverage] = dict(found)
-    wanted: dict[tuple[str, Deviation, str, str], list[str]] = {}
-    for node_id, result in walked.items():
+    """*outcomes* brought up to date with the gaps *found* (node id, its walk coverage) and the
+    open outcomes of the other checks (*checked*: node id, its open deviation and cause
+    outcomes): decided outcomes kept as they are, an ``open`` one per gap with its causes or
+    items refreshed (new ones appended, *by* naming the tool), ``open`` ones of a node and kind
+    that was checked and no longer needs them dropped."""
+    wanted: dict[tuple[Any, ...], Outcome] = {}
+    done: set[tuple[str, str]] = set()
+    for node_id, result in found:
+        done.add((node_id, "walk"))
         for gap in result.gaps:
-            key = (node_id, gap.deviation, gap.top_event, gap.at)
-            wanted[key] = [*gap.uncovered, *gap.cause_only]
-    kept: list[Outcome] = []
-    for o in outcomes:
-        key = (o.node, Deviation(o.parameter, o.guide_word), o.top_event, o.at)
-        if o.status != "open" or o.node not in walked:
-            kept.append(o)
-        elif key in wanted:
-            kept.append(o.model_copy(update={"causes": wanted.pop(key)}))
-    for (node_id, deviation, top_event, at), causes in wanted.items():
-        kept.append(
-            Outcome.model_validate(
+            o = Outcome.model_validate(
                 {
                     "node": node_id,
-                    "guide_word": deviation.guide_word,
-                    "parameter": deviation.parameter,
-                    "top_event": top_event,
-                    "at": at,
-                    "causes": causes,
+                    "guide_word": gap.deviation.guide_word,
+                    "parameter": gap.deviation.parameter,
+                    "top_event": gap.top_event,
+                    "at": gap.at,
+                    "causes": [*gap.uncovered, *gap.cause_only],
                     "by": by,
                 }
             )
-        )
+            wanted[_triage_key(o)] = o
+    for node_id, opened in checked:
+        done.update({(node_id, "deviation"), (node_id, "cause")})
+        wanted.update({_triage_key(o): o for o in opened})
+    kept: list[Outcome] = []
+    for o in outcomes:
+        key = _triage_key(o)
+        if o.status != "open" or (o.node, o.kind) not in done:
+            kept.append(o)
+        elif key in wanted:
+            kept.append(o.model_copy(update={"causes": wanted.pop(key).causes}))
+    kept.extend(wanted.values())
     return kept
