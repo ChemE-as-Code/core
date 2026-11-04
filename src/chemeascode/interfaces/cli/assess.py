@@ -248,6 +248,16 @@ def lca(
             "as the error cheme.lca-factor-status, with its factor status).",
         ),
     ] = False,
+    case: Annotated[
+        str | None,
+        typer.Option(
+            "--case",
+            help="With --dataset, --write or --check only: the unallocated LCI dataset of this "
+            "flowsheet case instead of lca/lca.yaml's, its id, title and uuid naming the case; "
+            "--write writes it to lca/datasets/<dataset id>-<case>.yaml, --check exits 1 when "
+            "that file is stale. The case lca/lca.yaml studies is the same as no --case.",
+        ),
+    ] = None,
 ) -> None:
     """The LCA of the plant's operation per functional unit (Markdown by default): the
     flowsheet's feeds and products in the case of lca/lca.yaml, shared between the co-products,
@@ -257,6 +267,13 @@ def lca(
     from chemeascode.domains.assessment.lca.report import LCA_FILE, unpublished
     from chemeascode.foundation.findings import Finding
 
+    if case is not None:
+        others = csv or inventory or coverage or balance or as_json or strict or pact is not None
+        if others or not (dataset or write or check):
+            typer.echo("--case goes with --dataset, --write or --check only", err=True)
+            raise typer.Exit(2)
+        if _lca_case(case, write, check):
+            return
     report = _lca(csv, inventory, dataset, coverage, balance, as_json, write, check, pact, strict)
     if not strict:
         return
@@ -274,6 +291,51 @@ def lca(
         typer.echo(finding.format(), err=True)
     if problems:
         raise typer.Exit(1)
+
+
+def _lca_case(case: str, write: bool, check: bool) -> bool:
+    """``cheme assess lca --dataset|--write|--check --case``: the dataset of flowsheet *case*.
+    False when *case* is the one lca/lca.yaml studies (the command then runs as without it)."""
+    from chemeascode.domains.assessment.lca.case_dataset import (
+        UnknownCase,
+        case_dataset,
+        overwrite_finding,
+        stale_finding,
+        variant_case,
+    )
+
+    workspace = _workspace()
+    try:
+        if variant_case(workspace.root, case) is None:
+            return False
+        result = case_dataset(workspace.root, case)
+    except UnknownCase as failure:
+        declared = ", ".join(failure.cases) if failure.cases else "none declared"
+        typer.echo(f"unknown case {case}; cases of process/flowsheet.yaml: {declared}", err=True)
+        raise typer.Exit(2) from failure
+    for finding in result.findings:
+        typer.echo(finding.format(), err=True)
+    if not result.loaded:
+        typer.echo(f"no LCI dataset for case {case}", err=True)
+        raise typer.Exit(1)
+    if write:
+        refused = overwrite_finding(workspace.root, result)
+        if refused is not None:
+            typer.echo(refused.format(), err=True)
+            raise typer.Exit(1)
+        path = workspace.root / result.path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(result.text, encoding="utf-8")
+        typer.echo(f"wrote {result.path}")
+    elif check:
+        stale = stale_finding(workspace.root, result)
+        if stale is not None:
+            typer.echo(stale.format(), err=True)
+            raise typer.Exit(1)
+        typer.echo(f"{result.path} current")
+    else:
+        typer.echo(result.text, nl=False)
+    return True
 
 
 def _lca(
