@@ -52,7 +52,12 @@ starts with :data:`STACK_MARK`), never over one written by hand.
 Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 
 - ``stack-schema`` (error): a unit a quantity does not take, a duplicate stack id, a value out
-  of its range (a margin below 0, an H/D or a duty not above 0);
+  of its range: not above 0 (the product rate, the stack voltage and current limits, the
+  rectifier current, the cell pitch, the replacement interval, an H/D, the anolyte flow,
+  density and viscosity, the reservoir pressure), below 0 (the end plates, the frame margin,
+  the clearances, the operating hours, a margin, the stack's pressure drop) or a rectifier
+  efficiency not in (0, 1]. The value is not used: a stated voltage or current limit refuses
+  the stack, any other leaves what rests on it TBD (or, for the rectifiers, not given);
 - ``stack-cell`` (error, the stack is refused): the cell is not in the file, its Faraday
   balance refuses it (outside the measured range among others), it has no active area, its
   reaction does not form the product or the product has no molar mass, or a specified cell lies
@@ -64,10 +69,12 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 - ``stack-input-missing`` (info): an equipment input is missing: that value stays TBD;
 - ``stack-unsourced`` (info): an assumed input without a source;
 - ``stack-tags`` (warning): fewer or more tags than stacks, or a tag not in the equipment list;
-- ``stack-duty`` (error): the duty is not in ``process/duties.yaml``, is refused, or is not
-  feasible at the sized arrangement over its horizon (the equipment inputs from it are not
-  given); (warning) the duty runs the cell at another current density than the stack; (info)
-  the duty states another arrangement, replaced by the sized one;
+- ``stack-duty`` (error, the equipment inputs from the duty are not given): the duty is not in
+  ``process/duties.yaml``, runs another cell than the stack's, runs the cell at another current
+  density than the stack is sized at (one operating point), is refused, or is not feasible at
+  the sized arrangement over its horizon; (info) the duty states another arrangement, replaced
+  by the sized one (``cheme process duty`` runs it at the sized one too:
+  :func:`stack_arrangements`);
 - ``stack-outdated`` (warning): an equipment-list dimension or datasheet input this tool would
   write differs from the file (or is not there): ``cheme process stack --write``;
 - ``stack-kept`` (warning): a value written by hand differs from the calculated one: kept;
@@ -346,22 +353,32 @@ class _Out:
 
 
 class _Inputs:
-    """Reads the stack's quantities in SI with their provenance, recording unit errors and
-    unsourced assumptions as findings."""
+    """Reads the stack's quantities in SI with their provenance, recording unit errors, values
+    out of their range and unsourced assumptions as findings."""
 
     def __init__(self, sid: str, out: _Out, loc: list[Any]) -> None:
         self.sid = sid
         self.out = out
         self.loc = loc
         self.unsourced: list[str] = []
+        #: the inputs given but not usable (a unit they do not take, a value out of range)
+        self.invalid: list[str] = []
 
     def get(
-        self, q: Quantity | None, units: dict[Any, float], what: str, at: list[Any]
+        self,
+        q: Quantity | None,
+        units: dict[Any, float],
+        what: str,
+        at: list[Any],
+        low: str | None = None,
     ) -> tuple[float, Quantity] | None:
+        """*q* in the unit of *units* with *q*; None when it is not given or not usable (a
+        ``stack-schema`` error then). *low*: ``positive`` (above 0) or ``nonnegative``."""
         if q is None:
             return None
         factor = units.get(q.unit)
         if factor is None:
+            self.invalid.append(what)
             self.out.add(
                 "error",
                 "schema",
@@ -369,6 +386,18 @@ class _Inputs:
                 [*self.loc, *at],
                 [self.sid],
                 "use one of " + ", ".join(str(u) for u in units if u is not None),
+            )
+            return None
+        if (low == "positive" and not q.value > 0) or (low == "nonnegative" and not q.value >= 0):
+            self.invalid.append(what)
+            self.out.add(
+                "error",
+                "schema",
+                f"stack {self.sid}: {what} {q.value:g}{' ' + q.unit if q.unit else ''} is "
+                + ("not above 0" if low == "positive" else "below 0"),
+                [*self.loc, *at],
+                [self.sid],
+                f"give {what} " + ("> 0" if low == "positive" else ">= 0"),
             )
             return None
         if q.provenance == "assumed" and not q.source.strip():
@@ -383,6 +412,10 @@ class _Inputs:
                 "DESIGN.md D-NNN)",
             )
         return q.value * factor, q
+
+    def no(self, what: str, label: str | None = None) -> str:
+        """``no LABEL``, or ``no valid LABEL`` when *what* was given but not usable."""
+        return f"no {'valid ' if what in self.invalid else ''}{label or what}"
 
 
 def _text(q: Quantity, value: float, unit: str) -> str:
@@ -606,12 +639,15 @@ def size_stack(
 
     # the electrical limits
     e = stack.electrical
-    umax = read.get(e.max_stack_voltage, _VOLTAGE, "max_stack_voltage", ["electrical"])
-    imax = read.get(e.max_stack_current, _CURRENT, "max_stack_current", ["electrical"])
-    eta = read.get(e.rectifier_efficiency, _FRACTION, "rectifier_efficiency", ["electrical"])
-    irect = read.get(e.rectifier_max_current, _CURRENT, "rectifier_max_current", ["electrical"])
-    if umax is None:  # its unit error is reported
-        return refuse("schema", "max_stack_voltage unreadable", [], "", report=False)
+    at = ["electrical"]
+    umax = read.get(e.max_stack_voltage, _VOLTAGE, "max_stack_voltage", at, "positive")
+    imax = read.get(e.max_stack_current, _CURRENT, "max_stack_current", at, "positive")
+    eta = read.get(e.rectifier_efficiency, _FRACTION, "rectifier_efficiency", at)
+    irect = read.get(e.rectifier_max_current, _CURRENT, "rectifier_max_current", at, "positive")
+    if umax is None:  # its unit or range error is reported
+        return refuse("schema", "max_stack_voltage unusable", [], "", report=False)
+    if e.max_stack_current is not None and imax is None:  # a limit stated is never ignored
+        return refuse("schema", "max_stack_current unusable", [], "", report=False)
     u, i, j, fe = (
         point.voltage_v,
         point.current_a,
@@ -783,14 +819,18 @@ def _envelope(
     assert point is not None
     env = stack.envelope
     names = ("cell_pitch", "end_plates", "frame_margin")
+    lows = {"cell_pitch": "positive", "end_plates": "nonnegative", "frame_margin": "nonnegative"}
     got = {
-        name: read.get(getattr(env, name) if env else None, _LENGTH, name, ["envelope", name])
+        name: read.get(
+            getattr(env, name) if env else None, _LENGTH, name, ["envelope", name], lows[name]
+        )
         for name in names
     }
     missing = [name for name in names if got[name] is None]
     dims = ("stack_length_m", "stack_width_m", "stack_height_m")
     if missing:
-        reason = f"no envelope {', '.join(missing)} (the vendor's, or ASSUMED with a source)"
+        valid = "valid " if any(name in read.invalid for name in missing) else ""
+        reason = f"no {valid}envelope {', '.join(missing)} (the vendor's, or ASSUMED with a source)"
         for key in dims:
             v[key] = Sized("TBD", "m", "tbd", reason)
         out.add(
@@ -825,9 +865,15 @@ def _envelope(
                 assumed,
             )
         access = stack.access
-        ends = read.get(access.end if access else None, _LENGTH, "access end", ["access", "end"])
+        ends = read.get(
+            access.end if access else None, _LENGTH, "access end", ["access", "end"], "nonnegative"
+        )
         sides = read.get(
-            access.side if access else None, _LENGTH, "access side", ["access", "side"]
+            access.side if access else None,
+            _LENGTH,
+            "access side",
+            ["access", "side"],
+            "nonnegative",
         )
         if ends is not None and sides is not None:
             l_all, w_all = length + 2 * ends[0], across + 2 * sides[0]
@@ -849,15 +895,20 @@ def _envelope(
     replacement = stack.replacement
     if replacement is not None:
         interval = read.get(
-            replacement.interval, _HOURS, "replacement interval", ["replacement", "interval"]
+            replacement.interval,
+            _HOURS,
+            "replacement interval",
+            ["replacement", "interval"],
+            "positive",
         )
         hours = read.get(
             replacement.operating_hours,
             _HOURS_PER_YEAR,
             "operating_hours",
             ["replacement", "operating_hours"],
+            "nonnegative",
         )
-        if interval is not None and interval[0] > 0:
+        if interval is not None:
             v["replacement_interval_h"] = Sized(
                 interval[0],
                 "h",
@@ -898,21 +949,17 @@ def _tank(
 ) -> EquipmentInput:
     """A vertical cylinder holding *volume_l* times one plus the margin, at the stated H/D."""
     entry = EquipmentInput(tank.tag, role, "dimensions", EQUIPMENT_LIST)
-    margin = read.get(tank.margin, _FRACTION, f"{role} margin", [role, "margin"])
-    aspect = read.get(tank.aspect_ratio, _FRACTION, f"{role} aspect_ratio", [role, "aspect_ratio"])
-    absent = [n for n, q in (("margin", margin), ("aspect_ratio", aspect)) if q is None]
-    if margin is not None and margin[0] < 0 or aspect is not None and aspect[0] <= 0:
-        out.add(
-            "error",
-            "schema",
-            f"stack {sid}: {role} margin below 0 or aspect_ratio not above 0",
-            [*loc, role],
-            [sid],
-            "a margin >= 0 (fraction or %) and H/D > 0",
-        )
-        absent = absent or ["a valid margin and aspect_ratio"]
+    margin = read.get(tank.margin, _FRACTION, f"{role} margin", [role, "margin"], "nonnegative")
+    aspect = read.get(
+        tank.aspect_ratio, _FRACTION, f"{role} aspect_ratio", [role, "aspect_ratio"], "positive"
+    )
+    absent = [
+        read.no(f"{role} {name}", name)
+        for name, q in (("margin", margin), ("aspect_ratio", aspect))
+        if q is None
+    ]
     if absent:
-        reason = f"no {role} {' or '.join(absent)}"
+        reason = f"{' and '.join(absent)} for the {role.replace('_', ' ')}"
         entry.values = {k: Sized("TBD", "m", "tbd", reason) for k in ("diameter", "height")}
         out.add(
             "info",
@@ -1000,13 +1047,17 @@ def _skid(
         return
     if duty.cell != stack.cell:
         out.add(
-            "warning",
+            "error",
             "duty",
-            f"stack {sid}: duty {duty.id} runs cell {duty.cell}, the stack is of cell {stack.cell}",
+            f"stack {sid}: duty {duty.id} runs cell {duty.cell}, the stack is of cell "
+            f"{stack.cell}: the reservoir, dosing and bleed inputs are not given",
             [*loc, "duty"],
             [sid],
-            "a skid duty runs the stack's cell",
+            f"a skid duty runs the stack's cell: set the duty's cell to {stack.cell}, or name "
+            "a duty that does",
         )
+        _duty_tbd(stack, result, f"duty {duty.id} runs cell {duty.cell}, not {stack.cell}")
+        return
     stated = (duty.cells_in_series, duty.stacks)
     if stated != (per_stack, stacks) and stated != (None, 1):
         out.add(
@@ -1039,7 +1090,33 @@ def _skid(
         "simulated_h": run.simulated_h if run else None,
         "time_to_threshold_h": run.time_to_threshold_h if run else None,
         "findings": [f.rule for f in report.findings if f.level in ("warning", "error")],
+        #: the reservoir, dosing and bleed inputs come from this run (set below)
+        "inputs_given": False,
     }
+    if run is not None and not run.refused:
+        # one operating point: the duty runs the cell where the stack is sized, or nothing
+        # (its feasibility at another current density says nothing about this stack's)
+        other = _current_mismatch(run, point)
+        if other is not None:
+            out.add(
+                "error",
+                "duty",
+                f"stack {sid}: duty {duty.id} runs the cell at {other}, the stack is sized at "
+                f"{point.current_density_a_m2:.6g} A/m2: the reservoir, dosing and bleed inputs "
+                "are not given",
+                [*loc, "duty"],
+                [sid],
+                "a skid duty runs the cell at the stack's current density: state the duty's "
+                f"schedule at {point.current_density_a_m2:.6g} A/m2 (the cell's current over its "
+                "active_area), or size the stack at the duty's",
+            )
+            _duty_tbd(
+                stack,
+                result,
+                f"duty {duty.id} runs the cell at {other}, not the stack's "
+                f"{point.current_density_a_m2:.6g} A/m2",
+            )
+            return
     if run is None or run.refused or not run.feasible:
         if run is None:
             why = "no result"
@@ -1071,7 +1148,7 @@ def _skid(
         )
         _duty_tbd(stack, result, f"duty {duty.id} not feasible at {arrangement} ({why})")
         return
-    _current_check(stack, run, point, out, loc)
+    result.duty["inputs_given"] = True
     series = run.series
     totals = run.totals
     campaign = run.horizon_h
@@ -1095,7 +1172,11 @@ def _skid(
     if skid.dosing_pump is not None:
         entry = EquipmentInput(skid.dosing_pump.tag, "dosing_pump", "type_specific", "")
         margin = read.get(
-            skid.dosing_pump.margin, _FRACTION, "dosing_pump margin", ["dosing_pump", "margin"]
+            skid.dosing_pump.margin,
+            _FRACTION,
+            "dosing_pump margin",
+            ["dosing_pump", "margin"],
+            "nonnegative",
         )
         density = getattr(dosing, "density", None)
         rate_l_h = (
@@ -1113,7 +1194,7 @@ def _skid(
             if rate is None
             else f"duty {duty.id}: dosing rate in unit {rate.unit!r}"
             if rate_l_h is None
-            else "no dosing_pump margin"
+            else read.no("dosing_pump margin")
             if margin is None
             else f"no density of the dosing solution in duty {duty.id}"
             if rho is None
@@ -1240,8 +1321,9 @@ def _volume_needed(duty: Any, run: Any) -> float | None:
     return volume[0] * run.horizon_h / run.time_to_threshold_h
 
 
-def _current_check(stack: Stack, run: Any, point: CellPoint, out: _Out, loc: list[Any]) -> None:
-    """The duty's current density against the stack's (a warning when they differ)."""
+def _current_mismatch(run: Any, point: CellPoint) -> str | None:
+    """The current density (or span, ``A/m2``) duty *run* operates the cell at while it is on,
+    when that is not the stack's; None when it is (or the run has no current)."""
     found = [
         x
         for x, current in zip(
@@ -1252,22 +1334,12 @@ def _current_check(stack: Stack, run: Any, point: CellPoint, out: _Out, loc: lis
         if x is not None and current
     ]
     if not found:
-        return
+        return None
     lo, hi = min(found), max(found)
     j = point.current_density_a_m2
     if abs(lo - j) <= 1e-6 * j and abs(hi - j) <= 1e-6 * j:
-        return
-    span = f"{lo:.6g} A/m2" if abs(hi - lo) <= 1e-9 * hi else f"{lo:.6g}-{hi:.6g} A/m2"
-    out.add(
-        "warning",
-        "duty",
-        f"stack {stack.id}: duty {run.id} runs the cell at {span}, the stack is sized at "
-        f"{j:.6g} A/m2",
-        [*loc, "duty"],
-        [stack.id],
-        "a skid duty runs the cell at the stack's current density (or the stack is sized at "
-        "the duty's)",
-    )
+        return None
+    return f"{lo:.6g} A/m2" if abs(hi - lo) <= 1e-9 * hi else f"{lo:.6g}-{hi:.6g} A/m2"
 
 
 def _recirculation(
@@ -1283,12 +1355,21 @@ def _recirculation(
     """The anolyte recirculation pump's inputs to the pump sizing."""
     role = "recirculation_pump"
     entry = EquipmentInput(pump.tag, role, "type_specific", "")
-    per_area = read.get(pump.flow_per_area, _FLOW_AREA, "flow_per_area", [role, "flow_per_area"])
-    per_cell = read.get(pump.flow_per_cell, _FLOW_CELL, "flow_per_cell", [role, "flow_per_cell"])
-    rho = read.get(pump.density, _DENSITY, "density", [role, "density"])
-    mu = read.get(pump.viscosity, _VISCOSITY, "viscosity", [role, "viscosity"])
-    p_res = read.get(pump.reservoir_pressure, _PRESSURE, "reservoir_pressure", [role])
-    dp = read.get(pump.stack_pressure_drop, _PRESSURE_DROP, "stack_pressure_drop", [role])
+    positive, nonnegative = "positive", "nonnegative"
+    per_area = read.get(
+        pump.flow_per_area, _FLOW_AREA, "flow_per_area", [role, "flow_per_area"], positive
+    )
+    per_cell = read.get(
+        pump.flow_per_cell, _FLOW_CELL, "flow_per_cell", [role, "flow_per_cell"], positive
+    )
+    rho = read.get(pump.density, _DENSITY, "density", [role, "density"], positive)
+    mu = read.get(pump.viscosity, _VISCOSITY, "viscosity", [role, "viscosity"], positive)
+    p_res = read.get(
+        pump.reservoir_pressure, _PRESSURE, "reservoir_pressure", [role], positive
+    )  # absolute
+    dp = read.get(
+        pump.stack_pressure_drop, _PRESSURE_DROP, "stack_pressure_drop", [role], nonnegative
+    )
     head = f"{STACK_MARK}: stack {sid} at {arrangement}"
     values: dict[str, Sized] = {}
     if per_area is not None:
@@ -1306,11 +1387,12 @@ def _recirculation(
         q_cell, flow_basis, flow_q = None, "", None
     flow = q_cell * total if q_cell is not None else None  # L/h
     if flow is None or rho is None:
-        reason = "no " + " and no ".join(
-            n
-            for n, missing in (
-                ("anolyte flow_per_area or flow_per_cell", flow is None),
-                ("density", rho is None),
+        flow_name = "flow_per_area" if pump.flow_per_area is not None else "flow_per_cell"
+        reason = " and ".join(
+            text
+            for text, missing in (
+                (read.no(flow_name, "anolyte flow_per_area or flow_per_cell"), flow is None),
+                (read.no("density"), rho is None),
             )
             if missing
         )
@@ -1489,6 +1571,34 @@ def stack_findings(root: Path) -> list[Finding]:
     if cells is None or not cells.stacks:
         return []  # the cells' schema findings come with the cells
     return stack_report(Path(root), duties=False).findings
+
+
+def stack_arrangements(root: Path) -> dict[str, Any]:
+    """The arrangement each skid duty runs at: duty id (``equipment.duty`` of a stack) to the
+    :class:`~chemeascode.domains.process.electrolysis_duty.Arrangement` (cells per stack,
+    stacks) the stack sizing chose, for ``cheme process duty`` to run the duty as ``cheme
+    process stack`` does. A refused stack gives none, nor a duty of another cell than the
+    stack's (``cheme process stack`` refuses that duty); the first stack naming a duty wins."""
+    from chemeascode.domains.process.electrochemical_cell import load_cells
+    from chemeascode.domains.process.electrolysis_duty import Arrangement, load_duties
+
+    cells, _, _ = load_cells(Path(root))
+    if cells is None or not any(s.equipment is not None for s in cells.stacks):
+        return {}
+    duties, _, _ = load_duties(Path(root))
+    cell_of = {d.id: d.cell for d in duties.duties} if duties is not None else {}
+    sized = {s.id: s for s in stack_report(Path(root), duties=False).stacks}
+    found: dict[str, Any] = {}
+    for stack in cells.stacks:
+        result = sized.get(stack.id)
+        if stack.equipment is None or result is None or result.refused:
+            continue
+        if cell_of.get(stack.equipment.duty) != stack.cell:
+            continue
+        per_stack, stacks = result.number("cells_per_stack"), result.number("stacks")
+        if per_stack and stacks and stack.equipment.duty not in found:
+            found[stack.equipment.duty] = Arrangement(per_stack, stacks, f"stack {stack.id}")
+    return found
 
 
 def has_stacks(root: Path) -> bool:
@@ -1957,7 +2067,7 @@ def report_text(report: StackReport) -> str:
                 f"{d['ended']} at {_g(d['simulated_h'])} h of {_g(d['campaign_h'])} h, "
                 f"feasible: {'yes' if d['feasible'] else 'no'}"
             )
-            if d["feasible"]:
+            if d.get("inputs_given"):
                 lines.append(
                     f"  reservoir working volume {_v(s, 'reservoir_working_volume_l')}, dosed "
                     f"{_v(s, 'dosing_solution_l')}, bled {_v(s, 'bleed_l')} over the campaign"

@@ -27,6 +27,7 @@ from chemeascode.domains.equipment.electrolyser_stack import (
     MODEL,
     STACK_MARK,
     CellPoint,
+    _Out,
     set_dimensions,
     size_stack,
     stack_findings,
@@ -277,6 +278,7 @@ def test_propagation_into_the_list_datasheets_and_layout_model(tmp_path, monkeyp
     assert shell["radius"] == pytest.approx(d / 2, abs=1e-3)
     assert shell["end"][2] - shell["start"][2] == pytest.approx(h, abs=1e-3)
     assert placed["E-101A"]["dimensions"] == {"length": 0.2, "width": 0.18, "height": 0.18}
+    assert _body(placed, "E-101A") == pytest.approx([0.2, 0.18, 0.18])  # the built geometry
     written = (root / "equipment/datasheets/P-101.yaml").read_text()
     assert written.startswith("# DRAFT datasheet")  # the header comment is kept
     sheet = yaml.safe_load(written)
@@ -307,12 +309,19 @@ def test_propagation_into_the_list_datasheets_and_layout_model(tmp_path, monkeyp
         d2,
         h2,
     )
+    shell = next(p for p in placed["T-101"]["parts"] if p["id"] == "T-101/shell")
+    assert shell["radius"] == pytest.approx(d2 / 2, abs=1e-3)
+    assert shell["end"][2] - shell["start"][2] == pytest.approx(h2, abs=1e-3)
     dd, dh = _cylinder(200 * 1.2, 1.2)
     assert (placed["T-102"]["dimensions"]["diameter"], placed["T-102"]["dimensions"]["height"]) == (
         dd,
         dh,
     )
+    shell = next(p for p in placed["T-102"]["parts"] if p["id"] == "T-102/shell")
+    assert shell["radius"] == pytest.approx(dd / 2, abs=1e-3)
+    assert shell["end"][2] - shell["start"][2] == pytest.approx(dh, abs=1e-3)
     assert placed["E-101A"]["dimensions"] == {"length": 0.2, "width": 0.18, "height": 0.18}
+    assert _body(placed, "E-101A") == pytest.approx([0.2, 0.18, 0.18])
     # a changed anolyte flow reaches the pump datasheet; the stacks' list entries stay current
     _edit(
         root,
@@ -325,6 +334,37 @@ def test_propagation_into_the_list_datasheets_and_layout_model(tmp_path, monkeyp
     sheet = yaml.safe_load((root / "equipment/datasheets/P-101.yaml").read_text())
     assert sheet["type_specific"]["mass_flow_kg_h"]["value"] == pytest.approx(126)
     assert sheet["type_specific"]["flow_m3_h"]["value"] == "TBD"  # the pump fill's, untouched
+
+    # a new envelope rewrites the stack dimensions this tool wrote, and the built stack bodies
+    # carry them: 10 cells x 10 mm + 120 mm long, 100 mm + 2 x 50 mm across
+    def envelope(data):
+        env = data["stacks"][0]["envelope"]
+        env["cell_pitch"]["value"], env["frame_margin"]["value"] = 10, 50
+
+    _edit(root, "process/cells.yaml", envelope)
+    fourth, listed, placed = run()
+    assert fourth.number("cells_per_stack") == 10
+    for tag in ("E-101A", "E-101B"):
+        sizes = {k: listed[tag][k] for k in ("length", "width", "height")}
+        assert sizes == {"length": 0.22, "width": 0.2, "height": 0.2}
+        assert listed[tag]["source"].startswith(STACK_MARK)
+        assert placed[tag]["dimensions"] == sizes
+        assert _body(placed, tag) == pytest.approx([0.22, 0.2, 0.2])
+    # a smaller product duty: fewer cells per stack, a shorter stack in the list and the model
+    _edit(
+        root, "process/cells.yaml", lambda c: c["stacks"][0]["product"]["rate"].update(value=0.08)
+    )
+    fifth, listed, placed = run()
+    per_stack = fifth.number("cells_per_stack")
+    assert per_stack < 10
+    length = math.ceil((per_stack * 0.010 + 0.120) * 1000 - 1e-6) / 1000
+    assert listed["E-101A"]["length"] == length
+    assert _body(placed, "E-101A") == pytest.approx([length, 0.2, 0.2])
+
+
+def _body(placed, tag):
+    """The size of the built body of stack *tag* in the layout model (L, W, H)."""
+    return next(p for p in placed[tag]["parts"] if p["id"] == f"{tag}/body")["size"]
 
 
 def test_duty_change_keeps_the_stack_and_a_range_exit_is_flagged(tmp_path):
@@ -351,16 +391,26 @@ def test_duty_change_keeps_the_stack_and_a_range_exit_is_flagged(tmp_path):
     assert not s.duty["feasible"] and "cheme.stack-duty" in _rules(report.findings, "error")
     assert _entry(s, "T-101").values["diameter"].provenance == "tbd"
     assert _entry(s, "P-101").complete  # from the arrangement, not the duty
-    # inside the range but not the stack's current density: a warning
+    # inside the range but not the stack's current density: one operating point or nothing,
+    # an error and no reservoir, dosing or bleed inputs (the duty is feasible on its own)
     _edit(
         root,
         "process/duties.yaml",
         lambda d: d["duties"][0]["schedule"]["current_density"].update(value=120),
     )
     report = stack_report(root)
+    s = _stack(report)
     assert any(
-        f.rule == "cheme.stack-duty" and f.level == "warning" and "sized at 1500" in f.message
+        f.rule == "cheme.stack-duty" and f.level == "error" and "sized at 1500" in f.message
         for f in report.findings
+    )
+    assert s.duty["feasible"] and not s.duty["inputs_given"]
+    for tag in ("T-101", "T-102"):
+        assert _entry(s, tag).values["diameter"].provenance == "tbd"
+    assert _entry(s, "P-102").values["mass_flow_kg_h"].provenance == "tbd"
+    assert "reservoir_working_volume_l" not in s.values
+    assert not {"T-101", "T-102"} & set(
+        write_stack_inputs(root, report).written.get("equipment/equipment-list.yaml", [])
     )
     # the cell itself outside the measured range: the stack is refused, never extrapolated
     _edit(root, "process/cells.yaml", lambda c: c["cells"][0]["current"].update(value=25))
@@ -441,6 +491,143 @@ def test_hand_written_values_are_kept(tmp_path):
     assert sheet["tag"] == "P-101" and sheet["draft"] is True
 
 
+def test_values_out_of_range_are_schema_errors(tmp_path):
+    """A rectifier current, an envelope, a flow, a density, a margin or an interval out of its
+    range is a stack-schema error: never a crash, a negative size or a silently dropped value."""
+    point = CellPoint("C-100", "specified", 20.0, 2000.0, 0.01, 3.5, 0.9, 2, 1, M_CO)
+    for value in (0, -50):
+        rectified = {
+            **HAND,
+            "electrical": {
+                **HAND["electrical"],
+                "rectifier_max_current": {"value": value, "unit": "A", "provenance": "given"},
+            },
+        }
+        out = _Out(None)
+        result = size_stack(Stack.model_validate(rectified), point, out)
+        assert "rectifiers" not in result.values
+        assert any(
+            f.rule == "cheme.stack-schema" and "rectifier_max_current" in f.message
+            for f in out.findings
+        )
+    for name, unit in (("max_stack_voltage", "V"), ("max_stack_current", "A")):
+        bad = {
+            **HAND,
+            "electrical": {
+                **HAND["electrical"],
+                name: {"value": 0, "unit": unit, "provenance": "given"},
+            },
+        }
+        out = _Out(None)
+        assert size_stack(Stack.model_validate(bad), point, out).refused
+        assert any(f.rule == "cheme.stack-schema" and name in f.message for f in out.findings)
+    q = {"unit": "mm", "provenance": "given"}
+    negative = {
+        **HAND,
+        "envelope": {k: {"value": -5, **q} for k in ("cell_pitch", "end_plates", "frame_margin")},
+        "replacement": {"interval": {"value": 0, "unit": "h", "provenance": "given"}},
+    }
+    out = _Out(None)
+    result = size_stack(Stack.model_validate(negative), point, out)
+    assert {result.values[k].provenance for k in ("stack_length_m", "stack_width_m")} == {"tbd"}
+    assert "no valid envelope" in result.values["stack_length_m"].source
+    schema = [f.message for f in out.findings if f.rule == "cheme.stack-schema"]
+    assert sum("is not above 0" in m or "is below 0" in m for m in schema) == 4, schema
+    assert any("replacement interval" in m for m in schema)
+
+    # through the plant: cheme validate and the skid inputs
+    root = _plant(tmp_path)
+
+    def wrong(data):
+        stack = data["stacks"][0]
+        stack["electrical"]["rectifier_max_current"] = {
+            "value": 0,
+            "unit": "A",
+            "provenance": "assumed",
+            "source": "placeholder",
+        }
+        skid = stack["equipment"]
+        skid["recirculation_pump"]["density"]["value"] = -1050
+        skid["dosing_pump"]["margin"]["value"] = -0.5
+        skid["reservoir"]["margin"]["value"] = -0.1
+
+    _edit(root, "process/cells.yaml", wrong)
+    found = stack_findings(root)  # cheme validate's: no ZeroDivisionError
+    assert any("rectifier_max_current" in f.message for f in found if f.level == "error")
+    report = stack_report(root)
+    s = _stack(report)
+    assert _entry(s, "P-101").values["mass_flow_kg_h"].provenance == "tbd"
+    assert "density_kg_m3" not in _entry(s, "P-101").values
+    assert _entry(s, "P-102").values["mass_flow_kg_h"].provenance == "tbd"
+    assert "no valid dosing_pump margin" in _entry(s, "P-102").values["mass_flow_kg_h"].source
+    assert _entry(s, "T-101").values["diameter"].provenance == "tbd"
+    assert _entry(s, "T-102").values["diameter"].provenance != "tbd"
+    messages = [f.message for f in report.errors if f.rule == "cheme.stack-schema"]
+    assert len(messages) == 4, messages
+    written = write_stack_inputs(root, report)  # what is valid is still written
+    assert "T-102" in written.written["equipment/equipment-list.yaml"]
+
+
+def test_a_duty_of_another_cell_gives_no_skid_inputs(tmp_path):
+    root = _plant(tmp_path)
+
+    def other(data):
+        cell = json.loads(json.dumps(data["cells"][0]))
+        cell["id"] = "BPM-200"
+        cell["active_area"]["value"] = 50
+        cell["current"]["value"] = 7.5
+        data["cells"].append(cell)
+
+    _edit(root, "process/cells.yaml", other)
+    _edit(root, "process/duties.yaml", lambda d: d["duties"][0].update(cell="BPM-200"))
+    report = stack_report(root)
+    s = _stack(report)
+    assert any(
+        f.rule == "cheme.stack-duty" and f.level == "error" and "runs cell BPM-200" in f.message
+        for f in report.findings
+    )
+    for tag in ("T-101", "T-102"):
+        assert _entry(s, tag).values["diameter"].provenance == "tbd"
+        assert "runs cell BPM-200" in _entry(s, tag).values["diameter"].source
+    assert _entry(s, "P-102").values["mass_flow_kg_h"].provenance == "tbd"
+    assert s.duty is None  # the duty is not run for this stack
+    listed = write_stack_inputs(root, report).written.get("equipment/equipment-list.yaml", [])
+    assert listed == ["E-101A", "E-101B"]
+
+
+def test_the_duty_command_runs_a_skid_duty_at_the_sized_arrangement(tmp_path, monkeypatch):
+    """`cheme process duty` and `cheme process stack` run one duty id alike: the arrangement
+    the stack is sized at (one design basis), with a cheme.duty-arrangement info finding."""
+    from chemeascode.domains.equipment.electrolyser_stack import stack_arrangements
+    from chemeascode.domains.process.electrolysis_duty import compare_duties, duty_report
+
+    root = _plant(tmp_path)
+    arrangements = stack_arrangements(root)
+    assert set(arrangements) == {"SKID-150"}
+    a = arrangements["SKID-150"]
+    assert (a.cells_in_series, a.stacks, a.by) == (10, 2, "stack STK-1")
+    reported = duty_report(root, ["SKID-150"], arrangements)
+    alone = reported.duties[0]
+    stacked = run_duty(root, "SKID-150", 10, 2).duties[0]
+    assert (alone.cells_in_series, alone.stacks) == (10, 2)
+    assert alone.totals == stacked.totals and alone.series == stacked.series
+    assert any(f.rule == "cheme.duty-arrangement" for f in reported.findings)
+    compared = compare_duties(root, ["SKID-150"], 0.1, arrangements=arrangements)
+    assert (compared.duties[0].cells_in_series, compared.duties[0].stacks) == (10, 2)
+    monkeypatch.chdir(root)
+    result = runner.invoke(app, ["process", "duty", "SKID-150", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert (payload["duties"][0]["cells_in_series"], payload["duties"][0]["stacks"]) == (10, 2)
+    assert payload["duties"][0]["totals"] == json.loads(json.dumps(stacked.totals))
+    assert "cheme.duty-arrangement" in {f["rule"] for f in payload["findings"]}
+    # without stacks the duty runs as it states
+    _edit(root, "process/cells.yaml", lambda c: c.pop("stacks"))
+    assert stack_arrangements(root) == {}
+    payload = json.loads(runner.invoke(app, ["process", "duty", "SKID-150", "--json"]).stdout)
+    assert (payload["duties"][0]["cells_in_series"], payload["duties"][0]["stacks"]) == (1, 1)
+
+
 # -- editing the equipment list -----------------------------------------------------------------
 
 LIST = """\
@@ -514,7 +701,15 @@ def test_cli_exit_codes(tmp_path, monkeypatch):
     _edit(root, "process/cells.yaml", lambda c: c["stacks"][0].update(cell="NOPE"))
     result = runner.invoke(app, ["process", "stack"])
     assert result.exit_code == 1 and "refused" in result.stdout
+    # a stacks: entry the schema refuses: its finding is printed, exit 1 (not "no stacks")
+    _edit(root, "process/cells.yaml", lambda c: c["stacks"][0].update(cell="BPM-100", celll="x"))
+    result = runner.invoke(app, ["process", "stack"])
+    assert result.exit_code == 1
+    assert "cheme.cell-schema" in result.stdout and "celll" in result.stdout
     _edit(root, "process/cells.yaml", lambda c: c.pop("stacks"))
+    result = runner.invoke(app, ["process", "stack"])
+    assert result.exit_code == 2 and "has no stacks: section" in result.output
+    (root / "process/cells.yaml").unlink()
     assert runner.invoke(app, ["process", "stack"]).exit_code == 2
 
 
