@@ -13,7 +13,12 @@ datasets of one process never share an id, a title or a uuid:
   uuid ``lca/lca.yaml`` pins (``dataset: uuid:``) or the one cheme derives: the same base and
   case give the same uuid in every version, and the base dataset's uuid is unchanged.
 
-The reference product, the functional unit, the basis and the documentation are the study's.
+The reference product, the functional unit, the basis and the documentation are the study's,
+except what describes the study's dataset alone: a review the study records is not the case
+dataset's (``review`` becomes ``unreviewed``), ``superseded_by`` is dropped, and ``parent`` is
+the plant dataset's uuid (:func:`with_case`). Two declared cases whose ids give one identifier
+(``Hot`` and ``hot``) would share the id and the file: neither gets a dataset
+(``cheme.lca-case-id-clash``, :func:`clash_finding`).
 ``--write --case`` writes it to ``lca/datasets/<dataset id>-<case>.yaml``
 (:func:`case_dataset_path`), never over a file it did not generate for that case
 (:func:`overwrite_finding`); ``--check --case`` compares it with what would be generated now
@@ -32,7 +37,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 from chemeascode.domains.assessment.lca.documentation import NAMESPACE
-from chemeascode.domains.assessment.lca.schemas import LciDataset
+from chemeascode.domains.assessment.lca.schemas import LciDataset, Review
 from chemeascode.foundation.findings import Finding
 
 if TYPE_CHECKING:
@@ -67,14 +72,20 @@ def case_uuid(base: str, case: str) -> str:
 
 def with_case(dataset: LciDataset, case: str) -> LciDataset:
     """*dataset* (derived for *case*) with the identity of a design case's dataset: its id,
-    title and uuid name the case; nothing else changes. *dataset* is documented
-    (:func:`.documentation.document`), so it has the plant dataset's uuid."""
+    title and uuid name the case, and what the study records of its own dataset only is not
+    carried over: a review (``review`` becomes ``unreviewed`` when the study states one, since
+    nobody reviewed this dataset), ``superseded_by`` (dropped) and ``parent`` (the plant
+    dataset's uuid: the case dataset is a variant of it). Nothing else changes. *dataset* is
+    documented (:func:`.documentation.document`), so it has the plant dataset's uuid."""
     base = dataset.uuid or str(_uuid.uuid5(NAMESPACE, dataset.id))
     return dataset.model_copy(
         update={
             "id": f"{dataset.id}-{case_slug(case)}",
             "title": f"{dataset.title or dataset.id}, case {case}",
             "uuid": case_uuid(base, case),
+            "parent": base,
+            "superseded_by": None,
+            "review": [Review(type="none")] if dataset.review else [],
         }
     )
 
@@ -84,25 +95,61 @@ def case_dataset_path(dataset_id: str) -> str:
     return f"{CASE_DATASETS_DIR}/{dataset_id}.yaml"
 
 
-def variant_case(root: Path, case: str) -> str | None:
-    """*case* when it is a flowsheet case other than the one ``lca/lca.yaml`` studies; None
-    when it is that case. When the flowsheet does not load, *case* (the report then says what
-    is wrong). Raises :class:`UnknownCase` for a case the flowsheet does not declare."""
+def _cases(root: Path) -> tuple[list[str], str | None] | None:
+    """The declared flowsheet cases and the one ``lca/lca.yaml`` studies (None when
+    ``lca/lca.yaml`` does not read); None when the flowsheet does not load."""
     from chemeascode.domains.assessment.lca.inventory import LCA_FILE
     from chemeascode.domains.process.model import load
 
     process, _ = load(Path(root))
     if process is None:
-        return case
+        return None
     declared = [c.id for c in process.flowsheet.cases]
-    if case not in declared:
-        raise UnknownCase(case, declared)
     try:
         data = yaml.safe_load((Path(root) / LCA_FILE).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
-        return case
+        return declared, None
     studied = data.get("case") if isinstance(data, dict) else None
-    return None if case == (studied or process.flowsheet.default_case()) else case
+    return declared, studied or process.flowsheet.default_case()
+
+
+def variant_case(root: Path, case: str) -> str | None:
+    """*case* when it is a flowsheet case other than the one ``lca/lca.yaml`` studies; None
+    when it is that case. When the flowsheet or ``lca/lca.yaml`` does not load, *case* (the
+    report then says what is wrong). Raises :class:`UnknownCase` for a case the flowsheet does
+    not declare."""
+    cases = _cases(root)
+    if cases is None:
+        return case
+    declared, studied = cases
+    if case not in declared:
+        raise UnknownCase(case, declared)
+    return None if case == studied else case
+
+
+def clash_finding(root: Path, case: str) -> Finding | None:
+    """The error ``cheme.lca-case-id-clash`` when another declared case other than the
+    study's gives the same identifier as *case* (:func:`case_slug`: ``Hot`` and ``hot``,
+    ``Skid B`` and ``skid-b``): their datasets would share an id and a file. None when *case*
+    is the only one."""
+    cases = _cases(root)
+    if cases is None:
+        return None
+    declared, studied = cases
+    slug = case_slug(case)
+    others = [c for c in declared if c not in (case, studied) and case_slug(c) == slug]
+    if not others:
+        return None
+    return Finding(
+        "process/flowsheet.yaml",
+        "error",
+        "cheme.lca-case-id-clash",
+        f"cases {', '.join([case, *others])} all give the dataset id suffix -{slug} (and the "
+        f"file lca/datasets/<dataset id>-{slug}.yaml): no dataset for case {case}",
+        ids=[case, *others],
+        hint="give the cases ids that differ in more than upper and lower case and the "
+        "characters outside [A-Za-z0-9_.-]",
+    )
 
 
 @dataclass
@@ -137,17 +184,24 @@ def case_dataset(root: Path, case: str) -> CaseDataset:
     dataset = report.inventory.dataset if report.inventory is not None else None
     if dataset is None or not report.loaded:
         return CaseDataset(case, "", "", report)
+    clash = clash_finding(root, case) if report.variant_case else None
+    if clash is not None:
+        report.findings.append(clash)
+        return CaseDataset(case, "", "", report)
     path = case_dataset_path(dataset.id) if report.variant_case else DATASET_FILE
     return CaseDataset(case, path, dataset_yaml(report), report)
 
 
-def _rerun(case: str) -> str:
-    return f"rerun cheme assess lca --write --case {case}"
+def _rerun(result: CaseDataset) -> str:
+    if result.report.variant_case is None:
+        return "rerun cheme assess lca --write"
+    return f"rerun cheme assess lca --write --case {result.case}"
 
 
 def stale_finding(root: Path, result: CaseDataset) -> Finding | None:
     """The error ``cheme.lca-dataset-stale`` when the written file of *result* is missing or
-    differs from what is generated now; None when it is current."""
+    differs from what is generated now; None when it is current. For the study's own case
+    (``lca/dataset.yaml``, plain ``--check``) the hint is ``cheme assess lca --write``."""
     path = Path(root) / result.path
     try:
         written = path.read_text(encoding="utf-8") if path.is_file() else None
@@ -168,7 +222,7 @@ def stale_finding(root: Path, result: CaseDataset) -> Finding | None:
         "cheme.lca-dataset-stale",
         message,
         ids=[result.case],
-        hint=_rerun(result.case) + " and commit it; never edit it by hand",
+        hint=_rerun(result) + " and commit it; never edit it by hand",
     )
 
 
@@ -199,5 +253,5 @@ def overwrite_finding(root: Path, result: CaseDataset) -> Finding | None:
         f"{result.case}: not overwritten",
         ids=[result.case],
         hint="move or rename that dataset (or give the flowsheet another title), then "
-        + _rerun(result.case),
+        + _rerun(result),
     )

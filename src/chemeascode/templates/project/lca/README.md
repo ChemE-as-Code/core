@@ -11,7 +11,7 @@ The life cycle assessment of the plant's operation (ISO 14040/44), per functiona
 | `gaps.csv` | every exchange and category without a burden (unmapped, a factor without the category, an emission the method does not characterise, an unlinked exchange of a referenced dataset): excluded from the totals, never 0 | `cheme assess lca --write` |
 | `manifest.json` | what the results rest on (inputs, mappings, background versions, methods, settings, software), their class and publication policy | `cheme assess lca --write` |
 | `dataset.yaml` | the plant's unallocated LCI dataset (`kind: lci_dataset`, per hour of operation): what other studies and a process library reference (`dataset: {path, product, allocation}`) | `cheme assess lca --write` |
-| `datasets/*.yaml` | LCI datasets of other processes, written by hand or copied from a library, used as backgrounds | people |
+| `datasets/*.yaml` | LCI datasets of other processes, written by hand, copied from a library or estimated, used as backgrounds; and the datasets of this plant's other design cases (`<dataset id>-<case>.yaml`, never edit them: `cheme assess lca --check --case <case>` finds them stale) | people; `cheme assess lci-estimate`; `cheme assess lca --write --case <case>` |
 
 A minimal `lca.yaml`:
 

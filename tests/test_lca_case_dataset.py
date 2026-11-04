@@ -110,6 +110,64 @@ def test_the_case_uuid_derives_from_a_pinned_base_uuid(asu: Path) -> None:
     assert case_uuid(pinned, "hot") == case_uuid(pinned, "hot") != case_uuid(pinned, "cold")
 
 
+def test_the_studys_review_and_lineage_are_not_the_case_datasets(asu: Path) -> None:
+    pinned = "0f1e2d3c-4b5a-4968-8776-655443322110"
+    grandparent = "11111111-2222-4333-8444-555555555555"
+    documentation = {
+        "uuid": pinned,
+        "parent": grandparent,
+        "review": [{"type": "independent-external", "reviewer": "Jane Doe"}],
+        "superseded_by": {"id": "other", "version": "2.0.0"},
+    }
+    _edit(asu, "lca/lca.yaml", lambda d: d.update({"dataset": documentation}))
+    base = yaml.safe_load(case_dataset(asu, "design").text)
+    hot = case_dataset(asu, "hot")
+    data = yaml.safe_load(hot.text)
+    # the study's dataset keeps what lca.yaml records of it
+    assert base["review"][0]["reviewer"] == "Jane Doe"
+    assert base["superseded_by"] == {"id": "other", "version": "2.0.0"}
+    assert base["parent"] == grandparent
+    # the case dataset: nobody reviewed it, nothing supersedes it, it is a variant of the base
+    assert data["review"] == [{"type": "none"}]
+    assert "superseded_by" not in data
+    assert data["parent"] == pinned
+    dataset = hot.report.inventory.dataset
+    assert [r.type for r in dataset.review] == ["none"] and dataset.superseded_by is None
+    # still stated (unreviewed), so the documentation check counts review as given
+    from chemeascode.domains.assessment.lca.documentation import missing
+
+    assert "review" not in missing(dataset)
+
+
+def test_a_case_dataset_without_a_stated_review_states_none(asu: Path) -> None:
+    data = yaml.safe_load(case_dataset(asu, "hot").text)
+    assert not data.get("review")
+    assert data["parent"] == yaml.safe_load(case_dataset(asu, "design").text)["uuid"]
+
+
+def test_two_case_ids_giving_one_identifier_are_refused(asu: Path, monkeypatch) -> None:
+    def add_upper_hot(data: dict) -> None:
+        data["cases"].append({**next(c for c in data["cases"] if c["id"] == "hot"), "id": "HOT"})
+        for stream in data["streams"]:
+            if "hot" in stream.get("state", {}):
+                stream["state"]["HOT"] = stream["state"]["hot"]
+
+    _edit(asu, "process/flowsheet.yaml", add_upper_hot)
+    for case in ("hot", "HOT"):
+        result = case_dataset(asu, case)
+        assert not result.loaded and result.path == ""
+        clash = [f for f in result.findings if f.rule == "cheme.lca-case-id-clash"]
+        assert clash and set(clash[0].ids) == {"hot", "HOT"}, [f.format() for f in result.findings]
+    for flags in (["--write"], ["--check"], ["--dataset"]):
+        result = _cli(asu, monkeypatch, *flags, "--case", "HOT")
+        assert result.exit_code == 1, (flags, result.output)
+        assert "cheme.lca-case-id-clash" in result.output
+    assert not (asu / "lca/datasets").exists()
+    # the study's own case never clashes: it is lca/dataset.yaml
+    _edit(asu, "lca/lca.yaml", lambda d: d.update({"case": "HOT"}))
+    assert case_dataset(asu, "hot").loaded
+
+
 def test_a_case_id_is_made_an_identifier() -> None:
     assert case_slug("Skid B / 1000 h") == "skid-b-1000-h"
     assert case_dataset_path("plant-skid-b") == "lca/datasets/plant-skid-b.yaml"
@@ -247,6 +305,13 @@ def test_check_without_case_is_the_study_gate(asu: Path, monkeypatch) -> None:
     result = _cli(asu, monkeypatch, "--check")
     assert result.exit_code == 1
     assert "lca/dataset.yaml is not current; run cheme assess lca --write" in result.stdout
+    # the stale dataset is the finding --check --case reports, with the plain rerun hint
+    assert "lca/dataset.yaml: error cheme.lca-dataset-stale [design]" in result.output
+    assert "rerun cheme assess lca --write and commit it" in result.output
+    # the same through --case naming the study's case
+    result = _cli(asu, monkeypatch, "--check", "--case", "design")
+    assert result.exit_code == 1
+    assert "lca/dataset.yaml: error cheme.lca-dataset-stale [design]" in result.output
     # the case's file is checked by its own gate, and is current
     assert _cli(asu, monkeypatch, "--check", "--case", "hot").exit_code == 0
 
@@ -285,15 +350,21 @@ def test_write_never_replaces_a_dataset_it_did_not_generate(asu: Path, monkeypat
     assert path.read_text(encoding="utf-8") == case_dataset(asu, "hot").text
 
 
-def test_the_written_case_dataset_loads_and_validates(asu: Path, monkeypatch) -> None:
+def test_the_written_case_dataset_loads_as_an_lci_dataset(asu: Path, monkeypatch) -> None:
+    """The schema check of the written file (``cheme validate`` does not read lca/datasets/:
+    ``--check --case`` is the gate of a committed case dataset)."""
     from chemeascode.domains.assessment.lca.report import load_dataset
+    from chemeascode.domains.assessment.lca.schemas import LciDataset
 
     assert _cli(asu, monkeypatch, "--write", "--case", "hot").exit_code == 0
+    path = asu / HOT_FILE
     loaded = load_dataset(asu, HOT_FILE)
     assert not isinstance(loaded, str), loaded
     assert loaded.id == f"{BASE_ID}-hot"
-    result = CliRunner().invoke(app, ["validate"])
-    assert "lca/datasets" not in result.output, result.output
+    assert LciDataset.model_validate(yaml.safe_load(path.read_text(encoding="utf-8"))) == loaded
+    # the check has teeth: a broken file does not load
+    path.write_text(path.read_text(encoding="utf-8") + "bogus: 1\n", encoding="utf-8")
+    assert isinstance(load_dataset(asu, HOT_FILE), str)
 
 
 # -- import boundaries -------------------------------------------------------------------------

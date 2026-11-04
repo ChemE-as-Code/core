@@ -42,7 +42,11 @@
   uuid (`uuid5(<base uuid>, "case:<case>")`) name the case, so two datasets of one process
   stay distinct. `--write --case` writes `lca/datasets/<dataset id>-<case>.yaml` (generated:
   header comment and provenance; never over a file it did not generate,
-  `cheme.lca-dataset-not-generated`), and `--check --case` reports `cheme.lca-dataset-stale`.
+  `cheme.lca-dataset-not-generated`), and `--check --case` reports `cheme.lca-dataset-stale`
+  (plain `--check` now reports a stale `lca/dataset.yaml` with it too). A review the study
+  states is `unreviewed` in the case dataset, `superseded_by` is dropped and `parent` is the
+  study dataset's uuid. Two cases whose ids give one identifier (`Hot`, `hot`) are the error
+  `cheme.lca-case-id-clash`.
   An undeclared case exits 2 and lists the declared ones. `lca/dataset.yaml` is unchanged,
   and naming the study's case is the same as no `--case`. Python: `lca_report(root,
   case=...)`, `domains/assessment/lca/case_dataset.py`.

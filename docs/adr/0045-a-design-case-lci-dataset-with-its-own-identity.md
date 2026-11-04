@@ -39,10 +39,13 @@ identity of a design case's dataset (option 3, `domains/assessment/lca/case_data
 | `title` | `<title>, case <case>` (the dataset id when the title is empty) |
 | `uuid` | `uuid5(<base uuid>, "case:<case>")`, where the base uuid is the one `lca/lca.yaml` pins (`dataset: uuid:`) or the one cheme derives for `lca/dataset.yaml` |
 | `description`, `provenance.case` | the case (as before: they always named it) |
+| `parent` | the base uuid: the case dataset is a variant of the study's dataset |
+| `review` | `unreviewed` (`[{type: none}]`) when the study states a review, else none: a review of the study's dataset is not one of this dataset |
+| `superseded_by` | none: what supersedes the study's dataset does not supersede this one |
 
-The reference product, functional unit, basis, location, allocation and the `dataset:`
-documentation stay those of the study. The same base uuid and case id always give the same
-uuid, and the base dataset's own uuid does not change.
+The reference product, functional unit, basis, location, allocation and the rest of the
+`dataset:` documentation stay those of the study. The same base uuid and case id always give
+the same uuid, and the base dataset's own uuid does not change.
 
 - `--write --case <id>` writes only that dataset, to `lca/datasets/<dataset id>-<case>.yaml`.
   The study's outputs (`lca/dataset.yaml`, results, manifest) are not written, since they
@@ -57,6 +60,13 @@ uuid, and the base dataset's own uuid does not change.
   hint is `rerun cheme assess lca --write --case <id>`. A project that commits the file keeps
   it current with a `kind: command` gate running this check. `cheme assess lca --check`
   without `--case` checks the study's outputs as before.
+- Two declared cases whose ids give one identifier (`Hot` and `hot`, `Skid B` and `skid-b`)
+  would share the dataset id and the file. Neither gets a dataset: `--dataset`, `--write`
+  and `--check --case` report the error `cheme.lca-case-id-clash` naming both, and exit 1.
+  The study's own case never clashes, since its dataset is `lca/dataset.yaml`.
+- `cheme assess lca --check` reports a stale `lca/dataset.yaml` as the same
+  `cheme.lca-dataset-stale` finding (hint `rerun cheme assess lca --write`), beside the line
+  it always printed.
 - A case the flowsheet does not declare is a usage error (exit 2) that lists the declared
   cases. `--case` with any other output option (`--json`, `--csv`, `--inventory`,
   `--coverage`, `--balance`, `--pact`, `--strict`), or without `--dataset`, `--write` or
@@ -74,20 +84,26 @@ uuid, and the base dataset's own uuid does not change.
   from one project, without a scratch copy, and both are checked as current. The uuids can be
   reproduced from the base uuid and the case id alone.
 - Positive: `lca/datasets/` already holds generated datasets (`cheme assess lci-estimate`) and
-  hand-written ones, and `cheme validate` and `cheme migrate` already read it. The generated
-  case dataset needs no new loader.
+  hand-written ones. `cheme assess lca` loads a dataset there when a study references it as a
+  background, and `cheme migrate` reads every file there. The generated case dataset needs no
+  new loader.
+- Negative: `cheme validate` does not read `lca/datasets/`, so a committed case dataset that
+  was edited by hand is caught by `--check --case` (and by a study that loads it), not by
+  `cheme validate`. `cheme migrate` treats the case datasets as inputs like the other files
+  there: after a schema bump, rewrite them with `--write --case` rather than migrating them.
 - Negative: data quality (`lca/manifest.json`), the study's allocation, the results and the
   scenario records apply to the study's case only. A design case's dataset carries the
   study's `dataset:` documentation as written. A `production_volume` pinned there is the study
   case's, so give it per case in the consumer, or leave it to be derived (cheme derives it
-  from each case's own product flow).
+  from each case's own product flow). Only the review, `superseded_by` and `parent` are
+  reset for the case (see the table); `version` and `classification` are the study's.
 - Negative: renaming a case or the flowsheet title changes the case dataset's id, file name
   and uuid. The old file then stays behind, because `--check --case` only checks the case it
   is given.
 - Known limitations and follow-ups: `cheme assess lca --check` without `--case` does not
   discover the case datasets already written, and nothing reports a generated file whose case
-  was removed. Two case ids that differ only in characters the identifier drops (`Skid B` and
-  `skid-b`) would share a file name; the overwrite check then refuses the second one.
+  was removed. A case cannot state its own review or documentation: give each design its
+  own in the consumer.
 
 ## Evidence
 

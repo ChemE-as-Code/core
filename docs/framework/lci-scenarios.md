@@ -158,14 +158,19 @@ share an id, a title or a uuid:
 - `uuid`: `uuid5(<base uuid>, "case:<case>")`, from the uuid `dataset: uuid:` pins, or else
   the one cheme derives for `lca/dataset.yaml`. The same base and case give the same uuid.
 
-The reference product, functional unit, basis and `dataset:` documentation are the study's.
-The header comment says the file is generated and names the command that rewrites it. The
+The reference product, functional unit, basis and `dataset:` documentation are the study's,
+except what describes the study's dataset alone: a stated review becomes `unreviewed` (nobody
+reviewed this dataset), `superseded_by` is dropped, and `parent` is the study dataset's uuid.
+The case id is made an identifier in lower case (`--case B` writes `<dataset id>-b.yaml`);
+two declared cases that give one identifier (`Hot` and `hot`) are the error
+`cheme.lca-case-id-clash`, and neither gets a dataset. The header comment says the file is generated and names the command that rewrites it. The
 provenance (`generator`, `case` and the sha256 of each input file) records what it was
 derived from. `--write --case` writes only this file, never over a dataset in `lca/datasets/`
 that it did not generate for that case (`cheme.lca-dataset-not-generated`). `--check --case`
 reports `cheme.lca-dataset-stale` with the file and the hint to rerun. Run it in a
 `kind: command` gate. `cheme assess lca --check` without `--case` checks the study's outputs
-only.
+only, and reports a stale `lca/dataset.yaml` with the same finding. `cheme validate` does not
+read `lca/datasets/`: the check of a committed case dataset is `--check --case`.
 
 A case the flowsheet does not declare exits 2 and lists the declared cases. `--case` naming
 the study's own case is the same as no `--case`, so `lca/dataset.yaml` is unchanged. Data

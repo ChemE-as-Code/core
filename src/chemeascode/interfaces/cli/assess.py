@@ -411,6 +411,16 @@ def _lca(
         if not (write or check or as_json or csv or coverage or inventory or dataset):
             return report
     files = outputs(report)
+    if check and not write and files.get(DATASET_FILE):
+        from chemeascode.domains.assessment.lca.case_dataset import CaseDataset, stale_finding
+
+        # the dataset's staleness as the finding --check --case reports for a case dataset
+        study = report.inventory.case if report.inventory is not None else ""
+        stale = stale_finding(
+            workspace.root, CaseDataset(study or "", DATASET_FILE, files[DATASET_FILE], report)
+        )
+        if stale is not None:
+            typer.echo(stale.format(), err=True)
     if _write_or_check(workspace, files, write, check, "lca"):
         return report
     if coverage:

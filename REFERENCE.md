@@ -138,7 +138,7 @@ cheme assess mto | estimate [--write]         # material take-off of the model, 
 cheme assess equipment [--write]              # equipment costs from published correlations (Turton)
 cheme assess tea [--write] [--compare REV]    # TEA: capex build-up, cash flow, NPV/IRR/LCOP, drivers
 cheme assess lca [--write | --check]          # LCA per functional unit; lca/dataset.yaml, results
-cheme assess lca --write --case B             # case B's own LCI dataset: lca/datasets/<id>-B.yaml
+cheme assess lca --write --case B             # case B's own LCI dataset: lca/datasets/<id>-b.yaml
 cheme datasheets draft [--tag T]              # draft datasheets for items without one (sources, TBD)
 cheme datasheets fill [--tag T] [--param k=v] # calculated sizes with their basis into the drafts
 cheme schema [equipment]                      # JSON Schema of a YAML file kind (none: list them)
