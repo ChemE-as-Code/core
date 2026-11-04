@@ -27,17 +27,25 @@ stacks, tanks and footprint. It follows the skills `electrochemical-cell-modelli
   efficiency, measured (`performance: measured`, inside the measured range) or specified with
   an `operating_range.current_density`. The stack is never sized outside that range.
 - **The stack design** under `stacks:` (docs/framework/electrolyser-stacks.md): the product
-  component and rate (kg/h or mol/s, purity and pressure as declared data), the electrical
+  component and rate (kg/h or mol/s, purity and pressure as declared data; the `recovery` of
+  the product formed at the skid boundary, when gas conditioning loses some: the stacks are
+  sized for rate / recovery formed), the electrical
   limits (the stack voltage or DC bus; optional stack current, rectifier efficiency and
   current), the envelope per cell (pitch, end plates, frame margin), access clearances, the
   replacement interval, the equipment-list tags of the stacks.
 - **The skid equipment** under `equipment:`: the duty id, and per tag the reservoir, dosing
   and bleed tank margins and H/D, the recirculation pump's anolyte flow per area (or per cell),
-  density, viscosity, reservoir pressure and stack pressure drop, the dosing pump's margin.
+  density, viscosity, reservoir pressure and stack pressure drop, the dosing pump's margin. A
+  dosing tank refilled (a bleed tank emptied) during the campaign states its
+  `refill_interval` (`empty_interval`): it then holds what any such interval needs, not the
+  whole campaign.
 - **The duty** in `process/duties.yaml`, at the stack's cell and current density (the cell's
   current over its active area): the reservoir, dosing, bleed, the stated pH threshold with its
   source and the horizon (the campaign). Leave `cells_in_series` and `stacks` out: the sizing
-  sets them.
+  sets them. An undosed duty (no dosing, bleed, make-up or degassing) can state
+  `reservoir.size: to_horizon` (and a `time_margin`): `cheme process stack --write` then writes
+  the exact reservoir volume that reaches the horizon into it. Comparison duties on the same
+  hardware (on/off, part load) name the stack (`stack: ID`) to run at its arrangement.
 - The equipment list items for every tag (skill `lists-sync`) and the pump datasheets
   (`cheme datasheets draft`).
 
@@ -98,7 +106,14 @@ leave it out and the value stays TBD with the reason.
 - `cheme.stack-cell` (error) on the product: a side reaction forms it too (O2 of a CO2
   cell); size on the cell's main or measured product.
 - `cheme.stack-duty` (error): an earlier stack names the same duty. One duty runs at one
-  arrangement: give the second skid its own duty.
+  arrangement: give the second skid its own duty. Also when the skid duty names its own stack
+  (`stack:`) and states another `cells_in_series` or `stacks`: drop them from the duty.
+- `cheme.duty-size` (error): `reservoir.size: to_horizon` on a duty whose volume does not
+  scale exactly (dosing, bleed, make-up, degassing, two operating points): size the reservoir
+  by hand, or drop those from the duty.
+- `cheme.duty-arrangement` (error): a duty naming a stack also states another
+  `cells_in_series` or `stacks`, names a stack that is not there or of another cell, or is
+  another stack's skid duty: drop the arrangement from the duty, or correct `stack:`.
 - `cheme.stack-schema` (error): a unit or a value out of range (a zero rectifier current, a
   negative pitch, flow, density or margin): the value is not used.
 - `cheme.stack-outdated` (warning): `cheme process stack --write`, then steps 7 and 8. Also

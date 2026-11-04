@@ -2,6 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-04
+- **Amended:** 2026-11-04, skid inputs for the CO2 pilot skids (see "Amendment" below)
 
 ## Context
 
@@ -123,6 +124,56 @@ design file the layout and datasheets would also read; or writing into the exist
   flowsheet, whose electricity stream the cell's Faraday balance already checks against the
   cell's own power; that link is a follow-up.
 
+## Amendment (2026-11-04): skid inputs for pilot skids
+
+What the CO2 pilot skids of process-library#330 need beyond the first version, each an
+optional field (schemas unchanged in version), without changing a value of a plant that
+does not state them:
+
+- **Tank intervals.** A dosing tank's `refill_interval` and a bleed tank's `empty_interval`
+  (their own models, `DosingTank` and `BleedTank`, so an interval on another tank is a schema
+  error) size the tank for the most dosed or bled in any window of min(campaign, interval) of
+  the duty's transient (exact: the rates are constant between its samples), with the margin,
+  and report the fills or emptyings per campaign `ceil(campaign / interval)`. Without an
+  interval the tank holds the campaign's total, as before.
+- **A duty names its stack.** `stack:` on a duty of `process/duties.yaml` runs it at that
+  stack's arrangement in `cheme process duty` and `--compare` (`stack_arrangements`), as the
+  duty a stack's `equipment.duty` names, so comparison duties on a skid's hardware need no
+  copied arrangement. The equipment's claim wins: a duty a stack's equipment runs that names
+  another stack, a duty stating `cells_in_series` or `stacks` other than its stack's, or naming
+  a stack that is not there, of another cell, or refused, is refused
+  (`cheme.duty-arrangement`, error) rather than run at either arrangement; `cheme process
+  stack` refuses a skid duty that names its own stack with another arrangement in the same
+  way (`cheme.stack-duty`, error), so the two commands agree. The stack's own
+  skid inputs still come from its `equipment.duty` only. `Arrangement` carries the stack id.
+- **A reservoir sized to the horizon.** `reservoir.size: to_horizon` (optional
+  `time_margin`, a fraction of the horizon or a time) on a duty asks for the volume that
+  reaches the horizon at the stated threshold. It is computed in the duty module, not by
+  probing: without dosing, bleed, make-up and degassing and at one operating point (one WDE and
+  co-ion split while on), the state moves along the charge, so `V = V0 Q(target) / Q*` is
+  exact (ADR 0043); `Q*` comes from the run's threshold, or by following the run's straight
+  path in the charge with the model's speciation when the stated volume does not reach it.
+  The volume is raised, exactly on the same path, where the duty would otherwise stop or
+  leave the model's claim before the target: a stated `minimum_inventory` is absolute and does
+  not scale with the volume, and the anolyte model's validity holds along the path to the
+  target (`limited_by`), so the written volume is a feasible one. A duty where it is not
+  exact is refused that field (`cheme.duty-size`, error), not approximated. `cheme process stack --write` writes the volume, rounded up to 4 significant
+  figures (at least 1e-6 above the exact one, so the run at it reaches the target within the
+  integration's tolerance), into the duty's `reservoir.volume` in `process/duties.yaml`: a
+  second, narrow writer of a hand-maintained file, in place (comments kept, the edit checked
+  to change that volume only), and only for a duty that asks for it. The tanks then follow
+  from the duty at that volume in the same `--write`.
+- **Product recovery.** `product.recovery` (default 1, 0 < r <= 1) sizes the stacks for
+  rate / recovery formed and reports the output formed and delivered and kWh per kg of each.
+  A stated recovery out of range refuses the stack. Its fingerprint leaves out a recovery not
+  given, so the sizes written before stay current.
+- **Duty totals by route.** Every duty also integrates the cation leaving and the carbon
+  entering through the membrane and the cation and carbon leaving with the bleed, and reports
+  the initial inventories and the cation dosed, so the cation and the carbon balance close
+  independently (the LCI reconciliation is not closed by difference). They are quadratures:
+  `foundation/ode.py` `solve(..., error_components=n)` keeps them out of the error control, so
+  the steps, and every value reported before, are unchanged bit for bit.
+
 ## Consequences
 
 - Positive: a changed product duty, cell operating point, envelope or duty reaches the stack
@@ -143,6 +194,11 @@ design file the layout and datasheets would also read; or writing into the exist
   sized.
 - Negative: the stacks' power and dosing reach the LCA by hand, and nothing reports them stale
   when the stacks change.
+- Negative (amendment): `cheme process stack --write` also edits `process/duties.yaml`, for
+  a duty with `reservoir.size: to_horizon` only; the written volume is rounded up, so the duty
+  lasts slightly beyond its target. A comparison duty's own reservoir is not tied to the skid
+  duty's (it is stated, or sized to its own horizon). Dosing and bleed still run while the
+  current is off.
 - Follow-ups: the stack power and dosing into the flowsheet streams the LCA reads, with a
   stale check; the anolyte flow per area as part of a measured series; series strings of stacks
   on a higher bus voltage; a stale check of the written values in `cheme validate` that does
@@ -161,5 +217,10 @@ design file the layout and datasheets would also read; or writing into the exist
   `src/chemeascode/domains/equipment/outline.py`, `src/chemeascode/interfaces/cli/process.py`
   (`stack`).
 - `tests/test_electrolyser_stack.py`, `tests/data/electrochemical/co2-skid/`.
+- Amendment: `src/chemeascode/domains/process/electrolysis_duty.py` (`_required_volume`,
+  `_ROUTES`, `_arrange`), `src/chemeascode/foundation/ode.py` (`error_components`),
+  `electrolyser_stack.py` (`_interval_tank`, `_reservoir_volume`, `set_duty_volume`,
+  `stack_arrangements`); `tests/test_electrolysis_duty.py`, `tests/test_electrolyser_stack.py`,
+  `tests/test_ode.py`; the design note of process-library#330 (core gaps A1 to A5).
 - `docs/framework/electrolyser-stacks.md`; skill `skid-design`
   (`src/chemeascode/domains/equipment/skills/skid-design/SKILL.md`).

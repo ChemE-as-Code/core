@@ -24,6 +24,7 @@ stacks:
     product:
       component: CO                  # a product of the cell's reaction
       rate: {value: 0.1, unit: kg/h, provenance: given, source: "..."}   # or mol/s, kmol/h, t/d
+      recovery: {value: 0.9, provenance: assumed, source: "..."}          # optional, default 1
       purity: {value: 0.95, provenance: given, source: "..."}            # declared, reported
       pressure: {value: 1.2, unit: bar(a), provenance: given, source: "..."}
     electrical:
@@ -52,8 +53,16 @@ stacks:
         reservoir_pressure: {value: 101.3, unit: kPa, ...}
         stack_pressure_drop: {value: 50, unit: kPa, ...}
       dosing_pump: {tag: P-102, margin: {value: 0.5, ...}}
-      dosing_tank: {tag: T-102, margin: {value: 0.2, ...}, aspect_ratio: {value: 1.2, ...}}
-      bleed_tank: {tag: T-103, margin: ..., aspect_ratio: ...}
+      dosing_tank:
+        tag: T-102
+        margin: {value: 0.2, ...}
+        aspect_ratio: {value: 1.2, ...}
+        refill_interval: {value: 168, unit: h, provenance: assumed, source: "..."}  # optional
+      bleed_tank:
+        tag: T-103
+        margin: ...
+        aspect_ratio: ...
+        empty_interval: {value: 24, unit: h, provenance: assumed, source: "..."}    # optional
 ```
 
 Every field is optional except `id`, `cell`, `product` and `electrical.max_stack_voltage`; the
@@ -68,13 +77,14 @@ at `j` in its series):
 
 | value | how |
 | --- | --- |
-| total active area | `A = n F Ndot / (nu FE j)` for the product duty `Ndot` (mol/s) |
+| product formed | the duty over the `recovery` (default 1: formed = delivered): the share of the product formed that reaches the skid boundary (gas conditioning, purification), 0 < r <= 1 |
+| total active area | `A = n F Ndot / (nu FE j)` for the product formed `Ndot` (mol/s) |
 | cells required | `ceil(A / A_cell)` |
 | cells per stack | at most `floor(U_max / U)` in series; the stacks `ceil(cells / that)`; the cells shared evenly, `ceil(cells / stacks)` per stack |
 | stack voltage, current | cells x `U`; the cell's current (one current through a series stack) |
 | bus current, DC power | stacks x `I`; `P = sum N U I`; AC power over the rectifier efficiency; rectifiers for the rectifier current |
-| output, margin | the integer arrangement's product (never below the duty) and its margin over the duty |
-| electricity, heat | kWh per kg of product (all the DC power); the cell's heat per cell times the cells |
+| output, margin | the integer arrangement's product formed and, with a recovery, delivered (never below the duty), and its margin over the duty |
+| electricity, heat | kWh per kg of product formed (all the DC power) and, with a recovery, per kg delivered; the cell's heat per cell times the cells |
 | envelope | `L = cells x pitch + end plates`, `W = H = sqrt(A_cell) + 2 x frame margin`; the footprint with the clearances |
 | replacements | cells and membrane area replaced per year from the interval and the operating hours |
 
@@ -84,11 +94,17 @@ series, the stacks on the one reservoir) over its horizon:
 | tag | gets | from |
 | --- | --- | --- |
 | reservoir | list `dimensions` (diameter, height, `head: flat`, `support: none`) | the largest volume over the duty times one plus the margin, a vertical cylinder of the stated H/D |
-| dosing tank | list `dimensions` | the solution dosed over the campaign, with the margin |
-| bleed tank | list `dimensions` | the bleed over the campaign, with the margin |
+| dosing tank | list `dimensions` | the solution dosed over the campaign, or with a `refill_interval` the most dosed in any window of min(campaign, interval), with the margin; the fills per campaign `ceil(campaign / interval)` |
+| bleed tank | list `dimensions` | the bleed over the campaign, or with an `empty_interval` the most bled in any window of min(campaign, interval), with the margin; the emptyings per campaign |
+| the duty's reservoir volume | `process/duties.yaml` `reservoir.volume`, when the duty states `reservoir.size: to_horizon` | the exact volume that reaches the duty's horizon (plus its time margin) at the pH threshold, `V0 Q(target) / Q*` ([duties](electrolysis-duties.md#the-reservoir-volume-that-reaches-the-horizon)), written rounded up to 4 significant figures |
 | recirculation pump | datasheet `type_specific`: `mass_flow_kg_h`, `density_kg_m3`, `viscosity_mpa_s`, `suction_pressure_kpa`, `discharge_pressure_kpa`, `suction_from`, `discharge_to` | the anolyte flow per area (or per cell) times the cells at the density; the reservoir pressure and the stack's pressure drop; the reservoir's tag and the first stack's tag (the stacks in parallel share the inlet header) |
 | dosing pump | datasheet `mass_flow_kg_h`, `density_kg_m3` | the duty's dosing rate times one plus the margin (its end points and pressures are declared by hand) |
 | stack tags | list `dimensions` (length, width, height) | the envelope |
+
+The window of an interval is exact on the duty's transient: the dosing and bleed rates are
+constant between its samples (the dosing switches are sampled), so the largest increase of the
+dosed or bled total over a window starts or ends at a sample. Without an interval a tank holds
+the campaign's total, as before.
 
 Every value carries its provenance (`given`, `assumed`, `calculated`, or `tbd` with the
 reason) and its source; a value resting on an assumed input is marked ASSUMED. A tank is a
@@ -110,6 +126,14 @@ The cell's operating point, the arrangement and the duty are stated once:
   duty's own `cells_in_series` and `stacks` are then not used (`cheme.stack-duty`, info: drop
   them). One duty runs at one arrangement: the first stack naming it has it, and a later stack
   naming the same duty gets no reservoir, dosing or bleed inputs (`cheme.stack-duty`, error);
+- a duty that is no stack's skid duty, such as a comparison duty on the skid's hardware, names
+  the stack itself (`stack: STK-1` in `process/duties.yaml`): `cheme process duty` and
+  `--compare` run it at that stack's arrangement too. Such a duty stating `cells_in_series` or
+  `stacks` other than the stack's, naming a stack that is not in the file or is of another
+  cell, or being another stack's skid duty, is refused (`cheme.duty-arrangement`, error); the
+  stack's own skid inputs still come from its `equipment.duty` only. A skid duty that names
+  its own stack and states another `cells_in_series` or `stacks` is refused by both commands
+  (`cheme.stack-duty` and `cheme.duty-arrangement`, errors: no tank or dosing inputs);
 - one item, one size: a tag two stacks (or two roles of one skid) name is written by neither
   (`cheme.stack-tags`, error).
 
@@ -123,8 +147,12 @@ written) and the pumps' datasheets, and only a value that is missing, TBD or wri
 (`cheme.stack-kept`). A value `cheme process stack` wrote that the design basis no longer
 gives (an envelope or a pump input removed, a duty no longer feasible) is reported outdated
 too; `--write` sets a datasheet value TBD with the reason and removes the list sizes (sizes
-beside a weight are kept: `cheme.stack-kept`, clear them by hand). With `--json`, the report
-(as the files are after the write) carries `written`: each file written with its tags.
+beside a weight are kept: `cheme.stack-kept`, clear them by hand). A duty with
+`reservoir.size: to_horizon` asks for its reservoir volume: `--write` writes it into
+`process/duties.yaml` (in place, comments kept, only that volume changed, with its source), and
+in the same run the tanks from the duty at that volume (before it, the duty at the stated
+volume is not feasible and gives no tank sizes). With `--json`, the report (as the files are
+after the write) carries `written`: each file written with its tags (or duty ids).
 
 The equipment list's `dimensions` take three optional fields for sizes a tool calculated:
 
@@ -156,14 +184,14 @@ The skill `skid-design` chains the whole sequence.
 
 | rule | level | when |
 | --- | --- | --- |
-| `cheme.stack-schema` | error | a unit a quantity does not take, a duplicate stack id, a value out of its range (not above 0: product rate, voltage and current limits, rectifier current, cell pitch, replacement interval, H/D, anolyte flow, density, viscosity, reservoir pressure; below 0: end plates, frame margin, clearances, operating hours, a margin, the stack's pressure drop; a rectifier efficiency not in (0, 1]): the value is not used (a stated voltage or current limit refuses the stack; a rectifier efficiency leaves only the AC power out) |
+| `cheme.stack-schema` | error | a unit a quantity does not take, a duplicate stack id, a value out of its range (not above 0: product rate, voltage and current limits, rectifier current, cell pitch, replacement interval, H/D, anolyte flow, density, viscosity, reservoir pressure, a refill or emptying interval; a recovery not in (0, 1], which refuses the stack; below 0: end plates, frame margin, clearances, operating hours, a margin, the stack's pressure drop; a rectifier efficiency not in (0, 1]): the value is not used (a stated voltage or current limit refuses the stack; a rectifier efficiency leaves only the AC power out) |
 | `cheme.stack-cell` | error | the cell is missing, refused by its Faraday balance (outside the measured range among others), has no active area, does not form the product, a side reaction forms or consumes the product too (the Faradaic efficiency is the overall reaction's: name the main product), or a specified cell is outside its declared operating range: the stack is refused, never extrapolated |
 | `cheme.stack-electrical` | error | the cell voltage above the stack voltage limit, or the cell current above the stack current limit |
-| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement, or an earlier stack names it (no tank and dosing inputs); info: the duty states another arrangement |
+| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement, names another stack (`stack:`), names this stack and states another `cells_in_series` or `stacks`, or an earlier stack names it (no tank and dosing inputs); info: the duty states another arrangement |
 | `cheme.stack-envelope`, `stack-input-missing` | info | an envelope or equipment input is missing: that value stays TBD |
 | `cheme.stack-unsourced` | info | an assumed input without a source |
 | `cheme.stack-tags` | warning / error | fewer or more tags than stacks, or a tag not in the equipment list; error: a tag given twice (two stacks, or two roles), written by neither |
-| `cheme.stack-outdated` | warning | a list dimension or datasheet input differs from the calculated one, or one `cheme process stack` wrote is no longer given: `--write` |
+| `cheme.stack-outdated` | warning | a list dimension, datasheet input or a duty's reservoir volume (`size: to_horizon`) differs from the calculated one, or one `cheme process stack` wrote is no longer given: `--write` |
 | `cheme.stack-kept` | warning | a value written by hand differs: kept; a tank stating a head or a support; sizes no longer given beside a weight |
 | `cheme.stack-target` | info | the item or datasheet a value goes to does not exist |
 

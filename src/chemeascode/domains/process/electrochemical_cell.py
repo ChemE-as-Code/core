@@ -332,6 +332,12 @@ class StackProduct(Strict):
 
     component: str = Field(description="The main product: a product of the cell's reaction.")
     rate: Quantity = Field(description="kg/h, kg/d, t/d, g/h, mol/s or kmol/h.")
+    recovery: Quantity | None = Field(
+        default=None,
+        description="The share of the product formed that is delivered at the skid boundary "
+        "(gas conditioning, purification), 0 < r <= 1 (or %), default 1: the stacks are sized "
+        "for rate / recovery formed.",
+    )
     purity: Quantity | None = Field(default=None, description="Declared, reported only.")
     pressure: Quantity | None = Field(default=None, description="Declared, reported only.")
 
@@ -406,6 +412,26 @@ class SkidTank(Strict):
     )
 
 
+class DosingTank(SkidTank):
+    """The dosing tank: what is dosed over the campaign, or over the refill interval."""
+
+    refill_interval: Quantity | None = Field(
+        default=None,
+        description="h (d): the tank is refilled this often; it holds the most dosed in any "
+        "such interval of the campaign (default: the whole campaign).",
+    )
+
+
+class BleedTank(SkidTank):
+    """The bleed tank: what is bled over the campaign, or over the emptying interval."""
+
+    empty_interval: Quantity | None = Field(
+        default=None,
+        description="h (d): the tank is emptied this often; it holds the most bled in any "
+        "such interval of the campaign (default: the whole campaign).",
+    )
+
+
 class RecirculationPump(Strict):
     """The anolyte recirculation pump: its flow from the flow per cell and the cells."""
 
@@ -447,8 +473,8 @@ class SkidEquipment(Strict):
     reservoir: SkidTank | None = None
     recirculation_pump: RecirculationPump | None = None
     dosing_pump: DosingPump | None = None
-    dosing_tank: SkidTank | None = None
-    bleed_tank: SkidTank | None = None
+    dosing_tank: DosingTank | None = None
+    bleed_tank: BleedTank | None = None
 
 
 class Stack(Strict):

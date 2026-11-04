@@ -421,8 +421,10 @@ def stack(
         bool,
         typer.Option(
             "--write",
-            help="Write the calculated stack and tank dimensions into the equipment list and "
-            "the pumps' inputs into their datasheets (never over a value written by hand).",
+            help="Write the calculated stack and tank dimensions into the equipment list, "
+            "the pumps' inputs into their datasheets (never over a value written by hand) and "
+            "a reservoir volume the duty asks for (reservoir.size: to_horizon) into "
+            "process/duties.yaml.",
         ),
     ] = False,
 ) -> None:
@@ -431,10 +433,13 @@ def stack(
     cells, cells per stack from the voltage limit, stacks, stack voltage and current, DC power,
     output and its margin, kWh per kg, the stack envelope; and the skid equipment inputs from
     the duty named, run at the sized arrangement over its horizon: reservoir and tank
-    dimensions, the recirculation and dosing pumps' flows. Without --write it writes nothing
-    and reports what differs from the equipment list and datasheets (cheme.stack-outdated);
-    with --write --json the report (as the files are then) carries `written`, each file
-    written with its tags.
+    dimensions (a dosing or bleed tank over its refill or emptying interval), the recirculation
+    and dosing pumps' flows, and with the duty's reservoir.size: to_horizon the reservoir volume
+    that reaches its horizon. Without --write it writes nothing and reports what differs from
+    the equipment list, the datasheets and process/duties.yaml (cheme.stack-outdated); --write
+    writes them (a reservoir volume first, then the tanks from the duty at it); with --write
+    --json the report (as the files are then) carries `written`, each file written with its
+    tags (or duty ids).
     Exit 1 on an error finding (process/cells.yaml not following its schema among them: its
     findings are printed), 2 without process/cells.yaml or stacks, or for an unknown id."""
     from chemeascode.domains.equipment.electrolyser_stack import (
@@ -444,6 +449,7 @@ def stack(
         write_stack_inputs,
     )
     from chemeascode.domains.process.electrochemical_cell import CELLS_FILE, has_cells
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE
 
     workspace = _workspace()
     if not has_cells(workspace.root):
@@ -464,6 +470,14 @@ def stack(
     if write:
         try:
             written = write_stack_inputs(workspace.root, report)
+            if DUTIES_FILE in written.written:
+                # a reservoir volume written (reservoir.size: to_horizon): the tanks follow
+                # from the duty at that volume, in a second pass
+                again = write_stack_inputs(
+                    workspace.root, stack_report(workspace.root, ids or None)
+                )
+                for name, tags in again.written.items():
+                    written.written[name] = sorted({*written.written.get(name, []), *tags})
         except ValueError as failure:
             typer.echo(str(failure), err=True)
             raise typer.Exit(1) from failure
