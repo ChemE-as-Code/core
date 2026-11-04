@@ -138,3 +138,21 @@ def test_quadratures_outside_the_error_control_leave_the_steps():
     assert controlled.t != alone.t
     with pytest.raises(ValueError, match="error_components"):
         solve(lambda t, y: [-y[0], y[0]], 0.0, [1.0, 0.0], 1.0, error_components=3)
+
+
+def test_a_quadrature_error_that_is_not_finite_rejects_the_step(monkeypatch):
+    """Outside the error control a quadrature's error still has to be finite: an error
+    estimate that overflows (here forced through the k7 weight, the stages and y finite)
+    rejects the step rather than accepting it unchecked, so the integration fails instead of
+    reporting a value it cannot vouch for."""
+    from chemeascode.foundation import ode
+
+    def f(t, y):
+        return [0.0, 1e10]
+
+    plain = solve(f, 0.0, [1.0, 0.0], 1.0, error_components=1)
+    assert plain.status == "end" and plain.y_final[1] == pytest.approx(1e10)
+    monkeypatch.setattr(ode, "_E", (*ode._E[:6], -1e308))
+    forced = solve(f, 0.0, [1.0, 0.0], 1.0, error_components=1)
+    assert forced.status == "failed" and forced.rejected > 0
+    assert math.isfinite(forced.y_final[1])

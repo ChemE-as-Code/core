@@ -1328,3 +1328,185 @@ def test_set_duty_volume_keeps_the_rest_of_the_file():
         _check_duties(text, new.replace("ph: 12", "ph: 11", 1), {"A": a, "B": b})
     with pytest.raises(ValueError, match="no reservoir.volume"):
         set_duty_volume(text, "Z", a)
+
+
+# -- review fixes: the skid duty's own stack, intervals, minimum inventory, reporting ----------
+
+
+def test_a_skid_duty_naming_its_stack_with_another_arrangement_is_refused(tmp_path):
+    """SKID-150 names its own stack (stack: STK-1): with the sized arrangement stated, or
+    none, it gives the skid inputs; with cells_in_series 7 both commands refuse it
+    (cheme.stack-duty and cheme.duty-arrangement, errors) and the tanks stay TBD."""
+    from chemeascode.domains.equipment.electrolyser_stack import stack_arrangements
+    from chemeascode.domains.process.electrolysis_duty import duty_report
+
+    root = _plant(tmp_path)
+    _edit(root, "process/duties.yaml", lambda d: d["duties"][0].update(stack="STK-1"))
+    s = _stack(stack_report(root))
+    assert s.duty["inputs_given"]
+    _edit(root, "process/duties.yaml", lambda d: d["duties"][0].update(cells_in_series=10))
+    assert _stack(stack_report(root)).duty["inputs_given"]
+    _edit(root, "process/duties.yaml", lambda d: d["duties"][0].update(cells_in_series=7))
+    report = stack_report(root)
+    s = _stack(report)
+    error = next(f for f in report.errors if f.rule == "cheme.stack-duty")
+    assert "states cells_in_series 7" in error.message
+    assert not s.duty or not s.duty.get("inputs_given")
+    for tag in ("T-101", "T-102", "P-102"):
+        assert not _entry(s, tag).complete
+    duty = duty_report(root, ["SKID-150"], stack_arrangements(root))
+    assert duty.duties[0].refused and "cells_in_series 7" in duty.duties[0].reasons[0]
+
+
+def test_an_interval_of_a_tank_without_flow_is_still_checked(tmp_path):
+    """A bleed tank's empty_interval out of range is a cheme.stack-schema error also when the
+    duty bleeds nothing (the tank is TBD either way)."""
+    root = _plant(tmp_path)
+    _edit(root, "process/duties.yaml", lambda d: d["duties"][0].pop("bleed"))
+
+    def tank(interval):
+        def edit(data):
+            data["stacks"][0]["equipment"]["bleed_tank"] = {
+                "tag": "T-103",
+                "margin": {"value": 0.1, "provenance": "assumed", "source": "test"},
+                "aspect_ratio": {"value": 1.0, "provenance": "assumed", "source": "test"},
+                "empty_interval": interval,
+            }
+
+        return edit
+
+    good = {"value": 10, "unit": "h", "provenance": "assumed", "source": "test"}
+    _edit(root, "process/cells.yaml", tank(good))
+    report = stack_report(root)
+    assert "cheme.stack-schema" not in _rules(report.findings)
+    assert _entry(_stack(report), "T-103").values["diameter"].provenance == "tbd"
+    for bad in ({**good, "value": 0}, {**good, "unit": "A"}):
+        _edit(root, "process/cells.yaml", tank(bad))
+        report = stack_report(root)
+        schema = [f for f in report.errors if f.rule == "cheme.stack-schema"]
+        assert any("bleed_tank empty_interval" in f.message for f in schema), bad
+        assert _entry(_stack(report), "T-103").values["diameter"].provenance == "tbd"
+
+
+def test_reservoir_size_to_horizon_with_a_minimum_inventory_writes_a_feasible_volume(
+    tmp_path, monkeypatch
+):
+    """SKID-150 without dosing or bleed at 200 L, sized to the horizon with 74.2 mol of K+
+    kept: the written volume keeps the minimum to the horizon, so after --write the duty is
+    feasible, its tanks given and nothing is left to write."""
+    root = _plant(tmp_path)
+    _to_horizon(root)
+
+    def edit(data):
+        duty = data["duties"][0]
+        duty["reservoir"]["volume"]["value"] = 200
+        duty["minimum_inventory"] = {"cation": {"value": 74.2, "unit": "mol"}}
+
+    _edit(root, "process/duties.yaml", edit)
+    s = _stack(stack_report(root))
+    assert s.duty["feasible"]
+    exact = s.number("reservoir_required_volume_l")
+    assert "the stated minimum cation inventory" in _entry(s, "SKID-150").detail
+    monkeypatch.chdir(root)
+    result = runner.invoke(app, ["process", "stack", "--write"])
+    assert result.exit_code == 0, result.output
+    report = stack_report(root)
+    s = _stack(report)
+    assert not report.errors, [f.format() for f in report.errors]
+    assert s.duty["feasible"] and s.duty["ended"] == "horizon" and s.duty["inputs_given"]
+    assert _entry(s, "T-101").complete
+    assert s.number("reservoir_required_volume_l") == pytest.approx(exact, rel=1e-9)
+    assert runner.invoke(app, ["process", "stack", "--write"]).stdout.startswith("nothing to write")
+
+
+def test_a_duty_volume_with_no_target_is_reported():
+    """The duty's reservoir volume compares against process/duties.yaml: a duty without a
+    usable reservoir.volume there is no-target (info); a TBD volume is tbd."""
+    from chemeascode.domains.equipment.electrolyser_stack import (
+        EquipmentInput,
+        Sized,
+        _compare_duty,
+    )
+
+    root = DATA / "co2-skid"
+    entry = EquipmentInput("NO-SUCH-DUTY", "reservoir_volume", "duty", "process/duties.yaml")
+    entry.values = {"volume": Sized(12.5, "L", "calculated", "test")}
+    out = _Out(None)
+    _compare_duty(root, entry, out, "STK-1", [])
+    assert entry.status == "no-target"
+    assert [(f.level, f.rule) for f in out.findings] == [("info", "cheme.stack-target")]
+    entry.values = {"volume": Sized("TBD", "L", "tbd", "test")}
+    _compare_duty(root, entry, _Out(None), "STK-1", [])
+    assert entry.status == "tbd"
+
+
+def test_a_dosing_tank_over_its_interval_with_threshold_dosing(tmp_path):
+    """Dosing on a pH trigger (2 L/h when on) over 20 h with a refill every 10 h: the tank
+    holds the most dosed in any 10 h of the on and off periods the duty reports (its events),
+    found here from those periods directly."""
+    root = _plant(tmp_path)
+
+    def duty(data):
+        d = data["duties"][0]
+        d["dosing"] = {
+            "kind": "on_threshold",
+            "trigger_ph": 13.8,
+            "stop_ph": 13.9,
+            "concentration": {"value": 2, "unit": "mol/L"},
+            "rate": {"value": 2, "unit": "L/h"},
+            "density": {"value": 1.1, "unit": "kg/L", "source": "test: about 2 M KOH"},
+        }
+        d["horizon"]["value"] = 20
+
+    _edit(root, "process/duties.yaml", duty)
+    refill = {"value": 10, "unit": "h", "provenance": "assumed", "source": "test"}
+    _edit(
+        root,
+        "process/cells.yaml",
+        lambda c: c["stacks"][0]["equipment"]["dosing_tank"].update(refill_interval=refill),
+    )
+    run = run_duty(root, "SKID-150", 10, 2).duties[0]
+    assert run.feasible
+    switches = [(e["kind"], e["t_h"]) for e in run.events if e["kind"].startswith("dosing-")]
+    assert len(switches) >= 4  # on and off more than once
+    periods, start = [], None
+    for kind, t in switches:
+        if kind == "dosing-on":
+            start = t
+        elif start is not None:
+            periods.append((start, t))
+            start = None
+    if start is not None:
+        periods.append((start, 20.0))
+
+    def dosed(t):
+        return 2 * sum(max(0.0, min(b, t) - a) for a, b in periods)
+
+    starts = {0.0, 10.0} | {
+        x for a, b in periods for t in (a, b) for x in (t, t - 10) if 0 <= x <= 10
+    }
+    largest = max(dosed(t + 10) - dosed(t) for t in starts)
+    s = _stack(stack_report(root))
+    assert s.number("dosing_solution_per_fill_l") == pytest.approx(largest, rel=1e-6)
+    assert s.number("dosing_tank_fills_per_campaign") == 2
+    assert _tank_volume(_entry(s, "T-102")) == pytest.approx(largest * 1.2, rel=1e-5)
+    assert largest < s.number("dosing_solution_l")  # less than the whole campaign's
+
+
+def test_the_report_text_gives_the_product_formed_and_delivered(tmp_path):
+    """With product.recovery the report text names the duty delivered and the product formed
+    at that recovery; without it, neither."""
+    root = _plant(tmp_path)
+    assert "delivered (formed" not in report_text(stack_report(root, duties=False))
+    _edit(
+        root,
+        "process/cells.yaml",
+        lambda c: c["stacks"][0]["product"].update(
+            recovery={"value": 0.9, "provenance": "assumed", "source": "test: PSA"}
+        ),
+    )
+    report = stack_report(root, duties=False)
+    s = _stack(report)
+    text = report_text(report)
+    assert "delivered (formed" in text and "at recovery 0.9" in text
+    assert f"{s.number('product_formed_duty_kg_h'):.6g}" in text

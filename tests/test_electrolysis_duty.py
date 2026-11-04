@@ -1032,3 +1032,186 @@ def test_a_duty_naming_an_unknown_stack_is_refused(tmp_path):
     assert d.refused and "whose arrangement is not given" in d.reasons[0]
     compared = compare_duties(root, ["SPEC-CONST"], 0.01)
     assert not compared.rows[0].reached and "STK-X" in compared.rows[0].reason
+
+
+def _spec_const(root: Path, **edit) -> None:
+    """SPEC-CONST (1 A, no dosing) with reservoir.size: to_horizon and *edit* on the duty
+    (reservoir keys under ``reservoir``)."""
+
+    def change(duties):
+        duty = duties[2]
+        duty["reservoir"]["size"] = "to_horizon"
+        duty["reservoir"].update(edit.pop("reservoir", {}))
+        duty.update(edit)
+
+    _duties(root, change)
+
+
+def _at(root: Path, volume: float, did: str = "SPEC-CONST"):
+    def edit(duties):
+        next(d for d in duties if d["id"] == did)["reservoir"]["volume"]["value"] = volume
+
+    _duties(root, edit)
+    return _by_id(duty_report(root, [did]), did)
+
+
+@pytest.mark.parametrize(
+    ("edit", "limit", "ended_below"),
+    [
+        # 50 L reaches the 1000 h horizon; the threshold alone gives 3.10 L, at which the
+        # absolute 2.6 mol of the cation is left before 1000 h: the minimum sets the volume
+        (
+            {
+                "reservoir": {"volume": {"value": 50, "unit": "L"}},
+                "horizon": {"value": 1000, "unit": "h"},
+                "minimum_inventory": {"cation": {"value": 2.6, "unit": "mol"}},
+            },
+            "the stated minimum cation inventory",
+            "minimum-inventory",
+        ),
+        # 1.45 M KOH to pH 9.5: carbonate forming takes the ionic strength above the model's
+        # 1.5 M before the threshold: the model's validity sets the volume
+        (
+            {
+                "reservoir": {
+                    "volume": {"value": 100, "unit": "L"},
+                    "composition": {"hydroxide": {"value": 1.45, "unit": "mol/L"}},
+                },
+                "threshold": {"ph": 9.5},
+                "horizon": {"value": 1000, "unit": "h"},
+            },
+            "the validity of anolyte model well-mixed-carbonate",
+            "horizon",
+        ),
+    ],
+)
+def test_reservoir_size_to_horizon_keeps_the_minimum_and_the_model(
+    tmp_path, edit, limit, ended_below
+):
+    """The volume is raised to keep the stated minimum inventory (absolute: it does not scale
+    with V) and the anolyte model's validity up to the target, both exact on the charge path:
+    1e-4 above it the duty is feasible to the horizon, 1e-4 below it is not (it ends at the
+    minimum, or spends time outside the model); a re-run there gives the same volume."""
+    root = _plant(tmp_path)
+    _spec_const(root, **edit)
+    report = duty_report(root, ["SPEC-CONST"])
+    d = _by_id(report, "SPEC-CONST")
+    assert d.feasible
+    need = d.required_volume
+    assert need["limited_by"].startswith(limit), need
+    exact = need["volume_l"]
+    assert "raised to" in need["basis"]
+    assert any(
+        f.rule == "cheme.duty-size" and f.level == "info" and limit in f.message
+        for f in report.findings
+    )
+    above, below = _at(root, exact * (1 + 1e-4)), _at(root, exact * (1 - 1e-4))
+    assert above.ended == "horizon" and above.feasible
+    assert above.time_outside_model_range_h == 0
+    assert below.ended == ended_below and not below.feasible
+    assert below.ended == "minimum-inventory" or below.time_outside_model_range_h > 0
+    assert above.required_volume["volume_l"] == pytest.approx(exact, rel=1e-9)
+    assert below.required_volume["volume_l"] == pytest.approx(exact, rel=1e-9)
+
+
+def test_reservoir_size_to_horizon_from_a_volume_past_an_inventory_end(tmp_path):
+    """SPEC-CONST to pH 6: most of the cation has left by the threshold, so doubling the charge
+    from a stated volume that reaches the horizon passes the cation's end. The search bisects
+    back instead of giving up: every stated volume, below or above, gives the one volume
+    (and so does the volume --write writes, rounded up)."""
+    root = _plant(tmp_path)
+    _spec_const(root, threshold={"ph": 6})
+    first = _at(root, 0.05)
+    assert first.ended == "threshold"
+    exact = first.required_volume["volume_l"]
+    for volume in (0.1, round(exact * 1.0004, 4), 0.5, 1.0):
+        d = _at(root, volume)
+        assert d.required_volume["volume_l"] == pytest.approx(exact, rel=1e-9), (volume, d)
+    assert d.ended == "horizon" and d.feasible
+
+
+def test_a_reservoir_below_its_minimum_at_the_start_is_not_feasible(tmp_path):
+    """A stated minimum inventory above the initial one ends the duty at t = 0 (its event
+    fires on a crossing only, so the run went on before): not feasible, and size: to_horizon
+    gives no volume from it."""
+    root = _plant(tmp_path)
+    _spec_const(root, minimum_inventory={"volume": {"value": 2, "unit": "L"}})
+    report = duty_report(root, ["SPEC-CONST"])
+    d = _by_id(report, "SPEC-CONST")
+    assert d.ended == "minimum-inventory" and d.simulated_h == 0 and not d.feasible
+    assert d.events[0]["detail"] == "the stated minimum inventory"
+    assert "starts below the stated minimum inventory" in d.required_volume["reason"]
+    low = next(f for f in report.findings if f.rule == "cheme.duty-inventory-low")
+    assert "at 0 h (the stated minimum inventory)" in low.message
+    # with the volume above the minimum: the minimum volume bounds the one to the horizon
+    _spec_const(root, minimum_inventory={"volume": {"value": 0.5, "unit": "L"}})
+    assert _at(root, 0.4).ended == "minimum-inventory"
+    d = _at(root, 1.0)
+    assert d.feasible and d.required_volume["volume_l"] >= 0.5
+
+
+def test_reservoir_size_to_horizon_refusals_after_the_run(tmp_path):
+    """No exact volume (cheme.duty-size, error): a time margin in another unit than a fraction
+    or a time, or negative (also in cheme validate); a linear power ramp; a run that ends by
+    an exhausted inventory (not the threshold, the horizon or the stated minimum)."""
+    root = _plant(tmp_path)
+
+    def margins(duties):
+        duties[2]["reservoir"].update(size="to_horizon", time_margin={"value": 5, "unit": "A"})
+        duties[3]["reservoir"].update(size="to_horizon", time_margin={"value": -1, "unit": "h"})
+        duties[1]["schedule"]["interpolation"] = "linear"  # MEAS-POWER, 2 -> 4.5 W
+        duties[1]["reservoir"]["size"] = "to_horizon"
+
+    _duties(root, margins)
+    report = duty_report(root, ["SPEC-CONST", "SPEC-ONOFF", "MEAS-POWER"])
+    errors = {
+        f.ids[0]: f for f in report.findings if f.rule == "cheme.duty-size" and f.level == "error"
+    }
+    assert "is no fraction or time >= 0" in errors["SPEC-CONST"].message
+    assert "-1 h is no fraction or time" in errors["SPEC-ONOFF"].message
+    assert "linear power ramp" in errors["MEAS-POWER"].message
+    for did in errors:
+        assert _by_id(report, did).required_volume["volume_l"] is None
+    static = {f.ids[0] for f in duty_findings(root) if f.rule == "cheme.duty-size"}
+    assert {"SPEC-CONST", "SPEC-ONOFF"} <= static
+    # the cation runs out before pH 3 (test_a_cation_inventory_that_runs_out_ends_the_duty)
+    duty = Duty.model_validate(
+        {
+            "id": "drain",
+            "cell": "bench",
+            "schedule": {"kind": "constant_current", "current": {"value": 0.5, "unit": "A"}},
+            "reservoir": {
+                "volume": {"value": 20, "unit": "mL"},
+                "composition": {"hydroxide": {"value": 0.01, "unit": "mol/L"}},
+                "model": "well-mixed-carbonate",
+                "size": "to_horizon",
+            },
+            "threshold": {"ph": 3},
+            "horizon": {"value": 10, "unit": "h"},
+        }
+    )
+    out = ed._Out(ed.DUTIES_FILE, None)
+    d = simulate_duty(duty, _bench(0.9, 0.66), out=out)
+    assert d.ended == "minimum-inventory"
+    assert "ended by minimum-inventory" in d.required_volume["reason"]
+    assert any(f.rule == "cheme.duty-size" and f.level == "error" for f in out.findings)
+
+
+def test_a_duty_naming_a_stack_of_another_cell_is_refused(tmp_path):
+    """stack: names a stack of process/cells.yaml whose cell is not the duty's: cheme
+    validate reports it (cheme.duty-arrangement, error), as for an unknown stack."""
+    root = _plant(tmp_path)
+    skid = yaml.safe_load((DATA / "co2-skid/process/cells.yaml").read_text(encoding="utf-8"))
+    stack = skid["stacks"][0]
+    stack.pop("equipment")
+    stack["cell"] = "BPM-1"
+    path = root / "process/cells.yaml"
+    cells = yaml.safe_load(path.read_text(encoding="utf-8"))
+    cells["stacks"] = [stack]
+    path.write_text(yaml.safe_dump(cells, sort_keys=False), encoding="utf-8")
+    _duties(root, lambda duties: duties[2].update(stack="STK-1"))  # SPEC-CONST runs BPM-S
+    found = [f for f in duty_findings(root) if f.rule == "cheme.duty-arrangement"]
+    assert any(
+        f.level == "error" and "a stack of cell BPM-1; the duty runs cell BPM-S" in f.message
+        for f in found
+    ), [f.message for f in found]

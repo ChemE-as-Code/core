@@ -131,7 +131,9 @@ The cell's operating point, the arrangement and the duty are stated once:
   `--compare` run it at that stack's arrangement too. Such a duty stating `cells_in_series` or
   `stacks` other than the stack's, naming a stack that is not in the file or is of another
   cell, or being another stack's skid duty, is refused (`cheme.duty-arrangement`, error); the
-  stack's own skid inputs still come from its `equipment.duty` only;
+  stack's own skid inputs still come from its `equipment.duty` only. A skid duty that names
+  its own stack and states another `cells_in_series` or `stacks` is refused by both commands
+  (`cheme.stack-duty` and `cheme.duty-arrangement`, errors: no tank or dosing inputs);
 - one item, one size: a tag two stacks (or two roles of one skid) name is written by neither
   (`cheme.stack-tags`, error).
 
@@ -185,7 +187,7 @@ The skill `skid-design` chains the whole sequence.
 | `cheme.stack-schema` | error | a unit a quantity does not take, a duplicate stack id, a value out of its range (not above 0: product rate, voltage and current limits, rectifier current, cell pitch, replacement interval, H/D, anolyte flow, density, viscosity, reservoir pressure, a refill or emptying interval; a recovery not in (0, 1], which refuses the stack; below 0: end plates, frame margin, clearances, operating hours, a margin, the stack's pressure drop; a rectifier efficiency not in (0, 1]): the value is not used (a stated voltage or current limit refuses the stack; a rectifier efficiency leaves only the AC power out) |
 | `cheme.stack-cell` | error | the cell is missing, refused by its Faraday balance (outside the measured range among others), has no active area, does not form the product, a side reaction forms or consumes the product too (the Faradaic efficiency is the overall reaction's: name the main product), or a specified cell is outside its declared operating range: the stack is refused, never extrapolated |
 | `cheme.stack-electrical` | error | the cell voltage above the stack voltage limit, or the cell current above the stack current limit |
-| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement, names another stack (`stack:`), or an earlier stack names it (no tank and dosing inputs); info: the duty states another arrangement |
+| `cheme.stack-duty` | error / info | the duty is missing, runs another cell or another current density, is refused or not feasible at the sized arrangement, names another stack (`stack:`), names this stack and states another `cells_in_series` or `stacks`, or an earlier stack names it (no tank and dosing inputs); info: the duty states another arrangement |
 | `cheme.stack-envelope`, `stack-input-missing` | info | an envelope or equipment input is missing: that value stays TBD |
 | `cheme.stack-unsourced` | info | an assumed input without a source |
 | `cheme.stack-tags` | warning / error | fewer or more tags than stacks, or a tag not in the equipment list; error: a tag given twice (two stacks, or two roles), written by neither |

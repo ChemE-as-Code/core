@@ -1144,7 +1144,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   membrane, the initial inventories), so both balances close on their own.
   `reservoir.size: to_horizon` (optional `time_margin`) reports the exact volume that reaches
   the horizon, `V0 Q(target) / Q*`, for a duty without dosing, bleed, make-up or degassing at
-  one operating point (`required_volume`; otherwise `cheme.duty-size`, error).
+  one operating point, raised to keep a stated minimum inventory and the anolyte model's
+  validity to the target (`required_volume`, `limited_by`; otherwise `cheme.duty-size`,
+  error).
 - **Electrolyser stacks**: the optional `stacks:` section of `process/cells.yaml` (same schema,
   optional fields only) names per stack design a cell, the product duty, the electrical
   limits, the assumed envelope per cell, clearances, the replacement interval and the skid

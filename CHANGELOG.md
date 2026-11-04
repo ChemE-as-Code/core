@@ -11,7 +11,8 @@
   `cheme process duty` and `--compare` (another `cells_in_series` or `stacks` on it, or a
   stack that is not there, is refused: `cheme.duty-arrangement`, error); `reservoir.size:
   to_horizon` (with an optional `time_margin`) gives the exact volume that reaches the horizon,
-  `V0 Q(target) / Q*`, in the duty's `required_volume` and the stack's
+  `V0 Q(target) / Q*` (raised to keep a stated minimum inventory and the anolyte model's
+  validity to the target, `limited_by`), in the duty's `required_volume` and the stack's
   `reservoir_required_volume_l`, which `cheme process stack --write` writes (rounded up to 4
   significant figures) into `process/duties.yaml`, then the tanks from the duty at it; refused
   with dosing, bleed, make-up, degassing or more than one operating point (`cheme.duty-size`);
@@ -118,6 +119,9 @@
 
 ### Fixed
 
+- Electrolysis duties: a stated `minimum_inventory` above the reservoir's initial one ended
+  nothing (its event fires on a crossing only), so the duty ran on and could be reported
+  feasible; it now ends at 0 h (`cheme.duty-inventory-low`, not feasible).
 - IDAES runs: the energy audit labelled the enthalpy reference as DWSIM's
   (`energy.reference.source` "DWSIM mass enthalpy", `formation_enthalpy_included: false`, and
   DWSIM's database as the formation basis) (#125). The reference now comes from the backend

@@ -65,7 +65,8 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 - ``stack-schema`` (error): a unit a quantity does not take, a duplicate stack id, a value out
   of its range: not above 0 (the product rate, the stack voltage and current limits, the
   rectifier current, the cell pitch, the replacement interval, an H/D, the anolyte flow,
-  density and viscosity, the reservoir pressure, a refill or emptying interval), a product
+  density and viscosity, the reservoir pressure, a refill or emptying interval, also on a
+  tank the duty puts nothing into), a product
   recovery not in (0, 1] (the stack is refused), below 0 (the end plates, the frame margin,
   the clearances, the operating hours, a margin, the stack's pressure drop) or a rectifier
   efficiency not in (0, 1]. The value is not used: a stated voltage or current limit refuses
@@ -88,8 +89,10 @@ Rules (``cheme.stack-*``), each finding naming the file, line, rule and a hint:
 - ``stack-duty`` (error, the equipment inputs from the duty are not given): the duty is not in
   ``process/duties.yaml``, runs another cell than the stack's, runs the cell at another current
   density than the stack is sized at (one operating point), is refused, or is not feasible at
-  the sized arrangement over its horizon, names another stack (``stack:``), or an earlier stack
-  names the same duty (one duty runs at one arrangement); (info) the duty states another
+  the sized arrangement over its horizon, names another stack (``stack:``), names this stack
+  and states ``cells_in_series`` or ``stacks`` other than the sized ones (as ``cheme process
+  duty`` refuses it, ``cheme.duty-arrangement``), or an earlier stack names the same duty (one
+  duty runs at one arrangement); (info) the duty states another
   arrangement, replaced by the sized one (``cheme process duty`` runs it at the sized one too:
   :func:`stack_arrangements`);
 - ``stack-outdated`` (warning): an equipment-list dimension, datasheet input or a duty's
@@ -1138,7 +1141,13 @@ def _skid(
     """The equipment inputs of *stack*'s skid: the recirculation pump from the arrangement,
     and with *duties* the reservoir, dosing and bleed from its duty run at the arrangement
     (none when *shared_with*, the stack that names the same duty first)."""
-    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE, load_duties, run_duty
+    from chemeascode.domains.process.electrolysis_duty import (
+        DUTIES_FILE,
+        Arrangement,
+        _arrangement_conflict,
+        load_duties,
+        run_duty,
+    )
     from chemeascode.foundation.provenance import value_fingerprint
 
     skid = stack.equipment
@@ -1226,6 +1235,23 @@ def _skid(
         )
         _duty_tbd(stack, result, f"duty {duty.id} names stack {duty.stack}")
         return
+    if duty.stack is not None:
+        # it names this stack: another cells_in_series or stacks on it is refused, as in
+        # cheme process duty (cheme.duty-arrangement), not run at the sized arrangement
+        conflict = _arrangement_conflict(duty, Arrangement(per_stack, stacks, f"stack {sid}", sid))
+        if conflict is not None:
+            out.add(
+                "error",
+                "duty",
+                f"stack {sid}: duty {duty.id}: {conflict}: the reservoir, dosing and bleed "
+                "inputs are not given",
+                [*loc, "duty"],
+                [sid],
+                f"a duty that names its stack runs at the arrangement the stack is sized at: "
+                f"drop cells_in_series and stacks from duty {duty.id}",
+            )
+            _duty_tbd(stack, result, f"duty {duty.id}: {conflict}")
+            return
     stated = (duty.cells_in_series, duty.stacks)
     if stated != (per_stack, stacks) and stated != (None, 1):
         out.add(
@@ -1424,6 +1450,9 @@ def _skid(
                 tank, role, interval, series, campaign, duty.id, result, read, sid, out, loc
             )
         elif volume <= 0:
+            if interval is not None:  # not used, but its unit and range are still checked
+                name = _INTERVALS[role][0]
+                read.get(interval, _HOURS, f"{role} {name}", [role, name], "positive")
             entry = EquipmentInput(tank.tag, role, "dimensions", EQUIPMENT_LIST)
             reason = f"duty {duty.id} has no {what.split(' over')[0]} (0 L)"
             entry.values = {k: Sized("TBD", "m", "tbd", reason) for k in ("diameter", "height")}
@@ -1599,8 +1628,9 @@ def _reservoir_volume(
         )
     }
     entry.detail = (
-        f"reservoir.size to_horizon: the volume that reaches {need['target']} at the pH "
-        f"threshold (exact {exact:.6g} L, rounded up to {_VOLUME_DIGITS} significant figures)"
+        f"reservoir.size to_horizon: the volume that reaches {need['target']} at "
+        f"{need.get('limited_by') or 'the pH threshold'} (exact {exact:.6g} L, rounded up to "
+        f"{_VOLUME_DIGITS} significant figures)"
     )
     _finish(entry, head, fingerprint)
     return entry

@@ -137,16 +137,25 @@ fixed charge per volume `Q* / V0`. The volume is then exact:
 with `V0` the stated volume, `Q(target)` the schedule's charge up to the target and `Q*` the
 charge at the threshold: from the run when it reaches the threshold, otherwise by following the
 run's straight path in the charge (the model's speciation) to the threshold. At constant current
-it is `V0 H / t_threshold`. The run itself is at `V0`, as without `size`; the volume is in
-`required_volume` of the JSON (`volume_l`, `target_h`, `probe_volume_l`, the charges and the
-basis) and a `cheme.duty-size` info finding. `cheme process stack --write` writes it into
+it is `V0 H / t_threshold`. The threshold is not the only limit: on the same path the
+concentrations at `V` after the charge `Q` are those at `V0` after `Q V0 / V`, and the
+inventories are `V/V0 n0 - Q dn/dQ`. So the volume is raised, exactly, where the duty would
+otherwise end first or leave the model's claim before the target: to keep a stated
+`minimum_inventory` (absolute, in mol or L, so it does not scale with the volume:
+`V >= (m + Q(target) dn/dQ) V0 / n0`), and to keep the anolyte inside the anolyte model's
+validity (pH, ionic strength) up to the target. `limited_by` names the limit that sets it
+(the pH threshold, the stated minimum, the model's validity). The run itself is at `V0`, as
+without `size`; the volume is in `required_volume` of the JSON (`volume_l`, `limited_by`,
+`target_h`, `probe_volume_l`, the charges and the basis) and a `cheme.duty-size` info finding.
+A run at `V0` that ends at the stated minimum inventory gives the volume too; a stated volume
+already below the minimum at the start ends the duty at 0 h (not feasible) and gives none. `cheme process stack --write` writes it into
 `reservoir.volume` for a duty a stack's equipment names
 ([electrolyser stacks](electrolyser-stacks.md)), rounded up to 4 significant figures so that
 the duty at the written volume reaches the target. With dosing, a bleed, make-up water or
 degassing the volume does not scale exactly and `size: to_horizon` is refused
 (`cheme.duty-size`, error), as for a schedule at more than one operating point, one leaving the
-measured range before the target, or a run ended otherwise than by the threshold or the
-horizon; the duty itself still runs.
+measured range before the target, or a run ended otherwise than by the threshold, the
+horizon or the stated minimum inventory (an exhausted inventory); the duty itself still runs.
 
 ## The anolyte model `well-mixed-carbonate` v1
 
@@ -219,7 +228,7 @@ compared transients, each up to the target.
 | `cheme.duty-compare` | error | compared duties form different products |
 | `cheme.duty-target-not-reached` | warning | a compared duty ends before the target |
 | `cheme.duty-arrangement` | info / error | the duty runs at the arrangement a stack of `process/cells.yaml` is sized at, not its own; error (refused): it names a stack (`stack:`) not in the file, of another cell, whose arrangement is not given, that another stack's equipment runs, or states `cells_in_series` or `stacks` other than the stack's |
-| `cheme.duty-size` | info / error / warning | `reservoir.size: to_horizon`: the volume that reaches the horizon; error: no exact volume (dosing, bleed, make-up, degassing, more than one operating point, the measured range left, a time margin not a fraction or time); warning: a time margin without `size` |
+| `cheme.duty-size` | info / error / warning | `reservoir.size: to_horizon`: the volume that reaches the horizon, keeping the stated minimum inventory and the model's validity; error: no exact volume (dosing, bleed, make-up, degassing, more than one operating point, the measured range left, a time margin not a fraction or time); warning: a time margin without `size` |
 
 `cheme validate` reports the schema, cell and model findings without integrating: every error
 `cheme process duty` refuses a duty on before it integrates (units, ranges, the cell and its

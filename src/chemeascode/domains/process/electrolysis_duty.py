@@ -83,9 +83,10 @@ Rules (``cheme.duty-*``), each finding naming the file, line, rule and a hint:
 - ``size`` (error): ``reservoir.size: to_horizon`` on a duty with dosing, bleed, make-up water
   or degassing, a time margin that is not a fraction or time, or a duty whose volume does not
   scale exactly (more than one operating point, leaving the measured range, another end than
-  the threshold or the horizon): no volume; (info) the volume that reaches the horizon plus
-  the time margin, ``V0 Q(target) / Q*`` (:func:`_required_volume`); (warning) a time margin
-  without ``size``.
+  the threshold, the horizon or the stated minimum inventory): no volume; (info) the volume
+  that reaches the horizon plus the time margin, ``V0 Q(target) / Q*`` (:func:`_required_volume`),
+  raised where needed to keep the stated minimum inventory and the anolyte model's validity up
+  to the target (``limited_by``); (warning) a time margin without ``size``.
 
 Totals by route: besides the totals, every duty integrates the cation leaving and the carbon
 entering through the membrane and the cation and carbon leaving with the bleed (``totals``
@@ -1437,6 +1438,10 @@ def _scales(plan: _Plan, cell: DutyCell, y0: list[float], k: int) -> list[float]
     return [max(plan.rtol * 1e-3 * t, 1e-300) for t in typical]
 
 
+#: the message of a run ended by the duty's own minimum_inventory
+_STATED_MINIMUM = "the stated minimum inventory"
+
+
 @dataclass
 class _Run:
     pieces: list[_Piece]
@@ -1489,6 +1494,19 @@ def _integrate(
     if initial.ph <= plan.threshold_ph:
         events.append({"kind": "threshold", "t_h": 0.0, "ph": initial.ph})
         return _Run([], "threshold", events, [], model=model, layout=layout)
+    # below the stated minimum from the start (its event fires on a crossing only)
+    if (plan.min_volume_l is not None and y0[iv] < plan.min_volume_l) or (
+        plan.min_cation_mol is not None and y0[ic] < plan.min_cation_mol
+    ):
+        events.append(
+            {
+                "kind": "minimum-inventory",
+                "t_h": 0.0,
+                "ph": initial.ph,
+                "detail": _STATED_MINIMUM,
+            }
+        )
+        return _Run([], "minimum-inventory", events, [], _STATED_MINIMUM, model, layout)
     validity = model.validity if track_validity else None
     volume_floor = 1e-9 * plan.volume_l
 
@@ -1602,7 +1620,7 @@ def _integrate(
                         "reservoir than it held)",
                     )
                 elif hit.name == "minimum-inventory":
-                    event["detail"] = "the stated minimum inventory"
+                    event["detail"] = _STATED_MINIMUM
                 events.append(event)
                 ended = event["kind"]
                 message = event.get("detail", "")
@@ -1851,8 +1869,13 @@ def _required_volume(
     charge the same whenever the cell is on (one water dissociation efficiency and co-ion
     split), the state is ``y0 + (y - y0) Q / Q_run`` along the charge ``Q``, and the threshold
     is reached at a fixed charge per volume ``Q* / V0``: ``V = V0 Q(target) / Q*``, exact. A
-    run ended by the threshold gives ``Q*``; one that reached its horizon gives it by
-    following that straight path in the charge (the model's speciation) to the threshold."""
+    run ended by the threshold gives ``Q*``; one that reached its horizon (or the stated
+    minimum inventory) gives it by following that straight path in the charge (the model's
+    speciation) to the threshold. The volume is raised where the duty would otherwise end
+    first or leave the model's claim before the target, each exact on that path: to keep the
+    stated minimum inventory (absolute, so ``V >= (m + Q(target) dn/dQ) V0 / n0``) and the
+    anolyte model's validity (the concentrations along the path) up to the target
+    (``limited_by`` names the limit that sets it)."""
     v0 = plan.volume_l
     found: dict[str, Any] = {
         "volume_l": None,
@@ -1914,10 +1937,16 @@ def _required_volume(
                 )
         charge += (b - a) * cell.cells * 0.5 * (ends[0].current_a + ends[2].current_a)
     found["charge_target_c"] = charge
-    if run.ended not in ("threshold", "horizon"):
+    stated_minimum = run.ended == "minimum-inventory" and run.message == _STATED_MINIMUM
+    if run.ended not in ("threshold", "horizon") and not stated_minimum:
         return none(f"the run at {v0:.6g} L ended by {run.ended}, not the threshold or horizon")
     if not run.pieces:
-        return none("the initial pH is at or below the threshold: no volume reaches it later")
+        return none(
+            "the initial pH is at or below the threshold: no volume reaches it later"
+            if run.ended == "threshold"
+            else f"the stated {v0:.6g} L starts below the stated minimum inventory: state a "
+            "volume above it"
+        )
     t_end = run.pieces[-1].solution.t_final
     y_end, _ = _state_at(run, t_end)
     layout = run.layout
@@ -1941,16 +1970,92 @@ def _required_volume(
             )
         q_star = s * q_run
     found["charge_threshold_c"] = q_star
-    found["volume_l"] = v0 * charge / q_star
+    # V = f V0. At f the state after the charge Q is f p(Q / f), p(q) = y0 + q (y1 - y0) / Q_run
+    # the run's straight path: its concentrations are those of p at q = Q / f, its inventories
+    # f y0 - Q (y0 - y1) / Q_run. Every limit is a lower bound on f, so the largest is exact:
+    factor, limit = charge / q_star, f"the pH threshold {plan.threshold_ph:g}"
+    # the stated minimum inventory (absolute, not scaled with V), at the start and the target
+    for i, minimum, what in (
+        (layout.cation, plan.min_cation_mol, "cation"),
+        (layout.volume, plan.min_volume_l, "volume"),
+    ):
+        if minimum is None:
+            continue
+        if y0[i] <= 0:
+            return none(f"the stated minimum {what} inventory: the anolyte holds none")
+        need = max(minimum, minimum + charge * (y0[i] - y1[i]) / q_run) / y0[i]
+        if need > factor:
+            factor, limit = need, f"the stated minimum {what} inventory"
+    # the anolyte model's validity along the path up to the target (the concentrations)
+    exit_s = _model_exit(run.model, layout, y0, y1, charge / (factor * q_run), plan.temperature_k)
+    if exit_s is not None:
+        if exit_s <= 0:
+            return none(
+                f"the initial anolyte is outside the validity of anolyte model {run.model.id} "
+                f"({_validity_text(run.model.validity)}): no volume keeps the duty inside it"
+            )
+        factor = charge / (exit_s * q_run)
+        limit = (
+            f"the validity of anolyte model {run.model.id} ({_validity_text(run.model.validity)})"
+        )
+    found["volume_l"] = v0 * factor
+    found["limited_by"] = limit
     found["basis"] += (
         f": V0 {v0:.6g} L x Q(target) {charge:.6g} C / Q* {q_star:.6g} C, the threshold "
         + (
             f"reached at {result.time_to_threshold_h:.6g} h in the run"
             if run.ended == "threshold"
-            else f"not reached by the horizon at {v0:.6g} L (Q* along the run's charge)"
+            else f"not reached in the run at {v0:.6g} L (ended by {run.ended}; Q* along the "
+            "run's charge)"
+        )
+        + (
+            ""
+            if factor == charge / q_star
+            else f"; raised to {factor * v0:.6g} L by {limit}, reached at the target"
         )
     )
     return found
+
+
+def _model_exit(
+    model: Any,
+    layout: _Layout,
+    y0: list[float],
+    y1: list[float],
+    s_end: float,
+    temperature_k: float | None,
+    samples: int = 256,
+) -> float | None:
+    """The first s in [0, *s_end*] at which ``y0 + s (y1 - y0)`` leaves the anolyte model's
+    validity (the last s inside it, to 1e-12; 0 when the start is outside); None when the path
+    stays inside it."""
+
+    def outside(s: float) -> bool:
+        y = [a + s * (b - a) for a, b in zip(y0, y1, strict=True)]
+        if y[layout.volume] <= 0:
+            return True
+        try:
+            return bool(model.speciate(y).outside(model.validity, temperature_k))
+        except ValueError:
+            return True
+
+    if outside(0.0):
+        return 0.0
+    lo = 0.0
+    for i in range(1, samples + 1):
+        hi = s_end * i / samples
+        if outside(hi):
+            for _ in range(100):
+                mid = 0.5 * (lo + hi)
+                if outside(mid):
+                    hi = mid
+                else:
+                    lo = mid
+                if hi - lo <= 1e-12 * hi:
+                    break
+            return lo
+        lo = hi
+    return None
 
 
 def _same_point(a: tuple[Any, ...], b: tuple[Any, ...]) -> bool:
@@ -1967,7 +2072,8 @@ def _threshold_along(
     model: Any, layout: _Layout, y0: list[float], y1: list[float], ph: float
 ) -> float | None:
     """s >= 1 at which the state ``y0 + s (y1 - y0)`` reaches *ph* (the pH falling along it),
-    with every conserved inventory still positive; None when there is none."""
+    with every conserved inventory still positive; None when there is none (an inventory runs
+    out first). A doubling step past an inventory's end is bisected back, not taken as none."""
 
     def at(s: float) -> list[float]:
         return [a + s * (b - a) for a, b in zip(y0, y1, strict=True)]
@@ -1985,14 +2091,28 @@ def _threshold_along(
             return None
 
     lo, hi = 1.0, 2.0
-    while True:
-        state = above(hi)
-        if state is None:
-            return None
-        if not state:
-            break
+    state = above(hi)
+    while state:  # still above the threshold at hi: double
         lo, hi = hi, hi * 2
         if hi > 1e12:
+            return None
+        state = above(hi)
+    if state is None:
+        # hi is past an inventory's end (the inventories are linear in s, so every s in
+        # [lo, end) is valid): bisect for a point below the threshold before the end
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            state = above(mid)
+            if state is None:
+                hi = mid
+            elif state:
+                lo = mid
+            else:
+                hi = mid
+                break
+            if hi - lo <= 1e-14 * hi:
+                return None  # the inventory runs out before the threshold
+        else:
             return None
     for _ in range(200):
         mid = 0.5 * (lo + hi)
@@ -2027,8 +2147,8 @@ def _size_finding(duty: Duty, result: DutyResult, out: _Out, loc: list[Any]) -> 
     out.add(
         "info",
         "size",
-        f"duty {duty.id}: a reservoir of {volume:.6g} L reaches {found['target']} at the pH "
-        f"threshold {duty.threshold.ph:g} (stated {found['probe_volume_l']:.6g} L)",
+        f"duty {duty.id}: a reservoir of {volume:.6g} L reaches {found['target']} at "
+        f"{found['limited_by']} (stated {found['probe_volume_l']:.6g} L)",
         [*loc, "reservoir", "volume"],
         [duty.id],
         "`cheme process stack --write` writes it into reservoir.volume for the duty a stack's "
@@ -2204,7 +2324,7 @@ def _report(
         )
     if run.ended == "minimum-inventory":
         exhausted = "exhausted" in run.message
-        stated = run.message == "the stated minimum inventory"
+        stated = run.message == _STATED_MINIMUM
         out.add(
             "warning",
             "inventory-low",

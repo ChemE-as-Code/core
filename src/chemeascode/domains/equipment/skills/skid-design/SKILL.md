@@ -106,7 +106,8 @@ leave it out and the value stays TBD with the reason.
 - `cheme.stack-cell` (error) on the product: a side reaction forms it too (O2 of a CO2
   cell); size on the cell's main or measured product.
 - `cheme.stack-duty` (error): an earlier stack names the same duty. One duty runs at one
-  arrangement: give the second skid its own duty.
+  arrangement: give the second skid its own duty. Also when the skid duty names its own stack
+  (`stack:`) and states another `cells_in_series` or `stacks`: drop them from the duty.
 - `cheme.duty-size` (error): `reservoir.size: to_horizon` on a duty whose volume does not
   scale exactly (dosing, bleed, make-up, degassing, two operating points): size the reservoir
   by hand, or drop those from the duty.

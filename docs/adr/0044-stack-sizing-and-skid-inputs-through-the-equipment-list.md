@@ -142,7 +142,9 @@ does not state them:
   copied arrangement. The equipment's claim wins: a duty a stack's equipment runs that names
   another stack, a duty stating `cells_in_series` or `stacks` other than its stack's, or naming
   a stack that is not there, of another cell, or refused, is refused
-  (`cheme.duty-arrangement`, error) rather than run at either arrangement. The stack's own
+  (`cheme.duty-arrangement`, error) rather than run at either arrangement; `cheme process
+  stack` refuses a skid duty that names its own stack with another arrangement in the same
+  way (`cheme.stack-duty`, error), so the two commands agree. The stack's own
   skid inputs still come from its `equipment.duty` only. `Arrangement` carries the stack id.
 - **A reservoir sized to the horizon.** `reservoir.size: to_horizon` (optional
   `time_margin`, a fraction of the horizon or a time) on a duty asks for the volume that
@@ -150,9 +152,12 @@ does not state them:
   probing: without dosing, bleed, make-up and degassing and at one operating point (one WDE and
   co-ion split while on), the state moves along the charge, so `V = V0 Q(target) / Q*` is
   exact (ADR 0043); `Q*` comes from the run's threshold, or by following the run's straight
-  path in the charge with the model's speciation when the stated volume does not reach it. A
-  duty where it is not exact is refused that field (`cheme.duty-size`, error), not
-  approximated. `cheme process stack --write` writes the volume, rounded up to 4 significant
+  path in the charge with the model's speciation when the stated volume does not reach it.
+  The volume is raised, exactly on the same path, where the duty would otherwise stop or
+  leave the model's claim before the target: a stated `minimum_inventory` is absolute and does
+  not scale with the volume, and the anolyte model's validity holds along the path to the
+  target (`limited_by`), so the written volume is a feasible one. A duty where it is not
+  exact is refused that field (`cheme.duty-size`, error), not approximated. `cheme process stack --write` writes the volume, rounded up to 4 significant
   figures (at least 1e-6 above the exact one, so the run at it reaches the target within the
   integration's tolerance), into the duty's `reservoir.volume` in `process/duties.yaml`: a
   second, narrow writer of a hand-maintained file, in place (comments kept, the edit checked
