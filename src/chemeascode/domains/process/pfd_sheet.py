@@ -88,6 +88,10 @@ class Table:
     #: (stream id, cells top to bottom, matching *heads* after the id row)
     columns: list[tuple[str, list[str]]] = field(default_factory=list)
     note: str = ""
+    #: the caption of the id row
+    title: str = "Stream"
+    #: the energy streams' duties, a table of their own below this one
+    duties: Table | None = None
 
     @property
     def rows(self) -> int:
@@ -107,12 +111,15 @@ class Table:
 
     def size(self, width: float) -> tuple[float, float]:
         """(width, height) of the table drawn in bands no wider than *width*."""
-        if not self.columns:
-            return 0.0, 0.0
-        bands = self.bands(width)
-        widest = max(len(b) for b in bands)
-        h = len(bands) * self.rows * ROW_H + (len(bands) - 1) * 4.0 + (5.0 if self.note else 0.0)
-        return self.head_width() + widest * self.col_width(), h
+        w = h = 0.0
+        if self.columns:
+            bands = self.bands(width)
+            w = self.head_width() + max(len(b) for b in bands) * self.col_width()
+            h = len(bands) * self.rows * ROW_H + (len(bands) - 1) * 4.0
+        if self.duties is not None and self.duties.columns:
+            dw, dh = self.duties.size(width)
+            w, h = max(w, dw), h + (4.0 if h else 0.0) + dh
+        return w, h + (5.0 if self.note and h else 0.0)
 
 
 def _num(value: float) -> str:
@@ -214,22 +221,15 @@ def stream_table(process: Any, material: list[str], energy: list[str], case: str
                 _num(value) if value else ("" if f is None or f.components is None else "-")
             )
         table.columns.append((sid, cells))
-    duty_heads = 0
+    duties = Table(heads=["Duty, kW"], title="Energy stream")
     for sid in energy:
         stream = by_id[sid]
         state = stream.state.get(case)
         if state is None or state.duty is None or "duty" in stale(process, stream, case):
             continue
         kw = state.duty.value * DUTY_UNITS.get(state.duty.unit or fs.units.duty, 1.0)
-        duty_heads += 1
-        table.columns.append(
-            (sid, ["energy", "", "", "", *[""] * len(shown), f"{_num(kw)}{_mark(state.duty)}"])
-        )
-    if duty_heads:
-        table.heads.append("Duty, kW")
-        for i, (sid, cells) in enumerate(table.columns):
-            if len(cells) < len(table.heads):
-                table.columns[i] = (sid, [*cells, ""])
+        duties.columns.append((sid, [f"{_num(kw)}{_mark(state.duty)}"]))
+    table.duties = duties
     notes = [f"Case {case}, from process/flowsheet.yaml (cheme process streams)"]
     notes.append("* assumed (estimate); blank: not given or stale")
     if hidden:
@@ -239,34 +239,50 @@ def stream_table(process: Any, material: list[str], energy: list[str], case: str
 
 
 def draw_table(table: Table, x0: float, y0: float, width: float) -> list[Any]:
-    """The table's lines and texts (a ``Static`` and a ``Label``), top left at (x0, y0)."""
+    """The table's lines and texts (a ``Static`` and a ``Label``), top left at (x0, y0), the
+    duties below the streams."""
     lines: list[Any] = []
     texts: list[Any] = []
+    y = _draw_bands(table, x0, y0, width, "StreamTable", lines, texts)
+    if table.duties is not None and table.duties.columns:
+        y = _draw_bands(table.duties, x0, y, width, "DutyTable", lines, texts)
+    if table.note:
+        texts.append(_text("StreamTable_note", table.note, x0, y + 0.5, 1.8, "LEFTTOP", grey=True))
+    return [
+        C.Static(id="Drawing_StreamTable_Static", elements=lines),
+        C.Label(id="Drawing_StreamTable_Label", elements=texts),
+    ]
+
+
+def _draw_bands(
+    table: Table, x0: float, y0: float, width: float, key: str, lines: list, texts: list
+) -> float:
+    """Draw *table*'s bands from (x0, y0) into *lines* and *texts*; the y below the last."""
     hw, cw = table.head_width(), table.col_width()
     y = y0
-    for b, band in enumerate(table.bands(width)):
+    for b, band in enumerate(table.bands(width) if table.columns else []):
         rows = table.rows
         x1 = x0 + hw + len(band) * cw
         y1 = y + rows * ROW_H
         lines.append(
-            _line(f"StreamTable_{b}_frame", [(x0, y), (x1, y), (x1, y1), (x0, y1), (x0, y)], _RULE)
+            _line(f"{key}_{b}_frame", [(x0, y), (x1, y), (x1, y1), (x0, y1), (x0, y)], _RULE)
         )
-        lines.append(_line(f"StreamTable_{b}_head", [(x0, y + ROW_H), (x1, y + ROW_H)], _RULE))
+        lines.append(_line(f"{key}_{b}_head", [(x0, y + ROW_H), (x1, y + ROW_H)], _RULE))
         for r in range(2, rows):
             lines.append(
-                _line(f"StreamTable_{b}_row_{r}", [(x0, y + r * ROW_H), (x1, y + r * ROW_H)], _FINE)
+                _line(f"{key}_{b}_row_{r}", [(x0, y + r * ROW_H), (x1, y + r * ROW_H)], _FINE)
             )
-        lines.append(_line(f"StreamTable_{b}_col_0", [(x0 + hw, y), (x0 + hw, y1)], _RULE))
+        lines.append(_line(f"{key}_{b}_col_0", [(x0 + hw, y), (x0 + hw, y1)], _RULE))
         for c in range(1, len(band)):
             cx = x0 + hw + c * cw
-            lines.append(_line(f"StreamTable_{b}_col_{c}", [(cx, y), (cx, y1)], _FINE))
+            lines.append(_line(f"{key}_{b}_col_{c}", [(cx, y), (cx, y1)], _FINE))
         texts.append(
-            _text(f"StreamTable_{b}_title", "Stream", x0 + 1.5, y + ROW_H / 2, TEXT, "LEFTCENTER")
+            _text(f"{key}_{b}_title", table.title, x0 + 1.5, y + ROW_H / 2, TEXT, "LEFTCENTER")
         )
         for r, head in enumerate(table.heads, 1):
             texts.append(
                 _text(
-                    f"StreamTable_{b}_h{r}",
+                    f"{key}_{b}_h{r}",
                     head.strip(),
                     x0 + (4.0 if head.startswith(" ") else 1.5),
                     y + (r + 0.5) * ROW_H,
@@ -276,12 +292,12 @@ def draw_table(table: Table, x0: float, y0: float, width: float) -> list[Any]:
             )
         for c, (sid, cells) in enumerate(band):
             cx = x0 + hw + (c + 0.5) * cw
-            texts.append(_text(f"StreamTable_{sid}", sid, cx, y + ROW_H / 2, TEXT, "CENTERCENTER"))
+            texts.append(_text(f"{key}_{sid}", sid, cx, y + ROW_H / 2, TEXT, "CENTERCENTER"))
             for r, cell in enumerate(cells, 1):
                 if cell:
                     texts.append(
                         _text(
-                            f"StreamTable_{sid}_{r}",
+                            f"{key}_{sid}_{r}",
                             cell,
                             cx,
                             y + (r + 0.5) * ROW_H,
@@ -290,12 +306,7 @@ def draw_table(table: Table, x0: float, y0: float, width: float) -> list[Any]:
                         )
                     )
         y = y1 + 4.0
-    if table.note:
-        texts.append(_text("StreamTable_note", table.note, x0, y + 0.5, 1.8, "LEFTTOP", grey=True))
-    return [
-        C.Static(id="Drawing_StreamTable_Static", elements=lines),
-        C.Label(id="Drawing_StreamTable_Label", elements=texts),
-    ]
+    return y
 
 
 # -- the sheet ------------------------------------------------------------------------------------

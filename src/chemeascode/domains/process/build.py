@@ -656,6 +656,9 @@ def place(process: Process, view: str) -> Placed:
                 nodes.append(sized(item, kind))
     edges = [LEdge(c.stream.id, c.src[0], c.src[1], c.dst[0], c.dst[1]) for c in top]
     bounds = layout(nodes, edges, origin=(20.0, 40.0))
+    rows = _rows(bounds) if not any(p.pinned for p in overrides.values()) else 1
+    if rows > 1:
+        bounds = layout(nodes, edges, origin=(20.0, 40.0), rows=rows)
     for node in nodes:
         placed.nodes[node.id] = node
     for edge in edges:
@@ -712,6 +715,30 @@ def place(process: Process, view: str) -> Placed:
     _on_sheet(placed, fixed=any(p.pinned for p in overrides.values()))
     _place_labels(placed, process)
     return placed
+
+
+#: A top-level layout wider than this wraps into rows (:func:`_rows`), mm: an A0 sheet's
+#: drawing width.
+WRAP_WIDTH = 1130.0
+#: The width to height a wrapped layout aims at (the stream table goes below it).
+WRAP_ASPECT = 1.8
+
+
+def _rows(bounds: tuple[float, float, float, float]) -> int:
+    """How many rows a top-level layout of *bounds* (laid out in one row) is wrapped into: one
+    while it is narrower than :data:`WRAP_WIDTH`, else the count (up to four) whose estimated
+    size is closest to :data:`WRAP_ASPECT`."""
+    from chemeascode.domains.process.layout import ROW_GAP
+
+    width, height = bounds[2] - bounds[0], bounds[3] - bounds[1]
+    if width <= WRAP_WIDTH or height <= 0:
+        return 1
+
+    def size(rows: int) -> float:
+        w, h = width / rows, rows * height + (rows - 1) * ROW_GAP
+        return max(w, WRAP_ASPECT * h)
+
+    return min(range(1, 5), key=size)
 
 
 def _place_stubs(
@@ -1756,7 +1783,7 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
         )
     title = fs.title or meta.get("plant", "")
     groups += pfd_sheet.frame(sheet)
-    if placed.table is not None and placed.table.columns:
+    if placed.table is not None and placed.table.size(sheet.table_width)[1] > 0:
         groups += pfd_sheet.draw_table(placed.table, *sheet.table_at, sheet.table_width)
     groups += pfd_sheet.title_block(
         sheet,

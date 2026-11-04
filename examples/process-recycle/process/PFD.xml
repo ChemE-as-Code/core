@@ -1,4 +1,4 @@
-<!-- cheme-process {"generator_version": "6", "generator_sha256": "af2bcdb6d03f7be3cc91390afb0211b50ca8b31ea9a1a28e60bebb680c8bcb53", "schema": "cheme/process/v1", "view": "pfd", "case": "design", "source_sha256": "82444219767998906b6e4ad6627efd07b3bfeb419ba5f78759e7b254646d21cf", "output_sha256": "46907720027e0c526a6e714f9cb85f2b75e463ac82ea5da39153fe3bb1699eec"} -->
+<!-- cheme-process {"generator_version": "6", "generator_sha256": "213b5c11982064e046a649cb2c75d1baafe83e7513532ce8fbad5c34f74766cf", "schema": "cheme/process/v1", "view": "pfd", "case": "design", "source_sha256": "82444219767998906b6e4ad6627efd07b3bfeb419ba5f78759e7b254646d21cf", "output_sha256": "0d328addd6c2040246b8d88506d644bf94aacf13fde2256279a2a9aca67342cf"} -->
 <!-- Generated with pyDEXPI 2.1.0 - https://github.com/process-intelligence-research/pyDEXPI -->
 <Model name="example" uri="http://www.example.org">
   <Import prefix="Core" source="https://data.dexpi.org/models/2.0.1/Core.xml"/>
@@ -1703,7 +1703,7 @@
                           <Double>105.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>177.15</Double>
+                          <Double>173.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1711,7 +1711,7 @@
                           <Double>136.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>177.15</Double>
+                          <Double>173.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1719,7 +1719,7 @@
                           <Double>141.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>184.15</Double>
+                          <Double>180.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1727,7 +1727,7 @@
                           <Double>136.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>191.15</Double>
+                          <Double>187.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1735,7 +1735,7 @@
                           <Double>105.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>191.15</Double>
+                          <Double>187.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1743,7 +1743,7 @@
                           <Double>105.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>177.15</Double>
+                          <Double>173.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -1801,7 +1801,7 @@
                           <Double>121.2</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>181.55</Double>
+                          <Double>177.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -1841,7 +1841,7 @@
                           <Double>121.2</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>185.55</Double>
+                          <Double>181.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -1867,7 +1867,7 @@
                       <Double>141.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>184.15</Double>
+                      <Double>180.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -1905,7 +1905,7 @@
                           <Double>324.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>162.1</Double>
+                          <Double>158.0</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -1931,7 +1931,7 @@
                       <Double>324.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>162.9</Double>
+                      <Double>158.8</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -1950,7 +1950,7 @@
                           <Double>175.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>173.483</Double>
+                          <Double>169.383</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1958,7 +1958,7 @@
                           <Double>237.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>173.483</Double>
+                          <Double>169.383</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1966,7 +1966,7 @@
                           <Double>237.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>205.483</Double>
+                          <Double>201.383</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1974,7 +1974,7 @@
                           <Double>175.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>205.483</Double>
+                          <Double>201.383</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -1982,7 +1982,7 @@
                           <Double>175.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>173.483</Double>
+                          <Double>169.383</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2040,7 +2040,7 @@
                           <Double>178.2</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>178.483</Double>
+                          <Double>174.383</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2067,7 +2067,7 @@
                               <Double>213.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>189.15</Double>
+                              <Double>185.05</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2075,7 +2075,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>189.15</Double>
+                              <Double>185.05</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2110,7 +2110,7 @@
                               <Double>213.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>193.816</Double>
+                              <Double>189.716</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2118,7 +2118,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>193.816</Double>
+                              <Double>189.716</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2153,7 +2153,7 @@
                               <Double>223.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>191.483</Double>
+                              <Double>187.383</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2161,7 +2161,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>191.483</Double>
+                              <Double>187.383</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2196,7 +2196,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>189.15</Double>
+                              <Double>185.05</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2204,7 +2204,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>193.816</Double>
+                              <Double>189.716</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2239,7 +2239,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>189.15</Double>
+                              <Double>185.05</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2286,7 +2286,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>193.816</Double>
+                              <Double>189.716</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2333,7 +2333,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>191.483</Double>
+                              <Double>187.383</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2403,7 +2403,7 @@
                               <Double>218.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.55</Double>
+                              <Double>183.45</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2432,7 +2432,7 @@
                                   <Double>198.5</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>184.15</Double>
+                                  <Double>180.05</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -2440,7 +2440,7 @@
                                   <Double>198.5</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>189.15</Double>
+                                  <Double>185.05</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -2486,7 +2486,7 @@
                                   <Double>194.7</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>194.816</Double>
+                                  <Double>190.716</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -2494,7 +2494,7 @@
                                   <Double>194.7</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>193.816</Double>
+                                  <Double>189.716</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -2540,7 +2540,7 @@
                                   <Double>234.2</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>191.483</Double>
+                                  <Double>187.383</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -2548,7 +2548,7 @@
                                   <Double>234.2</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>189.483</Double>
+                                  <Double>185.383</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -2591,7 +2591,7 @@
                           <Double>213.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>189.15</Double>
+                          <Double>185.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2604,7 +2604,7 @@
                           <Double>213.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>193.816</Double>
+                          <Double>189.716</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2617,7 +2617,7 @@
                           <Double>223.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>191.483</Double>
+                          <Double>187.383</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2635,7 +2635,7 @@
                       <Double>175.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>184.15</Double>
+                      <Double>180.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -2648,7 +2648,7 @@
                       <Double>237.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>189.483</Double>
+                      <Double>185.383</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -2661,7 +2661,7 @@
                       <Double>175.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>194.816</Double>
+                      <Double>190.716</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -2680,7 +2680,7 @@
                           <Double>271.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>148.9</Double>
+                          <Double>144.8</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -2688,7 +2688,7 @@
                           <Double>428.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>148.9</Double>
+                          <Double>144.8</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -2696,7 +2696,7 @@
                           <Double>428.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>219.4</Double>
+                          <Double>215.3</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -2704,7 +2704,7 @@
                           <Double>271.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>219.4</Double>
+                          <Double>215.3</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -2712,7 +2712,7 @@
                           <Double>271.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>148.9</Double>
+                          <Double>144.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2770,7 +2770,7 @@
                           <Double>274.2</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>153.9</Double>
+                          <Double>149.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -2797,7 +2797,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>178.3</Double>
+                              <Double>174.2</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2805,7 +2805,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>178.3</Double>
+                              <Double>174.2</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2840,7 +2840,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>181.5</Double>
+                              <Double>177.4</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2848,7 +2848,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>181.5</Double>
+                              <Double>177.4</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2883,7 +2883,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>184.7</Double>
+                              <Double>180.6</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2891,7 +2891,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>184.7</Double>
+                              <Double>180.6</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2926,7 +2926,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.906</Double>
+                              <Double>183.806</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2934,7 +2934,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.906</Double>
+                              <Double>183.806</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -2969,7 +2969,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>191.106</Double>
+                              <Double>187.006</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -2977,7 +2977,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>191.106</Double>
+                              <Double>187.006</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -3012,7 +3012,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>194.306</Double>
+                              <Double>190.206</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3020,7 +3020,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>194.306</Double>
+                              <Double>190.206</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -3055,7 +3055,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>197.506</Double>
+                              <Double>193.406</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3063,7 +3063,7 @@
                               <Double>331.106</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>197.506</Double>
+                              <Double>193.406</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -3098,7 +3098,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.1</Double>
+                              <Double>171.0</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3106,7 +3106,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.1</Double>
+                              <Double>171.0</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3114,7 +3114,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.706</Double>
+                              <Double>196.606</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3122,7 +3122,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.706</Double>
+                              <Double>196.606</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3130,7 +3130,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.1</Double>
+                              <Double>171.0</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -3165,7 +3165,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.7</Double>
+                              <Double>196.6</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3173,7 +3173,7 @@
                               <Double>331.094</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.866</Double>
+                              <Double>196.766</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3181,7 +3181,7 @@
                               <Double>331.068</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.033</Double>
+                              <Double>196.933</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3189,7 +3189,7 @@
                               <Double>331.023</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.199</Double>
+                              <Double>197.099</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3197,7 +3197,7 @@
                               <Double>330.959</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.366</Double>
+                              <Double>197.266</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3205,7 +3205,7 @@
                               <Double>330.882</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.526</Double>
+                              <Double>197.426</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3213,7 +3213,7 @@
                               <Double>330.786</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.692</Double>
+                              <Double>197.592</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3221,7 +3221,7 @@
                               <Double>330.678</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.846</Double>
+                              <Double>197.746</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3229,7 +3229,7 @@
                               <Double>330.55</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.999</Double>
+                              <Double>197.899</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3237,7 +3237,7 @@
                               <Double>330.402</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.153</Double>
+                              <Double>198.053</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3245,7 +3245,7 @@
                               <Double>330.242</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.3</Double>
+                              <Double>198.2</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3253,7 +3253,7 @@
                               <Double>330.07</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.441</Double>
+                              <Double>198.341</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3261,7 +3261,7 @@
                               <Double>329.878</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.582</Double>
+                              <Double>198.482</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3269,7 +3269,7 @@
                               <Double>329.673</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.716</Double>
+                              <Double>198.616</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3277,7 +3277,7 @@
                               <Double>329.455</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.844</Double>
+                              <Double>198.744</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3285,7 +3285,7 @@
                               <Double>329.225</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.966</Double>
+                              <Double>198.866</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3293,7 +3293,7 @@
                               <Double>328.982</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.081</Double>
+                              <Double>198.981</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3301,7 +3301,7 @@
                               <Double>328.726</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.19</Double>
+                              <Double>199.09</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3309,7 +3309,7 @@
                               <Double>328.463</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.292</Double>
+                              <Double>199.192</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3317,7 +3317,7 @@
                               <Double>328.182</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.382</Double>
+                              <Double>199.282</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3325,7 +3325,7 @@
                               <Double>327.9</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.471</Double>
+                              <Double>199.371</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3333,7 +3333,7 @@
                               <Double>327.606</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.554</Double>
+                              <Double>199.454</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3341,7 +3341,7 @@
                               <Double>327.298</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.625</Double>
+                              <Double>199.525</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3349,7 +3349,7 @@
                               <Double>326.991</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.689</Double>
+                              <Double>199.589</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3357,7 +3357,7 @@
                               <Double>326.678</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.746</Double>
+                              <Double>199.646</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3365,7 +3365,7 @@
                               <Double>326.351</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.791</Double>
+                              <Double>199.691</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3373,7 +3373,7 @@
                               <Double>326.031</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.83</Double>
+                              <Double>199.73</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3381,7 +3381,7 @@
                               <Double>325.698</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.862</Double>
+                              <Double>199.762</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3389,7 +3389,7 @@
                               <Double>325.366</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.881</Double>
+                              <Double>199.781</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3397,7 +3397,7 @@
                               <Double>325.033</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.894</Double>
+                              <Double>199.794</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3405,7 +3405,7 @@
                               <Double>324.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.9</Double>
+                              <Double>199.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3413,7 +3413,7 @@
                               <Double>324.361</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.894</Double>
+                              <Double>199.794</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3421,7 +3421,7 @@
                               <Double>324.028</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.881</Double>
+                              <Double>199.781</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3429,7 +3429,7 @@
                               <Double>323.695</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.862</Double>
+                              <Double>199.762</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3437,7 +3437,7 @@
                               <Double>323.362</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.83</Double>
+                              <Double>199.73</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3445,7 +3445,7 @@
                               <Double>323.042</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.791</Double>
+                              <Double>199.691</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3453,7 +3453,7 @@
                               <Double>322.716</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.746</Double>
+                              <Double>199.646</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3461,7 +3461,7 @@
                               <Double>322.402</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.689</Double>
+                              <Double>199.589</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3469,7 +3469,7 @@
                               <Double>322.095</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.625</Double>
+                              <Double>199.525</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3477,7 +3477,7 @@
                               <Double>321.788</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.554</Double>
+                              <Double>199.454</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3485,7 +3485,7 @@
                               <Double>321.494</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.471</Double>
+                              <Double>199.371</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3493,7 +3493,7 @@
                               <Double>321.212</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.382</Double>
+                              <Double>199.282</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3501,7 +3501,7 @@
                               <Double>320.93</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.292</Double>
+                              <Double>199.192</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3509,7 +3509,7 @@
                               <Double>320.668</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.19</Double>
+                              <Double>199.09</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3517,7 +3517,7 @@
                               <Double>320.412</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>203.081</Double>
+                              <Double>198.981</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3525,7 +3525,7 @@
                               <Double>320.169</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.966</Double>
+                              <Double>198.866</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3533,7 +3533,7 @@
                               <Double>319.938</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.844</Double>
+                              <Double>198.744</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3541,7 +3541,7 @@
                               <Double>319.721</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.716</Double>
+                              <Double>198.616</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3549,7 +3549,7 @@
                               <Double>319.516</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.582</Double>
+                              <Double>198.482</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3557,7 +3557,7 @@
                               <Double>319.324</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.441</Double>
+                              <Double>198.341</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3565,7 +3565,7 @@
                               <Double>319.151</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.3</Double>
+                              <Double>198.2</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3573,7 +3573,7 @@
                               <Double>318.991</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>202.153</Double>
+                              <Double>198.053</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3581,7 +3581,7 @@
                               <Double>318.844</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.999</Double>
+                              <Double>197.899</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3589,7 +3589,7 @@
                               <Double>318.716</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.846</Double>
+                              <Double>197.746</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3597,7 +3597,7 @@
                               <Double>318.607</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.692</Double>
+                              <Double>197.592</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3605,7 +3605,7 @@
                               <Double>318.511</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.526</Double>
+                              <Double>197.426</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3613,7 +3613,7 @@
                               <Double>318.434</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.366</Double>
+                              <Double>197.266</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3621,7 +3621,7 @@
                               <Double>318.37</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.199</Double>
+                              <Double>197.099</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3629,7 +3629,7 @@
                               <Double>318.326</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>201.033</Double>
+                              <Double>196.933</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3637,7 +3637,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.866</Double>
+                              <Double>196.766</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3645,7 +3645,7 @@
                               <Double>318.294</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>200.7</Double>
+                              <Double>196.6</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -3680,7 +3680,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.1</Double>
+                              <Double>171.0</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3688,7 +3688,7 @@
                               <Double>331.094</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.934</Double>
+                              <Double>170.834</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3696,7 +3696,7 @@
                               <Double>331.068</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.767</Double>
+                              <Double>170.667</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3704,7 +3704,7 @@
                               <Double>331.023</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.601</Double>
+                              <Double>170.501</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3712,7 +3712,7 @@
                               <Double>330.959</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.434</Double>
+                              <Double>170.334</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3720,7 +3720,7 @@
                               <Double>330.882</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.274</Double>
+                              <Double>170.174</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3728,7 +3728,7 @@
                               <Double>330.786</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.108</Double>
+                              <Double>170.008</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3736,7 +3736,7 @@
                               <Double>330.678</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.954</Double>
+                              <Double>169.854</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3744,7 +3744,7 @@
                               <Double>330.55</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.801</Double>
+                              <Double>169.701</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3752,7 +3752,7 @@
                               <Double>330.402</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.647</Double>
+                              <Double>169.547</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3760,7 +3760,7 @@
                               <Double>330.242</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.5</Double>
+                              <Double>169.4</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3768,7 +3768,7 @@
                               <Double>330.07</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.359</Double>
+                              <Double>169.259</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3776,7 +3776,7 @@
                               <Double>329.878</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.218</Double>
+                              <Double>169.118</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3784,7 +3784,7 @@
                               <Double>329.673</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.084</Double>
+                              <Double>168.984</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3792,7 +3792,7 @@
                               <Double>329.455</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.956</Double>
+                              <Double>168.856</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3800,7 +3800,7 @@
                               <Double>329.225</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.834</Double>
+                              <Double>168.734</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3808,7 +3808,7 @@
                               <Double>328.982</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.719</Double>
+                              <Double>168.619</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3816,7 +3816,7 @@
                               <Double>328.726</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.61</Double>
+                              <Double>168.51</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3824,7 +3824,7 @@
                               <Double>328.463</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.508</Double>
+                              <Double>168.408</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3832,7 +3832,7 @@
                               <Double>328.182</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.418</Double>
+                              <Double>168.318</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3840,7 +3840,7 @@
                               <Double>327.9</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.329</Double>
+                              <Double>168.229</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3848,7 +3848,7 @@
                               <Double>327.606</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.246</Double>
+                              <Double>168.146</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3856,7 +3856,7 @@
                               <Double>327.298</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.175</Double>
+                              <Double>168.075</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3864,7 +3864,7 @@
                               <Double>326.991</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.111</Double>
+                              <Double>168.011</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3872,7 +3872,7 @@
                               <Double>326.678</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.054</Double>
+                              <Double>167.954</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3880,7 +3880,7 @@
                               <Double>326.351</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.009</Double>
+                              <Double>167.909</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3888,7 +3888,7 @@
                               <Double>326.031</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.97</Double>
+                              <Double>167.87</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3896,7 +3896,7 @@
                               <Double>325.698</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.938</Double>
+                              <Double>167.838</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3904,7 +3904,7 @@
                               <Double>325.366</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.919</Double>
+                              <Double>167.819</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3912,7 +3912,7 @@
                               <Double>325.033</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.906</Double>
+                              <Double>167.806</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3920,7 +3920,7 @@
                               <Double>324.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.9</Double>
+                              <Double>167.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3928,7 +3928,7 @@
                               <Double>324.361</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.906</Double>
+                              <Double>167.806</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3936,7 +3936,7 @@
                               <Double>324.028</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.919</Double>
+                              <Double>167.819</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3944,7 +3944,7 @@
                               <Double>323.695</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.938</Double>
+                              <Double>167.838</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3952,7 +3952,7 @@
                               <Double>323.362</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>171.97</Double>
+                              <Double>167.87</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3960,7 +3960,7 @@
                               <Double>323.042</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.009</Double>
+                              <Double>167.909</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3968,7 +3968,7 @@
                               <Double>322.716</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.054</Double>
+                              <Double>167.954</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3976,7 +3976,7 @@
                               <Double>322.402</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.111</Double>
+                              <Double>168.011</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3984,7 +3984,7 @@
                               <Double>322.095</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.175</Double>
+                              <Double>168.075</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -3992,7 +3992,7 @@
                               <Double>321.788</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.246</Double>
+                              <Double>168.146</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4000,7 +4000,7 @@
                               <Double>321.494</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.329</Double>
+                              <Double>168.229</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4008,7 +4008,7 @@
                               <Double>321.212</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.418</Double>
+                              <Double>168.318</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4016,7 +4016,7 @@
                               <Double>320.93</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.508</Double>
+                              <Double>168.408</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4024,7 +4024,7 @@
                               <Double>320.668</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.61</Double>
+                              <Double>168.51</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4032,7 +4032,7 @@
                               <Double>320.412</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.719</Double>
+                              <Double>168.619</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4040,7 +4040,7 @@
                               <Double>320.169</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.834</Double>
+                              <Double>168.734</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4048,7 +4048,7 @@
                               <Double>319.938</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>172.956</Double>
+                              <Double>168.856</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4056,7 +4056,7 @@
                               <Double>319.721</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.084</Double>
+                              <Double>168.984</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4064,7 +4064,7 @@
                               <Double>319.516</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.218</Double>
+                              <Double>169.118</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4072,7 +4072,7 @@
                               <Double>319.324</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.359</Double>
+                              <Double>169.259</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4080,7 +4080,7 @@
                               <Double>319.151</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.5</Double>
+                              <Double>169.4</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4088,7 +4088,7 @@
                               <Double>318.991</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.647</Double>
+                              <Double>169.547</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4096,7 +4096,7 @@
                               <Double>318.844</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.801</Double>
+                              <Double>169.701</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4104,7 +4104,7 @@
                               <Double>318.716</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>173.954</Double>
+                              <Double>169.854</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4112,7 +4112,7 @@
                               <Double>318.607</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.108</Double>
+                              <Double>170.008</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4120,7 +4120,7 @@
                               <Double>318.511</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.274</Double>
+                              <Double>170.174</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4128,7 +4128,7 @@
                               <Double>318.434</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.434</Double>
+                              <Double>170.334</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4136,7 +4136,7 @@
                               <Double>318.37</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.601</Double>
+                              <Double>170.501</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4144,7 +4144,7 @@
                               <Double>318.326</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.767</Double>
+                              <Double>170.667</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4152,7 +4152,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>174.934</Double>
+                              <Double>170.834</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4160,7 +4160,7 @@
                               <Double>318.294</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.1</Double>
+                              <Double>171.0</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4199,7 +4199,7 @@
                               <Double>309.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.9</Double>
+                              <Double>183.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4207,7 +4207,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.9</Double>
+                              <Double>183.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4245,7 +4245,7 @@
                               <Double>318.3</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.9</Double>
+                              <Double>183.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4253,7 +4253,7 @@
                               <Double>315.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>188.75</Double>
+                              <Double>184.65</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4261,7 +4261,7 @@
                               <Double>315.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.05</Double>
+                              <Double>182.95</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4296,7 +4296,7 @@
                               <Double>339.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4304,7 +4304,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4339,7 +4339,7 @@
                               <Double>339.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.9</Double>
+                              <Double>183.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4347,7 +4347,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>187.9</Double>
+                              <Double>183.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4382,7 +4382,7 @@
                               <Double>339.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>195.9</Double>
+                              <Double>191.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4390,7 +4390,7 @@
                               <Double>331.1</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>195.9</Double>
+                              <Double>191.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4448,7 +4448,7 @@
                               <Double>324.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>206.7</Double>
+                              <Double>202.6</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4488,7 +4488,7 @@
                               <Double>324.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>210.1</Double>
+                              <Double>206.0</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4517,7 +4517,7 @@
                                   <Double>294.5</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>184.15</Double>
+                                  <Double>180.05</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4525,7 +4525,7 @@
                                   <Double>294.5</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>187.9</Double>
+                                  <Double>183.8</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -4571,7 +4571,7 @@
                                   <Double>360.271</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>187.9</Double>
+                                  <Double>183.8</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4579,7 +4579,7 @@
                                   <Double>360.271</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>200.4</Double>
+                                  <Double>196.3</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4587,7 +4587,7 @@
                                   <Double>424.43</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>200.4</Double>
+                                  <Double>196.3</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4595,7 +4595,7 @@
                                   <Double>424.43</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>184.15</Double>
+                                  <Double>180.05</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -4641,7 +4641,7 @@
                                   <Double>356.843</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>195.9</Double>
+                                  <Double>191.8</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4649,7 +4649,7 @@
                                   <Double>356.843</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>201.775</Double>
+                                  <Double>197.675</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -4723,7 +4723,7 @@
                                   <Double>324.7</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>171.9</Double>
+                                  <Double>167.8</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4731,7 +4731,7 @@
                                   <Double>323.85</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>169.3</Double>
+                                  <Double>165.2</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -4739,7 +4739,7 @@
                                   <Double>325.55</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>169.3</Double>
+                                  <Double>165.2</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -4782,7 +4782,7 @@
                           <Double>339.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>179.9</Double>
+                          <Double>175.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -4795,7 +4795,7 @@
                           <Double>309.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>187.9</Double>
+                          <Double>183.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -4808,7 +4808,7 @@
                           <Double>324.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>171.9</Double>
+                          <Double>167.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -4821,7 +4821,7 @@
                           <Double>339.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>187.9</Double>
+                          <Double>183.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -4834,7 +4834,7 @@
                           <Double>339.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>195.9</Double>
+                          <Double>191.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -4853,7 +4853,7 @@
                               <Double>377.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4900,7 +4900,7 @@
                               <Double>387.696</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.906</Double>
+                              <Double>171.806</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4908,7 +4908,7 @@
                               <Double>373.699</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.906</Double>
+                              <Double>171.806</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4943,7 +4943,7 @@
                               <Double>373.699</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>175.906</Double>
+                              <Double>171.806</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4951,7 +4951,7 @@
                               <Double>377.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -4986,7 +4986,7 @@
                               <Double>377.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -4994,7 +4994,7 @@
                               <Double>373.699</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>183.894</Double>
+                              <Double>179.794</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5029,7 +5029,7 @@
                               <Double>373.699</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>183.894</Double>
+                              <Double>179.794</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -5037,7 +5037,7 @@
                               <Double>387.696</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>183.894</Double>
+                              <Double>179.794</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5076,7 +5076,7 @@
                               <Double>363.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -5084,7 +5084,7 @@
                               <Double>369.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5122,7 +5122,7 @@
                               <Double>369.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -5130,7 +5130,7 @@
                               <Double>367.104</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>180.75</Double>
+                              <Double>176.65</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -5138,7 +5138,7 @@
                               <Double>367.104</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.05</Double>
+                              <Double>174.95</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5173,7 +5173,7 @@
                               <Double>393.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                           <AggregatedDataValue type="Core/Diagram.Point">
@@ -5181,7 +5181,7 @@
                               <Double>385.704</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>179.9</Double>
+                              <Double>175.8</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5239,7 +5239,7 @@
                               <Double>378.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>190.7</Double>
+                              <Double>186.6</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5279,7 +5279,7 @@
                               <Double>378.7</Double>
                             </Data>
                             <Data property="Y">
-                              <Double>194.1</Double>
+                              <Double>190.0</Double>
                             </Data>
                           </AggregatedDataValue>
                         </Data>
@@ -5308,7 +5308,7 @@
                                   <Double>424.43</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>179.9</Double>
+                                  <Double>175.8</Double>
                                 </Data>
                               </AggregatedDataValue>
                               <AggregatedDataValue type="Core/Diagram.Point">
@@ -5316,7 +5316,7 @@
                                   <Double>424.43</Double>
                                 </Data>
                                 <Data property="Y">
-                                  <Double>166.525</Double>
+                                  <Double>162.425</Double>
                                 </Data>
                               </AggregatedDataValue>
                             </Data>
@@ -5359,7 +5359,7 @@
                           <Double>363.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>179.9</Double>
+                          <Double>175.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5372,7 +5372,7 @@
                           <Double>393.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>179.9</Double>
+                          <Double>175.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5390,7 +5390,7 @@
                       <Double>271.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>184.15</Double>
+                      <Double>180.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5403,7 +5403,7 @@
                       <Double>428.271</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>166.525</Double>
+                      <Double>162.425</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5416,7 +5416,7 @@
                       <Double>428.271</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>184.15</Double>
+                      <Double>180.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5429,7 +5429,7 @@
                       <Double>428.271</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>201.775</Double>
+                      <Double>197.675</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5442,7 +5442,7 @@
                       <Double>324.7</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>167.4</Double>
+                      <Double>163.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5461,7 +5461,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>159.15</Double>
+                          <Double>155.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5469,7 +5469,7 @@
                           <Double>493.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>159.15</Double>
+                          <Double>155.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5477,7 +5477,7 @@
                           <Double>498.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>166.15</Double>
+                          <Double>162.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5485,7 +5485,7 @@
                           <Double>493.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>173.15</Double>
+                          <Double>169.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5493,7 +5493,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>173.15</Double>
+                          <Double>169.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5501,7 +5501,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>159.15</Double>
+                          <Double>155.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5559,7 +5559,7 @@
                           <Double>477.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>163.55</Double>
+                          <Double>159.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5599,7 +5599,7 @@
                           <Double>477.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>167.55</Double>
+                          <Double>163.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5625,7 +5625,7 @@
                       <Double>462.271</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>166.15</Double>
+                      <Double>162.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5644,7 +5644,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>195.15</Double>
+                          <Double>191.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5652,7 +5652,7 @@
                           <Double>493.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>195.15</Double>
+                          <Double>191.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5660,7 +5660,7 @@
                           <Double>498.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>202.15</Double>
+                          <Double>198.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5668,7 +5668,7 @@
                           <Double>493.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>209.15</Double>
+                          <Double>205.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5676,7 +5676,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>209.15</Double>
+                          <Double>205.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5684,7 +5684,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>195.15</Double>
+                          <Double>191.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5742,7 +5742,7 @@
                           <Double>477.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>199.55</Double>
+                          <Double>195.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5782,7 +5782,7 @@
                           <Double>477.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>203.55</Double>
+                          <Double>199.45</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5808,7 +5808,7 @@
                       <Double>462.271</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>202.15</Double>
+                      <Double>198.05</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -5877,7 +5877,7 @@
                           <Double>158.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>183.15</Double>
+                          <Double>179.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5909,7 +5909,7 @@
                           <Double>254.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>189.483</Double>
+                          <Double>185.383</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -5917,7 +5917,7 @@
                           <Double>254.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>184.15</Double>
+                          <Double>180.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -5975,7 +5975,7 @@
                           <Double>246.2</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>188.483</Double>
+                          <Double>184.383</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6007,7 +6007,7 @@
                           <Double>445.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>166.525</Double>
+                          <Double>162.425</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6015,7 +6015,7 @@
                           <Double>445.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>166.15</Double>
+                          <Double>162.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6053,7 +6053,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>166.15</Double>
+                          <Double>162.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6061,7 +6061,7 @@
                           <Double>459.671</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>167.0</Double>
+                          <Double>162.9</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6069,7 +6069,7 @@
                           <Double>459.671</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>165.3</Double>
+                          <Double>161.2</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6127,7 +6127,7 @@
                           <Double>436.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>165.525</Double>
+                          <Double>161.425</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6159,7 +6159,7 @@
                           <Double>436.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>184.15</Double>
+                          <Double>180.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6167,7 +6167,7 @@
                           <Double>436.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>225.4</Double>
+                          <Double>221.3</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6175,7 +6175,7 @@
                           <Double>164.367</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>225.4</Double>
+                          <Double>221.3</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6183,7 +6183,7 @@
                           <Double>164.367</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>194.816</Double>
+                          <Double>190.716</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6241,7 +6241,7 @@
                           <Double>300.569</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>224.4</Double>
+                          <Double>220.3</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6273,7 +6273,7 @@
                           <Double>453.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>201.775</Double>
+                          <Double>197.675</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6281,7 +6281,7 @@
                           <Double>453.771</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>202.15</Double>
+                          <Double>198.05</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6319,7 +6319,7 @@
                           <Double>462.271</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>202.15</Double>
+                          <Double>198.05</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6327,7 +6327,7 @@
                           <Double>459.671</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>203.0</Double>
+                          <Double>198.9</Double>
                         </Data>
                       </AggregatedDataValue>
                       <AggregatedDataValue type="Core/Diagram.Point">
@@ -6335,7 +6335,7 @@
                           <Double>459.671</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>201.3</Double>
+                          <Double>197.2</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6393,7 +6393,7 @@
                           <Double>441.021</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>200.775</Double>
+                          <Double>196.675</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6473,7 +6473,7 @@
                           <Double>326.932</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>168.5</Double>
+                          <Double>164.4</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -6553,7 +6553,7 @@
                           <Double>351.7</Double>
                         </Data>
                         <Data property="Y">
-                          <Double>178.9</Double>
+                          <Double>174.8</Double>
                         </Data>
                       </AggregatedDataValue>
                     </Data>
@@ -8144,31 +8144,23 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>366.4</Double>
+                      <Double>358.2</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>366.4</Double>
+                      <Double>358.2</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>30.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
+                      <Double>387.6</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
@@ -8176,7 +8168,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>366.4</Double>
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>30.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8211,15 +8211,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>370.6</Double>
+                      <Double>362.4</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>370.6</Double>
+                      <Double>362.4</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8254,15 +8254,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>374.8</Double>
+                      <Double>366.6</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>374.8</Double>
+                      <Double>366.6</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8297,15 +8297,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>379.0</Double>
+                      <Double>370.8</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>379.0</Double>
+                      <Double>370.8</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8340,15 +8340,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>383.2</Double>
+                      <Double>375.0</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>383.2</Double>
+                      <Double>375.0</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8383,15 +8383,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>387.4</Double>
+                      <Double>379.2</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>387.4</Double>
+                      <Double>379.2</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8426,58 +8426,15 @@
                       <Double>30.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>391.6</Double>
+                      <Double>383.4</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>179.0</Double>
+                      <Double>164.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>391.6</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_row_7" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>30.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>395.8</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>179.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>395.8</Double>
+                      <Double>383.4</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8512,7 +8469,375 @@
                       <Double>74.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>366.4</Double>
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>74.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>0</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.25</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="StreamTable_0_col_1" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>89.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>89.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>110</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.18</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="StreamTable_0_col_2" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>104.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>104.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>110</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.18</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="StreamTable_0_col_3" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>119.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>119.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>110</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.18</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="StreamTable_0_col_4" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>134.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>134.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>110</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.18</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="StreamTable_0_col_5" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>149.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>358.2</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>149.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>387.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>110</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>110</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.18</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="DutyTable_0_frame" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>30.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>391.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>89.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>391.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>89.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>400.0</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>30.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>400.0</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>30.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>391.6</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>0</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.25</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="DutyTable_0_head" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>30.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>395.8</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>89.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>395.8</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Stroke">
+                  <AggregatedDataValue type="Core/Diagram.Stroke">
+                    <Data property="Color">
+                      <AggregatedDataValue type="Core/Diagram.Color">
+                        <Data property="B">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="G">
+                          <Integer>0</Integer>
+                        </Data>
+                        <Data property="R">
+                          <Integer>0</Integer>
+                        </Data>
+                      </AggregatedDataValue>
+                    </Data>
+                    <Data property="DashStyle">
+                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
+                    </Data>
+                    <Data property="Width">
+                      <Double>0.25</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+              </Object>
+              <Object id="DutyTable_0_col_0" type="Core/Diagram.PolyLine">
+                <Data property="Points">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>74.0</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>391.6</Double>
                     </Data>
                   </AggregatedDataValue>
                   <AggregatedDataValue type="Core/Diagram.Point">
@@ -8548,264 +8873,6 @@
                   </AggregatedDataValue>
                 </Data>
               </Object>
-              <Object id="StreamTable_0_col_1" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>89.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>89.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_col_2" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>104.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>104.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_col_3" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>119.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>119.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_col_4" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>134.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>134.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_col_5" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>149.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>149.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_col_6" type="Core/Diagram.PolyLine">
-                <Data property="Points">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>164.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>366.4</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>164.0</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>400.0</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Stroke">
-                  <AggregatedDataValue type="Core/Diagram.Stroke">
-                    <Data property="Color">
-                      <AggregatedDataValue type="Core/Diagram.Color">
-                        <Data property="B">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="G">
-                          <Integer>110</Integer>
-                        </Data>
-                        <Data property="R">
-                          <Integer>110</Integer>
-                        </Data>
-                      </AggregatedDataValue>
-                    </Data>
-                    <Data property="DashStyle">
-                      <DataReference data="Core/Diagram.DashStyle.Solid"/>
-                    </Data>
-                    <Data property="Width">
-                      <Double>0.18</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-              </Object>
             </Components>
           </Object>
           <Object id="Drawing_StreamTable_Label" type="Core/Diagram.Label">
@@ -8836,7 +8903,7 @@
                       <Double>31.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8876,7 +8943,7 @@
                       <Double>31.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>372.7</Double>
+                      <Double>364.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8916,7 +8983,7 @@
                       <Double>31.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>376.9</Double>
+                      <Double>368.7</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8956,7 +9023,7 @@
                       <Double>31.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>381.1</Double>
+                      <Double>372.9</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -8996,7 +9063,7 @@
                       <Double>31.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9036,7 +9103,7 @@
                       <Double>34.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9076,7 +9143,7 @@
                       <Double>34.0</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9088,46 +9155,6 @@
                 </Data>
                 <Data property="Text">
                   <String>Ethanol, kg/h</String>
-                </Data>
-              </Object>
-              <Object id="StreamTable_0_h7" type="Core/Diagram.Text">
-                <Data property="Alignment">
-                  <DataReference data="Core/Diagram.TextAlignment.LeftCenter"/>
-                </Data>
-                <Data property="Color">
-                  <AggregatedDataValue type="Core/Diagram.Color">
-                    <Data property="B">
-                      <Integer>0</Integer>
-                    </Data>
-                    <Data property="G">
-                      <Integer>0</Integer>
-                    </Data>
-                    <Data property="R">
-                      <Integer>0</Integer>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Font">
-                  <String>Arial</String>
-                </Data>
-                <Data property="Position">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>31.5</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>397.9</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Rotation">
-                  <Double>0.0</Double>
-                </Data>
-                <Data property="Size">
-                  <Double>2.0</Double>
-                </Data>
-                <Data property="Text">
-                  <String>Duty, kW</String>
                 </Data>
               </Object>
               <Object id="StreamTable_S1" type="Core/Diagram.Text">
@@ -9156,7 +9183,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9196,7 +9223,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>376.9</Double>
+                      <Double>368.7</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9236,7 +9263,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>381.1</Double>
+                      <Double>372.9</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9276,7 +9303,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9316,7 +9343,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9356,7 +9383,7 @@
                       <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9396,7 +9423,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9436,7 +9463,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>376.9</Double>
+                      <Double>368.7</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9476,7 +9503,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>381.1</Double>
+                      <Double>372.9</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9516,7 +9543,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9556,7 +9583,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9596,7 +9623,7 @@
                       <Double>96.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9636,7 +9663,7 @@
                       <Double>111.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9676,7 +9703,7 @@
                       <Double>111.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>381.1</Double>
+                      <Double>372.9</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9716,7 +9743,7 @@
                       <Double>111.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9756,7 +9783,7 @@
                       <Double>111.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9796,7 +9823,7 @@
                       <Double>111.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9836,7 +9863,7 @@
                       <Double>126.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9876,7 +9903,7 @@
                       <Double>126.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9916,7 +9943,7 @@
                       <Double>126.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9956,7 +9983,7 @@
                       <Double>126.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -9996,7 +10023,7 @@
                       <Double>141.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10036,7 +10063,7 @@
                       <Double>141.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10076,7 +10103,7 @@
                       <Double>141.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10116,7 +10143,7 @@
                       <Double>141.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10156,7 +10183,7 @@
                       <Double>156.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>360.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10196,7 +10223,7 @@
                       <Double>156.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>372.7</Double>
+                      <Double>364.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10236,7 +10263,7 @@
                       <Double>156.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>385.3</Double>
+                      <Double>377.1</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10276,7 +10303,7 @@
                       <Double>156.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>389.5</Double>
+                      <Double>381.3</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10316,7 +10343,7 @@
                       <Double>156.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>393.7</Double>
+                      <Double>385.5</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10330,7 +10357,87 @@
                   <String>380</String>
                 </Data>
               </Object>
-              <Object id="StreamTable_Q1" type="Core/Diagram.Text">
+              <Object id="DutyTable_0_title" type="Core/Diagram.Text">
+                <Data property="Alignment">
+                  <DataReference data="Core/Diagram.TextAlignment.LeftCenter"/>
+                </Data>
+                <Data property="Color">
+                  <AggregatedDataValue type="Core/Diagram.Color">
+                    <Data property="B">
+                      <Integer>0</Integer>
+                    </Data>
+                    <Data property="G">
+                      <Integer>0</Integer>
+                    </Data>
+                    <Data property="R">
+                      <Integer>0</Integer>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Font">
+                  <String>Arial</String>
+                </Data>
+                <Data property="Position">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>31.5</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>393.7</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Rotation">
+                  <Double>0.0</Double>
+                </Data>
+                <Data property="Size">
+                  <Double>2.0</Double>
+                </Data>
+                <Data property="Text">
+                  <String>Energy stream</String>
+                </Data>
+              </Object>
+              <Object id="DutyTable_0_h1" type="Core/Diagram.Text">
+                <Data property="Alignment">
+                  <DataReference data="Core/Diagram.TextAlignment.LeftCenter"/>
+                </Data>
+                <Data property="Color">
+                  <AggregatedDataValue type="Core/Diagram.Color">
+                    <Data property="B">
+                      <Integer>0</Integer>
+                    </Data>
+                    <Data property="G">
+                      <Integer>0</Integer>
+                    </Data>
+                    <Data property="R">
+                      <Integer>0</Integer>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Font">
+                  <String>Arial</String>
+                </Data>
+                <Data property="Position">
+                  <AggregatedDataValue type="Core/Diagram.Point">
+                    <Data property="X">
+                      <Double>31.5</Double>
+                    </Data>
+                    <Data property="Y">
+                      <Double>397.9</Double>
+                    </Data>
+                  </AggregatedDataValue>
+                </Data>
+                <Data property="Rotation">
+                  <Double>0.0</Double>
+                </Data>
+                <Data property="Size">
+                  <Double>2.0</Double>
+                </Data>
+                <Data property="Text">
+                  <String>Duty, kW</String>
+                </Data>
+              </Object>
+              <Object id="DutyTable_Q1" type="Core/Diagram.Text">
                 <Data property="Alignment">
                   <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
                 </Data>
@@ -10353,10 +10460,10 @@
                 <Data property="Position">
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>171.5</Double>
+                      <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
-                      <Double>368.5</Double>
+                      <Double>393.7</Double>
                     </Data>
                   </AggregatedDataValue>
                 </Data>
@@ -10370,7 +10477,7 @@
                   <String>Q1</String>
                 </Data>
               </Object>
-              <Object id="StreamTable_Q1_1" type="Core/Diagram.Text">
+              <Object id="DutyTable_Q1_1" type="Core/Diagram.Text">
                 <Data property="Alignment">
                   <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
                 </Data>
@@ -10393,47 +10500,7 @@
                 <Data property="Position">
                   <AggregatedDataValue type="Core/Diagram.Point">
                     <Data property="X">
-                      <Double>171.5</Double>
-                    </Data>
-                    <Data property="Y">
-                      <Double>372.7</Double>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Rotation">
-                  <Double>0.0</Double>
-                </Data>
-                <Data property="Size">
-                  <Double>2.0</Double>
-                </Data>
-                <Data property="Text">
-                  <String>energy</String>
-                </Data>
-              </Object>
-              <Object id="StreamTable_Q1_7" type="Core/Diagram.Text">
-                <Data property="Alignment">
-                  <DataReference data="Core/Diagram.TextAlignment.CenterCenter"/>
-                </Data>
-                <Data property="Color">
-                  <AggregatedDataValue type="Core/Diagram.Color">
-                    <Data property="B">
-                      <Integer>0</Integer>
-                    </Data>
-                    <Data property="G">
-                      <Integer>0</Integer>
-                    </Data>
-                    <Data property="R">
-                      <Integer>0</Integer>
-                    </Data>
-                  </AggregatedDataValue>
-                </Data>
-                <Data property="Font">
-                  <String>Arial</String>
-                </Data>
-                <Data property="Position">
-                  <AggregatedDataValue type="Core/Diagram.Point">
-                    <Data property="X">
-                      <Double>171.5</Double>
+                      <Double>81.5</Double>
                     </Data>
                     <Data property="Y">
                       <Double>397.9</Double>

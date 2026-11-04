@@ -17,11 +17,14 @@ route's waypoints; everything else is laid out deterministically.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 GAP_X = 34.0
 GAP_Y = 22.0
 CHANNEL = 6.0
+#: The gap between the rows of a layout wrapped into rows (``layout(rows=...)``).
+ROW_GAP = 44.0
 
 #: Where routes may run: (x0, y0, x1, y1), None for a side that is free.
 Area = tuple[float | None, float | None, float | None, float | None]
@@ -150,8 +153,13 @@ def layout(
     grid_feedback: bool = False,
     area: Area | None = None,
     order_ports: bool = False,
+    rows: int = 1,
 ) -> tuple[float, float, float, float]:
     """Place unpinned *nodes* and route *edges* in place; returns the bounds (x0, y0, x1, y1).
+
+    With *rows* above one the layers wrap into that many rows, read like text (left to right,
+    then the next row below), on one grid of columns: a line between rows, and every recycle, is
+    routed by :class:`GridRouter`.
 
     With *order_ports* each node's ports are sorted by where their lines go (inside a block,
     where the grid router takes every route; the channel routes outside keep declared order).
@@ -188,16 +196,28 @@ def layout(
         layers.setdefault(layer[n], []).append(n)
     count = max(layers) + 1
     widths = [max((by_id[n].width for n in layers.get(k, [])), default=0.0) for k in range(count)]
+    per = math.ceil(count / rows) if rows > 1 else count
+    if per < count:  # one grid of columns for every row
+        shared = [max(widths[k] for k in range(j, count, per)) for j in range(per)]
+        widths = [shared[k % per] for k in range(count)]
+        grid_feedback = True
     column_x = []
     x = origin[0]
     for k in range(count):
+        if k % per == 0:
+            x = origin[0]
         column_x.append(x)
         x += widths[k] + gap_x
     # Rounds of: barycentre ordering, coordinates, port order by where each port's line goes.
     # The port order changes the barycentres, so a second round settles both.
     for _ in range(2):
         layers = _order_layers(layers, count, by_id, forward)
-        _coordinates(layers, count, by_id, column_x, widths, origin, gap_y)
+        y = origin[1]
+        for start in range(0, count, per):
+            row = {k: v for k, v in layers.items() if start <= k < start + per}
+            _coordinates(row, count, by_id, column_x, widths, (origin[0], y), gap_y)
+            placed = [by_id[n] for v in row.values() for n in v if not by_id[n].ghost]
+            y = max((n.y + n.height for n in placed), default=y) + ROW_GAP
         if order_ports:
             _order_ports(nodes, by_id, edges)
     _align_inlets(layers, count, by_id, forward, origin, gap_y)
@@ -213,7 +233,7 @@ def layout(
             return True
         if e.feedback:
             return grid_feedback
-        return dst.layer != src.layer + 1
+        return dst.layer != src.layer + 1 or src.layer // per != dst.layer // per
 
     slotted = [e for e in edges if not gridded(e)]
     _route(by_id, slotted, column_x, widths, gap_x, (x0, y0, x1, y1), skip)
