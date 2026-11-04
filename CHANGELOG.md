@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 (2026-11-04)
+
+Minor release: electrochemical measurements, measured-performance cells, dynamic electrolysis
+duties with an anolyte model, stack sizing with skid equipment inputs, and design case LCI
+datasets (tracker #136: #137, #138, #139; ADRs 0041 to 0045). No breaking change: every new
+schema field is optional, and the outputs of existing water-electrolysis, chlor-alkali and LCA
+fixtures are unchanged.
 
 ### Added
 
