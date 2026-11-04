@@ -56,7 +56,10 @@ Schedules:
 | `power` | `points: [[t, P], ...]`, P of all the duty's cells (W, kW) | `P = N U(j) j A` solved for j inside the measured range; outside it there is no current |
 | `on_off` | `period`, `duty_fraction`, `current` when on | `start: on` or `off` |
 
-`N` is the cells in series times the stacks, all on the one reservoir.
+`N` is the cells in series times the stacks, all on the one reservoir. A duty a stack of
+`process/cells.yaml` names under `equipment.duty` runs at the arrangement that stack is sized
+at, in `cheme process duty` as in `cheme process stack` (`cheme.duty-arrangement`, info): its
+own `cells_in_series` and `stacks` are then not used ([electrolyser stacks](electrolyser-stacks.md)).
 
 ## What is computed
 
@@ -166,6 +169,7 @@ compared transients, each up to the target.
 | `cheme.duty-degassing` | info | no CO2 degassing stated |
 | `cheme.duty-compare` | error | compared duties form different products |
 | `cheme.duty-target-not-reached` | warning | a compared duty ends before the target |
+| `cheme.duty-arrangement` | info | the duty runs at the arrangement a stack of `process/cells.yaml` is sized at, not its own |
 
 `cheme validate` reports the schema, cell and model findings without integrating: every error
 `cheme process duty` refuses a duty on before it integrates (units, ranges, the cell and its

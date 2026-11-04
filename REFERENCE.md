@@ -245,7 +245,9 @@ can be accepted.
 
 YAML lists are checked against their schemas, then compared with the P&IDs: equipment tags and
 classes (`cheme.equipment-*`), the optional `dimensions` of an equipment item (overall
-`diameter`, `height` or `length`, `width`, `head`, `support`, `weight`) against the sizes its
+`diameter`, `height` or `length`, `width`, `head`, `support`, `weight`; `source`, `assumed`
+and `fingerprint` of sizes a tool calculated, such as `cheme process stack`, of which the
+datasheets carry `source` and `assumed`) against the sizes its
 P&ID states where it states them (`NominalCapacityVolume`, `CylinderLength`, `TubeLength`, a
 chamber's `InsideDiameter` or `NominalDiameter`, `PlateHeight`/`PlateWidth`:
 `cheme.equipment-dimension-mismatch`, warning), line numbers against `PipingNetworkSystem` LineNumbers and
@@ -1121,7 +1123,26 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   product; `--plot` writes aligned time plots and an operating map (WDE x reservoir volume)
   with the measured WDE points apart from the simulated values. The first anolyte model is
   `well-mixed-carbonate` v1 (equilibrium carbonate speciation on a concentration basis;
-  `docs/framework/electrolysis-duties.md`).
+  `docs/framework/electrolysis-duties.md`). A duty a stack of `process/cells.yaml` names runs
+  at the arrangement that stack is sized at (`cheme.duty-arrangement`), as in
+  `cheme process stack`.
+- **Electrolyser stacks**: the optional `stacks:` section of `process/cells.yaml` (same schema,
+  optional fields only) names per stack design a cell, the product duty, the electrical
+  limits, the assumed envelope per cell, clearances, the replacement interval and the skid
+  equipment a duty sizes. **`cheme process stack [IDS] [--json] [--write]`** sizes it at the
+  cell's operating point (refused outside its measured or declared range, never
+  extrapolated): `A = n F Ndot / (nu FE j)`, `ceil(A / A_cell)` cells, at most
+  `floor(U_max / U)` in series per stack, the stacks, the reconciled voltage, current, DC
+  power, output and margin, kWh per kg, the envelope and footprint; and the reservoir, dosing
+  and bleed tanks and the recirculation and dosing pumps' inputs from the named duty, run at
+  that arrangement (a duty at another current density or of another cell, or not feasible,
+  gives none: `cheme.stack-duty`). Without `--write` it writes nothing and reports what
+  differs (`cheme.stack-outdated`); `--write` edits the equipment-list `dimensions` in place and
+  the pumps' datasheet `type_specific`, never over a value written by hand
+  (`cheme.stack-kept`), from which `cheme layout build` and `cheme datasheets draft`/`fill`
+  take them. Exit 1 on an error finding (a `process/cells.yaml` that does not follow its
+  schema among them, its findings printed), 2 without the file or stacks or for an unknown id
+  (`docs/framework/electrolyser-stacks.md`, ADR 0044, skill `skid-design`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
@@ -1702,6 +1723,7 @@ skills in `.claude/skills/`:
 | `reactions` | `process/reactions.yaml` (stoichiometry, conversion, heat of reaction, catalyst, sources), reactions on reactor steps, element and extent balances, conversion reactors in `process propagate` |
 | `electrochemical-cell-modelling` | `process/cells.yaml`: reactions and electrons, half-reactions, specified or measured performance (`performance: measured`, never extrapolated), the membrane block with FE and WDE kept apart, `cheme process cell` and the flowsheet link |
 | `electrolysis-duty-assessment` | `process/duties.yaml`: current, power or on/off schedules against the anolyte reservoir, the stated pH threshold, dosing, bleed, `cheme process duty`, comparison at equal delivered product, the measured range never left unflagged, measured points kept apart from simulated transients |
+| `skid-design` | an electrolyser skid from one design basis: the cell, the `stacks:` section of `process/cells.yaml` and a duty, `cheme process cell`, `duty` and `stack --write`, the control P&ID and `control report`, `datasheets draft/fill`, `layout build/render`, `assess lca`; the vendor envelope, clearances, hazardous area and H2/CO handling left to a human |
 | `experiment-reproduction` | reproducing a published measured series: the data set pinned by DOI and checksum, tolerances frozen before comparing, reproduction kept apart from validation and design use, no third-party content copied, `cheme experiments electrochem` |
 | `process-simulation` | `process/simulation.yaml` (property package, step specs), `process simulate --check` and `--fill` with DWSIM, deviations from assumed values, shortcut before rigorous columns, recycles |
 | `pid-edit` | changing a sheet: edit, fmt, validate, render, diff, commit |
