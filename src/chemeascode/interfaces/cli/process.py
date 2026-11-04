@@ -366,6 +366,93 @@ def energy(
         raise typer.Exit(1)
 
 
+@process_app.command("pinch")
+def pinch(
+    dt_min: Annotated[
+        float,
+        typer.Option(
+            "--dt-min", help="The global minimum approach temperature dTmin, K (required)."
+        ),
+    ],
+    dt_min_source: Annotated[
+        str,
+        typer.Option(
+            "--dt-min-source", help="Where dTmin comes from (recorded; default: ASSUMED)."
+        ),
+    ] = "ASSUMED",
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    include_constrained: Annotated[
+        bool,
+        typer.Option(
+            "--include-constrained",
+            help="Include the constrained duties (reactors) in the targets, as a sensitivity.",
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    md: Annotated[bool, typer.Option("--md", help="As Markdown.")] = False,
+    write: Annotated[
+        bool, typer.Option("--write", help="Record the targets in process/pinch-run.json.")
+    ] = False,
+) -> None:
+    """Whole-plant pinch targets of the case's recorded simulation run
+    (process/simulation-run.json, from cheme process simulate --fill; the simulator is not run).
+
+    Prints the current utility demand, the theoretical minimum utility demand at dTmin and the
+    theoretical energy-saving potential (their difference: not a saving), the hot-side,
+    cold-side and shifted pinch (or a threshold problem), the utility-use pinch violations
+    apart from cross-pinch transfer in existing exchangers, the thermal streams with class and
+    quality, and the reconciliation against the run's duties. --write records the result in
+    process/pinch-run.json. Exit 1 on an error (no current converged run, too few streams) or a
+    reconciliation finding; 2 on invalid input; 3 when --write is refused (a reconciliation
+    finding), nothing written."""
+    from chemeascode.domains.process.heat_integration.report import (
+        PINCH_FILE,
+        UnknownCase,
+        pinch_markdown,
+        pinch_report,
+        pinch_text,
+    )
+    from chemeascode.domains.process.heat_integration.report import write as record
+
+    if as_json and md:
+        typer.echo("give --json or --md, not both", err=True)
+        raise typer.Exit(2)
+    workspace = _workspace()
+    process = _process(workspace)
+    try:
+        report = pinch_report(
+            workspace.root,
+            process,
+            case,
+            dt_min,
+            dt_min_source=dt_min_source,
+            include_constrained=include_constrained,
+        )
+    except (UnknownCase, ValueError) as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    if as_json:
+        typer.echo(report.to_json())
+    elif md:
+        typer.echo(pinch_markdown(report))
+    else:
+        typer.echo(pinch_text(report))
+    if report.failed:
+        raise typer.Exit(1)
+    if write:
+        if report.unreconciled:
+            typer.echo(
+                f"refused: {PINCH_FILE} not written, the reconciliation has a finding (heat of "
+                "the run the extracted streams do not give back)",
+                err=True,
+            )
+            raise typer.Exit(3)
+        record(workspace.root, report)
+        typer.echo(f"{PINCH_FILE}: targets of case {report.case} recorded", err=as_json)
+    if any(f.level in ("warning", "error") for f in report.findings):
+        raise typer.Exit(1)
+
+
 @process_app.command("furnace")
 def furnace(
     furnace_id: Annotated[

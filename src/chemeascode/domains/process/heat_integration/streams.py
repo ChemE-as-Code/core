@@ -214,6 +214,9 @@ class ThermalStream:
     utility: str | None = None
     #: The process stream ids (inlet, outlet) where there are some.
     streams: tuple[str, ...] = ()
+    #: The existing process/process exchange it is a side of (class recovery): the exchanger's
+    #: id, or ``<condensing column>/<reboiled column>`` for a condenser heating a reboiler.
+    exchange: str | None = None
     reason: str = ""
     notes: tuple[str, ...] = ()
 
@@ -253,6 +256,7 @@ class ThermalStream:
             "counted_kW": self.counted_kW,
             "utility": self.utility,
             "streams": list(self.streams),
+            "exchange": self.exchange,
             "reason": self.reason or None,
             "notes": list(self.notes),
         }
@@ -399,7 +403,12 @@ def _notes_for(out: dict[str, Any], a: str | None, b: str | None) -> tuple[str, 
             "linearised across it, not split at a dew or bubble point",
         )
     if changes is None:
-        return ("vapour fractions not recorded: a phase change is not known",)
+        if a in (out.get("phase_change") or ()):
+            return (
+                f"{a} changes phase in the exchanger (the run's energy audit): linearised across "
+                "it, not split at a dew or bubble point",
+            )
+        return ("vapour fractions not recorded: whether it changes phase is not known",)
     return ()
 
 
@@ -678,6 +687,7 @@ def _exchanger(u, got, out, base, ends, terminals) -> list[ThermalStream]:
                 side="hot" if hot else "cold",
                 segments=_segments(stream),
                 counted_kW=duty if hot else 0.0,
+                exchange=uid,
                 notes=(
                     ("counts the exchanger's duty" if hot else "the same heat as the hot side"),
                     *_notes_for(out, a, b),
@@ -737,6 +747,7 @@ def _multi_stream(u, got, out, base) -> list[ThermalStream]:
                 quality="linearised",
                 segments=_segments(stream),
                 notes=_notes_for(out, a, b),
+                exchange=uid,
                 **common,
             )
         )
@@ -776,13 +787,16 @@ def _column(u, got, out, base, linked, utility_of) -> list[ThermalStream]:
         duty_key = (uid, role)
         counted = kw
         notes: list[str] = []
+        exchange = None
         if role == "condenser" and uid in linked:
             other = (units.get(linked[uid]) or {}).get("reboiler_kW") or 0.0
             duty_key = (uid, "condenser-excess")
             counted = max(kw - other, 0.0)
             notes.append(f"heats {linked[uid]}'s reboiler: the same heat as that reboiler")
+            exchange = f"{uid}/{linked[uid]}"
         if role == "reboiler" and link:
             notes.append(f"heated by {link['condenser_of']}'s condenser")
+            exchange = f"{link['condenser_of']}/{uid}"
         found_duty = by_role.get(role)
         basis_note = {
             "stage": f"isothermal at the column's {'top' if hot else 'bottom'} stage temperature",
@@ -799,6 +813,7 @@ def _column(u, got, out, base, linked, utility_of) -> list[ThermalStream]:
             "duty_key": duty_key,
             "counted_kW": counted,
             "utility": None if recovery else utility_of(u, role),
+            "exchange": exchange,
             **base,
         }
         if found_duty is None:
@@ -924,7 +939,7 @@ def out_from_record(entry: dict[str, Any], model: dict[str, Any]) -> dict[str, A
     record entry (``process/simulation-run.json``): the units' recorded results and the
     streams' recorded temperatures, the feeds' from the model. The record keeps no stream
     enthalpies or vapour fractions: an exchanger's sides then take its duty, and a phase change
-    is not known (``notes``)."""
+    is known only where the run's energy audit found one in an exchanger (``phase_change``)."""
     from chemeascode.foundation.units import to_kelvin
 
     units = {
@@ -944,4 +959,18 @@ def out_from_record(entry: dict[str, Any], model: dict[str, Any]) -> dict[str, A
         kelvin = to_kelvin(t["value"], t.get("unit") or "K")
         if kelvin is not None:
             streams.setdefault(row["id"], {})["temperature_K"] = kelvin
-    return {"converged": entry.get("converged", False), "units": units, "streams": streams}
+    changing = sorted(
+        {
+            sid
+            for row in (entry.get("energy") or {}).get("exchangers") or []
+            for sid in row.get("phase_change") or []
+        }
+    )
+    return {
+        "converged": entry.get("converged", False),
+        "units": units,
+        "streams": streams,
+        # the exchanger inlets the run's energy audit found changing phase (no vapour fractions
+        # are recorded)
+        "phase_change": changing,
+    }
