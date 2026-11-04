@@ -137,6 +137,8 @@ cheme layout lifting [--write]                # lifting study: radius, load mome
 cheme assess mto | estimate [--write]         # material take-off of the model, factor estimate
 cheme assess equipment [--write]              # equipment costs from published correlations (Turton)
 cheme assess tea [--write] [--compare REV]    # TEA: capex build-up, cash flow, NPV/IRR/LCOP, drivers
+cheme assess lca [--write | --check]          # LCA per functional unit; lca/dataset.yaml, results
+cheme assess lca --write --case B             # case B's own LCI dataset: lca/datasets/<id>-b.yaml
 cheme datasheets draft [--tag T]              # draft datasheets for items without one (sources, TBD)
 cheme datasheets fill [--tag T] [--param k=v] # calculated sizes with their basis into the drafts
 cheme schema [equipment]                      # JSON Schema of a YAML file kind (none: list them)
@@ -415,6 +417,17 @@ the table of every row), escalated by the CEPCI value the project gives with its
 source in `estimate/cost-basis.yaml`; an item outside a correlation's range or without its size
 or factors is a finding, never extrapolated, and the report states its AACE 18R-97 class.
 Rows, rules and `GET /api/mto`: [docs/framework/mto.md](docs/framework/mto.md).
+
+**A design case's LCI dataset.** `cheme assess lca --dataset|--write|--check --case <id>`
+derives the unallocated LCI dataset of another computed flowsheet case. It uses the study's
+scope, reference product and functional unit, and an id (`<dataset id>-<case>`), title
+(`<title>, case <case>`) and uuid (`uuid5(<base uuid>, "case:<case>")`) that name the case.
+`--write` writes it to `lca/datasets/<dataset id>-<case>.yaml` (generated: a header comment
+and `provenance`; never over a file it did not generate, `cheme.lca-dataset-not-generated`).
+`--check` exits 1 with `cheme.lca-dataset-stale` when that file is missing or differs. An
+undeclared case exits 2 and lists the declared ones. The study's own case is
+`lca/dataset.yaml`, unchanged. Details:
+[docs/framework/lci-scenarios.md](docs/framework/lci-scenarios.md), ADR 0045.
 
 **Techno-economic analysis.** `cheme assess tea` evaluates the economics against the decision
 `estimate/tea.yaml` states (npv, irr, lcop or cash cost and a threshold). It works for continuous

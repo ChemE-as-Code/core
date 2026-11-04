@@ -184,4 +184,5 @@ nav:
       - "0042 WaterTAP and IDAES not reused for electrochemical cells": adr/0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md
       - "0043 Dynamic electrolysis duties and the anolyte model interface": adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md
       - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
+      - "0045 A design case's LCI dataset with its own identity": adr/0045-a-design-case-lci-dataset-with-its-own-identity.md
       - Template: adr/template.md

@@ -634,7 +634,10 @@ limitation, not assumed absent.
 **Foreground without a background.** `cheme assess lca --dataset` (or `--inventory`) alone
 derives the unallocated foreground without `lca/factors.yaml`, a Brightway project or
 credentials: what a public library publishes. `cheme validate` checks `lci_dataset` files the
-same way.
+same way. `--case <id>` (with `--dataset`, `--write` or `--check`) gives the dataset of another
+computed flowsheet case. Its id, title and uuid name the case, and `--write` writes it to
+`lca/datasets/<dataset id>-<case>.yaml`
+([design case datasets](lci-scenarios.md#a-design-cases-own-dataset), ADR 0045).
 
 ## Publication and the run manifest
 
