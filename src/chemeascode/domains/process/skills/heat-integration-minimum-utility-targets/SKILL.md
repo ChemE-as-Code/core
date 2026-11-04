@@ -20,8 +20,11 @@ and report the result as the target.
 
 ## Workflow and tools
 
-Core has no `cheme` command for this. The problem table algorithm is implemented in the Python
-function `chemeascode.domains.process.heat_integration.pinch.pinch_analysis(streams, dt_min)`
+For a solved plant, `cheme process pinch --dt-min X` gives these targets from the recorded
+simulation run, with the current utility demand beside them (see `heat-integration`); for
+stream data you assemble yourself, use the function below. The problem table algorithm is
+implemented in the Python function
+`chemeascode.domains.process.heat_integration.pinch.pinch_analysis(streams, dt_min)`
 (temperatures in K, CP in kW/K, duties in kW); it returns minimum hot and cold utility, the pinch
 and the grand composite curve, and no network. The method it follows (Ray and Das §5.4.1, §5.10):
 

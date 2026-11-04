@@ -39,12 +39,12 @@ d779d298ece32016846565eb9b469d8305c1d904fbf7ce4003140e8f3e6ac7a7  .claude/skills
 96f49a3c1a594f9c5c4f47e6f9bdac50c499ca1d5dead203d3c1e48e427b735b  .claude/skills/hazop-study/SKILL.md
 b0d980275585f81d89c20de525ea01c0e2f31b7572851bfd7df678b1d2e0f24d  .claude/skills/hazop-study/examples/study.yaml
 b597327e86cf310b483c4d7f1602ed507aadd36ee6da37b029bd4b869628c0f0  .claude/skills/heat-integration-flowsheet-review/SKILL.md
-c7c1ba10555ed324ee0c7d351bc4ad37fab6aae12bf96d8139e1caa67695e189  .claude/skills/heat-integration-minimum-utility-targets/SKILL.md
+29b03c18b5743dea91f8d54e3ff0d0ef9020c8f2043736a88e7808a3b8204092  .claude/skills/heat-integration-minimum-utility-targets/SKILL.md
 d07e87eb605d421eb2d6569917e52149c5d706b195d17e9c3905cc6bcae21c74  .claude/skills/heat-integration-multiple-utilities/SKILL.md
 7698660b0311aeb407f0ee6507de22d22d9ab90a020e0774066528004f3d34db  .claude/skills/heat-integration-network-design/SKILL.md
 afb07d1742339f3aad658452f693f08787271ecbd52fd61bf7aec243b96806db  .claude/skills/heat-integration-pinch-analysis/SKILL.md
-fdc64e8b9f47488630efa808c601cefe8fdebe526f1cb7cac2927eb2d353515c  .claude/skills/heat-integration-stream-data/SKILL.md
-eea3ab65d00323ba7500b36ab4a627f44ba7b591e9bc37299b0c6b55f6c81a31  .claude/skills/heat-integration/SKILL.md
+1dca44118c5a137e2683edca25bec10283945cd0f40a7e1f0a758f52508013a3  .claude/skills/heat-integration-stream-data/SKILL.md
+b4501bae6311d50624d78a093c72fd7a3e12a53a14b405070dc458c2c58f1afc  .claude/skills/heat-integration/SKILL.md
 da952010dd8ea1038d24c9d4643b36e9df2928b3b7f76bb30e8627a0b9088535  .claude/skills/hvac-ducts/SKILL.md
 41bd2a0ef32e512a39549e8b6dca48dd495a64eed550ded612851042c65a7ee4  .claude/skills/layout-yaml/SKILL.md
 4e6fd3cfaf6faa490c8fbe2710c6f4b7d1afdc80b0f6421c5511ddd05bad9817  .claude/skills/lca/SKILL.md
