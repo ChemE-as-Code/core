@@ -8,7 +8,11 @@ the root-mean-square of its error estimate, each component scaled by
 ``atol_i + rtol * max(|y_i|, |y_new_i|)``, is at most 1 (Hairer, Norsett and Wanner, Solving
 Ordinary Differential Equations I, 2nd ed., Springer 1993, II.4 and II.6); the next step is
 ``h * min(10, max(0.2, 0.9 err**(-1/5)))``. A step whose right-hand side or error is not
-finite is rejected and retried with a fifth of the step.
+finite is rejected and retried with a fifth of the step. With ``error_components`` only the
+first that many components enter the error control (and the first step's estimate); the rest
+are quadratures (running integrals) integrated on the same steps with the same stages, so a
+linear combination of components the right-hand side keeps constant stays constant to
+rounding, and adding a quadrature does not change the steps taken.
 
 An :class:`Event` is a function ``g(t, y)`` whose zero is wanted. After every accepted step its
 sign at both ends is compared; a change (in the event's ``direction``, if one is given) is
@@ -182,18 +186,26 @@ def _finite(values: Sequence[float]) -> bool:
 
 
 def _first_step(
-    f: Rhs, t0: float, y0: list[float], f0: Sequence[float], atol: list[float], rtol: float
+    f: Rhs,
+    t0: float,
+    y0: list[float],
+    f0: Sequence[float],
+    atol: list[float],
+    rtol: float,
+    m: int | None = None,
 ) -> float:
-    """Hairer et al. II.4: a first step from the size of y and of its first two derivatives."""
-    scale = [a + rtol * abs(y) for a, y in zip(atol, y0, strict=True)]
-    d0 = _norm(y0, scale)
-    d1 = _norm(f0, scale)
+    """Hairer et al. II.4: a first step from the size of y and of its first two derivatives
+    (of the first *m* components, default all)."""
+    m = len(y0) if m is None else m
+    scale = [a + rtol * abs(y) for a, y in zip(atol[:m], y0[:m], strict=True)]
+    d0 = _norm(y0[:m], scale)
+    d1 = _norm(f0[:m], scale)
     h0 = 1e-6 if d0 < 1e-5 or d1 < 1e-5 else 0.01 * d0 / d1
     y1 = [y + h0 * k for y, k in zip(y0, f0, strict=True)]
     f1 = f(t0 + h0, y1)
     if not _finite(f1):
         return h0
-    d2 = _norm([a - b for a, b in zip(f1, f0, strict=True)], scale) / h0
+    d2 = _norm([a - b for a, b in zip(f1[:m], f0[:m], strict=True)], scale) / h0
     h1 = max(1e-6, h0 * 1e-3) if max(d1, d2) <= 1e-15 else (0.01 / max(d1, d2)) ** 0.2
     return min(100 * h0, h1)
 
@@ -244,12 +256,14 @@ def solve(
     first_step: float | None = None,
     max_steps: int = 100_000,
     event_tolerance: float | None = None,
+    error_components: int | None = None,
 ) -> Solution:
     """Integrate ``dy/dt = f(t, y)`` from *t0* to *t_end* (> *t0*) with the Dormand-Prince
     5(4) pair (see the module docstring). *atol* is one value or one per component. Ends at
     *t_end* (``status`` ``end``), at the first terminal event (``event``), or when a step
     becomes too small or *max_steps* are taken (``failed``, with the reason in ``message``,
-    the solution up to there kept)."""
+    the solution up to there kept). *error_components*: only the first that many components
+    enter the error control (default all; see the module docstring)."""
     if not t_end > t0:
         raise ValueError(f"t_end {t_end!r} must be after t0 {t0!r}")
     if not rtol > 0:
@@ -259,6 +273,9 @@ def solve(
     tolerances = [float(atol)] * n if isinstance(atol, int | float) else [float(a) for a in atol]
     if len(tolerances) != n or any(not a > 0 for a in tolerances):
         raise ValueError("atol: one positive value, or one per component")
+    m = n if error_components is None else error_components
+    if not 1 <= m <= n:
+        raise ValueError(f"error_components {error_components!r}: 1 to {n}")
     span = t_end - t0
     locate_to = event_tolerance if event_tolerance is not None else 1e-12 * max(span, abs(t_end))
     t = float(t0)
@@ -269,7 +286,7 @@ def solve(
         solution.status = "failed"
         solution.message = f"the right-hand side at t = {t:.6g} is not finite"
         return solution
-    h = first_step if first_step is not None else _first_step(f, t, y, k1, tolerances, rtol)
+    h = first_step if first_step is not None else _first_step(f, t, y, k1, tolerances, rtol, m)
     solution.evaluations += 0 if first_step is not None else 1
     h = min(h, max_step, span)
     g_old = [e.function(t, y) for e in events]
@@ -354,9 +371,11 @@ def solve(
             for p, r, u, v, w, x in zip(k1_, k3, k4, k5, k6, k7, strict=True)  # type: ignore[arg-type]
         ]
         total = 0.0
-        for e, yi, yn, tol in zip(error, y, y_new, tolerances, strict=True):
+        for e, yi, yn, tol in zip(error[:m], y[:m], y_new[:m], tolerances[:m], strict=True):
             total += (e / (tol + rtol * max(abs(yi), abs(yn)))) ** 2
-        err = math.sqrt(total / n) if math.isfinite(total) else math.inf
+        if m < n and not _finite(error[m:]):
+            total = math.inf
+        err = math.sqrt(total / m) if math.isfinite(total) else math.inf
         if err > 1.0:
             factor = 0.2 if not math.isfinite(err) else max(0.2, 0.9 * err**-0.2)
             h *= factor

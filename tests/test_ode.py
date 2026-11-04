@@ -112,3 +112,29 @@ def test_wrong_calls_raise():
         solve(_oscillator, 0.0, [1.0, 0.0], 1.0, atol=[1e-9])
     with pytest.raises(ValueError, match="rtol"):
         solve(_oscillator, 0.0, [1.0, 0.0], 1.0, rtol=0)
+
+
+def test_quadratures_outside_the_error_control_leave_the_steps():
+    """y' = -y with the running integral q' = y outside the error control
+    (error_components=1): the same steps and y as without it, q = 1 - y (the linear invariant
+    y + q = 1 to rounding) and close to 1 - exp(-t)."""
+    alone = solve(lambda t, y: [-y[0]], 0.0, [1.0], 5.0, rtol=1e-8, atol=1e-12)
+    both = solve(
+        lambda t, y: [-y[0], y[0]],
+        0.0,
+        [1.0, 0.0],
+        5.0,
+        rtol=1e-8,
+        atol=[1e-12, 1e-300],
+        error_components=1,
+    )
+    assert both.t == alone.t and [y[0] for y in both.y] == [y[0] for y in alone.y]
+    assert all(abs(y[0] + y[1] - 1.0) <= 1e-15 for y in both.y)
+    assert both.y_final[1] == pytest.approx(1 - math.exp(-5.0), rel=1e-7)
+    # with the quadrature in the error control, the steps change
+    controlled = solve(
+        lambda t, y: [-y[0], y[0]], 0.0, [1.0, 0.0], 5.0, rtol=1e-8, atol=[1e-12, 1e-12]
+    )
+    assert controlled.t != alone.t
+    with pytest.raises(ValueError, match="error_components"):
+        solve(lambda t, y: [-y[0], y[0]], 0.0, [1.0, 0.0], 1.0, error_components=3)
