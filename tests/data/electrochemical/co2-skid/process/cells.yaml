@@ -1,0 +1,78 @@
+# The plant cell of a small CO2-to-CO skid (tests only): 100 cm2 cells at 150 mA/cm2, their
+# voltage, Faradaic efficiencies and water dissociation efficiency looked up in the SYNTHETIC
+# measured series of the 5 cm2 bench cell (made up to exercise the code, not taken from any
+# publication). The stacks, the envelope, the clearances and the skid inputs are illustrative.
+schema: cheme/electrochemical-cells/v1
+kind: electrochemical_cells
+cells:
+  - id: BPM-100
+    title: Reverse-bias bipolar-membrane cell, 100 cm2 (synthetic data)
+    performance: measured
+    reaction: CO2R
+    electrons: 2
+    electrodes:
+      anode: {equation: "2 OH- -> 1/2 O2 + H2O + 2 e-", species: {OH-: -2, O2: 0.5, H2O: 1, e-: 2}}
+      cathode: {equation: "CO2 + H2O + 2 e- -> CO + 2 OH-", species: {CO2: -1, H2O: -1, e-: -2, CO: 1, OH-: 2}}
+    current: {value: 15, unit: A, provenance: given, source: "test: 150 mA/cm2 on 100 cm2"}
+    active_area: {value: 100, unit: cm2, provenance: given, source: "test: the plant cell"}
+    side_reactions:
+      - {reaction: WS, electrons: 2}
+    measurements:
+      file: experiments/electrochemistry/synthetic-bpm.yaml
+      product: CO
+      side_products: [H2]
+    membrane:
+      kind: bipolar
+      bias: reverse
+      co_ion_crossover: {K+: 0.34, HCO3-: 0.66}
+      source: "test: illustrative co-ion split"
+    thermal:
+      kind: isothermal
+      temperature: {value: 25, unit: °C, provenance: given, source: "test: thermostatted"}
+    electrolyte: "1 M KOH anolyte"
+    sources: ["synthetic test data"]
+stacks:
+  - id: STK-1
+    title: CO2-to-CO stacks on a 48 V DC bus
+    cell: BPM-100
+    tags: [E-101A, E-101B]
+    product:
+      component: CO
+      rate: {value: 0.1, unit: kg/h, provenance: given, source: "test: the skid's CO duty"}
+      purity: {value: 0.95, provenance: given, source: "test: dry, after the CO2 removal"}
+      pressure: {value: 1.2, unit: bar(a), provenance: given, source: "test: to the buffer"}
+    electrical:
+      max_stack_voltage: {value: 48, unit: V, provenance: given, source: "test: the DC bus"}
+      max_stack_current: {value: 100, unit: A, provenance: given, source: "test: the busbar rating"}
+      rectifier_efficiency: {value: 0.95, provenance: assumed, source: "test: a thyristor rectifier"}
+    envelope:
+      cell_pitch: {value: 8, unit: mm, provenance: assumed, source: "test: bipolar plate and frames"}
+      end_plates: {value: 120, unit: mm, provenance: assumed, source: "test: two end plates"}
+      frame_margin: {value: 40, unit: mm, provenance: assumed, source: "test: manifolds and frame"}
+    access:
+      end: {value: 1.0, unit: m, provenance: assumed, source: "test: stack removal"}
+      side: {value: 0.8, unit: m, provenance: assumed, source: "test: maintenance"}
+    replacement:
+      interval: {value: 8000, unit: h, provenance: assumed, source: "test: membrane life"}
+      operating_hours: {value: 8000, unit: h/a, provenance: assumed, source: "test: availability"}
+    equipment:
+      duty: SKID-150
+      reservoir:
+        tag: T-101
+        margin: {value: 0.25, provenance: assumed, source: "test: freeboard"}
+        aspect_ratio: {value: 1.5, provenance: assumed, source: "test: H/D of a small tank"}
+      recirculation_pump:
+        tag: P-101
+        flow_per_area: {value: 0.5, unit: mL/(min cm2), provenance: assumed, source: "test: the bench flow per area"}
+        density: {value: 1050, unit: kg/m3, provenance: assumed, source: "test: 1 M KOH"}
+        viscosity: {value: 1.2, unit: mPa s, provenance: assumed, source: "test: 1 M KOH"}
+        reservoir_pressure: {value: 101.3, unit: kPa, provenance: assumed, source: "test: vented tank"}
+        stack_pressure_drop: {value: 50, unit: kPa, provenance: assumed, source: "test: vendor estimate"}
+      dosing_pump:
+        tag: P-102
+        margin: {value: 0.5, provenance: assumed, source: "test: metering pump turndown"}
+      dosing_tank:
+        tag: T-102
+        margin: {value: 0.2, provenance: assumed, source: "test: refill reserve"}
+        aspect_ratio: {value: 1.2, provenance: assumed, source: "test: an IBC-like tank"}
+    sources: ["synthetic test data"]

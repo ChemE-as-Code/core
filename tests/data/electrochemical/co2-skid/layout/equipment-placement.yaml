@@ -1,0 +1,8 @@
+# Placement of the skid (tests only): the sizes come from the equipment list.
+equipment:
+  - {tag: E-101A, position: [4, 4, 0]}
+  - {tag: E-101B, position: [4, 8, 0]}
+  - {tag: T-101, position: [11, 5, 0]}
+  - {tag: T-102, position: [19, 5, 0]}
+  - {tag: P-101, position: [11, 13, 0]}
+  - {tag: P-102, position: [19, 13, 0]}

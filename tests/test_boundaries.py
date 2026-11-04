@@ -304,6 +304,7 @@ BASIC_IMPORTS = [
     "chemeascode.domains.experiments.electrochemistry",
     "chemeascode.domains.process.electrolysis_duty",
     "chemeascode.domains.process.electrolysis_plots",
+    "chemeascode.domains.equipment.electrolyser_stack",
     "chemeascode.domains.chemistry.anolyte",
     "chemeascode.domains.chemistry.carbonate",
     "chemeascode.domains.chemistry.properties",

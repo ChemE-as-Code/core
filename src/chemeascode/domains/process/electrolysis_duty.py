@@ -2448,6 +2448,12 @@ def _load_duties(root: Path) -> tuple[Duties | None, Any, list[Finding]]:
     return duties, doc, findings
 
 
+def load_duties(root: Path) -> tuple[Duties | None, Any, list[Finding]]:
+    """``process/duties.yaml`` under *root*: the model (None when missing or invalid), its
+    composed YAML document (for line numbers) and the schema findings."""
+    return _load_duties(Path(root))
+
+
 def _duplicates(duties: Duties, out: _Out) -> None:
     seen: set[str] = set()
     for index, duty in enumerate(duties.duties):
@@ -2523,6 +2529,43 @@ def duty_report(root: Path, ids: Sequence[str] | None = None) -> DutyReport:
             continue
         results.append(_one(duty, ctx, out, index))
     return DutyReport(results, out.findings, source)
+
+
+def run_duty(
+    root: Path,
+    duty_id: str,
+    cells_in_series: int | None = None,
+    stacks: int | None = None,
+) -> DutyReport:
+    """Duty *duty_id* of the plant at *root* integrated (as :func:`duty_report`), with its
+    arrangement replaced where given: *cells_in_series* per stack and *stacks* on the one
+    reservoir (the arrangement a stack sizing chose; the duty's own are then not used).
+    Read-only; an unknown id raises KeyError, a missing file gives an empty report."""
+    from chemeascode.foundation.provenance import source_revision
+
+    root = Path(root)
+    duties, doc, findings = _load_duties(root)
+    ctx = _context(root)
+    source = source_revision(root, ctx.inputs)
+    if duties is None:
+        return DutyReport([], findings, source)
+    known = {d.id: (i, d) for i, d in enumerate(duties.duties)}
+    if duty_id not in known:
+        raise KeyError(f"no duty {duty_id} in {DUTIES_FILE}")
+    out = _Out(DUTIES_FILE, doc)
+    out.findings += findings
+    index, duty = known[duty_id]
+    cell, reasons = resolve_cell(duty, ctx, out, index)
+    if cell is None:
+        result = DutyResult(duty.id, duty.cell, line=_yaml_line(out.doc, ["duties", index]))
+        result.title, result.refused, result.reasons = duty.title, True, reasons
+        return DutyReport([result], out.findings, source)
+    if cells_in_series is not None:
+        cell.cells_in_series = cells_in_series
+    if stacks is not None:
+        cell.stacks = stacks
+    result = simulate_duty(duty, cell, out=out, index=index)
+    return DutyReport([result], out.findings, source)
 
 
 def _one(

@@ -17,7 +17,10 @@ of the measurement's side products become the current fractions of the side reac
 name. An optional ``membrane:`` block reports the membrane's water dissociation efficiency
 (given, or measured), the co-ion fluxes ``f_i (1 - WDE) N I / (|z_i| F)`` and the anolyte
 hydroxide deficit ``(1 - WDE) N I / F``, apart from the Faradaic efficiency, which it never
-changes.
+changes. An optional ``stacks:`` section sizes stacks of a cell for a product duty, with the
+skid equipment a duty of ``process/duties.yaml`` gives (:class:`Stack`); the Faraday balance
+does not read it, ``cheme process stack``
+(:mod:`chemeascode.domains.equipment.electrolyser_stack`) does.
 
 :func:`cell_report` evaluates every cell (model :data:`MODEL`):
 
@@ -324,12 +327,160 @@ class Cell(Strict):
     sources: list[str] = Field(default_factory=list)
 
 
+class StackProduct(Strict):
+    """The product duty of the stacks at the skid boundary."""
+
+    component: str = Field(description="The main product: a product of the cell's reaction.")
+    rate: Quantity = Field(description="kg/h, kg/d, t/d, g/h, mol/s or kmol/h.")
+    purity: Quantity | None = Field(default=None, description="Declared, reported only.")
+    pressure: Quantity | None = Field(default=None, description="Declared, reported only.")
+
+
+class StackElectrical(Strict):
+    """The electrical limits the arrangement is chosen within: cells in series in a stack,
+    stacks in parallel on the DC bus."""
+
+    max_stack_voltage: Quantity = Field(
+        description="V: the DC bus voltage (or the stack's insulation limit); cells per stack "
+        "= floor(U_max / U_cell)."
+    )
+    max_stack_current: Quantity | None = Field(
+        default=None, description="A or kA: the current one stack may carry (its cells')."
+    )
+    rectifier_efficiency: Quantity | None = Field(
+        default=None, description="AC to DC, 0..1: the AC power (optional)."
+    )
+    rectifier_max_current: Quantity | None = Field(
+        default=None, description="A or kA per rectifier: the number of rectifiers (optional)."
+    )
+
+
+class StackEnvelope(Strict):
+    """The stack's outline per cell, ASSUMED (with its source) until the vendor's: missing
+    values leave the stack's dimensions TBD."""
+
+    cell_pitch: Quantity | None = Field(
+        default=None,
+        description="mm (or m) per cell along the stack axis (bipolar plate, "
+        "frames, gaskets, membrane).",
+    )
+    end_plates: Quantity | None = Field(
+        default=None,
+        description="mm (or m): both end plate assemblies (current collectors, "
+        "insulation, compression) together, along the axis.",
+    )
+    frame_margin: Quantity | None = Field(
+        default=None,
+        description="mm (or m): the frame and manifolds beyond the (square) "
+        "active area on each side.",
+    )
+
+
+class StackAccess(Strict):
+    """Clearances around each stack for maintenance and stack replacement (ASSUMED until
+    the layout review)."""
+
+    end: Quantity | None = Field(default=None, description="m at each end of the stack axis.")
+    side: Quantity | None = Field(default=None, description="m along each side.")
+
+
+class StackReplacement(Strict):
+    """The membrane and electrode life (ASSUMED until the vendor's warranty)."""
+
+    interval: Quantity = Field(description="h of operation between cell replacements.")
+    operating_hours: Quantity | None = Field(
+        default=None, description="h of operation per year: replacements per year."
+    )
+
+
+class SkidTank(Strict):
+    """A tank whose working volume follows from the duty (reservoir, dosing or bleed tank)."""
+
+    tag: str = Field(description="Its tag in the equipment list (a vertical cylinder).")
+    margin: Quantity | None = Field(
+        default=None,
+        description="The freeboard or margin over the working volume, as a fraction (0.2) or %.",
+    )
+    aspect_ratio: Quantity | None = Field(
+        default=None, description="Height over diameter of the cylinder (ASSUMED)."
+    )
+
+
+class RecirculationPump(Strict):
+    """The anolyte recirculation pump: its flow from the flow per cell and the cells."""
+
+    tag: str
+    flow_per_area: Quantity | None = Field(
+        default=None, description="Anolyte flow per active area: mL/(min cm2), L/(h m2)."
+    )
+    flow_per_cell: Quantity | None = Field(
+        default=None, description="Anolyte flow per cell: mL/min, L/min, L/h, m3/h."
+    )
+    density: Quantity | None = Field(default=None, description="Of the anolyte: kg/m3, kg/L.")
+    viscosity: Quantity | None = Field(default=None, description="Of the anolyte: mPa s.")
+    reservoir_pressure: Quantity | None = Field(
+        default=None, description="kPa(a), bar(a): over the reservoir (the suction)."
+    )
+    stack_pressure_drop: Quantity | None = Field(
+        default=None, description="kPa, bar: across a stack (inlet to return)."
+    )
+
+    @model_validator(mode="after")
+    def _one(self) -> RecirculationPump:
+        if self.flow_per_area is not None and self.flow_per_cell is not None:
+            raise ValueError("give flow_per_area or flow_per_cell, not both")
+        return self
+
+
+class DosingPump(Strict):
+    tag: str
+    margin: Quantity | None = Field(
+        default=None, description="Over the duty's largest dosing rate, as a fraction or %."
+    )
+
+
+class SkidEquipment(Strict):
+    """The skid equipment whose inputs follow from a duty of ``process/duties.yaml``, run at
+    the sized arrangement."""
+
+    duty: str = Field(description="A duty id of process/duties.yaml: the campaign is its horizon.")
+    reservoir: SkidTank | None = None
+    recirculation_pump: RecirculationPump | None = None
+    dosing_pump: DosingPump | None = None
+    dosing_tank: SkidTank | None = None
+    bleed_tank: SkidTank | None = None
+
+
+class Stack(Strict):
+    """Stacks of one cell of this file sized for a product duty (``cheme process stack``)."""
+
+    id: str
+    title: str = ""
+    cell: str = Field(description="A cell id of this file: area, current, FE and voltage.")
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Equipment-list tags of the stacks, one per stack: each gets the envelope.",
+    )
+    product: StackProduct
+    electrical: StackElectrical
+    envelope: StackEnvelope | None = None
+    access: StackAccess | None = None
+    replacement: StackReplacement | None = None
+    equipment: SkidEquipment | None = None
+    sources: list[str] = Field(default_factory=list)
+
+
 class Cells(Strict):
     """The electrochemical cells of the process."""
 
     schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
     kind: Literal["electrochemical_cells"]
     cells: list[Cell] = Field(default_factory=list)
+    stacks: list[Stack] = Field(
+        default_factory=list,
+        description="Stacks sized from a cell for a product duty, and the skid equipment "
+        "inputs from a duty (cheme process stack); not part of the Faraday balance.",
+    )
 
     @model_validator(mode="after")
     def _version(self) -> Cells:
@@ -1783,6 +1934,44 @@ def _load[T](root: Path, name: str, model: type[T], rule: str) -> tuple[T | None
 
 def has_cells(root: Path) -> bool:
     return (Path(root) / CELLS_FILE).is_file()
+
+
+def load_cells(root: Path) -> tuple[Cells | None, Any, list[Finding]]:
+    """``process/cells.yaml`` under *root*: the model (None when it is missing or invalid), its
+    composed YAML document (for line numbers) and the schema findings."""
+    cells, doc, findings = _load(Path(root), CELLS_FILE, Cells, "cheme.cell-schema")
+    if doc is None and (Path(root) / CELLS_FILE).is_file():
+        doc = _compose(Path(root) / CELLS_FILE)
+    return cells, doc, findings
+
+
+@dataclass(frozen=True)
+class CellProduct:
+    """A product of a cell's overall reaction: the electrons and the product's coefficient per
+    extent, and its molar mass (kg/kmol; None when materials.yaml gives none)."""
+
+    reaction: str
+    electrons: float
+    coefficient: float
+    molar_mass: float | None
+
+
+def cell_product(root: Path, cell: Cell, product: str) -> CellProduct | None:
+    """*product* of *cell*'s overall reaction in ``process/reactions.yaml`` under *root*, with
+    its molar mass from ``process/materials.yaml``; None when the reaction is not declared or
+    does not form *product*."""
+    root = Path(root)
+    reactions, _, _ = _load(root, REACTIONS_FILE, Reactions, "cheme.cell-schema")
+    materials, _, _ = _load(root, MATERIALS_FILE, Materials, "cheme.cell-schema")
+    reaction = reactions.by_id().get(cell.reaction) if reactions is not None else None
+    if reaction is None or reaction.stoichiometry.get(product, 0.0) <= 0:
+        return None
+    return CellProduct(
+        reaction.id,
+        cell.electrons,
+        reaction.stoichiometry[product],
+        _molar_masses(materials).get(product),
+    )
 
 
 def cell_report(root: Path) -> CellReport:

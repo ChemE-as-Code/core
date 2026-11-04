@@ -407,6 +407,63 @@ def duty(
         raise typer.Exit(1)
 
 
+@process_app.command("stack")
+def stack(
+    ids: Annotated[
+        list[str] | None, typer.Argument(help="Stack ids (default: every stack).")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write",
+            help="Write the calculated stack and tank dimensions into the equipment list and "
+            "the pumps' inputs into their datasheets (never over a value written by hand).",
+        ),
+    ] = False,
+) -> None:
+    """The stacks of the stacks: section of process/cells.yaml sized for their product duty
+    at the cell's operating point (never outside its measured or declared range): active area,
+    cells, cells per stack from the voltage limit, stacks, stack voltage and current, DC power,
+    output and its margin, kWh per kg, the stack envelope; and the skid equipment inputs from
+    the duty named, run at the sized arrangement over its horizon: reservoir and tank
+    dimensions, the recirculation and dosing pumps' flows. Without --write it writes nothing
+    and reports what differs from the equipment list and datasheets (cheme.stack-outdated).
+    Exit 1 on an error finding, 2 without process/cells.yaml or stacks, or for an unknown id."""
+    from chemeascode.domains.equipment.electrolyser_stack import (
+        has_stacks,
+        report_text,
+        stack_report,
+        write_stack_inputs,
+    )
+    from chemeascode.domains.process.electrochemical_cell import CELLS_FILE
+
+    workspace = _workspace()
+    if not has_stacks(workspace.root):
+        typer.echo(f"{CELLS_FILE} has no stacks: section (or does not load)", err=True)
+        raise typer.Exit(2)
+    try:
+        report = stack_report(workspace.root, ids or None)
+    except KeyError as failure:
+        typer.echo(str(failure).strip("'\""), err=True)
+        raise typer.Exit(2) from failure
+    if write:
+        try:
+            written = write_stack_inputs(workspace.root, report)
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(1) from failure
+        report = stack_report(workspace.root, ids or None)  # as the files are now
+        if not as_json:
+            for name, tags in written.written.items():
+                typer.echo(f"wrote {name}: {', '.join(tags)}")
+            if not written.written:
+                typer.echo("nothing to write")
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if report.errors:
+        raise typer.Exit(1)
+
+
 def _duty_plots(report, directory: Path, as_json: bool) -> None:
     from chemeascode.domains.process.electrolysis_plots import duty_plots
 
