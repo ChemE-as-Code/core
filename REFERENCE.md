@@ -1107,6 +1107,21 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   efficiency from the anolyte titration, power, heat and the charge and carbon balances, and
   writes polarisation, efficiency, partial-current and water-dissociation plots only for the
   inputs that support them (`docs/framework/electrochemical-measurements.md`).
+- **Electrolysis duties**: `process/duties.yaml` (schema `cheme/electrolysis-duties/v1`)
+  states dynamic duties of a cell of `process/cells.yaml` against its anolyte reservoir: a
+  current, power or on/off schedule, the reservoir (volume, composition, anolyte model by id,
+  optional CO2 degassing), dosing on a pH trigger or continuous, bleed, make-up water, the
+  stated pH threshold (a design criterion) and the horizon.
+  **`cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]`** integrates
+  them (Dormand-Prince 5(4) with events): the voltage, Faradaic efficiency and water
+  dissociation efficiency at each instant from the measured series (never extrapolated: the
+  transient stops at the first exit from the measured range and the time outside is summed)
+  or the specified cell; pH, inventory, product, charge, energy, dosing and bleed over time;
+  the time to the specified pH threshold; `--compare` compares duties at equal delivered
+  product; `--plot` writes aligned time plots and an operating map (WDE x reservoir volume)
+  with the measured WDE points apart from the simulated values. The first anolyte model is
+  `well-mixed-carbonate` v1 (equilibrium carbonate speciation on a concentration basis;
+  `docs/framework/electrolysis-duties.md`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
@@ -1686,6 +1701,7 @@ skills in `.claude/skills/`:
 | `route-selection` | comparing the routes (`cheme chemistry evidence`), selecting one with its rationale, the `model_basis` (reactions, evidence, assumptions, validation plan) and the handoff to `reactions.yaml` with each value citing its observation |
 | `reactions` | `process/reactions.yaml` (stoichiometry, conversion, heat of reaction, catalyst, sources), reactions on reactor steps, element and extent balances, conversion reactors in `process propagate` |
 | `electrochemical-cell-modelling` | `process/cells.yaml`: reactions and electrons, half-reactions, specified or measured performance (`performance: measured`, never extrapolated), the membrane block with FE and WDE kept apart, `cheme process cell` and the flowsheet link |
+| `electrolysis-duty-assessment` | `process/duties.yaml`: current, power or on/off schedules against the anolyte reservoir, the stated pH threshold, dosing, bleed, `cheme process duty`, comparison at equal delivered product, the measured range never left unflagged, measured points kept apart from simulated transients |
 | `experiment-reproduction` | reproducing a published measured series: the data set pinned by DOI and checksum, tolerances frozen before comparing, reproduction kept apart from validation and design use, no third-party content copied, `cheme experiments electrochem` |
 | `process-simulation` | `process/simulation.yaml` (property package, step specs), `process simulate --check` and `--fill` with DWSIM, deviations from assumed values, shortcut before rigorous columns, recycles |
 | `pid-edit` | changing a sheet: edit, fmt, validate, render, diff, commit |

@@ -4,6 +4,24 @@
 
 ### Added
 
+- `cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]` (#138,
+  ADR 0043): dynamic electrolysis duties in `process/duties.yaml` (schema
+  `cheme/electrolysis-duties/v1`, catalogue key `process-duties`). Current, power and on/off
+  schedules against a cell of `process/cells.yaml` (measured performance looked up at each
+  instant, never extrapolated: the transient stops at the first exit from the measured range
+  and the time outside is summed), the anolyte reservoir's pH and inventory, product, charge,
+  energy, dosing (on a pH trigger or continuous) and bleed over time, the time to the stated
+  pH threshold, comparison at equal delivered product, aligned time plots and an operating
+  map. `cheme.duty-*` findings; `cheme validate` reports the schema, cell and model ones
+  (every error a duty is refused on before it is integrated).
+- An anolyte model interface (`domains/chemistry/anolyte.py`: protocol and registry by id, no
+  default) and its first model `well-mixed-carbonate` v1 (`domains/chemistry/carbonate.py`):
+  moles of cation and inorganic carbon and the volume, equilibrium carbonate speciation from
+  the charge balance on a concentration basis, optional CO2 degassing. Agrees with the
+  process-library#329 reproduction of the authors' model (322.30 h to pH 12 at 1 L) and lies
+  within its validation envelope. The NaCl electrolyte route is unchanged.
+- `foundation/ode.py`: an adaptive Dormand-Prince 5(4) integrator with dense output and
+  event location (pure Python).
 - `cheme experiments electrochem FILE [--json] [--plot DIR]` (#137, ADR 0041): measured
   electrochemical series in `experiments/electrochemistry/*.yaml` (schema
   `cheme/electrochemical-measurements/v1`). Per replicate and point (mean, sd, n): Faradaic

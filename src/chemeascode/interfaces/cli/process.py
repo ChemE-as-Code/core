@@ -330,6 +330,93 @@ def cell(
         raise typer.Exit(1)
 
 
+@process_app.command("duty")
+def duty(
+    ids: Annotated[list[str] | None, typer.Argument(help="Duty ids (default: every duty).")] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    plot: Annotated[
+        Path | None,
+        typer.Option(help="Write the time plots and operating maps (SVG) into this directory."),
+    ] = None,
+    compare: Annotated[
+        str | None,
+        typer.Option(help="ID,ID: compare these duties at equal delivered product (--co)."),
+    ] = None,
+    co: Annotated[
+        float | None, typer.Option(help="With --compare: the delivered product, kg.")
+    ] = None,
+    tolerance: Annotated[
+        float,
+        typer.Option(help="With --compare: relative tolerance on the delivered product."),
+    ] = 1e-3,
+) -> None:
+    """The dynamic duties of process/duties.yaml: each cell's current or power schedule
+    against the anolyte reservoir (voltage, efficiencies and WDE from the measured series or
+    the specified cell, never extrapolated), the pH, inventory, product, charge, energy,
+    dosing and bleed over time, the time to the stated pH threshold and the time outside the
+    measured range. --compare ID,ID --co KG compares duties at equal delivered product (the
+    duties are named there, not as IDS; --plot then draws the compared transients). Writes
+    nothing but the plots. Exit 1 on an error finding, 2 without process/duties.yaml, for an
+    unknown duty id or for IDS given with --compare."""
+    from chemeascode.domains.process.electrolysis_duty import (
+        DUTIES_FILE,
+        DutyReport,
+        compare_duties,
+        comparison_text,
+        duty_report,
+        has_duties,
+        report_text,
+    )
+
+    workspace = _workspace()
+    if not has_duties(workspace.root):
+        typer.echo(f"{DUTIES_FILE} does not exist", err=True)
+        raise typer.Exit(2)
+    if compare is not None:
+        if co is None:
+            typer.echo("--compare needs --co KG (the delivered product)", err=True)
+            raise typer.Exit(2)
+        if ids:
+            typer.echo(
+                f"--compare names the duties to compare (ID,ID); drop {' '.join(ids)} or add "
+                "them to --compare",
+                err=True,
+            )
+            raise typer.Exit(2)
+        names = [n.strip() for n in compare.split(",") if n.strip()]
+        try:
+            comparison = compare_duties(workspace.root, names, co, tolerance)
+        except (KeyError, ValueError) as failure:
+            typer.echo(str(failure).strip("'\""), err=True)
+            raise typer.Exit(2) from failure
+        typer.echo(comparison.to_json() if as_json else comparison_text(comparison))
+        if plot is not None:  # the compared transients, each to the target
+            _duty_plots(DutyReport(comparison.duties, comparison.findings), plot, as_json)
+        if any(f.level == "error" for f in comparison.findings):
+            raise typer.Exit(1)
+        return
+    try:
+        report = duty_report(workspace.root, ids or None)
+    except KeyError as failure:
+        typer.echo(str(failure).strip("'\""), err=True)
+        raise typer.Exit(2) from failure
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if plot is not None:
+        _duty_plots(report, plot, as_json)
+    if report.errors:
+        raise typer.Exit(1)
+
+
+def _duty_plots(report, directory: Path, as_json: bool) -> None:
+    from chemeascode.domains.process.electrolysis_plots import duty_plots
+
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, svg in duty_plots(report).items():
+        (directory / name).write_text(svg, encoding="utf-8")
+        if not as_json:
+            typer.echo(f"wrote {directory / name}")
+
+
 @process_app.command("energy")
 def energy(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
