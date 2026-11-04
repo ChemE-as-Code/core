@@ -75,7 +75,26 @@ Rules (``cheme.duty-*``), each finding naming the file, line, rule and a hint:
   cannot give one; ``target-not-reached`` (warning): a compared duty ended before the target;
 - ``arrangement`` (info): the duty is run at the arrangement a stack design of
   ``process/cells.yaml`` sized for it (``cheme process stack``: its cells in series and stacks),
-  not the duty's own ``cells_in_series`` and ``stacks`` (one design basis).
+  not the duty's own ``cells_in_series`` and ``stacks`` (one design basis): the duty a stack's
+  ``equipment.duty`` names, or a duty that names the stack (``stack:``, a comparison duty at
+  the skid's arrangement); (error, the duty is refused) a duty naming a stack that is not in
+  the file or is of another cell, whose arrangement is not given, that another stack's
+  equipment runs, or that states ``cells_in_series`` or ``stacks`` other than the stack's;
+- ``size`` (error): ``reservoir.size: to_horizon`` on a duty with dosing, bleed, make-up water
+  or degassing, a time margin that is not a fraction or time, or a duty whose volume does not
+  scale exactly (more than one operating point, leaving the measured range, another end than
+  the threshold or the horizon): no volume; (info) the volume that reaches the horizon plus
+  the time margin, ``V0 Q(target) / Q*`` (:func:`_required_volume`); (warning) a time margin
+  without ``size``.
+
+Totals by route: besides the totals, every duty integrates the cation leaving and the carbon
+entering through the membrane and the cation and carbon leaving with the bleed (``totals``
+``membrane_cation_mol``, ``membrane_carbon_mol``, ``bleed_cation_mol``, ``bleed_carbon_mol``,
+with ``dosing_cation_mol`` and the initial inventories), so that the cation balance (initial
++ dosed - bled - membrane = final) and the carbon balance (initial + membrane - bled - degassed
+= final) close on their own, to rounding: they are quadratures on the integration's own steps
+(:func:`chemeascode.foundation.ode.solve`, ``error_components``), so they leave the steps and
+every other value as without them.
 """
 
 from __future__ import annotations
@@ -281,6 +300,18 @@ class Reservoir(Strict):
     model: str = Field(description="The anolyte model id, e.g. well-mixed-carbonate.")
     temperature: Value | None = Field(default=None, description="Default: the cell's.")
     degassing: Degassing | None = None
+    size: Literal["to_horizon"] | None = Field(
+        default=None,
+        description="to_horizon: report the volume that reaches the horizon (plus time_margin) "
+        "at the stated pH threshold, V = V0 Q(H) / Q(t_threshold), exact for a duty without "
+        "dosing, bleed, make-up or degassing at one operating point (cheme process stack "
+        "--write writes it into volume); refused otherwise (cheme.duty-size).",
+    )
+    time_margin: Value | None = Field(
+        default=None,
+        description="With size: to_horizon, how long beyond the horizon the reservoir lasts: "
+        "a fraction of the horizon (0.1, or unit %) or a time (h, d).",
+    )
 
 
 class NoDosing(Strict):
@@ -356,6 +387,12 @@ class Duty(Strict):
     id: str
     title: str = ""
     cell: str = Field(description="A cell id of process/cells.yaml.")
+    stack: str | None = Field(
+        default=None,
+        description="A stack id of process/cells.yaml (stacks:): the duty runs at the "
+        "arrangement that stack is sized at (cheme process duty, --compare), as the duty a "
+        "stack's equipment names does; cells_in_series or stacks stated otherwise is an error.",
+    )
     cells_in_series: int | None = Field(default=None, ge=1, description="Default: the cell's.")
     stacks: int = Field(default=1, ge=1, description="Stacks in parallel feeding the reservoir.")
     product: str | None = Field(
@@ -631,6 +668,9 @@ class DutyResult:
     time_outside_model_range_h: float | None = None
     feasible: bool = False
     totals: dict[str, Any] = field(default_factory=dict)
+    #: with reservoir.size: to_horizon, the volume that reaches the horizon (plus the time
+    #: margin) at the threshold (``volume_l``, None with the ``reason`` when not given)
+    required_volume: dict[str, Any] | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
     series: dict[str, Any] = field(default_factory=dict)
     limitations: list[str] = field(default_factory=list)
@@ -1260,16 +1300,21 @@ _ACCUMULATORS = (
     "makeup_l",
     "co2_degassed_mol",
 )
+#: the totals by route, after the accumulators: the cation leaving and the carbon entering
+#: through the membrane, the cation and carbon leaving with the bleed (quadratures: integrated
+#: on the steps the state and the accumulators take, outside the error control)
+_ROUTES = ("membrane_cation_mol", "membrane_carbon_mol", "bleed_cation_mol", "bleed_carbon_mol")
 
 
 def _fluxes(
     op: _Op, plan: _Plan, cell: DutyCell, dosing_on: bool
 ) -> tuple[ReservoirFluxes, dict[str, float]]:
-    """The reservoir's fluxes at one operation, and the accumulators' rates."""
+    """The reservoir's fluxes at one operation, and the accumulators' rates (with the
+    membrane's routes; the bleed's depend on the state: :func:`_bleed_routes`)."""
     n = cell.cells
     current = op.current_a * n  # A through all cells together (each carries op.current_a)
     ions: dict[str, float] = {}
-    rates = dict.fromkeys(_ACCUMULATORS, 0.0)
+    rates = dict.fromkeys((*_ACCUMULATORS, *_ROUTES), 0.0)
     point = op.point
     if current > 0 and point is not None and point.available:
         wde = point.water_dissociation_efficiency or 0.0
@@ -1280,8 +1325,10 @@ def _fluxes(
             z = _CARBON_IONS.get(ion)
             if z is not None:
                 ions[ion] = ions.get(ion, 0.0) + share * co / z
+                rates["membrane_carbon_mol"] += share * co / z  # one carbon per ion
             else:  # the cation leaves the anolyte
                 ions[ion] = ions.get(ion, 0.0) - share * co
+                rates["membrane_cation_mol"] += share * co
         rates["charge_c"] = current
         rates["energy_j"] = (point.voltage_v or 0.0) * current
         rates["product_mol"] = (
@@ -1299,6 +1346,17 @@ def _fluxes(
     rates["bleed_l"] = plan.bleed_l_s
     rates["makeup_l"] = plan.makeup_l_s
     return ReservoirFluxes(ions, dosing, volume_in, plan.bleed_l_s), rates
+
+
+def _bleed_routes(plan: _Plan, layout: _Layout, state: Sequence[float]) -> tuple[float, float]:
+    """mol/s of the cation and the carbon the bleed removes: reservoir solution at its
+    composition (as the anolyte model removes it)."""
+    volume = state[layout.volume]
+    if not plan.bleed_l_s or volume <= 0:
+        return 0.0, 0.0
+    bleed = plan.bleed_l_s / volume
+    carbon = state[layout.carbon] if layout.carbon is not None else 0.0
+    return bleed * state[layout.cation], bleed * carbon
 
 
 @dataclass(frozen=True)
@@ -1375,6 +1433,7 @@ def _scales(plan: _Plan, cell: DutyCell, y0: list[float], k: int) -> list[float]
         max(plan.makeup_l_s * plan.horizon_s, 1e-9),
         max(charge / FARADAY, 1e-9),
     ]
+    typical += [max(charge / FARADAY, 1e-9)] * len(_ROUTES)  # outside the error control
     return [max(plan.rtol * 1e-3 * t, 1e-300) for t in typical]
 
 
@@ -1406,7 +1465,8 @@ def _integrate(
     layout = _layout(model)
     k = layout.k
     iv, ic = layout.volume, layout.cation
-    y0 = list(model.initial(plan.composition, plan.volume_l)) + [0.0] * len(_ACCUMULATORS)
+    y0 = list(model.initial(plan.composition, plan.volume_l))
+    y0 += [0.0] * (len(_ACCUMULATORS) + len(_ROUTES))
     atol = _scales(plan, cell, y0, k)
     speciate = _Speciator(model, layout)
     events: list[dict[str, Any]] = []
@@ -1476,7 +1536,8 @@ def _integrate(
                 return [math.nan] * len(y)
             d = list(model.rates(state, fluxes, t))
             acc["co2_degassed_mol"] = model.losses(state).get("CO2", 0.0)
-            return d + [acc[name] for name in _ACCUMULATORS]
+            acc["bleed_cation_mol"], acc["bleed_carbon_mol"] = _bleed_routes(plan, layout, state)
+            return d + [acc[name] for name in (*_ACCUMULATORS, *_ROUTES)]
 
         return f
 
@@ -1498,6 +1559,7 @@ def _integrate(
                     atol=atol,
                     events=make_events(dosing_on),
                     max_steps=200_000,
+                    error_components=k + len(_ACCUMULATORS),  # the routes are quadratures
                 )
             except ValueError as failure:  # the model refused a state (an empty reservoir)
                 ended, message = "not-converged", str(failure)
@@ -1669,6 +1731,7 @@ def _prepare(
         return None
     result.horizon_h = plan.horizon_s / 3600
     result.rtol = plan.rtol
+    _size_check(duty, out, loc)
     model = _model_for(plan, result, out, loc)
     if model is None:
         return None
@@ -1702,6 +1765,275 @@ def _probe_density(cell: DutyCell, plan: _Plan) -> float | None:
         return (max(plan.values) or 0.0) / cell.area_m2
     lo_hi = cell.performance.bounds
     return 0.5 * (lo_hi[0] + lo_hi[1]) if lo_hi else None
+
+
+# -- the volume that reaches the horizon (reservoir.size: to_horizon) ---------------------------
+
+
+def _size_static(duty: Duty) -> tuple[str, list[Any]] | None:
+    """Why reservoir.size: to_horizon gives no volume for *duty* before it runs (and where):
+    dosing, bleed, make-up water or degassing (the time to the threshold no longer scales with
+    the volume), or a time margin that is not usable; None when there is none."""
+    r = duty.reservoir
+    flows = [
+        name
+        for name, given in (
+            ("dosing", duty.dosing.kind != "none"),
+            ("a bleed", duty.bleed is not None),
+            ("make-up water", duty.makeup_water is not None),
+            ("degassing", r.degassing is not None),
+        )
+        if given
+    ]
+    if flows:
+        return (
+            f"reservoir.size to_horizon with {', '.join(flows)}: the time to the threshold does "
+            "not scale with the volume, so no volume follows exactly",
+            ["reservoir", "size"],
+        )
+    m = r.time_margin
+    if m is not None and ((m.unit not in _FRACTION and m.unit not in _TIME) or not m.value >= 0):
+        return (
+            f"reservoir.time_margin {m.value:g} {m.unit or ''}".rstrip()
+            + " is no fraction or time >= 0",
+            ["reservoir", "time_margin"],
+        )
+    return None
+
+
+def _size_check(duty: Duty, out: _Out, loc: list[Any]) -> None:
+    """The ``duty-size`` error of :func:`_size_static` (the duty itself still runs)."""
+    if duty.reservoir.size != "to_horizon":
+        if duty.reservoir.time_margin is not None:
+            out.add(
+                "warning",
+                "size",
+                f"duty {duty.id}: reservoir.time_margin without reservoir.size: not used",
+                [*loc, "reservoir", "time_margin"],
+                [duty.id],
+                "add reservoir.size: to_horizon, or drop the time margin",
+            )
+        return
+    found = _size_static(duty)
+    if found is not None:
+        reason, at = found
+        out.add(
+            "error",
+            "size",
+            f"duty {duty.id}: {reason}: no volume is given",
+            [*loc, *at],
+            [duty.id],
+            "size the reservoir by hand (drop reservoir.size), or leave out the dosing, bleed, "
+            "make-up water and degassing",
+        )
+
+
+def _target_s(duty: Duty, horizon_s: float) -> tuple[float, str]:
+    """The time the reservoir is sized to last (s) and its text: the horizon plus the time
+    margin (a fraction of it, or a time)."""
+    m = duty.reservoir.time_margin
+    if m is None or not m.value:
+        return horizon_s, f"the horizon {horizon_s / 3600:.6g} h"
+    if m.unit in _FRACTION:
+        target = horizon_s * (1 + m.value * _FRACTION[m.unit])
+        text = f"{m.value:g}{' ' + m.unit if m.unit else ''} of it"
+    else:
+        target = horizon_s + m.value * _TIME[m.unit]  # type: ignore[index]
+        text = f"{m.value:g} {m.unit}"
+    return target, f"{target / 3600:.6g} h (the horizon {horizon_s / 3600:.6g} h + {text})"
+
+
+def _required_volume(
+    duty: Duty, plan: _Plan, cell: DutyCell, operation: _Operation, run: _Run, result: DutyResult
+) -> dict[str, Any]:
+    """The reservoir volume that reaches the target time (:func:`_target_s`) at the stated pH
+    threshold. Without dosing, bleed, make-up or degassing, and with the membrane's fluxes per
+    charge the same whenever the cell is on (one water dissociation efficiency and co-ion
+    split), the state is ``y0 + (y - y0) Q / Q_run`` along the charge ``Q``, and the threshold
+    is reached at a fixed charge per volume ``Q* / V0``: ``V = V0 Q(target) / Q*``, exact. A
+    run ended by the threshold gives ``Q*``; one that reached its horizon gives it by
+    following that straight path in the charge (the model's speciation) to the threshold."""
+    v0 = plan.volume_l
+    found: dict[str, Any] = {
+        "volume_l": None,
+        "reason": "",
+        "probe_volume_l": v0,
+        "horizon_h": plan.horizon_s / 3600,
+        "target_h": None,
+        "charge_target_c": None,
+        "charge_threshold_c": None,
+        "basis": "V = V0 Q(target) / Q*: the time to the threshold scales with the volume "
+        "(no dosing, bleed, make-up or degassing; one operating point)",
+    }
+
+    def none(reason: str) -> dict[str, Any]:
+        found["reason"] = reason
+        return found
+
+    static = _size_static(duty)
+    if static is not None:
+        return none(static[0])
+    target, target_text = _target_s(duty, plan.horizon_s)
+    found["target_h"] = target / 3600
+    found["target"] = target_text
+    if plan.quantity == "power" and plan.interpolation == "linear" and len(set(plan.values)) > 1:
+        return none("a linear power ramp: its charge over the target is not exact")
+    try:
+        cuts = [0.0, *operation.critical(target), target]
+    except ValueError as failure:
+        return none(f"the schedule up to {target / 3600:.6g} h: {failure}")
+    charge = 0.0
+    seen: tuple[Any, ...] | None = None
+    for a, b in zip(cuts, cuts[1:], strict=False):
+        if b <= a:
+            continue
+        op_of = operation.within(a, b)
+        ends = [op_of(a), op_of(0.5 * (a + b)), op_of(b)]
+        if any(not op.in_range for op in ends):
+            return none(
+                f"the schedule leaves the measured range at {a / 3600:.6g} h, before the "
+                f"target {target / 3600:.6g} h"
+            )
+        if all(op.current_a <= 0 for op in ends):
+            continue  # idle
+        for op in ends:
+            point = op.point
+            if point is None or not point.available:
+                continue
+            key = (
+                point.water_dissociation_efficiency,
+                tuple(sorted(point.co_ions.items())),
+            )
+            if seen is None:
+                seen = key
+            elif not _same_point(seen, key):
+                return none(
+                    "the schedule runs the cell at more than one water dissociation "
+                    "efficiency or co-ion split (another current density): the fluxes per "
+                    "charge change, the scaling is not exact"
+                )
+        charge += (b - a) * cell.cells * 0.5 * (ends[0].current_a + ends[2].current_a)
+    found["charge_target_c"] = charge
+    if run.ended not in ("threshold", "horizon"):
+        return none(f"the run at {v0:.6g} L ended by {run.ended}, not the threshold or horizon")
+    if not run.pieces:
+        return none("the initial pH is at or below the threshold: no volume reaches it later")
+    t_end = run.pieces[-1].solution.t_final
+    y_end, _ = _state_at(run, t_end)
+    layout = run.layout
+    assert layout is not None
+    k = layout.k
+    y0 = list(run.model.initial(plan.composition, plan.volume_l))
+    y1 = list(y_end[:k])
+    q_run = result.totals.get("charge_c") or 0.0
+    if q_run <= 0:
+        return none("no charge passes in the run: the threshold is never reached")
+    if abs(y1[layout.volume] - y0[layout.volume]) > 1e-9 * max(y0[layout.volume], 1e-12):
+        return none("the reservoir volume changes over the run")
+    if run.ended == "threshold":
+        q_star = q_run
+    else:
+        s = _threshold_along(run.model, layout, y0, y1, plan.threshold_ph)
+        if s is None:
+            return none(
+                "following the run's charge, the threshold is not reached before an inventory "
+                "of the anolyte runs out"
+            )
+        q_star = s * q_run
+    found["charge_threshold_c"] = q_star
+    found["volume_l"] = v0 * charge / q_star
+    found["basis"] += (
+        f": V0 {v0:.6g} L x Q(target) {charge:.6g} C / Q* {q_star:.6g} C, the threshold "
+        + (
+            f"reached at {result.time_to_threshold_h:.6g} h in the run"
+            if run.ended == "threshold"
+            else f"not reached by the horizon at {v0:.6g} L (Q* along the run's charge)"
+        )
+    )
+    return found
+
+
+def _same_point(a: tuple[Any, ...], b: tuple[Any, ...]) -> bool:
+    wa, ca = a
+    wb, cb = b
+    if wa is None or wb is None:
+        return wa == wb and ca == cb
+    if abs(wa - wb) > 1e-9 or [n for n, _ in ca] != [n for n, _ in cb]:
+        return False
+    return all(abs(x - y) <= 1e-9 for (_, x), (_, y) in zip(ca, cb, strict=True))
+
+
+def _threshold_along(
+    model: Any, layout: _Layout, y0: list[float], y1: list[float], ph: float
+) -> float | None:
+    """s >= 1 at which the state ``y0 + s (y1 - y0)`` reaches *ph* (the pH falling along it),
+    with every conserved inventory still positive; None when there is none."""
+
+    def at(s: float) -> list[float]:
+        return [a + s * (b - a) for a, b in zip(y0, y1, strict=True)]
+
+    def positive(y: list[float]) -> bool:
+        return all(y[i] > 0 for i, _ in layout.inventories)
+
+    def above(s: float) -> bool | None:
+        y = at(s)
+        if not positive(y):
+            return None
+        try:
+            return model.speciate(y).ph > ph
+        except ValueError:
+            return None
+
+    lo, hi = 1.0, 2.0
+    while True:
+        state = above(hi)
+        if state is None:
+            return None
+        if not state:
+            break
+        lo, hi = hi, hi * 2
+        if hi > 1e12:
+            return None
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        state = above(mid)
+        if state is None:
+            return None
+        if state:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo <= 1e-14 * hi:
+            break
+    return hi
+
+
+def _size_finding(duty: Duty, result: DutyResult, out: _Out, loc: list[Any]) -> None:
+    found = result.required_volume or {}
+    volume = found.get("volume_l")
+    if volume is None:
+        if _size_static(duty) is not None:
+            return  # reported by _size_check
+        out.add(
+            "error",
+            "size",
+            f"duty {duty.id}: reservoir.size to_horizon gives no volume: {found.get('reason')}",
+            [*loc, "reservoir", "size"],
+            [duty.id],
+            "size the reservoir by hand (drop reservoir.size), or keep the duty at one operating "
+            "point inside the measured range",
+        )
+        return
+    out.add(
+        "info",
+        "size",
+        f"duty {duty.id}: a reservoir of {volume:.6g} L reaches {found['target']} at the pH "
+        f"threshold {duty.threshold.ph:g} (stated {found['probe_volume_l']:.6g} L)",
+        [*loc, "reservoir", "volume"],
+        [duty.id],
+        "`cheme process stack --write` writes it into reservoir.volume for the duty a stack's "
+        "equipment names; or state it by hand",
+    )
 
 
 def simulate_duty(
@@ -1758,6 +2090,9 @@ def simulate_duty(
             "check the reservoir's composition and volume",
         )
     _report(result, run, plan, cell, operation, rows, first_exit, out, loc, samples)
+    if duty.reservoir.size == "to_horizon" and product_target_mol is None:
+        result.required_volume = _required_volume(duty, plan, cell, operation, run, result)
+        _size_finding(duty, result, out, loc)
     result._inputs = (duty, cell)
     return result
 
@@ -1914,6 +2249,9 @@ def _report(
     hydroxide_mass = _hydroxide_molar_mass(plan.cation)
     dose_mol = final["dosing_mol"]
     density = plan.dosing_density_kg_l
+    initial = _inventory(run.layout, model.initial(plan.composition, plan.volume_l))
+    routes = final["routes"]
+    carbon = run.layout is not None and run.layout.carbon is not None
     result.totals = {
         "charge_c": final["charge_c"],
         "charge_ah": final["charge_c"] / 3600,
@@ -1937,6 +2275,17 @@ def _report(
         "final_cation_mol": final["cation_mol"],
         "final_carbon_mol": final["carbon_mol"],
         "final_volume_l": final["volume_l"],
+        # by route, so that the cation and the carbon balance close on their own: initial +
+        # dosed - bled - membrane = final (cation); initial + membrane - bled - degassed =
+        # final (carbon)
+        "initial_cation_mol": initial["cation_mol"],
+        "initial_carbon_mol": initial["carbon_mol"],
+        "initial_volume_l": initial["volume_l"],
+        "dosing_cation_mol": dose_mol,  # one cation per hydroxide dosed
+        "membrane_cation_mol": routes["membrane_cation_mol"],
+        "membrane_carbon_mol": routes["membrane_carbon_mol"] if carbon else None,
+        "bleed_cation_mol": routes["bleed_cation_mol"],
+        "bleed_carbon_mol": routes["bleed_carbon_mol"] if carbon else None,
     }
     if plan.dosing != "none" and density is None:
         result.limitations.append(
@@ -2070,6 +2419,8 @@ def _empty_row(t: float) -> dict[str, Any]:
         "bleed_l": 0.0,
         "makeup_l": 0.0,
         "co2_degassed_mol": 0.0,
+        #: the totals by route (:data:`_ROUTES`); in the totals, not the series
+        "routes": dict.fromkeys(_ROUTES, 0.0),
     }
 
 
@@ -2081,7 +2432,8 @@ def _sample(run: _Run, plan: _Plan, cell: DutyCell, t: float, left: bool) -> dic
     fluxes, acc = _fluxes(op, plan, cell, piece.dosing_on)
     s = run.model.speciate(y[:k])
     mass = cell.product_molar_mass_kg_mol
-    totals = dict(zip(_ACCUMULATORS, y[k:], strict=True))
+    totals = dict(zip(_ACCUMULATORS, y[k : k + len(_ACCUMULATORS)], strict=True))
+    routes = dict(zip(_ROUTES, y[k + len(_ACCUMULATORS) :], strict=True))
     row = _empty_row(t)
     point = op.point
     row.update(
@@ -2109,13 +2461,14 @@ def _sample(run: _Run, plan: _Plan, cell: DutyCell, t: float, left: bool) -> dic
         bleed_l=totals["bleed_l"],
         makeup_l=totals["makeup_l"],
         co2_degassed_mol=totals["co2_degassed_mol"],
+        routes=routes,
     )
     del fluxes
     return row
 
 
 def _series(rows: list[dict[str, Any]], model: Any) -> dict[str, Any]:
-    keys = [k for k in rows[0] if k != "species"]
+    keys = [k for k in rows[0] if k not in ("species", "routes")]
     series: dict[str, Any] = {key: [r[key] for r in rows] for key in keys}
     names = sorted({n for r in rows for n in r["species"]})
     series["species_mol_l"] = {n: [r["species"].get(n) for r in rows] for n in names}
@@ -2169,6 +2522,8 @@ class _Context:
     measurements: dict[str, Any]
     root: Path
     inputs: list[str]
+    #: stack id -> its cell id (the stacks: section of process/cells.yaml)
+    stacks: dict[str, str] = field(default_factory=dict)
 
 
 def _context(root: Path) -> _Context:
@@ -2190,6 +2545,7 @@ def _context(root: Path) -> _Context:
         {},
         root,
         inputs,
+        {s.id: s.cell for s in cells.stacks} if cells is not None else {},
     )
 
 
@@ -2489,6 +2845,7 @@ def duty_findings(root: Path) -> list[Finding]:
     ctx = _context(root)
     for index, duty in enumerate(duties.duties):
         cell, _ = resolve_cell(duty, ctx, out, index)
+        _stack_reference(duty, ctx, out, index)
         if duty.reservoir.model not in anolyte_models():
             out.add(
                 "error",
@@ -2508,22 +2865,94 @@ def duty_findings(root: Path) -> list[Finding]:
     return out.findings
 
 
+def _stack_reference(duty: Duty, ctx: _Context, out: _Out, index: int) -> None:
+    """A duty's ``stack:`` names a stack of ``process/cells.yaml`` of the duty's cell (the
+    ``duty-arrangement`` errors that need no stack sizing)."""
+    if duty.stack is None:
+        return
+    cell = ctx.stacks.get(duty.stack)
+    if cell is None:
+        reason = f"names stack {duty.stack}, which is not in the stacks: of process/cells.yaml"
+    elif cell != duty.cell:
+        reason = f"names stack {duty.stack}, a stack of cell {cell}; the duty runs cell {duty.cell}"
+    else:
+        return
+    out.add(
+        "error",
+        "arrangement",
+        f"duty {duty.id}: {reason}: it is refused",
+        ["duties", index, "stack"],
+        [duty.id],
+        "name a stack of process/cells.yaml whose cell the duty runs, or drop stack:",
+    )
+
+
 @dataclass(frozen=True)
 class Arrangement:
     """The cells in series per stack and the stacks a duty runs at, set by something else
-    than the duty (a stack sizing): *by* names it (``stack STK-1``)."""
+    than the duty (a stack sizing): *by* names it (``stack STK-1``), *stack* is that stack's
+    id (None: not a stack of ``process/cells.yaml``)."""
 
     cells_in_series: int
     stacks: int
     by: str
+    stack: str | None = None
+
+
+def _arrangement_conflict(duty: Duty, arrangement: Arrangement | None) -> str | None:
+    """Why a duty that names a stack (``stack:``) cannot run at *arrangement* (the one given
+    for it); None when it can, or when it names no stack."""
+    if duty.stack is None:
+        return None
+    if arrangement is None:
+        return (
+            f"it names stack {duty.stack}, whose arrangement is not given (the stack is not in "
+            "process/cells.yaml, is refused, or is of another cell than the duty's)"
+        )
+    if arrangement.stack is not None and arrangement.stack != duty.stack:
+        return (
+            f"it names stack {duty.stack}, but {arrangement.by} runs it (its equipment.duty): "
+            "one duty runs at one arrangement"
+        )
+    stated = duty.model_fields_set
+    conflicts = [
+        f"{name} {mine}"
+        for name, mine, sized in (
+            ("cells_in_series", duty.cells_in_series, arrangement.cells_in_series),
+            ("stacks", duty.stacks, arrangement.stacks),
+        )
+        if name in stated and mine is not None and mine != sized
+    ]
+    if conflicts:
+        return (
+            f"it names stack {duty.stack}, sized at {arrangement.cells_in_series} cells in series "
+            f"x {arrangement.stacks} stack(s), and states {' and '.join(conflicts)}"
+        )
+    return None
 
 
 def _arrange(
     duty: Duty, cell: DutyCell, arrangement: Arrangement | None, out: _Out, index: int
-) -> None:
-    """*cell* at *arrangement* (when given), with the ``duty-arrangement`` info finding."""
+) -> str | None:
+    """*cell* at *arrangement* (when given), with the ``duty-arrangement`` info finding; the
+    reason (a ``duty-arrangement`` error) when the duty names a stack it cannot run at
+    (:func:`_arrangement_conflict`): the duty is refused then."""
+    conflict = _arrangement_conflict(duty, arrangement)
+    if conflict is not None:
+        out.add(
+            "error",
+            "arrangement",
+            f"duty {duty.id}: {conflict}: refused",
+            ["duties", index, "stack"],
+            [duty.id],
+            "a duty that names a stack runs at the arrangement the stack is sized at "
+            "(`cheme process stack`): drop cells_in_series and stacks from the duty, name a "
+            "stack of process/cells.yaml of the duty's cell, and run it with `cheme process "
+            "duty`",
+        )
+        return conflict
     if arrangement is None:
-        return
+        return None
     cell.cells_in_series, cell.stacks = arrangement.cells_in_series, arrangement.stacks
     stated = (
         f"its own {duty.cells_in_series} cell(s) x {duty.stacks} stack(s) are not used"
@@ -2542,6 +2971,7 @@ def _arrange(
         "product duty or limits, not the duty"
         + ("; drop cells_in_series and stacks from the duty" if "own" in stated else ""),
     )
+    return None
 
 
 def duty_report(
@@ -2627,7 +3057,11 @@ def _one(
         result.refused = True
         result.reasons = reasons
         return result
-    _arrange(duty, cell, arrangement, out, index)
+    conflict = _arrange(duty, cell, arrangement, out, index)
+    if conflict is not None:
+        result = DutyResult(duty.id, duty.cell, line=_yaml_line(out.doc, ["duties", index]))
+        result.title, result.refused, result.reasons = duty.title, True, [conflict]
+        return result
     return simulate_duty(duty, cell, product_target_mol=target, out=out, index=index)
 
 
@@ -2800,7 +3234,10 @@ def compare_duties(
         if cell is None:
             refused.append(_row(did, None, False, "; ".join(reasons)))
             continue
-        _arrange(duty, cell, (arrangements or {}).get(did), out, index)
+        conflict = _arrange(duty, cell, (arrangements or {}).get(did), out, index)
+        if conflict is not None:
+            refused.append(_row(did, None, False, conflict))
+            continue
         pairs.append((duty, cell))
         indices.append(index)
     comparison = compare(pairs, target_kg, tolerance, out, indices)
@@ -2962,6 +3399,26 @@ def report_text(report: DutyReport) -> str:
             f"{_g(t['dosing_hydroxide_kg'])} kg, solution {_g(t['dosing_solution_kg'])} kg); "
             f"bleed {t['bleed_l']:.6g} L; make-up water {t['makeup_water_l']:.6g} L"
         )
+        lines.append(
+            f"  by route: cation {t['initial_cation_mol']:.6g} mol + dosed "
+            f"{t['dosing_cation_mol']:.6g} - bled {t['bleed_cation_mol']:.6g} - through the "
+            f"membrane {t['membrane_cation_mol']:.6g} = {t['final_cation_mol']:.6g} mol"
+            + (
+                f"; carbon {t['initial_carbon_mol']:.6g} mol + through the membrane "
+                f"{t['membrane_carbon_mol']:.6g} - bled {t['bleed_carbon_mol']:.6g} - degassed "
+                f"{t['co2_degassed_mol']:.6g} = {t['final_carbon_mol']:.6g} mol"
+                if t.get("membrane_carbon_mol") is not None
+                else ""
+            )
+        )
+        need = d.required_volume
+        if need is not None:
+            lines.append(
+                f"  reservoir.size to_horizon: {need['volume_l']:.6g} L reaches {need['target']}"
+                f" (stated {need['probe_volume_l']:.6g} L)"
+                if need.get("volume_l") is not None
+                else f"  reservoir.size to_horizon: no volume ({need.get('reason')})"
+            )
         lines.append(
             f"  outside the measured range {d.time_outside_measured_range_h:.6g} h of "
             f"{d.operating_time_h:.6g} h operating; outside the anolyte model's validity "
