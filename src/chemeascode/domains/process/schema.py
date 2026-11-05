@@ -644,6 +644,26 @@ class CakeLiquid(Strict):
         return self
 
 
+class Filtration(Strict):
+    """A constant-pressure cake filtration (Ruth): the time to pass one batch's filtrate,
+    ``t = mu (alpha M V / (2 A^2) + R_m V / A) / dP`` with M the dry solid of the cake and V
+    the filtrate's volume per batch (:mod:`.dryer`; ``filter`` ``from:`` this step in
+    ``process/recipe.yaml``). The split itself stays the specified one."""
+
+    specific_cake_resistance: float = Field(gt=0, description="alpha, m/kg (incompressible)")
+    medium_resistance: float = Field(default=0.0, ge=0, description="R_m, 1/m")
+    pressure_difference: float = Field(gt=0, description="kPa across cake and medium")
+    viscosity: float = Field(gt=0, description="mPa s of the filtrate")
+    filtrate_density: float | None = Field(
+        default=None, gt=0, description="kg/m3; default: the components' liquid_molar_volume"
+    )
+    area: float | None = Field(
+        default=None, gt=0, description="m2; default: the recipe vessel's bottom (a Nutsche)"
+    )
+    provenance: Provenance
+    source: str = ""
+
+
 class SolidSeparation(Strict):
     """A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid
     the cake holds, specified (no filtration or centrifuge model); the liquid divides with the
@@ -655,6 +675,11 @@ class SolidSeparation(Strict):
     outlets: dict[Literal["cake", "filtrate"], str] = Field(default_factory=dict)
     provenance: Provenance
     source: str = ""
+    filtration: Filtration | None = Field(
+        default=None,
+        description="The filtration time of a batch (Ruth), for a recipe's filter from:.",
+        exclude_if=lambda value: value is None,  # a filter's fingerprint stays as it was
+    )
 
 
 class MotherLiquorRecycle(Strict):
@@ -737,8 +762,113 @@ class Crystallizer(Strict):
         return self
 
 
+class ResidualMoisture(Strict):
+    """The volatiles a dried product keeps: the dryer's specification."""
+
+    value: float = Field(ge=0)
+    basis: Literal["mass_fraction", "per_kg_solid"] = Field(
+        description="mass_fraction: volatiles over the dried product's mass (below 1); "
+        "per_kg_solid: kg of volatiles per kg of dry solid (everything not volatile)."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _range(self) -> ResidualMoisture:
+        if self.basis == "mass_fraction" and self.value >= 1:
+            raise ValueError("a residual moisture mass fraction must be below 1")
+        return self
+
+
+class Declared(Strict):
+    """One positive figure with its provenance."""
+
+    value: float = Field(gt=0)
+    provenance: Provenance
+    source: str = ""
+
+
+class DryingTime(Strict):
+    value: float = Field(gt=0)
+    unit: Literal["h", "min", "s"] = "h"
+    provenance: Provenance
+    source: str = ""
+
+
+class DryerEnergy(Strict):
+    """The dryer's heat: the wet cake from its inlet temperature to the drying temperature,
+    the volatiles evaporated at it, and (per batch) the vessel, over an efficiency."""
+
+    heat_capacity: float = Field(gt=0, description="kJ/(kg K) of the wet cake, constant")
+    latent_heat: dict[str, float] = Field(
+        default_factory=dict,
+        description="kJ per kg evaporated, per volatile at the drying temperature; default: "
+        "from the component's critical constants (Pitzer's corresponding states).",
+    )
+    inlet_temperature: float | None = Field(
+        default=None, gt=0, description="K of the wet cake; default: the inlet stream's"
+    )
+    vessel_heat_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/K of the vessel heated with each batch (its metal mass x cp); "
+        "counted per batch of process/recipe.yaml.",
+    )
+    efficiency: float = Field(
+        default=1.0, gt=0, le=1, description="Heat to the cake over the heat supplied"
+    )
+    port: str | None = Field(
+        default=None, description="The energy inlet port of the heat: its duty is compared."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> DryerEnergy:
+        if any(v <= 0 for v in self.latent_heat.values()):
+            raise ValueError("latent_heat: kJ/kg, positive")
+        return self
+
+
+class Dryer(Strict):
+    """A batch (filter-)dryer or vacuum dryer (:mod:`.dryer`): one wet-cake inlet, the dried
+    product and the vapour out. The ``volatiles`` leave as vapour down to the
+    ``residual_moisture``; every other component (the solid, and what the cake liquid held
+    dissolved) stays in the product. The energy (``energy:``) is the cake's sensible heat to
+    the drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's
+    heat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a
+    batch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given
+    ``drying_time``."""
+
+    volatiles: list[str] = Field(min_length=1, description="The components that evaporate.")
+    residual_moisture: ResidualMoisture
+    temperature: float = Field(gt=0, description="K: the drying temperature (product, vapour)")
+    energy: DryerEnergy | None = None
+    drying_rate: Declared | None = Field(
+        default=None, description="kg evaporated per m2 of heated area and hour, constant"
+    )
+    drying_time: DryingTime | None = None
+    cake_density: Declared | None = Field(
+        default=None,
+        description="kg/m3 of the wet cake (bulk): sizes the recipe's vessel and its heated area",
+    )
+    outlets: dict[Literal["product", "vapour"], str] = Field(
+        description="Role -> the step's outlet port."
+    )
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Dryer:
+        if set(self.outlets) != {"product", "vapour"}:
+            raise ValueError("dryer.outlets: give product and vapour")
+        if self.drying_rate is not None and self.drying_time is not None:
+            raise ValueError("give drying_rate or drying_time, not both")
+        if len(set(self.volatiles)) != len(self.volatiles):
+            raise ValueError("dryer.volatiles: each component once")
+        return self
+
+
 class Solids(Strict):
-    """The solid-handling models of a block or step (:mod:`.crystallization`)."""
+    """The solid-handling models of a block or step (:mod:`.crystallization`, :mod:`.dryer`)."""
 
     crystallizer: Crystallizer | None = Field(
         default=None, description="A crystallizer (with its filter and recycle)."
@@ -746,11 +876,19 @@ class Solids(Strict):
     solid_separation: SolidSeparation | None = Field(
         default=None, description="A filter or centrifuge on its own."
     )
+    dryer: Dryer | None = Field(
+        default=None,
+        description="A batch (filter-)dryer or vacuum dryer to a residual moisture.",
+        exclude_if=lambda value: value is None,  # other nodes' fingerprints stay as they were
+    )
 
     @model_validator(mode="after")
     def _one_model(self) -> Solids:
-        if self.crystallizer is not None and self.solid_separation is not None:
-            raise ValueError("give crystallizer or solid_separation, not both")
+        given = [n for n in ("crystallizer", "solid_separation", "dryer") if getattr(self, n)]
+        if len(given) > 1:
+            if "dryer" not in given:
+                raise ValueError("give crystallizer or solid_separation, not both")
+            raise ValueError("give one of crystallizer, solid_separation or dryer")
         if self.solid_separation is not None and set(self.solid_separation.outlets) != {
             "cake",
             "filtrate",

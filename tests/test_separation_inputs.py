@@ -247,7 +247,8 @@ def test_coverage_names_every_method_the_screening_can_rank():
     rows = {r["technique"]: r for r in coverage.coverage_table()}
     for technique in ("Adsorption", "Membrane separation", "Drying"):
         assert rows[technique]["representation"] == "specified_split"
-        assert rows[technique]["units"] == ["component_separator"]
+        assert rows[technique]["units"][-1] == "component_separator"
+    assert rows["Drying"]["units"] == ["dryer", "component_separator"]
     assert rows["Crystallization"]["representation"] == "predictive"
     assert rows["Crystallization"]["units"] == ["crystallizer"]
     assert rows["Solid-fluid separation"]["units"] == ["solid_separation"]

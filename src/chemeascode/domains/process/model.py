@@ -20,7 +20,8 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   becomes a solid one, :mod:`.solids`);
 - ``process-crystallizer``, ``process-solid-separation``, ``process-solid``: a crystallizer or
   filter whose components, ports or solubility range do not fit, and solids in a stream said to
-  be vapour (:func:`.crystallization.rules`);
+  be vapour (:func:`.crystallization.rules`); ``process-dryer``: a dryer whose volatiles, ports
+  or energy port do not fit (:func:`.dryer.rules`);
 - ``process-energy-balance`` (warning), ``process-energy-balance-unsupported`` (info): the
   energy balance of a block or step whose streams carry enthalpies (:mod:`.energy`): enthalpy
   flows against the energy streams crossing it; a reacting node or an inconsistent enthalpy
@@ -725,6 +726,9 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     from chemeascode.domains.process.crystallization import rules as solid_rules
 
     out.findings += solid_rules(process)
+    from chemeascode.domains.process.dryer import rules as dryer_rules
+
+    out.findings += dryer_rules(process)
     return out.findings
 
 

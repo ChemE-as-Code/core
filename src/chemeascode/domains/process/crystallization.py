@@ -915,9 +915,16 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
     from chemeascode.domains.process.model_basis import solids_basis
 
     basis = solids_basis(process, node)
+    model = (
+        "crystallizer"
+        if node.crystallizer is not None
+        else "dryer"
+        if node.dryer is not None
+        else "solid_separation"
+    )
     entry: dict[str, Any] = {
         "node": node.id,
-        "model": "crystallizer" if node.crystallizer is not None else "solid_separation",
+        "model": model,
         "basis": basis.basis,
         "predictive": basis.predictive,
         "sourced": basis.sourced,
@@ -933,14 +940,22 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
     }
     try:
         inlet = _inlet(process, node)
-        if node.crystallizer is not None:
+        if node.dryer is not None:
+            from chemeascode.domains.process.dryer import DryerError, dryer_entry
+
+            try:
+                ports, entry["solution"], differ = dryer_entry(process, node, inlet, case)
+            except DryerError as failure:
+                raise CrystallizationError(str(failure)) from failure
+            entry["differences"] += differ
+        elif node.crystallizer is not None:
             result, _ = solve_node(process, node, inlet, case)
             ports = node_outlets(node.crystallizer, result)
             entry["solution"] = result.entry()
         else:
             ports, _ = separate_node(process, node, inlet, case)
         entry["outlets"] = _slurry_entries(process, ports)
-        entry["differences"] = _compare(process, node, case, ports)
+        entry["differences"] = _compare(process, node, case, ports) + entry["differences"]
     except CrystallizationError as failure:
         entry["problem"] = str(failure)
         entry["unsupported"] = isinstance(failure, Unsupported)
@@ -970,7 +985,7 @@ def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerRepo
     keys = {n.id: ("steps", i) for i, n in enumerate(fs.steps)}
     keys |= {n.id: ("blocks", i) for i, n in enumerate(fs.blocks)}
     for node in [*fs.blocks, *fs.steps]:
-        if node.crystallizer is None and node.solid_separation is None:
+        if node.crystallizer is None and node.solid_separation is None and node.dryer is None:
             continue
         entry = unit_entry(process, node, case)
         report.units.append(entry)
@@ -1037,7 +1052,11 @@ def report_text(report: CrystallizerReport) -> str:
         if u["problem"]:
             lines.append(f"  not solved: {u['problem']}")
         sol = u["solution"]
-        if sol:
+        if sol and u["model"] == "dryer":
+            from chemeascode.domains.process.dryer import solution_lines
+
+            lines += solution_lines(sol)
+        elif sol:
             lines.append(
                 f"  crystals formed {num(sol['crystals_formed_kg_h'], ' kg/h')}"
                 + (
@@ -1079,5 +1098,7 @@ def report_text(report: CrystallizerReport) -> str:
         for text in u["differences"]:
             lines.append(f"  differs: {text}")
     if not report.units:
-        lines.append("no crystallizer or solid separation (crystallizer:, solid_separation:)")
+        lines.append(
+            "no crystallizer, solid separation or dryer (crystallizer:, solid_separation:, dryer:)"
+        )
     return "\n".join(lines)

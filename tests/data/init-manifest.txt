@@ -74,7 +74,7 @@ cd0e1a327b90b1453d3360c5f45c67fe24efbd47062100c8d01c3654c4e1d0ce  .claude/skills
 81d11f6e4145f2318535c9685b6463ac7dc398e5c6a071a52bac8dec467bbfe9  .claude/skills/pid-review-commissioning-readiness/SKILL.md
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md
 1a4ccaae67d432572a692e594ddd1fed5cd0b1f107d588e2fbeabdc2ff61862d  .claude/skills/pipe-routing/SKILL.md
-4dcd5aa8f633a5d60b862db6e6deb2dd853ac9c6c0fdd81c2974cf087d3f3f62  .claude/skills/process-design/SKILL.md
+08dfa923fb10fe415e3f0de86e6fd571fb9444d5db661609b37528f2f824587d  .claude/skills/process-design/SKILL.md
 53c51f4c1d7a1a1107b2c3f04df14979fda3d31a70d039e5d1c78eb1dde55132  .claude/skills/process-safety/SKILL.md
 4c88c41848b8470751933c17f4f892e3addfeed0d1851f4eb5b3787cb5d94875  .claude/skills/process-simulation/SKILL.md
 cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills/property-retrieval/SKILL.md
@@ -84,7 +84,7 @@ cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills
 4335d16628b7b9d55348f092b32d4a8cec33069d280294655d7718124ddcd776  .claude/skills/review/SKILL.md
 2e221aa00984c0d6cb3960705400b795c9ab4bd6ecc8a7588f215c3ac1b673a2  .claude/skills/route-selection/SKILL.md
 001191398a2d5ba18b85c422b555927515a22aee538c2e69b9a286eda196779e  .claude/skills/safeguard-crediting/SKILL.md
-0529450089892393faadcc213b6391708c0523de94d87503f214f874d70a04c2  .claude/skills/separation-method-selection/SKILL.md
+8e7b55982338b2c0e3026c69b047341d57b2f33aa2e12e66b7c901fcb3546ac6  .claude/skills/separation-method-selection/SKILL.md
 84194ebd9a1871e7281461cca6336744f21b92c2b46f435194252634c7ca1371  .claude/skills/skid-design/SKILL.md
 dbf6eb70599d14693dc33e8d4a34ff5622f4c9af41d81b0c25fb25fd7bb60999  .claude/skills/structures-access/SKILL.md
 9670f0081d6c99941e73e42157868e2bb19803ff77ef99228a2b0182d53c8f57  .claude/skills/tea/SKILL.md

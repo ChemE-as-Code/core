@@ -21,7 +21,8 @@ ones and never promote either on convergence alone:
 - crystallizers and filters (``crystallizer:``, ``solid_separation:``; :mod:`.crystallization`):
   ``solubility-equilibrium`` (predictive within its solubility data: the mother liquor leaves
   saturated), ``imposed-yield`` and ``solid-split`` (specified); solved by ``cheme process
-  propagate``, never simulated;
+  propagate``, never simulated; a dryer (``dryer:``; :mod:`.dryer`): ``residual-moisture``
+  (specified), solved the same way;
 - an adsorber with an entry in ``process/adsorption.yaml`` (:mod:`.separations.adsorption`):
   ``adsorption-equilibrium`` (predictive, not simulated: core's equilibrium TSA cycle gives the
   recoveries, inside every isotherm's range, meeting the specification, and the simulator's
@@ -490,6 +491,25 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     )
 
     outside = "not part of a converged simulation: solved by cheme process propagate"
+    dryer = node.dryer
+    if dryer is not None:
+        from chemeascode.domains.process.dryer import ASSUMPTIONS as DRYER_ASSUMPTIONS
+
+        moisture = dryer.residual_moisture
+        sourced = _sourced(moisture)
+        return UnitBasis(
+            node.id,
+            "separator",
+            "residual-moisture",
+            False,
+            sourced,
+            detail=f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
+            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
+            + ("" if sourced else " (not given with a source: assumed)"),
+            sources=[moisture.source] if sourced else [],
+            assumptions=list(DRYER_ASSUMPTIONS),
+            limitations=["specified moisture: no drying curve or sorption isotherm", outside],
+        )
     sep = node.solid_separation
     if sep is not None:
         sourced = _sourced(sep)
@@ -630,7 +650,11 @@ def model_bases(
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]
-        elif node.crystallizer is not None or node.solid_separation is not None:
+        elif (
+            node.crystallizer is not None
+            or node.solid_separation is not None
+            or node.dryer is not None
+        ):
             unit = solids_basis(process, node)
         elif reacting:
             unit = _reactor_basis(process, node, simulated, (runs or {}).get(node.id, []))

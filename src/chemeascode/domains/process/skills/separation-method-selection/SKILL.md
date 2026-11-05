@@ -123,6 +123,14 @@ with units, fallback, notes and the test that solves each arrangement):
   crystallization, a `crystallizer:` with `basis: solubility` on the flowsheet step (sourced
   solubility data, one solute in one solvent; `cheme process propagate` fills its outlets and
   `cheme process crystallizers` reports yield, recovery, balances and duty);
+- **specified, solids**: a filter or centrifuge as `solid_separation:` (solid recovery and cake
+  liquid; with `filtration:` and a specific cake resistance, Ruth's filtration time for the
+  recipe), and a filter-dryer or vacuum dryer as `dryer:` (the volatiles dried to a
+  `residual_moisture`; the duty from the cake's heat capacity, the latent heats and the
+  vessel; the drying time for the recipe from a `drying_rate` and the vessel's heated area).
+  In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
+  holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
+  (ADR 0057);
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
 - **specified split**: a `component_separator` with given recoveries (`basis: specified`, a
   `basis_source` and an `operating_basis`); its convergence closes balances, it predicts
@@ -165,7 +173,7 @@ established capability: say so when reporting it, and do not claim it as validat
 | Membrane separation | specified split | untested | `component_separator` |  | permeance, selectivity, area |
 | Adsorption | specified split | tested | `component_separator` |  | isotherms, breakthrough, PSA/TSA cycle |
 | Crystallization | predictive | tested | `crystallizer` (flowsheet) |  | population balance, kinetics, several solutes or impurities |
-| Drying | specified split | untested | `component_separator` |  | dryer, solids |
+| Drying | specified split | tested | `dryer` (flowsheet), `component_separator` |  | drying curve, sorption isotherm |
 | Solid-fluid separation | specified split | tested | `solid_separation` (flowsheet) |  | filtration, centrifuge, cyclone and settling models |
 
 Report the representation of the selected method beside the ranking; when it is a specified
