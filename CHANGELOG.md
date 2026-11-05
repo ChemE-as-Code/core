@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 (2026-11-05)
+
+Minor release: batch work-up (#165) and gas evolution (#174). A batch or semi-batch vents the
+gas it forms and doses a gas only partly absorbed (`batch.vent`, `dosing.absorbed`; ADR 0054);
+`still:` is a batch Rayleigh still or solvent swap whose boil-up time a recipe `distil` takes
+(ADR 0055); a crystallizer precipitates from a mixed liquor with `spectators:` and a solubility
+measured in that liquor or salted out, and `kind: phase-change` keeps phase changes out of the
+reaction screening (ADR 0056); `dryer:` dries a cake to a residual moisture with its duty and
+drying time, a filter gives Ruth's time, and a recipe unit procedure may hold several steps of
+one vessel as `units:` (ADR 0057). Plants that use none of them solve and fingerprint as in
+1.7.0, except that a recipe unit naming a block now sizes the vessel of the one batch step in
+it. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
 
 ### Added
 
