@@ -321,19 +321,24 @@ _ROWS = (
         "Crystallization",
         "predictive",
         ("crystallizer",),
-        fallback="several solutes, impurities or a solubility outside the data: a "
-        "component_separator (or crystallizer basis: yield) with recoveries given with their "
-        "source.",
+        fallback="several crystallizing solutes, or a solubility outside the data or without "
+        "data for the liquor: a component_separator (or crystallizer basis: yield) with "
+        "recoveries given with their source.",
         notes="A crystallizer: (basis: solubility) solved by cheme process propagate: one "
         "solute in one solvent, anhydrous or a hydrate, cooling and/or evaporative, saturated "
         "mother liquor from sourced solubility data (interpolated, never extrapolated), with a "
         "specified filter or centrifuge and mother-liquor recycle; basis: yield imposes the "
-        "yield (specified). No population balance, kinetics or several solutes; not part of "
-        "the DWSIM simulation.",
+        "yield (specified). Spectator solutes (a precipitation from a reaction liquor) pass "
+        "unchanged, the solubility measured in that liquor or corrected by Setschenow "
+        "salting-out coefficients (ADR 0056); a reslurry wash is a crystallizer fed by the cake "
+        "and the wash. No population balance, kinetics or several crystallizing solutes; not "
+        "part of the DWSIM simulation.",
         tested=(
             "tests/test_crystallization.py::test_felder_4_5_2_evaporative_crystallizer_filter_"
             "and_recycle",
             "tests/test_crystallization.py::test_geankoplis_12_11_1_decahydrate_yield",
+            "tests/test_precipitation.py::test_the_nbs_precipitation_and_reslurry_wash_"
+            "propagate_and_balance",
         ),
         aliases=("Crystallisation",),
     ),

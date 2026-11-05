@@ -26,6 +26,26 @@
   condensation: write its reactions' `heat_of_reaction` with the dosed gas as a gas. `process
   simulate` refuses a vented batch. An unvented batch or semi-batch solves and fingerprints as
   before. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
+- Precipitation from a mixed liquor (ADR 0056, core#165): `crystallizer.spectators: [ids]`
+  carries other dissolved components (salts, base, unreacted reagent) unchanged in the mother
+  liquor. The solubility is either measured in that liquor (`solubility.measured_in:
+  mother_liquor`, units `kg/kg_solvent`, `mass_fraction` or the new `kg/kg_liquor`), or the
+  pure solvent's corrected by `solubility.salting_out: {coefficients: {id: k}}` (Setschenow,
+  molal scale). A pure-solvent value alone is `cheme.process-crystallizer` (error) and refused
+  by propagate. A crystallizer takes several inlets together, so a reslurry wash is a
+  crystallizer fed by the cake and the wash. `cheme process crystallizers` (text and `--json`)
+  reports the spectators' balances and molalities; with spectators its
+  `solubility_kg_per_kg_solvent` is the mother liquor's per kg of free solvent (the declared
+  value under `mother_liquor.declared_solubility`). A block holding a crystallizer next to a
+  reacting step (a precipitation in the reactor vessel) balances, the crystallization fitted
+  as a phase change beside the block's reactions. Every BFD/PFD needs `cheme process build`
+  once (the process schema changed).
+- `kind: phase-change` on a reaction of `process/reactions.yaml`. A reaction of one component
+  into one other with the same formula, one of them `phase: solid`, counts as one without the
+  field unless it declares a `heat_of_reaction` (then it stays screened, its heat in dT_ad).
+  `cheme process reactor-hazards` no longer screens a step whose reactions are all
+  phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
+  a step with both on its reactions alone.
 
 ## 1.7.0 (2026-11-05)
 

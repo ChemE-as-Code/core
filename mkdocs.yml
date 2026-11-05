@@ -192,4 +192,5 @@ nav:
       - "0052 Batch vessel and jacket from the recipe": adr/0052-batch-vessel-and-jacket-from-the-recipe.md
       - "0053 Per-batch LCA consumables": adr/0053-per-batch-lca-consumables.md
       - "0054 Gas evolution and gas dosing in a batch": adr/0054-gas-evolution-and-gas-dosing-in-a-batch.md
+      - "0056 Precipitation from a mixed liquor": adr/0056-precipitation-from-a-mixed-liquor.md
       - Template: adr/template.md

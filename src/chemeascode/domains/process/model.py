@@ -628,6 +628,8 @@ def _reactive_balance(
         return
     if not reactions:
         return
+    declared = reactions
+    reactions = [*reactions, *_crystallizations(process, node)]
     unnamed = sorted({n for r in reactions for n in r.stoichiometry if n not in comps})
     if unnamed:
         result.missing += [f"component {n}" for n in unnamed]
@@ -639,9 +641,12 @@ def _reactive_balance(
         result.missing += [f"molar_mass of {n}" for n in lacking]
         return
     change = {n: moles_out.get(n, 0.0) - moles_in.get(n, 0.0) for n in names}
-    result.extents, residual = fit_extents(reactions, change)
+    extents, residual = fit_extents(reactions, change)
+    # the crystallizers' phase changes explain solute becoming crystal; they are no reactions
+    # (not reported as extents)
+    result.extents = {r.id: extents[r.id] for r in declared}
     ids = ", ".join(r.id for r in reactions)
-    for reaction in reactions:
+    for reaction in declared:
         xi = result.extents[reaction.id]
         turnover = -xi * sum(
             -v * (mw[n] or 0.0) for n, v in reaction.stoichiometry.items() if v < 0
@@ -659,6 +664,39 @@ def _reactive_balance(
                 f"{name} {cin:.6g} kg/h in, {cout:.6g} kg/h out: "
                 f"{r * (mw.get(name) or 0.0):+.6g} kg/h not explained by reactions {ids}"
             )
+
+
+def _crystallizations(process: Process, node: str) -> list[Reaction]:
+    """One reversible phase change ``<step>:crystallization`` per crystallizer in *node* (the
+    solute, and the hydrate's solvent, into the crystal), so that a reactive balance explains a
+    crystallization, or the dissolution of a reslurry wash, next to the node's reactions. A
+    crystallizer whose crystal form is not readable adds none (its own rules report it)."""
+    from chemeascode.domains.process.crystallization import CrystallizationError, form_of
+
+    found: list[Reaction] = []
+    for other, item in process.nodes.items():
+        spec = getattr(item, "crystallizer", None)
+        if spec is None or not (
+            other == node
+            or (process.kinds.get(other) in ("block", "step") and process.within(other, node))
+        ):
+            continue
+        try:
+            form = form_of(process, spec)
+        except (CrystallizationError, ValueError):
+            continue
+        stoichiometry = {spec.solute: -1.0, spec.crystal: 1.0}
+        if form.hydrate:
+            stoichiometry[spec.solvent] = -form.hydrate
+        found.append(
+            Reaction(
+                id=f"{other}:crystallization",
+                stoichiometry=stoichiometry,
+                reversible=True,
+                kind="phase-change",
+            )
+        )
+    return found
 
 
 def balances(process: Process, case: str | None = None) -> list[Balance]:

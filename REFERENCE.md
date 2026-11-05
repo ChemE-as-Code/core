@@ -1033,7 +1033,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
   (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
   accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
-  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`.
+  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`. A
+  reaction with `kind: phase-change` (or one component into one other of the same formula, one
+  of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
+  reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
+  JSON `phase_changes`), a step with both is screened on its reactions alone (ADR 0056).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1109,8 +1113,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `Na2CO3(H2O)10`), a separate component from the same substance dissolved; every stream then
   divides into dry solid and liquid (mother liquor or moisture) with their compositions
   (`domains/process/solids.py`; no particle size or population balance). A block or step with
-  `crystallizer:` (one solute, one solvent, one material inlet) is a cooling and/or evaporative
-  crystallizer with an optional specified filter or centrifuge (`separation:` solid recovery
+  `crystallizer:` (one solute, one solvent, its material inlets taken together) is a cooling
+  and/or evaporative crystallizer with an optional specified filter or centrifuge (`separation:` solid recovery
   and cake liquid) and mother-liquor `recycle:`; `basis: solubility` predicts the crystals from
   sourced solubility data (the mother liquor leaves saturated; points interpolated in
   temperature, never extrapolated), `basis: yield` imposes them (specified, compared with the
@@ -1120,10 +1124,26 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `solid-split` (specified). **`cheme process crystallizers [--case C] [--json]`** reports the
   crystals formed (and at equilibrium), recovery, loop iterations, mass, solute and element
   residuals, the lumped duty (with `energy:`), the outlets as dry solid, liquid and moisture,
-  and refuses impurities, several solutes or a temperature outside the data
-  (`cheme.process-crystallizer-unsupported`). Qualified against Felder & Rousseau Example 4.5-2
-  and Geankoplis Examples 12.11-1 and 12.11-2 (`tests/test_crystallization.py`;
+  and refuses undeclared impurities, several crystallizing solutes or a temperature outside the
+  data (`cheme.process-crystallizer-unsupported`). Qualified against Felder & Rousseau Example
+  4.5-2 and Geankoplis Examples 12.11-1 and 12.11-2 (`tests/test_crystallization.py`;
   `docs/adr/0025-solid-components-and-a-bounded-crystallizer-adapter.md`).
+- **Precipitation from a mixed liquor** (ADR 0056): `crystallizer.spectators: [ids]` names the
+  other dissolved components of the liquor (a salt, a base, unreacted reagent); they pass with
+  the liquor unchanged, never crystallize or evaporate, and appear in the balances and the
+  report, text and `--json` (`mother_liquor`: solubility basis, declared value and value at
+  the solution, salting-out factor, molalities; `solubility_kg_per_kg_solvent` is then the
+  mother liquor's per kg of free solvent). A block holding a crystallizer and a reacting step
+  balances with the crystallization as a phase change next to its reactions. The
+  solubility then holds in that liquor: `measured_in: mother_liquor` (unit `kg/kg_solvent`,
+  `kg/kg_liquor` per kg of solute-free liquor, or `mass_fraction` in the saturated liquor:
+  `C = (S - s (W + P)) / (a - s (1 - a))`), or the pure solvent's with `salting_out:
+  {coefficients: {id: k}, log: log10 | ln, provenance, source}` (Setschenow, `log10(s0/s) =
+  sum k_i m_i`, molal scale, every spectator once). A pure-solvent value alone is
+  `cheme.process-crystallizer` (error) and refused by propagate. A crystallizer takes several
+  inlets together (their mass-weighted mean temperature for the energy balance), so a reslurry
+  wash is a crystallizer fed by the cake and the wash, its crystals dissolving to saturation
+  (`tests/test_precipitation.py`).
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
   `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
   records the searches, sources, observations, candidate routes, conflicts and the model basis
