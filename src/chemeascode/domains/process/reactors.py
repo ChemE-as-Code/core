@@ -322,14 +322,12 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         except BedError as failure:
             lacking.append(f"the bed: {failure}")
     tank_entry = None
-    if with_bed and getattr(item, "reactor", None) in ("cstr", "batch"):
-        from chemeascode.domains.process.stirred_tank import TankError
+    if with_bed and getattr(item, "reactor", None) in ("cstr", "batch", "semibatch"):
+        from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
         from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
 
         try:
-            if len(ins) != 1:
-                raise TankError(f"a {item.reactor} takes one inlet stream")
-            solved_tank, _ = solve_tank(process, item, ins[0], case)
+            solved_tank, _ = solve_tank(process, item, tank_inlet(item, ins), case)
             tank_entry = {
                 "kind": solved_tank.kind,
                 "volume_m3": solved_tank.volume,
@@ -346,6 +344,8 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 ],
                 "notes": solved_tank.notes,
             }
+            if solved_tank.kind == "semibatch":
+                tank_entry |= semibatch_entry(solved_tank)
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
     return {
@@ -447,14 +447,56 @@ def reactor_text(report: ReactorReport) -> str:
         elif tank:
             end = tank["profile"][-1]["conversion"] if tank["profile"] else 0.0
             heat = tank["heat_released_kJ_kmol"]
+            semi = tank["kind"] == "semibatch"
             lines.append(
-                f"  batch: {tank['time_s']:.6g} s to conversion {end:.4g}, outlet "
+                f"  {tank['kind']}: {tank['time_s']:.6g} s to conversion {end:.4g}, outlet "
                 f"{tank['outlet_temperature_K']:.6g} K"
-                + (f", heat released {heat:.6g} kJ/kmol of charge" if heat is not None else "")
-                + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
+                + (
+                    f", heat released {heat:.6g} kJ/kmol of charge{' and doses' if semi else ''}"
+                    if heat is not None
+                    else ""
+                )
+                + (f"; {'; '.join(tank['notes'])}" if tank["notes"] and not semi else "")
             )
+            if semi:
+                worst = tank["cooling_failure"]
+                x = tank["max_accumulation"]
+                lines.append(
+                    f"    dosing {tank['dosing_time_s']:.6g} s; accumulation of the dosed "
+                    + (
+                        f"reactant at most {x:.3g} (at {tank['max_accumulation_time_s']:.6g} s)"
+                        if x is not None
+                        else "reactant unknown"
+                    )
+                    + (
+                        f"; cooling failure at worst {worst['mtsr_K']:.6g} K "
+                        f"(at {worst['time_s']:.6g} s)"
+                        if worst
+                        else ""
+                    )
+                    + f"; peak cooling duty {num(tank['peak_cooling_duty_kW_m3'], ' kW/m3')}"
+                    + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
+                )
         if r["missing"]:
             lines.append("  missing: " + "; ".join(dict.fromkeys(r["missing"])))
     if not report.reactors:
         lines.append("no reactors (no block or step names reactions or a reactor model)")
     return "\n".join(lines)
+
+
+def semibatch_entry(solved: Any) -> dict[str, Any]:
+    """What ``process reactors`` adds for a semi-batch (:func:`.stirred_tank.solve_batch`):
+    the dosing, the accumulation of the dosed reactant, the worst cooling failure and the peak
+    cooling duty."""
+    worst = solved.cooling_failure
+    return {
+        "dosing_time_s": solved.dosing_time,
+        "charge_volume_m3": solved.charge_volume,
+        "max_accumulation": solved.max_accumulation,
+        "max_accumulation_time_s": solved.max_accumulation_time,
+        "cooling_failure": (
+            {"time_s": worst[0], "temperature_K": worst[1], "mtsr_K": worst[2]} if worst else None
+        ),
+        "peak_cooling_duty_kW_m3": solved.peak_cooling_duty,
+        "accumulation": [{"time_s": t, "accumulation": x} for t, x in solved.accumulation],
+    }

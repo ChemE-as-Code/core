@@ -50,7 +50,7 @@ afb07d1742339f3aad658452f693f08787271ecbd52fd61bf7aec243b96806db  .claude/skills
 b4501bae6311d50624d78a093c72fd7a3e12a53a14b405070dc458c2c58f1afc  .claude/skills/heat-integration/SKILL.md
 da952010dd8ea1038d24c9d4643b36e9df2928b3b7f76bb30e8627a0b9088535  .claude/skills/hvac-ducts/SKILL.md
 41bd2a0ef32e512a39549e8b6dca48dd495a64eed550ded612851042c65a7ee4  .claude/skills/layout-yaml/SKILL.md
-c0ce80bab9367278d48059fa7f6bd3f74f3d82165b7f05415b6fb976b390aa1b  .claude/skills/lca/SKILL.md
+4603fd8506375fb6348633c6e330d256a10384d9ebd1581db4fbcd24a31fdc3a  .claude/skills/lca/SKILL.md
 a1cc4633b4212fd534625f93903c62069ee0e1d36d53c6c03c94e89faeb47448  .claude/skills/lci-estimate/SKILL.md
 a1d78705578a62202b7aeefcb1da09059bdb145c8823d186b12b468a9dbea5fd  .claude/skills/lists-sync/SKILL.md
 8ffa494dc7e7c107d3d52645f61a2565b67eed67633653f5f76e1a180daf9f8a  .claude/skills/materials/SKILL.md
@@ -76,10 +76,10 @@ e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills
 1a4ccaae67d432572a692e594ddd1fed5cd0b1f107d588e2fbeabdc2ff61862d  .claude/skills/pipe-routing/SKILL.md
 4dcd5aa8f633a5d60b862db6e6deb2dd853ac9c6c0fdd81c2974cf087d3f3f62  .claude/skills/process-design/SKILL.md
 53c51f4c1d7a1a1107b2c3f04df14979fda3d31a70d039e5d1c78eb1dde55132  .claude/skills/process-safety/SKILL.md
-cca9e5f6861564f7ebacf813aa78e9f23adf32684b3c74ff11e04826aa7734fb  .claude/skills/process-simulation/SKILL.md
+4c88c41848b8470751933c17f4f892e3addfeed0d1851f4eb5b3787cb5d94875  .claude/skills/process-simulation/SKILL.md
 cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills/property-retrieval/SKILL.md
 684eccadef18ba60bee8ff01623decae328ff41112353e0d4fc73fea386019b1  .claude/skills/reaction-evidence-search/SKILL.md
-f1c0a1dba5afb520e30ba3608b71586bfd437d051be204e20777111e191fa0e2  .claude/skills/reactions/SKILL.md
+18904d53c6928575aa93f071dbf6028e28215ec4b0786ba4d29c491b7883fe5e  .claude/skills/reactions/SKILL.md
 363ce4bc9cc61d5361fcf628e376f5d7ed1715a47c5f25b86198d8375d5a6854  .claude/skills/relief-scenarios/SKILL.md
 4335d16628b7b9d55348f092b32d4a8cec33069d280294655d7718124ddcd776  .claude/skills/review/SKILL.md
 2e221aa00984c0d6cb3960705400b795c9ab4bd6ecc8a7588f215c3ac1b673a2  .claude/skills/route-selection/SKILL.md
@@ -87,7 +87,7 @@ f1c0a1dba5afb520e30ba3608b71586bfd437d051be204e20777111e191fa0e2  .claude/skills
 0529450089892393faadcc213b6391708c0523de94d87503f214f874d70a04c2  .claude/skills/separation-method-selection/SKILL.md
 84194ebd9a1871e7281461cca6336744f21b92c2b46f435194252634c7ca1371  .claude/skills/skid-design/SKILL.md
 dbf6eb70599d14693dc33e8d4a34ff5622f4c9af41d81b0c25fb25fd7bb60999  .claude/skills/structures-access/SKILL.md
-756810237e8bf8ff98cf7aacf2a03d02dcd46e82bb91f0d9db16c6717590ae81  .claude/skills/tea/SKILL.md
+9670f0081d6c99941e73e42157868e2bb19803ff77ef99228a2b0182d53c8f57  .claude/skills/tea/SKILL.md
 3abcb35e87f810a284b8bc9867a4402536edbf0fb02396ce40bbcaae88f75915  .claude/skills/tech-gas-acid-gas-removal/SKILL.md
 e6b782a209d6ed84ad92b2416b0eac57b32e3bb686f680fe5d81011d29708b1c  .claude/skills/tech-gas-dehydration/SKILL.md
 0b22b57cdb53faac47397c310341fcc365c2dc09a022ef3600248f6626489b46  .claude/skills/tech-gas-inlet-and-separation/SKILL.md

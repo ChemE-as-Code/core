@@ -86,7 +86,12 @@ uniform `low`/`high` multipliers.
 - **`operation.batch`**: `{cycle_time, basis_hours, trains, batches_per_year, success_rate,
   source}`. The flowsheet's rates are those of one batch over `basis_hours`. The operating hours
   are batches times `basis_hours`, with batches = `batches_per_year`, else hours x trains /
-  cycle time. `success_rate` scales the products sold.
+  cycle time. `success_rate` scales the products sold. `{recipe: true, source}` (with
+  `success_rate` if wanted) takes the cycle time and the batches per year from
+  `process/recipe.yaml` (`cheme process recipe`, ADR 0051); the flowsheet's rates are then the
+  recipe's year averages, so `basis_hours` is hours / batches and `trains` 1 (the recipe's
+  parallel units are in its cycle). A recipe on other hours than `hours_per_year`, or one that
+  gives no cycle, is `cheme.tea-batch-recipe`.
 
 ### Capital
 

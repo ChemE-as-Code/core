@@ -36,7 +36,7 @@ from typing import Any
 
 from chemeascode.foundation.uncertainty import draw
 
-SAMPLED = ("pfr", "cstr", "batch", "conversion", "selectivity")
+SAMPLED = ("pfr", "cstr", "batch", "semibatch", "conversion", "selectivity")
 #: One draw's result: the conversion of the key, the outlet and the highest temperature (K),
 #: the outlet flow of each component (kmol/h).
 Solved = tuple[float, float | None, float | None, dict[str, float]]
@@ -134,7 +134,7 @@ def _selectivity_fields(spec: Any) -> list[str]:
 def _unused(reaction: Any, name: str, model: str, item: Any) -> str:
     """Why *model* (on step *item*) does not read the field *name* of *reaction*; "" when it
     does, so that its draws change the result."""
-    kinetic = model in ("pfr", "cstr", "batch")
+    kinetic = model in ("pfr", "cstr", "batch", "semibatch")
     given = f"a {model} reactor"
     if name == "rate":
         return "" if kinetic else f"{given} does not use the rate law"
@@ -154,7 +154,7 @@ def _unused(reaction: Any, name: str, model: str, item: Any) -> str:
         return f"{given} solves no energy balance"
     if model == "pfr":
         return "a fixed bed takes the heat of reaction from the ideal-gas data"
-    vessel = "tank" if model == "cstr" else "batch"
+    vessel = {"cstr": "tank", "semibatch": "semi-batch"}.get(model, "batch")
     if reaction.phase != "liquid":
         return f"a gas-phase {vessel} takes the heat of reaction from the ideal-gas data"
     spec = item.tank if model == "cstr" else item.batch
@@ -251,14 +251,22 @@ def sample_node(
         raise SamplingError(f"no reaction of {node} gives an uncertainty: nothing to sample")
     fs = process.flowsheet
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
-    if len(inlets) != 1:
+    if model == "semibatch":  # the charge and its doses: solve_node splits them
+        inlets = [s for s in inlets if s.kind == "material"]
+        inlet: Any = inlets
+    elif len(inlets) != 1:
         raise SamplingError(f"{node} has {len(inlets)} inlet streams; sampling takes one")
-    inlet = inlets[0]
-    flows = stream_flows(process, inlet, case)
-    if flows.components is None:
-        raise SamplingError(f"no composition and flow of {inlet.id}")
+    else:
+        inlet = inlets[0]
     comps = process.components()
-    moles = {n: kg / comps[n].molar_mass for n, kg in flows.components.items() if kg}
+    moles: dict[str, float] = {}
+    for stream in inlets:
+        flows = stream_flows(process, stream, case)
+        if flows.components is None:
+            raise SamplingError(f"no composition and flow of {stream.id}")
+        for n, kg in flows.components.items():
+            if kg:
+                moles[n] = moles.get(n, 0.0) + kg / comps[n].molar_mass
     key = next(
         (n for r in reactions for n, v in r.stoichiometry.items() if v < 0 and moles.get(n, 0) > 0),
         None,
@@ -291,7 +299,7 @@ def sample_node(
                 result.hot_spot,
                 result.outlet,
             )
-        if model in ("cstr", "batch"):
+        if model in ("cstr", "batch", "semibatch"):
             from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
 
             result, _ = solve_tank(work, item, inlet, case)

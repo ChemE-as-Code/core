@@ -1,0 +1,6 @@
+name: process-semibatch
+description: Acetic anhydride dosed into water, a semi-batch with its accumulation and thermal screening (cheme process, reactor semibatch)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}
