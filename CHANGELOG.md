@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Recycle convergence in `cheme process propagate` (ADR 0060, core#181 part 1). The flowsheet
+  names one tear stream per loop in `tears: [{stream, initial?}]`, and optionally
+  `convergence: {method: wegstein | substitution, max_iterations, damping, tolerance}`.
+  Propagate sets each tear to its guess and sweeps the flowsheet. It then compares what the loop
+  gives back with the guess, per component in kg/h, and repeats until every component is within
+  the tolerance. Wegstein's method (the default, q bounded to [-5, 0]) and damped successive
+  substitution are available. The tear values are `calculated`, fingerprinted on the loop's
+  inputs rather than on the iterate, so a converged plant is not stale on `--check`. A given or
+  assumed flow or composition of a tear stays fixed. `cheme.process-recycle` reports a
+  converged loop (info, with the iterations and the worst residual) and a loop that does not
+  converge or close (warning, with the residual; nothing that depends on it is written).
+  `cheme validate` reports a tear that cannot be iterated as `cheme.process-tear`. `--json`
+  counts the loop's iterations and is `not-converged` when a loop is. New example
+  `examples/process-purge-loop`: a loop reactor with a recycle split, checked against its
+  closed form in `tests/test_recycle.py`. On a scratch copy of the library's `sodium-azide-1`,
+  both recycles (mother liquor and methanol) converge in 20 iterations to within 0.02 % of the
+  hand-converged streams. Plants without `tears:` solve, report and fingerprint as in 1.8.0.
+  Every BFD/PFD needs `cheme process build` once, because the process generator's code changed.
+
 ## 1.8.0 (2026-11-05)
 
 Minor release: batch work-up (#165) and gas evolution (#174). A batch or semi-batch vents the

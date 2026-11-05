@@ -153,6 +153,30 @@ never overwrites), and rerun `--fill` when `validate` reports them stale. A comp
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
 in `DESIGN.md`. Run propagate before `props --fill`.
 
+**Recycles.** Propagate cannot start a loop on its own: the mixer waits for the recycle and the
+recycle for the mixer. Never converge a loop by hand (assumed tear values copied back over
+runs). Name one stream per loop in `tears:` and let propagate iterate it (ADR 0060):
+
+```yaml
+tears:
+  - stream: S11                     # the recycle, between two steps of the loop
+    initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.4, NAOH: 0.3}}
+convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
+```
+
+- Give the loop an exit for every component (a purge `split:`, a reaction, a product). A
+  component that only circulates has no steady state, and the loop does not converge.
+- A tear's flow or composition that is a design input (a charge ratio) stays `assumed`.
+  Propagate iterates only the other. Remove the old hand-converged values so it can.
+- Start from a guess of the right order (`initial:`), usually the hand estimate. An empty
+  recycle can leave a splitter remainder negative or a still empty, and then the loop does not
+  close (`cheme.process-recycle`, warning).
+- `cheme.process-recycle` (info) gives the iterations and the worst residual. Tighten
+  `convergence.tolerance` below the flowsheet's when the loop's gain is near 1: the tolerance
+  bounds the residual, not the error. Record the tears and the tolerance in `DESIGN.md`.
+- Nothing that depends on a loop that does not converge is written. Raise
+  `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`.
+
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:
 

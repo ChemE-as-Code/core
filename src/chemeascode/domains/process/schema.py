@@ -1443,6 +1443,52 @@ class BfdView(Strict):
         return any({a, b} == set(pair) for pair in self.aggregate)
 
 
+class TearGuess(Strict):
+    """The first guess of a tear stream, where its loop's iterations start (ADR 0060)."""
+
+    flow: float = Field(default=0.0, ge=0, description="In `unit`; 0: an empty recycle.")
+    unit: str | None = Field(default=None, description="A flow unit; default: units.flow.")
+    basis: Literal["mole_fraction", "mass_fraction"] = "mass_fraction"
+    composition: dict[str, float] = Field(
+        default_factory=dict, description="Component id -> fraction on `basis`."
+    )
+
+
+class Tear(Strict):
+    """A stream at which ``cheme process propagate`` tears a recycle loop (ADR 0060): its flow
+    and composition are iterated until the loop closes, then written as calculated. A given or
+    assumed flow or composition of the stream stays fixed (a design specification)."""
+
+    stream: str = Field(description="A material stream between two steps (or blocks).")
+    initial: TearGuess | None = Field(
+        default=None,
+        description="The first guess; default: an empty stream (flow 0).",
+        exclude_if=lambda value: value is None,
+    )
+
+
+class Convergence(Strict):
+    """How ``cheme process propagate`` converges the loops torn at ``tears`` (ADR 0060)."""
+
+    method: Literal["wegstein", "substitution"] = Field(
+        default="wegstein",
+        description="Successive substitution, accelerated by Wegstein's method per component "
+        "(q bounded to [-5, 0]) or not.",
+    )
+    max_iterations: int = Field(default=100, ge=1, le=10000)
+    damping: float = Field(
+        default=1.0,
+        gt=0,
+        le=1,
+        description="Substitution only: the share of the step to the new iterate taken.",
+    )
+    tolerance: Tolerance | None = Field(
+        default=None,
+        description="Per component of every tear stream, kg/h; default: the flowsheet's.",
+        exclude_if=lambda value: value is None,
+    )
+
+
 class Flowsheet(Versioned):
     """Feeds, products, blocks, steps and streams: the source of the BFD and PFD."""
 
@@ -1456,6 +1502,17 @@ class Flowsheet(Versioned):
     blocks: list[Block] = Field(default_factory=list)
     steps: list[Step] = Field(default_factory=list)
     streams: list[StreamDef] = Field(default_factory=list)
+    tears: list[Tear] = Field(
+        default_factory=list,
+        description="Recycle loops torn for cheme process propagate (ADR 0060).",
+        exclude_if=lambda value: not value,  # a plant without recycles dumps as it did
+    )
+    convergence: Convergence | None = Field(
+        default=None,
+        description="How propagate converges the torn loops; default: Wegstein, 100 "
+        "iterations, the flowsheet's tolerance.",
+        exclude_if=lambda value: value is None,
+    )
     bfd: BfdView | None = Field(default=None, description="How the BFD draws the streams.")
     layout: Layout = Field(default_factory=Layout)
 

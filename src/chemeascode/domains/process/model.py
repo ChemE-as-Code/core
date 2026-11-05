@@ -51,7 +51,11 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
 - ``process-calculated-stale``: a calculated value's input fingerprint differs from its
   current inputs (see :mod:`.props`);
 - ``process-link-unresolved``: info until a gate requires links (``kind: process-links``);
-- ``process-aggregate``: a ``bfd.aggregate`` pair names a node that is not on the BFD.
+- ``process-aggregate``: a ``bfd.aggregate`` pair names a node that is not on the BFD;
+- ``process-tear``: a tear stream (``tears:``, ADR 0060) propagate cannot iterate: an unknown
+  or energy stream, one not between two steps, one named twice, a guess in undeclared
+  components or flow units (errors), a stream whose flow and composition are both given or
+  assumed (warning).
 """
 
 from __future__ import annotations
@@ -766,6 +770,7 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _energy_rules(out)
     _terminal_rules(out)
     _calculated_rules(out)
+    _tear_rules(out)
     _link_rules(out, lists or {}, set(sheet_ids))
     _bfd_rules(out)
     from chemeascode.domains.process.crystallization import rules as solid_rules
@@ -2163,6 +2168,24 @@ def _calculated_rules(out: _Out) -> None:
                     "cheme process props --fill; a state outside the method's range keeps "
                     "the old values and stays stale",
                 )
+
+
+def _tear_rules(out: _Out) -> None:
+    """``cheme.process-tear``: a tear (``tears:``, ADR 0060) propagate cannot iterate."""
+    from chemeascode.domains.process.recycle import tear_problems
+
+    tears = out.process.flowsheet.tears
+    for i, level, message in tear_problems(out.process):
+        out.add(
+            level,
+            "tear",
+            message,
+            ["tears", i],
+            [tears[i].stream],
+            hint="tear a material stream between two steps of the loop (one per loop), its "
+            "initial: in declared components and a flow unit; a stream whose flow and "
+            "composition are both design inputs is no tear",
+        )
 
 
 #: Link target -> (parsed list key, attribute of the list, attribute of an item).
