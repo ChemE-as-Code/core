@@ -541,6 +541,63 @@ def test_a_partly_absorbed_gas_dose_in_a_plant(tmp_path):
     assert entry.adiabatic_rise == pytest.approx(0.8 * 100000.0 / (5.8 * 150.0), rel=1e-6)
 
 
+def test_what_stays_in_the_liquid_sets_the_mtt(tmp_path):
+    """The absorbed share of a gas dose (A boiling at 250 K, 99 % taken up) and a charged vent
+    component (G boiling at 188 K, 10 % of the charge; the vent takes only what forms) stay in
+    the liquid: each sets the MTT."""
+    low_a = MATERIALS.replace(
+        "normal_boiling_point: 400}\n  - {id: B", "normal_boiling_point: 250}\n  - {id: B", 1
+    ).replace("{id: gas, components: [G]}", "{id: gas, components: [A, G]}")
+    ws = _plant(tmp_path / "a", FLOWSHEET.replace("time: 3600}]", "time: 3600, absorbed: 0.99}]"))
+    (ws.root / "process/materials.yaml").write_text(low_a)
+    (entry,) = screen(ws.root).entries
+    assert entry.mtt == pytest.approx(250.0) and "of A" in entry.mtt_basis
+    assert entry.criticality == 3  # the MTSR above the MTT
+    charged = FLOWSHEET.replace(
+        "composition: {basis: mole_fraction, values: {S: 1.0}",
+        "composition: {basis: mole_fraction, values: {S: 0.9, G: 0.1}",
+        1,
+    )
+    assert charged != FLOWSHEET
+    ws = _plant(tmp_path / "b", charged)
+    (ws.root / "process/materials.yaml").write_text(
+        MATERIALS.replace(
+            "normal_boiling_point: 188}",
+            "normal_boiling_point: 188, liquid_molar_volume: 0.05, liquid_heat_capacity: 50}",
+        )
+    )
+    (entry,) = screen(ws.root).entries
+    assert entry.mtt == pytest.approx(188.0) and "of G" in entry.mtt_basis
+
+
+def test_a_semibatch_says_its_mtsr_includes_its_phase_changes(tmp_path):
+    """dT_ad leaves a declared phase change out (ADR 0056), but the semi-batch's cooling-failure
+    MTSR is its model's, the phase change's heat included: the screening says so."""
+    materials = MATERIALS.replace(
+        "templates:",
+        "  - {id: B_s, name: B crystals, formula: C2H4, molar_mass: 28.05, phase: solid,\n"
+        "     liquid_molar_volume: 0.1, liquid_heat_capacity: 150}\ntemplates:",
+    ).replace("components: [A, B, S, G]}", "components: [A, B, S, G, B_s]}")
+    entries = {}
+    for heat in (0, -200000):
+        ws = _plant(
+            tmp_path / str(heat), FLOWSHEET.replace("reactions: [R1]", "reactions: [R1, P1]")
+        )
+        (ws.root / "process/materials.yaml").write_text(materials)
+        (ws.root / "process/reactions.yaml").write_text(
+            REACTIONS
+            + "  - {id: P1, kind: phase-change, stoichiometry: {B: -1, B_s: 1}, phase: liquid,\n"
+            f"     heat_of_reaction: {{value: {heat}, provenance: assumed}},\n"
+            "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.01},\n"
+            "            orders: {B: 1}, provenance: assumed}}\n"
+        )
+        (entries[heat],) = screen(ws.root).entries
+    plain, heated = entries[0], entries[-200000]
+    assert plain.adiabatic_rise == pytest.approx(heated.adiabatic_rise)
+    assert heated.mtsr > plain.mtsr + 1  # the heat of crystallization counts in the MTSR
+    assert any("MTSR from the semibatch model includes" in n and "P1" in n for n in heated.notes)
+
+
 def test_the_recipe_reports_the_vent_per_batch(tmp_path):
     ws = _plant(tmp_path)
     process, _ = load(ws.root)

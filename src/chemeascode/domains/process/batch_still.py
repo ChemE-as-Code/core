@@ -839,6 +839,7 @@ def rules(process: Any) -> list[Finding]:
                 ("reactions", node.reactions or node.reactor),
                 ("crystallizer", node.crystallizer),
                 ("solid_separation", node.solid_separation),
+                ("dryer", getattr(node, "dryer", None)),
             )
             if value
         ]
@@ -848,7 +849,7 @@ def rules(process: Any) -> list[Finding]:
                 f"{node.id}: a still is not also a {' or '.join(others)}",
                 loc,
                 node.id,
-                "split the step: the reaction or crystallizer first, the still after it",
+                "split the step: the reaction, crystallizer or dryer apart from the still",
             )
         outs = _ports(node, "out")
         mapped = [spec.outlets["residue"], *(port for port, _ in spec.ends())]

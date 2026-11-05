@@ -101,8 +101,8 @@ not used: no code is copied from it, and its papers are cited as literature only
   `cheme.process-still-unsolved` (error), `-outlet` (warning: given outlet values differ) and
   `-note` (info).
 - **Rules** (`cheme.process-still` in `cheme validate`):
-  - errors: a still that is also a reactor or crystallizer; outlets or cuts that do not name
-    each material outlet port once; not exactly one charge besides the feed; a feed stream that
+  - errors: a still that is also a reactor, crystallizer, solid separation or dryer; outlets or
+    cuts that do not name each material outlet port once; not exactly one charge besides the feed; a feed stream that
     is no inlet; an unknown component in `nonvolatile`, `alpha` or a residue key; a volatile
     component without a vapour pressure (raoult) or an alpha (constant); a boil-up in kW
     without the heats of vaporization;
@@ -124,7 +124,7 @@ not used: no code is copied from it, and its papers are cited as literature only
   chloride, benzyl bromide, MeI, Boc2O) still needs a column (`process simulate` or a
   specified split) until the constant-reflux follow-up (core#173). One stage cannot reach a
   product's purity: at alpha 4 from x0 = 0.5 Rayleigh gives a distillate of 0.70 mole
-  fraction at 84 % recovery, 0.59 at 99 %.
+  fraction at 84 % recovery of the light key, 0.59 at 99 %.
 - Positive: it is qualified against closed forms. Rayleigh's binary at constant relative
   volatility agrees to 1e-8. Raoult's law (benzene-toluene, NIST Antoine) agrees with the
   Rayleigh integral to 1e-6. The constant-level swap's

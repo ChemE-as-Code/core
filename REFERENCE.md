@@ -1038,7 +1038,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reaction with `kind: phase-change` (or one component into one other of the same formula, one
   of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
   reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
-  JSON `phase_changes`), a step with both is screened on its reactions alone (ADR 0056).
+  JSON `phase_changes`), a step with both takes dT_ad and the MTT from its reactions alone, a
+  semi-batch's MTSR from its whole model, the phase changes included, with a note (ADR 0056).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1061,10 +1062,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **Batch recipe**: **`cheme process recipe [--case C] [--svg FILE] [--json]`** reads
   `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0051): the `batch_size` (kg, t or m3 of one
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
-  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
-  distil, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
-  batch or semi-batch step's model; for dry and filter, `from:` a dryer or a filter with
-  `filtration:`, ADR 0057; for distil, `from:` a still step's boil-up time, ADR 0055; a unit
+  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, distil,
+  filter, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
+  batch or semi-batch step's model; for distil, `from:` a still step's boil-up time (ADR 0055);
+  for dry and filter, `from:` a dryer or a filter with `filtration:` (ADR 0057); a unit
   procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's
   occupancy, the cycle time (the bottleneck), the batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
@@ -1076,7 +1077,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   sizes) and check its `jacket` (U, area or wetted shell, coolant and heating temperatures)
   against the model's peak duty (`cheme.recipe-jacket`, `-vessel`); a `heat` or `cool`
   operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
-  writes a batch reactor's volume and peak duty from it (ADR 0052).
+  writes a batch reactor's volume and peak duty from it (ADR 0052). A `unit:` that is a block,
+  or `units:`, holding one batch or semi-batch step sizes the vessel from that step (ADR 0057;
+  1.7.0 gave `cheme.recipe-reference` for a block); several such steps are
+  `cheme.recipe-reference` (name one as `unit:`). A filter or dryer in the same vessel takes
+  its plate and heated area (`vessel.heated_area`, else the jacket's area, else the shell and
+  bottom the dryer's wet cake wets) from it.
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1097,8 +1103,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
-  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (a note gives its
-  peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
+  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT, which is the
+  lowest boiling point of what stays in the liquid (the charge, a charged vent component
+  included, and each dose's absorbed share; a note gives the vent's peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
   more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
   a vent stream whose template lacks a vent component or a passing dose's component, (warning)
   one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
@@ -1206,8 +1213,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive;
     sourced when the relative volatilities, or for Raoult's law the volatility itself and every
     volatile component's vapour pressure, are `given` with a source: an ideal liquid declared
-    `assumed`, as for a pair with an azeotrope, is not sourced), the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
-    time, the mean and peak duty, the energy per batch and the still's temperatures
+    `assumed`, as for a pair with an azeotrope, is not sourced), the charge, feed, cuts and
+    residue (per batch and per hour, mole fractions), the boil-up time, the mean and peak duty,
+    the energy per batch and the still's temperatures
     (`cheme.process-still-unsolved`, `-outlet`, `-note`).
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without

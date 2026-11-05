@@ -18,7 +18,8 @@
   closes over them; `process reactors` reports the vent (kmol/h, peak kmol/(s m3) and when),
   `process recipe` the off-gas per batch (peak kmol/s and m3/h at the vessel's conditions, kg
   and kmol per batch), and `process reactor-hazards` leaves the vented and passing gas out of
-  the MTSR and the MTT, with a note of the peak gas rate. New `cheme.process-reactor` findings:
+  the MTSR and the MTT (what stays in the liquid, a charged vent component and a dose's
+  absorbed share included, sets the MTT), with a note of the peak gas rate. New `cheme.process-reactor` findings:
   the vent stream no outlet of the step or its only one, more than two outlets, an undeclared
   vent component, a vented batch on gas-phase reactions, a vent stream whose template lacks a
   vent component or a passing dose's component, (warning) a vent component no reaction forms,
@@ -44,8 +45,9 @@
   into one other with the same formula, one of them `phase: solid`, counts as one without the
   field unless it declares a `heat_of_reaction` (then it stays screened, its heat in dT_ad).
   `cheme process reactor-hazards` no longer screens a step whose reactions are all
-  phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
-  a step with both on its reactions alone.
+  phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and takes the
+  dT_ad and MTT of a step with both from its reactions alone; a semi-batch's MTSR stays its
+  model's, the phase changes included, and a note says so.
 - Filter-dryer and vacuum dryer (ADR 0057, core#165): a block or step may give `dryer:
   {volatiles, residual_moisture, temperature, energy, drying_rate | drying_time, cake_density,
   outlets: {product, vapour}}`. `cheme process propagate` writes the dried product (the
@@ -63,7 +65,10 @@
   share one vessel (a filter-dryer: filter, wash, re-filter, dry), its occupancy counted once
   (NBS lesson L-3). `vessel.heated_area` is new, and a filter-dryer's vessel is sized from the
   largest content of one batch: the dryer's wet cake over its `cake_density`, or the slurry or
-  reslurry wash a step of the vessel takes in. Every BFD/PFD needs `cheme process build` once
+  reslurry wash a step of the vessel takes in. A `unit:` that is a block holding one batch or
+  semi-batch step now sizes the vessel from that step (1.7.0 gave `cheme.recipe-reference`);
+  a block or `units:` holding several is `cheme.recipe-reference` (name one as `unit:`). A
+  filter or dryer in the vessel of a batch step takes its filter area and heated area from it. Every BFD/PFD needs `cheme process build` once
   (the process generator's code changed).
 - Batch still and solvent swap (ADR 0055, core#165): a block or step with `still:` is a batch
   (Rayleigh) still, shortcut level (one equilibrium stage, total condenser, no reflux). The
@@ -89,6 +94,18 @@
   ideal liquid is declared `assumed`). Product purification by fractional batch distillation still
   needs a column (`process simulate` or a specified split) until the constant-reflux
   follow-up (core#173).
+
+### Fixed
+
+- Batch work-up features together (the integrated review of #169 to #172): a step with both
+  `still:` and `dryer:` is `cheme.process-still` (error), not a still in propagate and a dryer
+  in `process crystallizers`. `cheme process crystallizers` prints the
+  `cheme.process-dryer-duty` warning in its text output too. A semi-batch's MTT counts what
+  stays in the liquid (a dose's absorbed share, a charged vent component). A recipe vessel
+  holding a batch step and a filter or dryer gives the filter and dry times its plate and
+  heated area. `datasheets fill` finds a batch reactor's recipe vessel inside `units:`. The
+  REFERENCE.md recipe paragraph and command list, the maturity table (`rayleigh`) and ADR
+  0055's Rayleigh example are corrected.
 
 ## 1.7.0 (2026-11-05)
 
