@@ -4,6 +4,11 @@
 
 ### Added
 
+- Per-batch LCA exchanges (ADR 0051, core#158 package 5): an `lca.yaml` consumable may give
+  `per_batch` instead of `per_year`: per hour of the flowsheet's year averages it is per batch x
+  batches per year / hours of `process/recipe.yaml`, the arithmetic in the exchange's source;
+  without a recipe that gives a cycle it is `cheme.lca-per-batch` (error).
+
 - Batch vessels and jackets (ADR 0050, core#158 package 3): a unit procedure of
   `process/recipe.yaml` on a batch or semi-batch step may give `vessel: {fill_fraction,
   aspect_ratio, nominal, volume, jacket: {u, area, coolant_temperature, heating_temperature}}`.
