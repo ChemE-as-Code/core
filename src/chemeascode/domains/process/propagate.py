@@ -26,6 +26,11 @@ is fully determined by their streams, by the DEXPI class:
 - batch stills and solvent swaps (a block or step with ``still:``, its charge and a swap's
   feed in): the distillate cuts and the residue by :mod:`.batch_still` (Rayleigh).
 
+- duties (ADR 0059): an isothermal batch or semi-batch, a still, a crystallizer with
+  ``energy:`` and a conversion step write their year-average duty on their energy stream
+  (``energy_port:``, else their one heat stream; :mod:`.duties`); a given or assumed duty is
+  compared (``cheme.process-duty``), never overwritten.
+
 Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
 them), never solved.
 
@@ -38,7 +43,8 @@ them), never solved.
 Derived values get provenance ``calculated``, source ``cheme process propagate: <rule>
 <step> from <streams>`` and an input fingerprint. They never overwrite a given or assumed value
 and become stale (``cheme.process-calculated-stale``) when their inputs change. The YAML is
-edited in place: only the ``composition:`` and ``flow:`` entries of a state change.
+edited in place: only the ``composition:`` and ``flow:`` entries of a state change (a fixed bed's
+outlet temperature and pressure, an energy stream's ``duty:``).
 """
 
 from __future__ import annotations
@@ -89,8 +95,9 @@ def _sig(value: float) -> float:
 
 SOURCE = "cheme process propagate"
 FIELDS = ("composition", "flow")
-#: What propagate writes: a fixed bed's outlet also gets its temperature and pressure.
-WRITTEN = (*FIELDS, "temperature", "pressure")
+#: What propagate writes: a fixed bed's outlet also gets its temperature and pressure, an energy
+#: stream a model's duty (ADR 0059).
+WRITTEN = (*FIELDS, "temperature", "pressure", "duty")
 #: DEXPI step classes (and their subclasses) by behaviour; the first match wins.
 BEHAVIOUR = (
     ("reactor", ("ReactingChemicals",)),
@@ -168,6 +175,14 @@ class Derivation:
     solids: list[tuple[str, str]] = field(default_factory=list)
     #: (node id, message) for batch stills that cannot be solved as declared.
     stills: list[tuple[str, str]] = field(default_factory=list)
+    #: (node id, level, message, hint, what) about a model's duty and its energy stream (ADR
+    #: 0059), *what* one of: ``given`` (a given or assumed duty the model differs from;
+    #: ``cheme validate`` reports it too), ``models`` (two models give one stream different
+    #: duties; validate too), ``direction`` (a heat that flows against the stream), ``info``
+    #: (a duty not known or a stream not chosen).
+    duties: list[tuple[str, str, str, str, str]] = field(default_factory=list)
+    #: node id -> the model's duty (:class:`.duties.ModelDuty`), where it has a target stream.
+    model_duties: dict[str, Any] = field(default_factory=dict)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
     passes: int = 0
     #: The loops torn at ``tears:`` and how they converged (:mod:`.recycle`); None without.
@@ -265,10 +280,10 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
     work = Process(process.root, process.materials, fs, reactions=process.reactions)
     work.catalysts = process.catalysts
     streams = {s.id: s for s in fs.streams if s.kind == "material"}
-    for s in streams.values():
+    for s in fs.streams:
         state = s.state.get(case)
-        if state is not None:
-            for name in WRITTEN:
+        if state is not None and s.kind in ("material", "energy"):
+            for name in WRITTEN if s.kind == "material" else ("duty",):
                 if ours(getattr(state, name)):
                     setattr(state, name, None)
     shadows: dict[str, StreamDef] = {}
@@ -375,6 +390,9 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         return names
 
     beds: dict[str, Any] = {}
+    #: node id -> a solved still's, crystallizer's or tank's result and inputs (its duty)
+    solutions: dict[str, Any] = {}
+    solved_inputs: dict[str, Any] = {}
 
     def bed(node, ins, extra):
         """The outlet of fixed bed *node* (:func:`.fixed_bed.solve_node`), its temperature and
@@ -420,6 +438,7 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         result, inputs = solve_tank(work, node, tank_inlet(node, ins), case)
         extra |= inputs
         beds[node.id] = result
+        solved_inputs[node.id] = inputs
         return result.outlet
 
     def solve(node, model, reactions, rates, names, mass, mw, ins, out, extra):
@@ -514,6 +533,7 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
                 ports = dried(node.dryer, solved)
             elif node.crystallizer is not None:
                 result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
+                solutions[node.id] = (result, dict(extra))
                 ports = node_outlets(node.crystallizer, result)
                 shapes = {
                     port: outlet_shape(node.crystallizer, role, result)
@@ -572,6 +592,7 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
                         del found.values[(s.id, name)]
                         setattr(s.state[case], name, None)
             return False
+        solutions[node.id] = (result, dict(extra))
         ports = node_outlets(work, node.still, result)
         shapes = outlet_shapes(work, node.still, result)
         names = sorted({n for mass in ports.values() for n in mass})
@@ -749,6 +770,12 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
             break
     for node_id, message in waiting.items():
         found.stills.append((node_id, message))
+    candidates = [
+        c
+        for node in nodes
+        if (c := _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, found))
+    ]
+    _put_duties(work, candidates, put, found)
     for node in nodes:
         kind = kinds[node.id]
         ends = [s for s, _ in at[node.id][0] + at[node.id][1]]
@@ -786,6 +813,178 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         for name in FIELDS:
             found.values.pop((sid, name), None)
     return found
+
+
+@dataclass
+class _Candidate:
+    """A model's duty for its energy stream, not yet written (:func:`_put_duties`)."""
+
+    node: str
+    label: str
+    model: str
+    stream: StreamDef
+    value: float  # kW in the stream's direction
+    used: list[StreamDef]
+    extra: dict[str, Any]
+
+
+def _duty(
+    work: Process,
+    node: Any,
+    case: str,
+    ends: tuple[list[tuple[StreamDef, str]], list[tuple[StreamDef, str]]],
+    beds: dict[str, Any],
+    solutions: dict[str, Any],
+    solved_inputs: dict[str, Any],
+    found: Derivation,
+) -> _Candidate | None:
+    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059): compared
+    where the stream has a given or assumed one, else the candidate :func:`_put_duties`
+    writes; None (and why, in *found*) when there is nothing to write."""
+    from chemeascode.domains.process import duties
+    from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
+    from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
+
+    model = duties.duty_model(node)
+    if model is None:
+        return None
+    goal, why = duties.target(work, node)
+    label = f"{node.id} ({model})"
+    if goal is None:
+        if why:
+            found.duties.append(
+                (
+                    node.id,
+                    "info",
+                    f"{label}: its model's duty is not written: {why}",
+                    "set energy_port: to the port of the energy stream that carries it",
+                    "info",
+                )
+            )
+        return None
+    ins = [s for s, _ in ends[0]]
+    outs = [s for s, _ in ends[1]]
+    used = list(ins)
+    extra: dict[str, Any] = {"duty": model, "into": goal.into}
+    try:
+        if model in ("batch", "semibatch"):
+            result, inputs = beds.get(node.id), solved_inputs.get(node.id)
+            if result is None or inputs is None:
+                result, inputs = solve_tank(work, node, tank_inlet(node, ins), case)
+            duty = duties.batch_duty(node, result)
+        elif model in ("still", "crystallizer"):
+            if node.id not in solutions:
+                return None  # not solved: propagate reports the still or crystallizer already
+            result, inputs = solutions[node.id]
+            if model == "still":
+                duty = duties.still_duty(node, result)
+                comps = work.components()
+                inputs = inputs | {
+                    "heat_of_vaporization": {
+                        n: getattr(comps.get(n), "heat_of_vaporization", None)
+                        for n in sorted({*result.charge, *result.fed})
+                    },
+                }
+            else:
+                duty = duties.crystallizer_duty(node, result)
+        else:
+            duty, inputs = duties.conversion_duty(work, node, case)
+            used = [*ins, *outs]
+    except (TankError, ValueError) as failure:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{label}: no duty for {goal.stream.id}: {failure}",
+                "correct the model's data; cheme process reactors reports it",
+                "info",
+            )
+        )
+        return None
+    found.model_duties[node.id] = duty
+    stream = goal.stream
+    if duty.heat_kW is None:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{label}: no duty for {stream.id}: missing " + "; ".join(duty.missing),
+                "give the missing data, or the stream's duty (given or assumed)",
+                "info",
+            )
+        )
+        return None
+    value = goal.duty(duty.heat_kW)
+    if value < -1e-9:
+        flows = "into" if duty.heat_kW > 0 else "out of"
+        direction = "into" if goal.into else "out of"
+        found.duties.append(
+            (
+                node.id,
+                "warning",
+                f"{label}: the model's heat flows {flows} it ({duty.heat_kW:.6g} kW in), "
+                f"energy stream {stream.id} runs {direction} it: its duty is not written",
+                "reverse the energy stream (from and to), or check the model's data",
+                "direction",
+            )
+        )
+        return None
+    q = getattr(stream.state.get(case), "duty", None)
+    if q is not None:
+        given = duties.given_duty(work, stream, case)
+        if q.provenance != "calculated" and given and duties.differs(work, given[0], value):
+            found.duties.append(
+                (
+                    node.id,
+                    "warning",
+                    f"{label}: energy stream {stream.id} duty {given[0]:.6g} kW "
+                    f"({q.provenance}), the model gives {value:.6g} kW",
+                    "remove the duty so cheme process propagate --fill writes the model's, or "
+                    "correct the model's data (or the stream's value and source)",
+                    "given",
+                )
+            )
+        return None
+    extra |= inputs
+    extra["temperature"] = {
+        s.id: t.model_dump(mode="json", exclude=NOT_INPUTS)
+        for s in used
+        if (t := getattr(s.state.get(case), "temperature", None)) is not None
+    }
+    return _Candidate(node.id, label, model, stream, value, used, extra)
+
+
+def _put_duties(work: Process, candidates: list[_Candidate], put: Any, found: Derivation) -> None:
+    """Write each candidate duty on its stream; where two models give one stream (an energy
+    stream between two modelled blocks or steps), the first when they agree, neither (a
+    ``cheme.process-duty`` warning naming both) when they differ."""
+    from chemeascode.domains.process import duties
+
+    by_stream: dict[str, list[_Candidate]] = {}
+    for c in candidates:
+        by_stream.setdefault(c.stream.id, []).append(c)
+    for group in by_stream.values():
+        first = group[0]
+        apart = [c for c in group[1:] if duties.differs(work, first.value, c.value)]
+        if apart:
+            models = ", ".join(f"{c.label} {c.value:.6g} kW" for c in group)
+            for c in group:
+                found.duties.append(
+                    (
+                        c.node,
+                        "warning",
+                        f"{c.label}: energy stream {c.stream.id} gets different duties from "
+                        f"the models at its two ends ({models}): neither is written",
+                        "correct either model's data, give the stream's duty (given or "
+                        "assumed), or point one node's energy_port at another stream",
+                        "models",
+                    )
+                )
+            continue
+        unit = None if work.flowsheet.units.duty == "kW" else "kW"
+        quantity = Quantity(value=_sig(first.value), unit=unit, provenance="calculated")
+        rule = f"{first.model} duty"
+        put(first.stream, "duty", quantity, rule, first.node, first.used, first.extra)
 
 
 def derivation(process: Process, case: str) -> Derivation:
@@ -853,6 +1052,7 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
 
     found = derive(process, case)
     edits: dict[int, dict[str, Any]] = {}
+    inline: list[tuple[int, int, int, str]] = []  # a flow-style stream's duty (_flow_edit)
     for i, stream in enumerate(fs.streams):
         state = stream.state.get(case)
         loc = ["streams", i, "state", case]
@@ -874,7 +1074,21 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             if _same(old, new):
                 continue
             result.lines.append(f"{stream.id} {name}: {new.source[len(SOURCE) + 2 :]}")
-            if write:
+            if write and name == "duty" and not _block_stream(doc, i, case):
+                edit = _flow_edit(doc, i, case, name, _flow(_dump(new)))
+                if edit is not None:
+                    inline.append(edit)
+                else:
+                    add(
+                        "info",
+                        "duty",
+                        f"stream {stream.id} ({case}): duty derivable, not written: its flow "
+                        "mapping spans lines",
+                        loc,
+                        [stream.id],
+                        "write the stream as a block mapping (one key per line), then --fill",
+                    )
+            elif write:
                 edits.setdefault(i, {})[name] = new
             elif old is None:
                 add(
@@ -927,6 +1141,8 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             "correct the still's specification, its data or the inlets; cheme process stills "
             "reports it",
         )
+    for node, level, message, hint, _ in found.duties:
+        add(level, "duty", message, list(keys.get(node, ())), [node], hint)
     for node, kind, lacking in found.unsolved:
         how = (
             "only checked (cheme validate balances it), never solved"
@@ -947,13 +1163,18 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             ),
         )
     if write:
+        if inline:  # within their own lines: the lines _write edits stay where they are
+            _write_inline(workspace.root / FLOWSHEET_FILE, inline)
         if edits:
             _write(workspace.root / FLOWSHEET_FILE, doc, case, edits)
-        result.written = len(edits)
+        result.written = len(edits) + len(inline)
         result.lines.append(
-            f"{FLOWSHEET_FILE}: propagated values written for {len(edits)} stream(s)"
+            f"{FLOWSHEET_FILE}: propagated values written for {result.written} stream(s)"
         )
     filled = {fs.streams[i].id: list(names) for i, names in edits.items()} if write else {}
+    if write:
+        for index, *_ in inline:
+            filled[fs.streams[index].id] = ["duty"]
     result.adapter = _adapter_result(workspace.root, process, case, found, filled, result)
     return result
 
@@ -1120,6 +1341,72 @@ def _adapter_result(
 
 
 # -- writing ------------------------------------------------------------------------------------
+
+
+def _block_stream(doc: Any, index: int, case: str) -> bool:
+    """Whether stream *index*'s mapping (and its state and *case* where present) is a block
+    mapping :func:`_write` can edit."""
+    streams = _child(doc, "streams")
+    if streams is None:
+        return False
+    node = streams[1].value[index]
+    for key in ("state", case):
+        if not isinstance(node, yaml.MappingNode) or node.flow_style:
+            return False
+        child = _child(node, key)
+        if child is None:
+            return True
+        node = child[1]
+    return isinstance(node, yaml.MappingNode) and not node.flow_style
+
+
+def _flow_edit(
+    doc: Any, index: int, case: str, key: str, text: str
+) -> tuple[int, int, int, int, str] | None:
+    """(stream index, line, start column, end column, new text) that writes *key*: *text*
+    into stream *index*'s ``state.<case>`` where a level of it is a flow mapping (an energy
+    stream on one line, ``{id: Q1, ..., state: {design: {duty: ...}}}``): inserted before that
+    flow mapping's closing brace, or in place of the key's value. None where a block mapping
+    lacks the level (:func:`_write`'s) or the edit would span lines."""
+    streams = _child(doc, "streams")
+    if streams is None:
+        return None
+    node = streams[1].value[index]
+    path = ["state", case, key]
+    # down the block mappings to the first flow mapping
+    while isinstance(node, yaml.MappingNode) and not node.flow_style:
+        child = _child(node, path[0])
+        if child is None or len(path) == 1:
+            return None
+        node, path = child[1], path[1:]
+    if not isinstance(node, yaml.MappingNode):
+        return None
+    # down the flow mappings as far as they go
+    while len(path) > 1 and (child := _child(node, path[0])) is not None:
+        if not isinstance(child[1], yaml.MappingNode):
+            return None
+        node, path = child[1], path[1:]
+    if len(path) == 1 and (child := _child(node, key)) is not None:
+        value = child[1]
+        if value.start_mark.line != value.end_mark.line:
+            return None
+        return (index, value.start_mark.line, value.start_mark.column, value.end_mark.column, text)
+    inner = f"{path[-1]}: {text}"
+    for name in reversed(path[:-1]):
+        inner = f"{name}: {{{inner}}}"
+    end = node.end_mark
+    if end.column == 0:
+        return None
+    at = end.column - 1  # the closing brace
+    return (index, end.line, at, at, (", " if node.value else "") + inner)
+
+
+def _write_inline(path: Any, inline: list[tuple[int, int, int, int, str]]) -> None:
+    """Apply :func:`_flow_edit`'s edits (each within one line)."""
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    for _, line, start, end, text in sorted(inline, key=lambda e: (e[1], e[2]), reverse=True):
+        lines[line] = lines[line][:start] + text + lines[line][end:]
+    path.write_text("".join(lines), encoding="utf-8")
 
 
 def _write(path: Any, doc: Any, case: str, edits: dict[int, dict[str, Any]]) -> None:

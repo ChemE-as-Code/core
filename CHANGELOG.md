@@ -54,6 +54,35 @@
   both recycles (mother liquor and methanol) converge in 20 iterations to within 0.02 % of the
   hand-converged streams. Plants without `tears:` solve, report and fingerprint as in 1.8.0.
   Every BFD/PFD needs `cheme process build` once, because the process generator's code changed.
+- Batch and conversion models write and check their energy streams (ADR 0059, #180). `cheme
+  process propagate --fill` writes the year-average duty (kW per hour of the flowsheet's
+  flows, `calculated` with a fingerprint) of an isothermal `reactor: batch` or `semibatch` (the
+  heat its reactions release and the doses warmed), a `still:` (its boil-up's latent heat), a
+  `crystallizer:` with `energy:` and a conversion step, batch or continuous (its declared heats
+  of reaction at their own `heat_of_reaction.temperature`, the streams brought to and from it at
+  their heat capacities; or, with no stream said to hold a liquid and no liquid or mixed
+  reaction, ideal-gas `H(out) - H(in)`; less the work its other energy streams bring in, such
+  as an electrolyser's DC power; a component going from vapour to liquid across the step leaves
+  it unknown). It goes on the energy stream at the step's new `energy_port:`, else on its one
+  heat stream to or from a heating or cooling utility; an energy stream to or from another
+  block or step (a furnace's coil, a rectifier's power) is heat only where `energy_port` names
+  it. A duty is positive in its stream's direction; a model whose heat flows against it is a
+  warning, never a negative duty. A given or assumed duty is never overwritten: one beyond the
+  flowsheet's relative tolerance is `cheme.process-duty` (warning, naming both values), from
+  `propagate` and now also from `cheme validate`; two models that give one stream different
+  duties are a warning naming both, neither written; several heat streams or missing data are
+  info. `validate` adds `cheme.process-energy-port`. A flow-style energy stream is written in
+  place. `cheme process reactors` shows a batch's or conversion step's duty and its stream where
+  the ideal-gas duty was `?`, and adds `model_duty` to `--json` where the model knows a duty or
+  a stream wants one; `cheme process stills` shows the year-average duty.
+  **Behaviour change**: `propagate --check` can newly exit 1, and `validate` newly warns, where
+  a hand-typed duty differs from the model. In the process library seven entries do (scratch
+  copies, 1.8.0 exit 0): benzyl-chloroformate-1 R101 Q2 and sodium-azide-1 R102 Q2 (batch),
+  ethylene-1 H102 Q102, formic-acid-1 R201 Q10, hydrogen-bromide-1 R101 Q2,
+  hydrogen-chloride-1 R101 Q1 and phosphorus-oxychloride-1 R201 Q3 (continuous conversion
+  steps). `process reactors` text and JSON change for 44 of its 73 entries (the model's duty
+  line). Plants without heat streams or given duties on these steps solve and fingerprint as in
+  1.8.0. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
 
 ### Changed
 

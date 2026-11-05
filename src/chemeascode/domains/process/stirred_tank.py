@@ -170,6 +170,12 @@ class TankResult:
     #: vented: the peak in kmol/s on the batch's basis (per hour of charge; times a batch's
     #: hours of flows, one batch's)
     peak_vent_flow: float | None = None
+    #: isothermal batch or semi-batch (ADR 0059): the heat into the content over the batch, kJ
+    #: per hour of charge by term (``reaction``: minus the heat released; ``doses``: the doses
+    #: warmed to the batch's temperature; ``vent gas``: a dosed gas passing through, warmed),
+    #: None with ``heat_missing`` what it lacks
+    heat_terms: dict[str, float] | None = None
+    heat_missing: list[str] = field(default_factory=list)
     #: semi-batch, every accepted step (the thermal screening's MTSR profile, ADR 0058): the
     #: cooling-failure potential of each reaction then
     cooling_profile: list[CoolingPoint] = field(default_factory=list, repr=False)
@@ -721,11 +727,13 @@ def solve_batch(
                 found.append(0.0)
         return found
 
+    unknown_heat = ""
     try:
         energies(temperature)
         known = True
-    except TankError:
+    except TankError as failure:
         known = False
+        unknown_heat = str(failure)
     worst_known = bool(doses) and known
     missing_cooling = ""
     if worst_known:
@@ -988,6 +996,16 @@ def solve_batch(
             result.peak_cooling_duty = cooling / result.volume
         if reagent is None:
             result.notes.append("no dosed reactant: no accumulation")
+    if not adiabatic:
+        _heat_terms(result, known, unknown_heat, heat, temperature, doses, dose_capacity)
+        if result.heat_terms is not None:
+            gas = sum(
+                c * (temperature - d.temperature)
+                for d, c in zip(doses, passing_capacity, strict=True)
+                if c is not None
+            )
+            if gas:
+                result.heat_terms["vent gas"] = gas
     for r in reactions:
         hottest = max(p[1] for p in result.profile)
         if not r.rate.covers(hottest) or not r.rate.covers(temperature):
@@ -1002,6 +1020,39 @@ def solve_batch(
                 result.accumulation[-1],
             ]
     return result
+
+
+def _heat_terms(
+    result: TankResult,
+    known: bool,
+    unknown: str,
+    heat: float,
+    temperature: float,
+    doses: Sequence[Dose],
+    capacity: Sequence[float | None],
+) -> None:
+    """The isothermal batch's heat into the content by term (:attr:`TankResult.heat_terms`):
+    minus the *heat* released (kJ), each dose warmed from its temperature to the batch's at its
+    heat *capacity* (kJ/K, None: not known), or what is missing."""
+    if not known:
+        result.heat_missing = [f"the heat of reaction: {unknown}"]
+        return
+    lacking = [
+        f"the liquid_heat_capacity of dose {k + 1} ({d.temperature:g} K, the batch at "
+        f"{temperature:g} K)"
+        for k, (d, c) in enumerate(zip(doses, capacity, strict=True))
+        if c is None and abs(d.temperature - temperature) > 1e-9
+    ]
+    if lacking:
+        result.heat_missing = lacking
+        return
+    terms = {"reaction": -heat}
+    warming = sum(
+        (c or 0.0) * (temperature - d.temperature) for d, c in zip(doses, capacity, strict=True)
+    )
+    if doses:
+        terms["doses"] = warming
+    result.heat_terms = terms
 
 
 def _released(

@@ -30,6 +30,8 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   energy balance of a block or step whose streams carry enthalpies (:mod:`.energy`): enthalpy
   flows against the energy streams crossing it; a reacting node or an inconsistent enthalpy
   reference is reported as unsupported, never as a number;
+- ``process-energy-port``: an ``energy_port`` that names no energy port of its block or step,
+  or (warning) one on a node no model gives a duty (:func:`.duties.rules`, ADR 0059);
 - ``process-terminal``: a terminal gives ``utility:`` without ``category: utility``;
 - ``process-reactor``: a reactor model (``reactor:``) that cannot be solved as declared:
   conversion without a conversion per reaction, equilibrium without reactions, an irreversible
@@ -788,6 +790,9 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     from chemeascode.domains.process.batch_still import rules as still_rules
 
     out.findings += still_rules(process)
+    from chemeascode.domains.process.duties import rules as duty_rules
+
+    out.findings += duty_rules(process)
     return out.findings
 
 
