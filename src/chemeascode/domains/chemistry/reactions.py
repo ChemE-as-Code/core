@@ -146,7 +146,7 @@ class Reaction(Strict):
         "another (a precipitation NBS(aq) -> NBS(s), a dissolution, a hydrate forming): the "
         "thermal screening (cheme process reactor-hazards) does not screen it as a reaction. "
         "A reaction of one component into one other of the same formula, one of them phase: "
-        "solid, counts as one.",
+        "solid, counts as one unless it declares a heat_of_reaction (then it is screened).",
         exclude_if=lambda value: value == "reaction",
     )
     reversible: bool = False

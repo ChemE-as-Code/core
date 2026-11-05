@@ -22,6 +22,7 @@ from chemeascode.domains.process.crystallization import (
     Slurry,
     crystal_form,
     crystallizer_report,
+    report_text,
     solubility_at,
     solve_train,
 )
@@ -63,9 +64,15 @@ def test_spectators_pass_unchanged_and_the_liquor_leaves_saturated_per_kg_of_liq
     for element in ("Na", "Cl", "Br", "N"):
         assert abs(result.balances["elements_kmol_h"][element]["residual"]) < 1e-12
     assert result.liquor["solubility_basis"] == "kg/kg_liquor"
+    # the report's per-kg-solvent value is the mother liquor's: 45 / 800 = 0.05625, not the
+    # declared 0.05 per kg of liquor (kept as declared_solubility)
+    assert result.entry()["solubility_kg_per_kg_solvent"] == pytest.approx(45 / 800, rel=1e-12)
+    assert result.liquor["declared_solubility"] == 0.05
+    assert result.liquor["solubility"] == 0.05
     assert result.entry()["streams"]["slurry"]["spectators"] == {"NaCl": 100.0}
     # without spectators nothing of this appears in the report
     plain = solve_train(Slurry(100.0, 800.0), form, solubility=0.05).entry()
+    assert plain["solubility_kg_per_kg_solvent"] == 0.05
     assert "mother_liquor" not in plain and "spectators" not in plain["streams"]["slurry"]
     assert "spectators" not in plain["balances"]
 
@@ -115,6 +122,14 @@ def test_setschenow_salting_out_against_a_hand_calculation():
     result = solve_train(feed, form, solubility=0.020, liquor=liquor)
     assert result.liquor["solubility"] == pytest.approx(0.0141589, rel=1e-5)
     assert result.liquor["salting_out_factor"] == pytest.approx(0.707946, rel=1e-5)
+    # reported per kg of solvent with the correction; the declared 0.020 kept apart
+    entry = result.entry()
+    assert entry["solubility_kg_per_kg_solvent"] == pytest.approx(0.0141589, rel=1e-5)
+    slurry = result.streams["slurry"]
+    assert entry["solubility_kg_per_kg_solvent"] == pytest.approx(
+        slurry.solute / slurry.solvent, rel=1e-12
+    )
+    assert entry["mother_liquor"]["declared_solubility"] == 0.020
     assert result.liquor["molality_mol_per_kg_solvent"]["NaCl"] == pytest.approx(1.0)
     assert result.crystals_formed == pytest.approx(35.8411, rel=1e-5)
     # the same coefficient on the natural-log scale: k_ln = 0.15 ln 10 = 0.345388
@@ -405,9 +420,106 @@ def test_the_nbs_precipitation_and_reslurry_wash_propagate_and_balance(tmp_path)
     assert report.loaded and not [f for f in report.findings if f.level == "error"]
     w = next(u for u in report.units if u["node"] == "W")
     assert w["solution"]["mother_liquor"]["spectators"] == ["NABR", "NAOH"]
+    cr = next(u for u in report.units if u["node"] == "CR")
+    assert cr["solution"]["solubility_kg_per_kg_solvent"] == pytest.approx(s, rel=1e-5)
+    # the text output shows the liquor and its spectators, as the --json does
+    text = report_text(report)
+    assert "mother liquor: solubility 0.01349 kg/kg_solvent (declared 0.0147, salting-out" in text
+    assert "spectators: NABR 0.3176 mol/kg, NAOH 0.05447 mol/kg; max residual" in text
     bases = {u.id: u for u in model_bases(process)}
     assert "spectators NABR, NAOH (pure-solvent solubility with Setschenow" in bases["CR"].detail
     assert any("spectator solutes stay dissolved" in a for a in bases["CR"].assumptions)
+
+
+IN_THE_REACTOR = """\
+schema: cheme/process/v1
+kind: flowsheet
+feeds:
+  - {id: L, ports: [{id: out, direction: out}]}
+products:
+  - {id: P, ports: [{id: in, direction: in}]}
+blocks:
+  - id: REACT
+    class: ReactingChemicals
+    ports: [{id: in, direction: in}, {id: out, direction: out}]
+steps:
+  - id: R1
+    block: REACT
+    class: ReactingChemicals
+    reactions: [HYD]
+    reactor: conversion
+    ports: [{id: in, direction: in, delegates: in}, {id: out, direction: out}]
+  - id: CR
+    block: REACT
+    class: Crystallizing
+    ports: [{id: in, direction: in}, {id: out, direction: out, delegates: out}]
+    crystallizer:
+      solute: NBS
+      solvent: H2O
+      crystal: NBS_S
+      basis: solubility
+      temperature: 278.15
+      solubility: {unit: kg/kg_solvent, value: 0.0147, provenance: assumed, source: test value,
+                   salting_out: {coefficients: {NABR: 0.1, NAOH: 0.1, HBR: 0.0},
+                                 provenance: assumed, source: test value}}
+      spectators: [NABR, NAOH, HBR]
+      outlets: {slurry: out}
+streams:
+  - id: S1
+    from: L.out
+    to: R1.in
+    template: liquor
+    state:
+      design:
+        temperature: {value: 278.15, provenance: given}
+        flow: {value: 1000, provenance: given}
+        composition: {basis: mass_fraction, values: {NBS: 0.05, H2O: 0.913, NABR: 0.03,
+                      NAOH: 0.005, HBR: 0.002}, provenance: given}
+  - id: S2
+    from: R1.out
+    to: CR.in
+    template: liquor
+  - id: S3
+    from: CR.out
+    to: P.in
+    template: liquor
+"""
+
+NEUTRALISATION = """\
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: HYD
+    stoichiometry: {NAOH: -1, HBR: -1, NABR: 1, H2O: 1}
+    phase: liquid
+    conversion: {key: HBR, value: 1.0, provenance: assumed}
+"""
+
+
+def test_a_crystallizer_in_a_block_with_a_reaction_balances(tmp_path):
+    # the precipitation in the reactor vessel: REACT holds the neutralisation R1 and the
+    # crystallizer CR; the NBS -> NBS_S change is the crystallizer's, not a reaction's
+    materials = MATERIALS.replace(
+        "templates:",
+        "  - {id: HBR, name: hydrogen bromide, formula: HBr, molar_mass: 80.912}\ntemplates:",
+    ).replace("NABR, NAOH]}", "NABR, NAOH, HBR]}")
+    ws = _plant(tmp_path, IN_THE_REACTOR, NEUTRALISATION, materials)
+    process, found = load(ws.root)
+    assert not [f.format() for f in found + rules(process) if f.level == "error"]
+    result = run(ws, process, "design", write=True)
+    assert not [f.format() for f in result.findings if f.level == "error"]
+    process, found = load(ws.root)
+    assert not [
+        f.format()
+        for f in found + rules(process)
+        if f.level == "error" and f.rule == "cheme.process-balance"
+    ]
+    by_node = {b.node: b for b in balances(process, "design")}
+    assert by_node["REACT"].status == "ok", by_node["REACT"].failing
+    assert by_node["CR"].status == "ok", by_node["CR"].failing
+    # 2 kg/h HBr (0.024718 kmol/h) neutralised; the crystallization is no reported extent
+    assert by_node["REACT"].extents == pytest.approx({"HYD": 2 / 80.912}, rel=1e-4)
+    assert _mass(ws, "S3")["NBS_S"] > 30.0
 
 
 def test_a_pure_water_solubility_in_a_mixed_liquor_is_refused(tmp_path):
@@ -568,3 +680,98 @@ def test_an_old_crystallizer_keeps_its_outlet_fingerprints(tmp_path, basis):
         state = stream["state"]["design"]
         assert state["flow"]["fingerprint"] == FINGERPRINTS_1_7_0[basis], stream["id"]
         assert state["composition"]["fingerprint"] == FINGERPRINTS_1_7_0[basis], stream["id"]
+
+
+CAUSTIC_MATERIALS = """\
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: NAOH_S, name: sodium hydroxide pellets, formula: NaOH, molar_mass: 39.997,
+     phase: solid, liquid_heat_capacity: 80}
+  - {id: NAOH, name: sodium hydroxide (dissolved), formula: NaOH, molar_mass: 39.997,
+     liquid_heat_capacity: 80}
+  - {id: H2O, name: water, formula: H2O, molar_mass: 18.015, liquid_heat_capacity: 75.3,
+     normal_boiling_point: 373.15}
+templates:
+  - {id: caustic, components: [NAOH_S, NAOH, H2O]}
+"""
+
+CAUSTIC_FLOWSHEET = """\
+schema: cheme/process/v1
+kind: flowsheet
+feeds:
+  - {id: F, ports: [{id: out, direction: out}]}
+products:
+  - {id: P, ports: [{id: in, direction: in}]}
+blocks:
+  - id: M1
+    class: ReactingChemicals
+    reactions: [DISSOLVE]
+    reactor: conversion
+    ports: [{id: in, direction: in}, {id: out, direction: out}]
+streams:
+  - id: S1
+    from: F.out
+    to: M1.in
+    template: caustic
+    state:
+      design:
+        temperature: {value: 298.15, provenance: given}
+        pressure: {value: 101.325, provenance: given}
+        flow: {value: 1000, provenance: given}
+        composition: {basis: mass_fraction, values: {NAOH_S: 0.5, H2O: 0.5}, provenance: given}
+  - id: S2
+    from: M1.out
+    to: P.in
+    template: caustic
+"""
+
+
+def _caustic(heat: str, kind: str = "") -> str:
+    return f"""\
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: DISSOLVE
+    stoichiometry: {{NAOH_S: -1, NAOH: 1}}
+    phase: liquid
+    conversion: {{key: NAOH_S, value: 1.0, provenance: assumed}}
+{heat}{kind}"""
+
+
+def test_an_exothermic_dissolution_detected_by_its_formula_is_still_screened(tmp_path):
+    # NaOH pellets dissolving, -44500 kJ/kmol declared: no kind: phase-change, so the formula
+    # heuristic must not drop it. 1000 kg/h at 50 wt%: 12.5009 kmol/h NaOH, 27.7546 kmol/h
+    # water; dT_ad = 44500 x 12.5009 / (12.5009 x 80 + 27.7546 x 75.3) = 179.6 K, MTSR 477.7 K
+    # above the MTT 373.15 K (water's boiling point)
+    heat = "    heat_of_reaction: {value: -44500, provenance: given, source: test value}\n"
+    ws = _plant(tmp_path, CAUSTIC_FLOWSHEET, _caustic(heat), CAUSTIC_MATERIALS)
+    report = screen(ws.root)
+    assert not report.phase_changes
+    (entry,) = report.entries
+    n, w = 500 / 39.997, 500 / 18.015
+    rise = 44500 * n / (n * 80 + w * 75.3)
+    assert entry.adiabatic_rise == pytest.approx(rise, rel=1e-6)
+    assert entry.mtsr == pytest.approx(298.15 + rise, rel=1e-6)
+    assert any("declared heat of reaction" in note and "DISSOLVE" in note for note in entry.notes)
+    rules_found = {f.rule for f in report.findings}
+    assert "cheme.reactor-hazard-mtsr" in rules_found
+    assert "cheme.reactor-hazard-phase-change" not in rules_found
+    # without a heat it is a phase change with no heat to run away
+    ws = _plant(tmp_path / "noheat", CAUSTIC_FLOWSHEET, _caustic(""), CAUSTIC_MATERIALS)
+    report = screen(ws.root)
+    assert not report.entries
+    (finding,) = [f for f in report.findings if f.rule == "cheme.reactor-hazard-phase-change"]
+    assert "no reaction heat declared" in finding.message
+    # declared kind: phase-change with its heat: the author's choice, the message says so
+    ws = _plant(
+        tmp_path / "declared",
+        CAUSTIC_FLOWSHEET,
+        _caustic(heat, "    kind: phase-change\n"),
+        CAUSTIC_MATERIALS,
+    )
+    report = screen(ws.root)
+    assert not report.entries
+    (finding,) = [f for f in report.findings if f.rule == "cheme.reactor-hazard-phase-change"]
+    assert "no reaction heat" not in finding.message
+    assert "DISSOLVE -44500 kJ/kmol" in finding.message

@@ -1035,9 +1035,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
   cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`. A
   reaction with `kind: phase-change` (or one component into one other of the same formula, one
-  of them `phase: solid`) is a phase change: a step whose reactions are all phase changes is
-  not screened (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), a step with
-  both is screened on its reactions alone (ADR 0056).
+  of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
+  reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
+  JSON `phase_changes`), a step with both is screened on its reactions alone (ADR 0056).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1115,7 +1115,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **Precipitation from a mixed liquor** (ADR 0056): `crystallizer.spectators: [ids]` names the
   other dissolved components of the liquor (a salt, a base, unreacted reagent); they pass with
   the liquor unchanged, never crystallize or evaporate, and appear in the balances and the
-  report (`mother_liquor`: solubility basis and value, salting-out factor, molalities). The
+  report, text and `--json` (`mother_liquor`: solubility basis, declared value and value at
+  the solution, salting-out factor, molalities; `solubility_kg_per_kg_solvent` is then the
+  mother liquor's per kg of free solvent). A block holding a crystallizer and a reacting step
+  balances with the crystallization as a phase change next to its reactions. The
   solubility then holds in that liquor: `measured_in: mother_liquor` (unit `kg/kg_solvent`,
   `kg/kg_liquor` per kg of solute-free liquor, or `mass_fraction` in the saturated liquor:
   `C = (S - s (W + P)) / (a - s (1 - a))`), or the pure solvent's with `salting_out:

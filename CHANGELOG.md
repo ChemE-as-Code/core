@@ -11,12 +11,17 @@
   pure solvent's corrected by `solubility.salting_out: {coefficients: {id: k}}` (Setschenow,
   molal scale). A pure-solvent value alone is `cheme.process-crystallizer` (error) and refused
   by propagate. A crystallizer takes several inlets together, so a reslurry wash is a
-  crystallizer fed by the cake and the wash. `cheme process crystallizers` reports the
-  spectators' balances and molalities. Every BFD/PFD needs `cheme process build` once (the
-  process schema changed).
+  crystallizer fed by the cake and the wash. `cheme process crystallizers` (text and `--json`)
+  reports the spectators' balances and molalities; with spectators its
+  `solubility_kg_per_kg_solvent` is the mother liquor's per kg of free solvent (the declared
+  value under `mother_liquor.declared_solubility`). A block holding a crystallizer next to a
+  reacting step (a precipitation in the reactor vessel) balances, the crystallization fitted
+  as a phase change beside the block's reactions. Every BFD/PFD needs `cheme process build`
+  once (the process schema changed).
 - `kind: phase-change` on a reaction of `process/reactions.yaml`. A reaction of one component
   into one other with the same formula, one of them `phase: solid`, counts as one without the
-  field. `cheme process reactor-hazards` no longer screens a step whose reactions are all
+  field unless it declares a `heat_of_reaction` (then it stays screened, its heat in dT_ad).
+  `cheme process reactor-hazards` no longer screens a step whose reactions are all
   phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
   a step with both on its reactions alone.
 

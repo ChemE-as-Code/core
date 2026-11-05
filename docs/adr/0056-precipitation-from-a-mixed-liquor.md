@@ -62,6 +62,15 @@ cheme-as-code takes option 3. It is implemented natively; no PharmaPy code is us
     successive substitution on the free solvent that the hydrate leaves.
   - Evaporation to a concentration counts the spectators in the liquid.
   - The balances add a per-spectator triple and the spectators' atoms.
+  - The report's `solubility_kg_per_kg_solvent` is then the mother liquor's at the solution,
+    per kg of free solvent (salting out applied, a per-liquor value converted). The declared
+    value stays under `mother_liquor.declared_solubility` with its basis. Without spectators
+    the key holds the declared value, as in 1.7.0.
+  - A block's reactive balance (`validate`, `cheme.process-balance`) fits one reversible
+    phase change `<step>:crystallization` (solute, and the hydrate's solvent, into crystal)
+    per crystallizer inside it next to the block's reactions. A precipitation in the reactor
+    vessel (a reacting step and a crystallizer in one block) therefore balances. These
+    extents are not reported as reaction extents.
 - **No silent pure-water value.** A crystallizer that declares spectators and gives only a
   pure-solvent solubility is `cheme.process-crystallizer` (error, with file, line and hint).
   `propagate` refuses it as unsupported, and its model basis is not sourced. An inlet
@@ -75,8 +84,11 @@ cheme-as-code takes option 3. It is implemented natively; no PharmaPy code is us
   - A reaction may say `kind: phase-change`. This field is left out of the dump at
     `reaction` and of the reactor input fingerprint.
   - One component into one other with the same formula, coefficient for coefficient, one of
-    them `phase: solid`, is recognized as a phase change without the field. An isomerization
-    has no solid side, so it stays a reaction.
+    them `phase: solid`, is recognized as a phase change without the field, unless it
+    declares a `heat_of_reaction`. An isomerization has no solid side, so it stays a reaction.
+    A recognized one with a heat of reaction (dissolving caustic or diluting acid can boil a
+    batch) stays screened as a reaction, its heat in dT_ad, with a note: a heuristic the
+    author never opted into must not drop an MTSR warning.
   - `cheme process reactor-hazards` does not screen a step whose reactions are all phase
     changes. Instead it reports `cheme.reactor-hazard-phase-change` (info, stable id
     `process/flowsheet.yaml#reactor-hazard-phase-change:<step>`) and lists the step under

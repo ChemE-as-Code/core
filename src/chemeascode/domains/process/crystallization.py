@@ -440,6 +440,8 @@ class TrainResult:
     streams: dict[str, Slurry]
     form: CrystalForm
     basis: str
+    #: kg/kg of free solvent: the declared solubility, or with spectators the mother liquor's
+    #: at the solution (per kg of solvent, salting out applied).
     solubility: float | None
     temperature: float | None
     crystals_formed: float
@@ -454,8 +456,10 @@ class TrainResult:
     balances: dict[str, Any] = field(default_factory=dict)
     energy: dict[str, Any] | None = None
     notes: list[str] = field(default_factory=list)
-    #: With spectator solutes: the mother liquor's solubility basis, its value at the solution
-    #: and the spectators' molality (ADR 0056); None for one solute in one solvent.
+    #: With spectator solutes: the mother liquor's solubility basis, the declared value and
+    #: its value at the solution in that basis (``solubility`` above is then the mother
+    #: liquor's per kg of free solvent), the salting-out factor and the spectators' molality
+    #: (ADR 0056); None for one solute in one solvent.
     liquor: dict[str, Any] | None = None
 
     def entry(self) -> dict[str, Any]:
@@ -593,9 +597,17 @@ def solve_train(
     if feed.spectators and liquor is not None:
         ml = stage.slurry
         free = ml.solvent
+        # the report's solubility_kg_per_kg_solvent: the mother liquor's at the solution, per kg
+        # of free solvent (the declared value may be per kg of liquor, or before salting out)
+        per_solvent = stage.solubility
+        if per_solvent is not None and liquor.basis == "liquor":
+            others = sum(ml.spectators.values())
+            per_solvent = per_solvent * (free + others) / free if free > 0 else None
+        result.solubility = per_solvent
         result.liquor = {
             "spectators": sorted(feed.spectators),
             "solubility_basis": "kg/kg_liquor" if liquor.basis == "liquor" else "kg/kg_solvent",
+            "declared_solubility": solubility,
             "solubility": stage.solubility,
             "salting_out_factor": (
                 stage.solubility / solubility
@@ -1365,6 +1377,29 @@ def report_text(report: CrystallizerReport) -> str:
                     ".3g",
                 )
             )
+            if ml := sol.get("mother_liquor"):
+                factor = ml.get("salting_out_factor")
+                declared = num(ml.get("declared_solubility"), fmt=".4g")
+                lines.append(
+                    f"  mother liquor: solubility {num(ml['solubility'], fmt='.4g')} "
+                    f"{ml['solubility_basis']} (declared {declared}"
+                    + (f", salting-out factor {factor:.4g}" if factor is not None else "")
+                    + f"), {num(sol['solubility_kg_per_kg_solvent'], fmt='.4g')} kg/kg_solvent"
+                )
+                spectators = b.get("spectators") or {}
+                molality = ml.get("molality_mol_per_kg_solvent") or {}
+                lines.append(
+                    "  spectators: "
+                    + ", ".join(
+                        f"{n} {num(molality.get(n), ' mol/kg', '.4g')}" for n in ml["spectators"]
+                    )
+                    + "; max residual "
+                    + num(
+                        max((abs(v["residual"]) for v in spectators.values()), default=0.0),
+                        " kg/h",
+                        ".3g",
+                    )
+                )
             energy = sol["energy"]
             if energy:
                 if energy["duty_kW"] is None:
