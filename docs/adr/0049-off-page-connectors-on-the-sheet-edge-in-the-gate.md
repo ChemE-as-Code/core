@@ -33,14 +33,17 @@ connectors sit just above the title block's top, not at the border.
   down to the top of the title block. A connector is on an edge within 10 mm of it
   (`EDGE_TOLERANCE`), or within 35 mm (`EDGE_REACH`) when nothing but its own line and texts is
   drawn between it and that edge.
-- A connector whose id or own text says it is an open end is not checked (`LOCAL_END`, on
-  the text in lower case with spaces, hyphens and underscores read as one space): atm,
-  atmosphere, sky, safe location, breather, hose, funnel, sewer; or vent or drain with no
-  system noun (header, system, collection, network, main, line, drum, KO, knock-out, scrubber,
-  station, tank, vessel, sump, pit, pot, stack) right after it or one word later, and for a
-  drain not closed ("to vent header", "to drain header" and "to closed-drain header" are
-  checked). Its text must name no sheet (`P-nn`, sheet) or the battery limit (`B/L`, `BL`,
-  battery limit: `SHEET_END`). The message names the criterion.
+- A connector is an open end, and not checked, when its own text (lower case, punctuation read
+  as spaces) contains an open-end word (atm, atmosphere, sky, safe location, breather, hose,
+  funnel, sewer, vent, drain: `OPEN_END`) and nowhere names a system it goes into (header,
+  flare, oxidiser, thermal, blowdown, recovery, closed, drum, KO, knock-out, scrubber,
+  collection, system, station, tank, sump, line, main, network, vessel, B/L, battery limit:
+  `DESTINATION`) or a sheet (`P-nn`/`P-nnn` after from, to, on, see, sheet or a comma:
+  `SHEET_REF`; a pump tag such as P-101A is no sheet). A destination word anywhere wins:
+  "vent to flare", "to vent/flare header", "drain to the closed drain drum" are checked. The
+  id counts only for a connector with no text, and then only atm, atmosphere or sky
+  (`OPEN_ID`): an id saying vent or drain never overrides a text naming a closed system. The
+  message names the criterion.
 - The hint gives the `cheme move ID --offset=DX,DY` onto the nearest edge and, when that is not
   the edge the connector's direction calls for, the offset onto the left (incoming) or right
   (outgoing) edge.
@@ -57,9 +60,9 @@ connectors sit just above the title block's top, not at the border.
 - Positive: a connector left mid-sheet fails the basic stage, with the move that fixes it. On
   the library sheets it finds the five connectors still off the edges (asu-1 P-04: the LOX-3001
   inlet and the E-4102/E-4103 CW and CWR stubs) and nothing else.
-- Negative: an open end whose id and note say nothing about where it goes (a note "to
-  scrubber" on a vent drawn as a connector) is reported; the plant accepts it in the gate or
-  writes "to atm." on it. A plant repository made with an earlier template keeps its own
+- Negative: the exemption errs towards reporting: an open end whose note says nothing about
+  where it goes, or names a system word ("vent near KO drum"), is reported; the plant accepts
+  it in the gate or writes "to atm." on it. A plant repository made with an earlier template keeps its own
   `checks.yaml` and gets the rule in its gate only when it adds it.
 - Known limitation: a utility stub drawn at its user by convention (CW/CWR at an exchanger) is
   reported and accepted one by one; a wrong-edge rule can follow if the owner wants one.

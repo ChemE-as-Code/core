@@ -34,8 +34,9 @@ lines, symbols and texts exactly where the sheet puts them, after every ``ShapeU
     an off-page connector that does not sit on an edge of the drawing area (the inside of the
     border, down to the top of the title block): within ``EDGE_TOLERANCE`` of it, or within
     ``EDGE_REACH`` with nothing else drawn between it and the edge. An open end drawn where it
-    is (its id or text says to atmosphere, a vent, a drain, a hose connection, not a vent or drain
-    header or a closed drain, and its text names no sheet or battery limit) may sit anywhere.
+    is (its text says to atmosphere, a vent, a drain, a hose connection, and names no system it
+    goes into, such as a header, flare or closed drain, and no sheet or battery limit; without a
+    text, its id says atm) may sit anywhere.
 
 Text extents are estimated from the font size, the characters (Arial widths, the export's
 fallback font), ``text-anchor`` and ``dominant-baseline``. The sheet's border and title block are
@@ -1179,36 +1180,43 @@ EDGE_TOLERANCE = 10.0
 #: it and the edge (a header sheet's row of connectors, its texts outside it; the DEXPI
 #: reference P&ID's two connectors, 27 and 31 mm in).
 EDGE_REACH = 35.0
-#: A system a vent or drain goes into, named right after it ("to vent header", "to drain
-#: collection system", "to vent KO drum"): a connection elsewhere, not an open end.
-_SYSTEM_NOUN = (
-    r"(?:header|system|collection|network|main|line|drum|ko|knock ?out|scrubber|station|"
-    r"tank|vessel|sump|pit|pot|stack)"
+#: An open end drawn where it is, not a connection to another sheet: its own text says so ("to
+#: atm.", "to drain", "open drain", "tanker hose", "breather", "to atmosphere (vent stack)") ...
+OPEN_END = re.compile(
+    r"\b(?:atm|atmosphere|sky|safe location|breather|hose|funnel|sewer|vent|drain)\b"
 )
-#: An open end drawn where it is (to atmosphere, a drain, a hose connection), not a connection
-#: to another sheet: its id or its own text says so ("to atm.", "to drain", "open drain",
-#: "tanker hose", "breather"). A vent or drain counts only when no system noun follows it within
-#: a word, and a drain not when closed ("to closed-drain header") ...
-LOCAL_END = re.compile(
-    r"\b(?:atm|atmosphere|sky|safe location|breather|hose|funnel|sewer)\b"
-    rf"|(?<!closed )\b(?:vent|drain)\b(?! (?:\S+ )?{_SYSTEM_NOUN}\b)"
+#: ... and names no system it goes into anywhere ("vent to flare", "drain to the closed drain
+#: drum", "to vent/flare header", "vent to thermal oxidiser", "CD header (drain)") ...
+DESTINATION = re.compile(
+    r"\b(?:header|flare|oxidi[sz]er|thermal|blowdown|recovery|closed|drum|ko|knock out|"
+    r"knockout|scrubber|collection|system|station|tank|sump|line|main|network|vessel|"
+    r"bl|b l|battery limit)\b"
 )
-#: ... unless its text names a sheet or the battery limit ("to vent, P-07", "to flare
-#: (B/L)"): DEXPI 2.0 draws both with the same off-page connector classes, and the sheets carry
-#: no reference to the other sheet's connector, so the words are what tells them apart.
-SHEET_END = re.compile(r"\bp \d+\b|\bsheet\b|\bb/?l\b|battery limit")
+#: ... and no sheet ("from P-03 E-3101", "to C-202, P-05", "sheet P-114"; not a pump tag such
+#: as P-101A, or a P-101 that follows no "from", "to", "on", "see", "sheet" or comma). DEXPI 2.0
+#: draws open ends and connections with the same off-page connector classes, and the sheets
+#: carry no reference to the other sheet's connector, so the words are what tells them apart.
+SHEET_REF = re.compile(r"(?:\b(?:from|to|on|see|sheet)\s+|,\s*)p[\s-]?\d{2,3}(?![\w/-])")
+#: A connector with no text of its own is an open end when its id says atmosphere.
+OPEN_ID = re.compile(r"\b(?:atm|atmosphere|sky)\b")
 
 
 def _words(text: str) -> str:
-    """*text* lower case with runs of spaces, hyphens and underscores as one space."""
-    return re.sub(r"[\s_-]+", " ", text.lower()).strip()
+    """*text* lower case, every run of characters other than letters and digits one space."""
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
 def is_open_end(connector: str, texts: list[str]) -> bool:
     """Whether a connector with id *connector* and its own *texts* is an open end drawn where it
-    is (``LOCAL_END``), its texts naming no sheet or battery limit (``SHEET_END``)."""
-    said = _words(" ".join(texts))
-    return bool(LOCAL_END.search(f"{_words(connector)} {said}")) and not SHEET_END.search(said)
+    is: its texts say so (``OPEN_END``) and name no system (``DESTINATION``) and no sheet
+    (``SHEET_REF``); a connector without text when its id says atmosphere (``OPEN_ID``)."""
+    raw = " ".join(t for t in texts if t.strip()).lower()
+    if not raw:
+        return bool(OPEN_ID.search(_words(connector)))
+    said = _words(raw)
+    return (
+        bool(OPEN_END.search(said)) and not DESTINATION.search(said) and not SHEET_REF.search(raw)
+    )
 
 
 @dataclass
@@ -1225,8 +1233,7 @@ class Placement:
     distance: float
     #: Whether it counts as on that edge.
     on_edge: bool
-    #: Whether it is an open end drawn where it is (``LOCAL_END``, its text naming no sheet or
-    #: battery limit: ``SHEET_END``), which may sit anywhere.
+    #: Whether it is an open end drawn where it is (``is_open_end``), which may sit anywhere.
     local: bool
 
 
@@ -1321,8 +1328,8 @@ def _offpage_not_on_edge(drawing: Drawing, context: Context) -> list[DrawingFind
                 f"{place.distance:.0f} mm inside the drawing area's {place.edge} edge: a "
                 "connection to another sheet or the battery limit goes on the edge (within "
                 f"{EDGE_TOLERANCE:g} mm, or {EDGE_REACH:g} mm with nothing else drawn between "
-                "it and the edge); only an open end whose id or text says atm., vent, drain or "
-                "hose (no vent or drain header, no closed drain) and names no sheet or B/L may "
+                "it and the edge); only an open end whose text says atm., vent, drain or hose and "
+                "names no header, flare, closed drain or other system, no sheet and no B/L may "
                 "stay by its valve",
                 [place.connector],
                 box,

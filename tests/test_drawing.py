@@ -511,7 +511,15 @@ def test_a_header_row_set_in_from_the_edge_needs_a_clear_way_to_it():
     assert "24 mm inside the drawing area's top edge" in found.message
 
 
-OPEN_ENDS = ["to atm.", "to drain", "open drain", "tanker hose", "from casing (breather)"]
+OPEN_ENDS = [
+    "to atm.",
+    "to drain",
+    "open drain",
+    "tanker hose",
+    "from casing (breather)",
+    "to atmosphere (vent stack)",
+    "to drain at P-101A",  # a pump tag, not a sheet
+]
 #: Closed systems and connections elsewhere, whatever their words say about vents and drains.
 NOT_OPEN = [
     "to vent header",
@@ -521,6 +529,18 @@ NOT_OPEN = [
     "to vent KO drum",
     "to vent header, P-07",
     "to flare (B/L)",
+    "vent to flare",
+    "PSV-101 vent to flare",
+    "vent gas to flare header",
+    "vent to the vent header",
+    "drain to closed drain drum",
+    "drain to the closed drain drum",
+    "to vent/flare header",
+    "vent to thermal oxidiser",
+    "to blowdown drum (vent)",
+    "CD header (drain)",
+    "to drain, P-07",
+    "vent, see P-07",
 ]
 
 
@@ -534,7 +554,10 @@ def test_open_ends_may_sit_by_their_valve():
         _offpage(*exempt, _connector("OPC_PSV1_atm", 100, 160), OPC_PSV1_atm=OUT_CONNECTOR, **kinds)
         == []
     )
-    fired = [_connector(f"OUT{i}", 100 + 30 * i, 160, t) for i, t in enumerate(NOT_OPEN)]
+    fired = [
+        _connector(f"OUT{i}", 80 + 30 * (i % 10), 150 + 40 * (i // 10), t)
+        for i, t in enumerate(NOT_OPEN)
+    ]
     kinds = {f"OUT{i}": OUT_CONNECTOR for i in range(len(NOT_OPEN))}
     found = _offpage(*fired, **kinds)
     assert sorted(f.ids[0] for f in found) == sorted(kinds)
@@ -552,6 +575,23 @@ def test_closed_system_words(note: str):
     from chemeascode.domains.piping.drawing import is_open_end
 
     assert not is_open_end("OPC_1", [note])
+
+
+@pytest.mark.parametrize(
+    "connector, texts, open_end",
+    [
+        ("OPC_PSV101_atm", [], True),  # no text: the id says atmosphere
+        ("OPC_PSV101_vent", ["to flare header"], False),  # the text wins over the id
+        ("OPC_VENT_1", ["to vent header"], False),
+        ("OPC_drain_01", ["to closed drain header"], False),
+        ("OPC_VENT_1", [], False),  # vent or drain in an id says nothing
+        ("OPC_drain_01", [], False),
+    ],
+)
+def test_the_id_counts_only_without_a_text(connector: str, texts: list[str], open_end: bool):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert is_open_end(connector, texts) is open_end
 
 
 # -- label-far-from-owner ---------------------------------------------------------------------
