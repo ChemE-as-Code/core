@@ -10,9 +10,10 @@ that rests on:
 - ``hours_per_year`` the batches fit in;
 - the unit procedures (ISA-88 names only, no S88 model): per unit (a flowsheet block or step),
   how many run in parallel and its ordered operations (charge, heat, dose, react, cool,
-  transfer, filter, dry, clean, hold, other), each with its ``duration`` or, for ``dose`` and
-  ``react``, ``from:`` the step's batch or semi-batch model (its dosing time, its reaction time;
-  :mod:`.stirred_tank`).
+  transfer, distil, filter, dry, clean, hold, other), each with its ``duration`` or, for
+  ``dose`` and ``react``, ``from:`` the step's batch or semi-batch model (its dosing time, its
+  reaction time; :mod:`.stirred_tank`), for ``distil`` ``from:`` a still step (its boil-up
+  time; :mod:`.batch_still`).
 
 A unit procedure on a batch or semi-batch step may size its ``vessel``: the batch's largest
 content (the model's volume per hour of flows times the hours of flows one batch makes, batch
@@ -35,7 +36,8 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 
 - ``recipe-schema``: the file does not follow ``cheme/recipe/v1``;
 - ``recipe-reference``: a unit, stream or ``from:`` step that is not in the flowsheet, a
-  ``from:`` on a step that is no batch or semi-batch, a ``dose`` from a step without dosing,
+  ``from:`` on a step that is no batch or semi-batch (a ``distil``: no still), a ``dose``
+  from a step without dosing,
   a ``start.after`` that is no earlier unit procedure, a duplicate id;
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
@@ -73,6 +75,7 @@ OPERATIONS = (
     "react",
     "cool",
     "transfer",
+    "distil",
     "filter",
     "dry",
     "clean",
@@ -102,6 +105,7 @@ class Operation(Strict):
         "react",
         "cool",
         "transfer",
+        "distil",
         "filter",
         "dry",
         "clean",
@@ -114,7 +118,8 @@ class Operation(Strict):
         default=None,
         alias="from",
         description="dose and react: the batch or semi-batch step whose model gives the "
-        "duration (its dosing time; its reaction time, the post-reaction of a semi-batch).",
+        "duration (its dosing time; its reaction time, the post-reaction of a semi-batch); "
+        "distil: the still step whose model gives its boil-up time (ADR 0055).",
     )
     temperatures: tuple[float, float] | None = Field(
         default=None,
@@ -139,10 +144,10 @@ class Operation(Strict):
                 raise ValueError(
                     f"operation {self.id}: temperatures in K, rising to heat, falling to cool"
                 )
-        if self.from_ is not None and self.kind not in ("dose", "react"):
+        if self.from_ is not None and self.kind not in ("dose", "react", "distil"):
             raise ValueError(
-                f"operation {self.id}: from: gives a dose's or a reaction's time only; give "
-                "the duration of a " + self.kind
+                f"operation {self.id}: from: gives a dose's or a reaction's time only (and a "
+                "distil's boil-up time); give the duration of a " + self.kind
             )
         return self
 
@@ -333,7 +338,6 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     """The batch content of unit procedure *up*'s unit, a batch or semibatch step: its model's
     figures (per hour of the flowsheet's flows) times the hours of flows one batch makes,
     batch size / the flowsheet's rate of the batch-size stream. Raises ValueError."""
-    from chemeascode.domains.process.model import stream_flows
     from chemeascode.domains.process.stirred_tank import (
         solve_node,
         split_inlets,
@@ -345,15 +349,7 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     model = getattr(node, "reactor", None)
     if model not in ("batch", "semibatch") or node.batch is None:
         raise _Reference(f"{up.unit} is no batch or semibatch: no batch content to size")
-    size = recipe.batch_size
-    stream = next((x for x in process.flowsheet.streams if x.id == size.stream), None)
-    flows = stream_flows(process, stream, case) if stream is not None else None
-    rate = None
-    if flows is not None:
-        rate = _volume_flow(process, flows.components) if size.unit == "m3" else flows.total
-    if not rate:
-        raise ValueError(f"no flow of {size.stream}: the batch's hours of flows are not known")
-    hours = size.value * (1000.0 if size.unit == "t" else 1.0) / rate
+    hours = _batch_hours(process, recipe, case)
     inlets = [
         s for s in process.flowsheet.streams if (e := process.ends(s)[1]) and e.node == up.unit
     ]
@@ -382,6 +378,33 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
         peak,
         solved.temperature,
     )
+
+
+def _batch_hours(process: Any, recipe: Recipe, case: str) -> float:
+    """h of the flowsheet's flows one batch makes: the batch size over the flowsheet's rate of
+    the batch-size stream. Raises ValueError."""
+    from chemeascode.domains.process.model import stream_flows
+
+    size = recipe.batch_size
+    stream = next((x for x in process.flowsheet.streams if x.id == size.stream), None)
+    flows = stream_flows(process, stream, case) if stream is not None else None
+    rate = None
+    if flows is not None:
+        rate = _volume_flow(process, flows.components) if size.unit == "m3" else flows.total
+    if not rate:
+        raise ValueError(f"no flow of {size.stream}: the batch's hours of flows are not known")
+    return size.value * (1000.0 if size.unit == "t" else 1.0) / rate
+
+
+def hours_per_batch(process: Any, case: str) -> float | None:
+    """h of the flowsheet's flows one batch of ``process/recipe.yaml`` makes (its batch size
+    over the flowsheet's rate of that stream); None without a recipe that loads. Raises
+    ValueError when the batch-size stream has no flow. A batch still scales its boil-up time
+    and energy per batch with it (:mod:`.batch_still`)."""
+    recipe, _, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    return _batch_hours(process, recipe, case)
 
 
 def _vessel(up: UnitProcedure, content: _Content) -> VesselResult:
@@ -480,11 +503,23 @@ class _Reference(ValueError):
 
 
 def _duration_from(process: Any, step_id: str, kind: str, case: str) -> float:
-    """h: the dosing time (dose) or reaction time (react) of batch or semi-batch *step_id*.
-    Raises _Reference, or ValueError (TankError) when the model does not solve."""
+    """h: the dosing time (dose) or reaction time (react) of batch or semi-batch *step_id*, or
+    the boil-up time (distil) of still *step_id*. Raises _Reference, or ValueError (TankError,
+    StillError) when the model does not solve."""
     from chemeascode.domains.process.stirred_tank import solve_node, tank_inlet
 
     node = process.nodes.get(step_id)
+    still = getattr(node, "still", None)
+    if kind == "distil" or still is not None:
+        from chemeascode.domains.process.batch_still import inlets_of
+        from chemeascode.domains.process.batch_still import solve_node as solve_still
+
+        if still is None:
+            raise _Reference(f"{step_id} is no still (still:): no boil-up time")
+        if kind != "distil":
+            raise _Reference(f"{step_id} is a still: from: it on a distil operation")
+        solved, _ = solve_still(process, node, inlets_of(process, node), case)
+        return solved.time / 3600.0
     model = getattr(node, "reactor", None)
     if model not in ("batch", "semibatch") or node.batch is None:
         raise _Reference(f"{step_id} is no batch or semibatch with batch:")
@@ -610,8 +645,8 @@ def evaluate(
                     "reference" if isinstance(failure, _Reference) else "duration",
                     f"{up.id}.{op.id}: no {op.kind} time from {op.from_}: {failure}",
                     [*at, "operations", j, "from"],
-                    "from: names a batch or semibatch step (a dose: a semibatch); else give "
-                    "the duration",
+                    "from: names a batch or semibatch step (a dose: a semibatch; a distil: a "
+                    "still); else give the duration",
                     [up.id],
                 )
                 continue
@@ -883,6 +918,7 @@ _KINDS = {
     "react": ("#8f2f3a", "#d05a66"),
     "cool": ("#3a7ca5", "#64a6cf"),
     "transfer": ("#6b6b66", "#a3a29b"),
+    "distil": ("#2f7f8a", "#5ab0bb"),
     "filter": ("#4b8a5c", "#73b384"),
     "dry": ("#a38a3a", "#cdb25e"),
     "clean": ("#8a6fa8", "#b29ad0"),

@@ -7,6 +7,7 @@ stream property its provenance: ``given`` (a design input), ``assumed`` or ``cal
 
 from __future__ import annotations
 
+import math
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -67,6 +68,41 @@ class Versioned(Strict):
 # -- materials.yaml -----------------------------------------------------------------------------
 
 
+#: kPa per unit of an Antoine pressure.
+ANTOINE_PRESSURE = {"bar": 100.0, "kPa": 1.0, "Pa": 0.001, "mmHg": 0.133322368}
+
+
+class VapourPressure(Strict):
+    """A component's vapour pressure, Antoine: ``log10(P) = a - b / (T + c)`` (or ``ln``), P in
+    ``pressure_unit``, T in ``temperature_unit``. The default form is the NIST WebBook's (and
+    ``cheme chemistry props``'): log10, bar, K."""
+
+    a: float
+    b: float
+    c: float = 0.0
+    form: Literal["log10", "ln"] = "log10"
+    pressure_unit: Literal["bar", "kPa", "Pa", "mmHg"] = "bar"
+    temperature_unit: Literal["K", "degC"] = "K"
+    temperature_range: tuple[float, float] | None = Field(
+        default=None, description="(K, K) the parameters were fitted over."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    def kpa(self, kelvin: float) -> float:
+        """kPa at *kelvin* K (0 where T + c is not positive: the form has no value there)."""
+        t = kelvin - 273.15 if self.temperature_unit == "degC" else kelvin
+        if t + self.c <= 0:
+            return 0.0
+        exponent = self.a - self.b / (t + self.c)
+        value = 10.0**exponent if self.form == "log10" else math.exp(exponent)
+        return value * ANTOINE_PRESSURE[self.pressure_unit]
+
+    def covers(self, kelvin: float) -> bool:
+        low, high = self.temperature_range or (0.0, math.inf)
+        return low <= kelvin <= high
+
+
 class Component(Strict):
     id: str
     name: str
@@ -105,6 +141,19 @@ class Component(Strict):
         default=None,
         description="Formation data and ideal-gas heat capacity: heats of reaction, equilibrium "
         "constants and reactor duties (cheme chemistry thermo prints it).",
+    )
+    vapour_pressure: VapourPressure | None = Field(
+        default=None,
+        description="Antoine vapour pressure: Raoult's law in a batch still (still: with "
+        "volatility: raoult).",
+        exclude_if=lambda value: value is None,  # a component's dump stays as it was
+    )
+    heat_of_vaporization: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/kmol near the still's temperature: a batch still's boil-up from its "
+        "duty, and its duty from its boil-up.",
+        exclude_if=lambda value: value is None,
     )
     phase: Literal["solid"] | None = Field(
         default=None,
@@ -759,7 +808,165 @@ class Solids(Strict):
         return self
 
 
-class Block(Node, Reacting, Solids):
+class Volatility(Strict):
+    """How a batch still's vapour follows from its liquid: ``raoult`` (each volatile
+    component's ``vapour_pressure`` in materials.yaml, the still at its bubble point at its
+    pressure) or ``constant`` (a relative volatility per volatile component, to any common
+    reference: ``alpha``)."""
+
+    model: Literal["raoult", "constant"]
+    alpha: dict[str, float] = Field(
+        default_factory=dict,
+        description="constant: component -> relative volatility (positive).",
+        exclude_if=lambda value: not value,
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _form(self) -> Volatility:
+        if (self.model == "constant") != bool(self.alpha):
+            raise ValueError("alpha: with model constant, and only then")
+        if any(v <= 0 for v in self.alpha.values()):
+            raise ValueError(
+                "alpha: relative volatilities are positive (a non-volatile "
+                "component goes in nonvolatile:)"
+            )
+        return self
+
+
+class Boilup(Strict):
+    """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
+    its heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol
+    of vapour per hour per kmol of the charge)."""
+
+    value: float = Field(gt=0)
+    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h"]
+    provenance: Provenance
+    source: str = ""
+
+
+class ResidueEnd(Strict):
+    key: str = Field(description="The component whose mole fraction in the still ends it.")
+    mole_fraction: float = Field(ge=0, lt=1)
+
+
+class StillEnd(Strict):
+    """When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all
+    charged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole
+    fraction in the still reaches the value), ``time`` (s of boil-up from the start) or
+    ``temperature`` (K of the still, at its bubble point: volatility raoult)."""
+
+    distilled: float | None = Field(default=None, gt=0, lt=1)
+    basis: Literal["mole", "mass"] = "mole"
+    residue: ResidueEnd | None = None
+    time: float | None = Field(default=None, gt=0, description="s of boil-up from the start")
+    temperature: float | None = Field(default=None, gt=0, description="K of the still")
+
+    @model_validator(mode="after")
+    def _one(self) -> StillEnd:
+        given = [n for n in ("distilled", "residue", "time", "temperature") if getattr(self, n)]
+        if len(given) != 1:
+            raise ValueError("give one of distilled, residue, time or temperature")
+        return self
+
+
+class StillCut(Strict):
+    """One distillate cut: its outlet port, collected until its ``end``."""
+
+    outlet: str = Field(description="The step's outlet port the cut leaves by.")
+    end: StillEnd
+
+
+class StillFeed(Strict):
+    """A solvent swap: an inlet stream of the step fed into the still while it boils,
+    ``constant_level`` (as fast as it boils up, the content's moles held at ``down_to`` of
+    the charge's) or ``portions`` (put and take: distil down to ``down_to`` of the charge's
+    moles, add one of the equal ``portions``, again, until all is in). The stream's flow is
+    the amount fed per hour of charge (the flowsheet's basis, as a semi-batch's dose)."""
+
+    stream: str
+    mode: Literal["constant_level", "portions"]
+    portions: int | None = Field(default=None, ge=1, description="portions: how many")
+    down_to: float = Field(
+        default=1.0,
+        gt=0,
+        le=1,
+        description="The level: the still's content before each portion (constant_level: "
+        "while fed), as a share of the charge's moles.",
+    )
+
+    @model_validator(mode="after")
+    def _form(self) -> StillFeed:
+        if (self.mode == "portions") != (self.portions is not None):
+            raise ValueError("portions: with mode portions, and only then")
+        if self.mode == "portions" and self.down_to >= 1:
+            raise ValueError("mode portions: give down_to below 1 (the level to distil to)")
+        return self
+
+
+class Still(Strict):
+    """A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge
+    (the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed
+    totally (one equilibrium stage, no reflux); ``outlets`` maps ``distillate`` and
+    ``residue`` to the step's outlet ports, or ``cuts`` collect the distillate in turn (then
+    ``outlets`` names the residue only). With a ``feed`` it is a solvent swap: the ends apply
+    once all of the feed is in (no end: it stops then; portions: down to the level)."""
+
+    pressure: float | None = Field(
+        default=None, gt=0, description="kPa(a) of the still; default: the charge's"
+    )
+    volatility: Volatility
+    nonvolatile: list[str] = Field(
+        default_factory=list,
+        description="Components that stay in the still (solid components always do).",
+    )
+    boilup: Boilup
+    end: StillEnd | None = None
+    cuts: list[StillCut] = Field(default_factory=list)
+    feed: StillFeed | None = None
+    outlets: dict[Literal["distillate", "residue"], str] = Field(
+        description="Role -> the step's outlet port."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Still:
+        if self.cuts and self.end is not None:
+            raise ValueError("give end or cuts, not both")
+        if self.cuts and set(self.outlets) != {"residue"}:
+            raise ValueError("with cuts, outlets names the residue only (each cut its outlet)")
+        if not self.cuts and set(self.outlets) != {"distillate", "residue"}:
+            raise ValueError("outlets: give distillate and residue")
+        if not self.cuts and self.end is None and self.feed is None:
+            raise ValueError("give end (or cuts): when the still stops")
+        ends = [self.end] if self.end is not None else [c.end for c in self.cuts]
+        if self.volatility.model == "constant" and any(e.temperature for e in ends):
+            raise ValueError("an end at a temperature needs volatility raoult")
+        ports = [c.outlet for c in self.cuts]
+        if len(set(ports)) != len(ports):
+            raise ValueError("cuts: each outlet once")
+        return self
+
+    def ends(self) -> list[tuple[str, StillEnd | None]]:
+        """(outlet port, end) of each cut in turn; one cut without cuts:."""
+        if self.cuts:
+            return [(c.outlet, c.end) for c in self.cuts]
+        return [(self.outlets["distillate"], self.end)]
+
+
+class Distilling(Strict):
+    """The batch still of a block or step (:mod:`.batch_still`)."""
+
+    still: Still | None = Field(
+        default=None,
+        description="A batch (Rayleigh) still or solvent swap.",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -779,7 +986,7 @@ class Block(Node, Reacting, Solids):
     )
 
 
-class Step(Node, Reacting, Solids):
+class Step(Node, Reacting, Solids, Distilling):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(

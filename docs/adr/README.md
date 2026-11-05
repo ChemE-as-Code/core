@@ -99,3 +99,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0051](0051-batch-recipe-derives-the-cycle-time.md) | A batch recipe in process/recipe.yaml derives the cycle time; the flowsheet holds year averages | Proposed | 2026-11-05 |
 | [0052](0052-batch-vessel-and-jacket-from-the-recipe.md) | Batch vessels and jackets are sized in the recipe, from the reactor model's content | Proposed | 2026-11-05 |
 | [0053](0053-per-batch-lca-consumables.md) | Per-batch LCA exchanges are consumables per batch of the recipe | Proposed | 2026-11-05 |
+| [0055](0055-batch-still-and-solvent-swap.md) | A batch (Rayleigh) still and solvent swap as a flowsheet step, solved natively | Proposed | 2026-11-05 |

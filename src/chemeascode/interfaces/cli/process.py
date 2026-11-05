@@ -155,6 +155,33 @@ def crystallizers(
         raise typer.Exit(1)
 
 
+@process_app.command("stills")
+def stills(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """Each batch still and solvent swap (still:): its basis (rayleigh), the charge, the swap's
+    feed, the distillate cuts and the residue (amounts per batch and compositions), the boil-up
+    time, the duty and the energy per batch (the batch from process/recipe.yaml), the still's
+    temperatures. Exit 1 on an error finding."""
+    from chemeascode.domains.process.batch_still import UnknownCase, report_text, still_report
+
+    workspace = _workspace()
+    try:
+        report = still_report(workspace.root, case)
+    except UnknownCase as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    _refuse_unloaded(report.process, report.findings)
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if not as_json:
+        for finding in report.findings:
+            if finding.rule.startswith("cheme.process-still"):
+                typer.echo(finding.format())
+    if any(f.level == "error" for f in report.findings):
+        raise typer.Exit(1)
+
+
 @process_app.command("reactor-uncertainty")
 def reactor_uncertainty(
     node: Annotated[str, typer.Argument(help="The reactor block or step.")],

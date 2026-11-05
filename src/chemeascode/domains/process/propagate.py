@@ -22,6 +22,9 @@ is fully determined by their streams, by the DEXPI class:
   :mod:`chemeascode.domains.process.crystallization` (solubility or imposed yield, the
   specified filter, the internal mother-liquor recycle).
 
+- batch stills and solvent swaps (a block or step with ``still:``, its charge and a swap's
+  feed in): the distillate cuts and the residue by :mod:`.batch_still` (Rayleigh).
+
 Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
 them), never solved.
 Derived values get provenance ``calculated``, source ``cheme process propagate: <rule>
@@ -141,6 +144,8 @@ class Derivation:
     problems: list[tuple[str, str]] = field(default_factory=list)
     #: (node id, message) for crystallizers and filters that cannot be solved as declared.
     solids: list[tuple[str, str]] = field(default_factory=list)
+    #: (node id, message) for batch stills that cannot be solved as declared.
+    stills: list[tuple[str, str]] = field(default_factory=list)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
     passes: int = 0
 
@@ -222,7 +227,9 @@ def derive(process: Process, case: str) -> Derivation:
             at[b.node][0].append((s, b.port))
     found = Derivation()
     kinds = {
-        n.id: "crystallizer"
+        n.id: "still"
+        if n.still is not None
+        else "crystallizer"
         if n.crystallizer is not None
         else "solid-separation"
         if n.solid_separation is not None
@@ -455,12 +462,47 @@ def derive(process: Process, case: str) -> Derivation:
             changed |= put(s, "composition", _mix(work, shape), kind, node.id, [inlet], extra)
         return changed
 
+    def still(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
+        """The cuts and the residue of batch still *node* (:mod:`.batch_still`)."""
+        from chemeascode.domains.process.batch_still import (
+            StillError,
+            node_outlets,
+            outlet_shapes,
+            solve_node,
+        )
+
+        if any(stream_flows(work, s, case).components is None for s in ins):
+            return False
+        try:
+            result, extra = solve_node(work, node, ins, case)
+        except StillError as failure:
+            if (node.id, str(failure)) not in found.stills:
+                found.stills.append((node.id, str(failure)))
+            return False
+        ports = node_outlets(work, node.still, result)
+        shapes = outlet_shapes(work, node.still, result)
+        names = sorted({n for mass in ports.values() for n in mass})
+        extra |= {"inlet": _converted(work, case, ins, components=names)}
+        changed = False
+        for s, port in outs:
+            mass = ports.get(port)
+            if mass is None:
+                continue
+            total = sum(mass.values())
+            changed |= put(s, "flow", kg_h(total), "still", node.id, ins, extra)
+            shape = mass if total > 0 else shapes.get(port) or mass
+            changed |= put(s, "composition", _mix(work, shape), "still", node.id, ins, extra)
+        return changed
+
     def step(node: Any) -> bool:
         kind = kinds[node.id]
         ins = [s for s, _ in at[node.id][0]]
         outs = at[node.id][1]
         changed = False
-        if kind in ("crystallizer", "solid-separation"):
+        if kind == "still":
+            if ins and outs:
+                changed |= still(node, ins, outs)
+        elif kind in ("crystallizer", "solid-separation"):
             if len(ins) == 1 and outs:
                 changed |= solids(node, ins[0], outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
@@ -604,6 +646,7 @@ def derive(process: Process, case: str) -> Derivation:
                 and any(p[0] == node.id for p in found.problems)
             )
             or any(p[0] == node.id for p in found.solids)
+            or any(p[0] == node.id for p in found.stills)
         )
         if not solved:
             label = kind or f"class {node.class_}"
@@ -743,6 +786,16 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             "correct the specification or the inlet; cheme process crystallizers shows the "
             "model's scope",
         )
+    for node, message in found.stills:
+        add(
+            "warning",
+            "propagate-still",
+            f"{node} (still): not solved: {message}",
+            list(keys.get(node, ())),
+            [node],
+            "correct the still's specification, its data or the inlets; cheme process stills "
+            "reports it",
+        )
     for node, kind, lacking in found.unsolved:
         how = (
             "only checked (cheme validate balances it), never solved"
@@ -832,6 +885,9 @@ def _adapter_result(
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
     for node, message in found.solids:
         messages.append(f"{node} (crystallizer or filter): not solved: {message}")
+        units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
+    for node, message in found.stills:
+        messages.append(f"{node} (still): not solved: {message}")
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
     shown = stream_values(process, found.values)
     return AdapterResult(

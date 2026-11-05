@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Batch still and solvent swap (ADR 0055, core#165): a block or step with `still:` is a batch
+  (Rayleigh) still, shortcut level (one equilibrium stage, total condenser, no reflux). The
+  vapour comes from Raoult's law with the components' new Antoine `vapour_pressure` in
+  `materials.yaml` (the NIST form by default), or from a constant relative volatility
+  (`volatility: {model: constant, alpha}`). The boil-up is constant: kmol/h, kmol/s, kg/h, kW
+  (with the new `heat_of_vaporization`) or 1/h of the charge. The still stops at its `end`
+  (a share `distilled`, a `residue` key's mole fraction, a `time` or a `temperature`), or
+  collects `cuts` in turn. `feed: {stream, mode: constant_level | portions, down_to}` makes
+  it a solvent swap. `cheme process propagate --fill` writes the cuts and the residue.
+  **`cheme process stills [--case] [--json]`** reports the charge, feed, cuts and residue per
+  batch, the boil-up time, the duty and the energy per batch (one batch from
+  `process/recipe.yaml`'s batch size) and the still's temperatures. A recipe `distil`
+  operation takes its time `from:` the still. `cheme validate` checks it
+  (`cheme.process-still`): the ports, the charge and feed, and the missing vapour pressures,
+  relative volatilities or heats of vaporization. Qualified against Rayleigh's binary closed
+  form, the Rayleigh integral with Raoult's law, and the constant-level swap's closed form
+  (`tests/test_batch_still.py`). PharmaPy was reviewed and not used (Assimulo is not
+  installable with uv on Python 3.12+). Every BFD/PFD needs `cheme process build` once (the
+  process generator's code changed).
+
 ## 1.7.0 (2026-11-05)
 
 Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a
