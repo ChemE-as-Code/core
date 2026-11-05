@@ -118,7 +118,7 @@ cheme process build                           # BFD and PFD from process/materia
 cheme process streams [--md]                  # stream table with provenance, block balances
 cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
-cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
+cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
@@ -1062,7 +1062,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
   `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
   dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
-  semi-batch step's model). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  semi-batch step's model; for dry and filter, `from:` a dryer or a filter with `filtration:`,
+  ADR 0057; a unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's occupancy, the cycle time (the bottleneck), the
   batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
@@ -1144,6 +1145,36 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   inlets together (their mass-weighted mean temperature for the energy balance), so a reslurry
   wash is a crystallizer fed by the cake and the wash, its crystals dissolving to saturation
   (`tests/test_precipitation.py`).
+
+- **Filter-dryers and dryers**: a block or step with `dryer:` (one wet-cake inlet, `outlets:
+  {product, vapour}`) dries its `volatiles` to a `residual_moisture` (`mass_fraction` of the
+  product or `per_kg_solid`). The volatiles kept have the inlet's ratio, and everything else
+  (the solid and what the cake liquid held dissolved) stays in the product. `process propagate
+  --fill` writes both outlets, and the model basis is `residual-moisture` (specified).
+  - With `energy: {heat_capacity, latent_heat: {id: kJ/kg}, inlet_temperature,
+    vessel_heat_capacity, efficiency, port}`, `process crystallizers` reports the duty `(m cp
+    (T - T_in) + sum W lambda + C_v (T - T_in) / h_batch) / eta`. A latent heat that is not
+    declared comes from the component's `critical` constants (Pitzer, Poling et al. 2001, eq.
+    7-9.4). The vessel's heat is per batch of `process/recipe.yaml`. The duty is compared with
+    the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
+    everything but the volatiles, so its moisture is the residual moisture.
+  - A recipe `dry` operation with `from:` the dryer takes one batch's vapour over
+    `drying_rate` (kg/(m2 h)) times the heated area of the unit procedure's vessel
+    (`vessel.heated_area`, the jacket's area, or the shell and bottom the cake wets), or the
+    dryer's `drying_time`. The vessel is sized, when it gives no `volume`, from the largest
+    content of one batch: the wet cake over `cake_density`, or what a step of the unit
+    procedure takes in (the slurry, a reslurry wash) from the liquid molar volumes. A given
+    `volume` is checked against the same content (`cheme.recipe-vessel`).
+  - A `solid_separation:` with `filtration: {specific_cake_resistance, medium_resistance,
+    pressure_difference, viscosity, filtrate_density, area}` gives a `filter` `from:` its
+    Ruth time `mu (alpha M V / (2 A^2) + R_m V / A) / dP`, with the area defaulting to the
+    vessel's bottom.
+  - A unit procedure may name `units: [F101, W101, F102, D101]` instead of `unit:`: the steps of
+    one vessel, whose occupancy is counted once. A step in two vessels is
+    `cheme.recipe-reference`. Rules: `cheme.process-dryer` (also a `latent_heat` keyed by a
+    component that is not a volatile), `cheme.process-dryer-duty`.
+  - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
+    `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
   `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
   records the searches, sources, observations, candidate routes, conflicts and the model basis

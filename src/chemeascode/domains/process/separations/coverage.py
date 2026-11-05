@@ -345,9 +345,18 @@ _ROWS = (
     TechniqueCoverage(
         "Drying",
         "specified_split",
-        ("component_separator",),
-        fallback="no dryer model (solids, drying curves): give the moisture split with its source.",
-        aliases=("Dryer",),
+        ("dryer", "component_separator"),
+        fallback="a gas or liquid dried on an adsorbent: a component_separator with the moisture "
+        "split and its source (see Adsorption).",
+        notes="A dryer: (a batch filter-dryer or vacuum dryer of a wet cake) solved by cheme "
+        "process propagate: the volatiles down to a specified residual moisture, the duty "
+        "(sensible, latent, vessel per batch) in cheme process crystallizers, the drying time "
+        "from a drying rate and the recipe vessel's heated area (ADR 0057). No drying curve "
+        "or sorption isotherm.",
+        tested=(
+            "tests/test_dryer.py::test_propagate_fills_the_dryer_and_the_report_closes_the_balance",
+        ),
+        aliases=("Dryer", "Filter-dryer", "Vacuum dryer"),
     ),
     TechniqueCoverage(
         "Solid-fluid separation",

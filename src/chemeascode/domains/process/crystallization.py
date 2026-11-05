@@ -1168,11 +1168,22 @@ class CrystallizerReport:
         )
 
 
-def _slurry_entries(process: Any, ports: dict[str, dict[str, float]]) -> dict[str, Any]:
+def _slurry_entries(
+    process: Any, ports: dict[str, dict[str, float]], volatiles: list[str] | None = None
+) -> dict[str, Any]:
+    """Outlet port -> its dry solid and liquid: the solid components and the rest, or for a
+    dryer (*volatiles*) its own split, the volatiles the liquid and everything else the dry
+    solid (what the cake liquid held dissolved is dried onto the crystals), so that the
+    product's moisture is the dryer's."""
     from chemeascode.domains.process.solids import divide, solid_components
 
-    solids = solid_components(process)
-    return {port: divide(port, mass, solids).entry() for port, mass in ports.items()}
+    if volatiles is None:
+        solids = solid_components(process)
+        return {port: divide(port, mass, solids).entry() for port, mass in ports.items()}
+    return {
+        port: divide(port, mass, {n for n in mass if n not in volatiles}).entry()
+        for port, mass in ports.items()
+    }
 
 
 def _flowsheet_outlets(process: Any, node: Any, case: str) -> dict[str, Any]:
@@ -1229,14 +1240,22 @@ def _inlet(process: Any, node: Any) -> Any:
 
 
 def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
-    """One crystallizer or filter in *case*: its basis, solution, outlets as dry solid and
-    liquid, balances, energy, assumptions and limitations (or the reason it is not solved)."""
+    """One crystallizer, filter or dryer in *case*: its basis, solution, outlets as dry solid
+    and liquid, balances, energy, assumptions and limitations (or the reason it is not solved).
+    A dryer's heating stream that differs from its duty is in ``duty_differences``."""
     from chemeascode.domains.process.model_basis import solids_basis
 
     basis = solids_basis(process, node)
+    model = (
+        "crystallizer"
+        if node.crystallizer is not None
+        else "dryer"
+        if node.dryer is not None
+        else "solid_separation"
+    )
     entry: dict[str, Any] = {
         "node": node.id,
-        "model": "crystallizer" if node.crystallizer is not None else "solid_separation",
+        "model": model,
         "basis": basis.basis,
         "predictive": basis.predictive,
         "sourced": basis.sourced,
@@ -1247,18 +1266,28 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         "solution": None,
         "outlets": {},
         "differences": [],
+        "duty_differences": [],
         "problem": None,
         "unsupported": False,
     }
     try:
         inlet = _inlet(process, node)
-        if node.crystallizer is not None:
+        if node.dryer is not None:
+            from chemeascode.domains.process.dryer import DryerError, dryer_entry
+
+            try:
+                ports, entry["solution"], differ = dryer_entry(process, node, inlet, case)
+            except DryerError as failure:
+                raise CrystallizationError(str(failure)) from failure
+            entry["duty_differences"] = differ
+        elif node.crystallizer is not None:
             result, _ = solve_node(process, node, inlet, case)
             ports = node_outlets(node.crystallizer, result)
             entry["solution"] = result.entry()
         else:
             ports, _ = separate_node(process, node, inlet, case)
-        entry["outlets"] = _slurry_entries(process, ports)
+        volatiles = list(node.dryer.volatiles) if node.dryer is not None else None
+        entry["outlets"] = _slurry_entries(process, ports, volatiles)
         entry["differences"] = _compare(process, node, case, ports)
     except CrystallizationError as failure:
         entry["problem"] = str(failure)
@@ -1267,8 +1296,9 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
 
 
 def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerReport:
-    """Every crystallizer and filter or centrifuge (``crystallizer:``, ``solid_separation:``)
-    of the plant repository at *root* in *case* (default: the default case). Raises
+    """Every crystallizer, filter or centrifuge and dryer (``crystallizer:``,
+    ``solid_separation:``, ``dryer:``) of the plant repository at *root* in *case* (default:
+    the default case). Raises
     :class:`NotAPlantRepository` and :class:`UnknownCase`; a process that does not load is
     reported through ``findings``."""
     from chemeascode.domains.process.model import load
@@ -1289,7 +1319,7 @@ def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerRepo
     keys = {n.id: ("steps", i) for i, n in enumerate(fs.steps)}
     keys |= {n.id: ("blocks", i) for i, n in enumerate(fs.blocks)}
     for node in [*fs.blocks, *fs.steps]:
-        if node.crystallizer is None and node.solid_separation is None:
+        if node.crystallizer is None and node.solid_separation is None and node.dryer is None:
             continue
         entry = unit_entry(process, node, case)
         report.units.append(entry)
@@ -1324,6 +1354,19 @@ def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerRepo
                     "the specification",
                 )
             )
+        for text in entry["duty_differences"]:
+            report.findings.append(
+                Finding(
+                    FLOWSHEET_FILE,
+                    "warning",
+                    "cheme.process-dryer-duty",
+                    f"{node.id} ({case}): {text}",
+                    line=_yaml_line(process.flowsheet_doc, [*loc, "dryer", "energy"]),
+                    ids=[node.id],
+                    hint="write the model's duty on the heating stream, or correct dryer.energy "
+                    "(heat capacity, latent heats, efficiency)",
+                )
+            )
         for note in (entry["solution"] or {}).get("notes", []):
             report.findings.append(
                 Finding(
@@ -1356,7 +1399,11 @@ def report_text(report: CrystallizerReport) -> str:
         if u["problem"]:
             lines.append(f"  not solved: {u['problem']}")
         sol = u["solution"]
-        if sol:
+        if sol and u["model"] == "dryer":
+            from chemeascode.domains.process.dryer import solution_lines
+
+            lines += solution_lines(sol)
+        elif sol:
             lines.append(
                 f"  crystals formed {num(sol['crystals_formed_kg_h'], ' kg/h')}"
                 + (
@@ -1418,8 +1465,10 @@ def report_text(report: CrystallizerReport) -> str:
                 f"liquid {o['liquid_kg_h']:.6g}"
                 + (f", moisture {moisture:.4g}" if o["dry_solid_kg_h"] > 0 else "")
             )
-        for text in u["differences"]:
+        for text in u["differences"] + u.get("duty_differences", []):
             lines.append(f"  differs: {text}")
     if not report.units:
-        lines.append("no crystallizer or solid separation (crystallizer:, solid_separation:)")
+        lines.append(
+            "no crystallizer, solid separation or dryer (crystallizer:, solid_separation:, dryer:)"
+        )
     return "\n".join(lines)

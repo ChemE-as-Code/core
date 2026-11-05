@@ -46,6 +46,25 @@
   `cheme process reactor-hazards` no longer screens a step whose reactions are all
   phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
   a step with both on its reactions alone.
+- Filter-dryer and vacuum dryer (ADR 0057, core#165): a block or step may give `dryer:
+  {volatiles, residual_moisture, temperature, energy, drying_rate | drying_time, cake_density,
+  outlets: {product, vapour}}`. `cheme process propagate` writes the dried product (the
+  volatiles down to the residual moisture, the dissolved solids dried onto the crystals) and
+  the vapour. `cheme process crystallizers` reports the duty: the cake's sensible heat, the
+  latent heat (declared, else Pitzer's correlation from the critical constants) and the
+  vessel's heat per batch, over an efficiency. It compares the duty with the heating stream at
+  `energy.port` (`cheme.process-dryer-duty`). Model basis `residual-moisture`; rules
+  `cheme.process-dryer`. A
+  `solid_separation:` may give `filtration:` (specific cake resistance and more) for Ruth's
+  filtration time.
+- Recipe (ADR 0057): a `dry` operation takes `from:` a dryer (one batch's vapour over the
+  drying rate times the vessel's heated area, or its drying time) and a `filter` operation
+  takes `from:` a filter with `filtration:`. A unit procedure may give `units: [steps]` that
+  share one vessel (a filter-dryer: filter, wash, re-filter, dry), its occupancy counted once
+  (NBS lesson L-3). `vessel.heated_area` is new, and a filter-dryer's vessel is sized from the
+  largest content of one batch: the dryer's wet cake over its `cake_density`, or the slurry or
+  reslurry wash a step of the vessel takes in. Every BFD/PFD needs `cheme process build` once
+  (the process generator's code changed).
 
 ## 1.7.0 (2026-11-05)
 

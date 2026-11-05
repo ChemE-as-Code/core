@@ -20,7 +20,8 @@ is fully determined by their streams, by the DEXPI class:
 - crystallizers and filters (a block or step with ``crystallizer:`` or ``solid_separation:``,
   one material stream in): the outlets from the inlet by
   :mod:`chemeascode.domains.process.crystallization` (solubility or imposed yield, the
-  specified filter, the internal mother-liquor recycle).
+  specified filter, the internal mother-liquor recycle); dryers (``dryer:``): the dried
+  product and the vapour at the residual moisture (:mod:`chemeascode.domains.process.dryer`).
 
 Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
 them), never solved.
@@ -226,6 +227,8 @@ def derive(process: Process, case: str) -> Derivation:
         if n.crystallizer is not None
         else "solid-separation"
         if n.solid_separation is not None
+        else "dryer"
+        if n.dryer is not None
         else "reactor"
         if n.reactions or n.reactor
         else behaviour(n.class_)
@@ -430,7 +433,17 @@ def derive(process: Process, case: str) -> Derivation:
         inlet = ins[0]
         shapes: dict[str, dict[str, float]] = {}
         try:
-            if node.crystallizer is not None:
+            if node.dryer is not None:
+                from chemeascode.domains.process.dryer import DryerError
+                from chemeascode.domains.process.dryer import node_outlets as dried
+                from chemeascode.domains.process.dryer import solve_node as dry
+
+                try:
+                    solved, extra = dry(work, node, inlet, case)
+                except DryerError as failure:
+                    raise CrystallizationError(str(failure)) from failure
+                ports = dried(node.dryer, solved)
+            elif node.crystallizer is not None:
                 result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 ports = node_outlets(node.crystallizer, result)
                 shapes = {
@@ -477,7 +490,7 @@ def derive(process: Process, case: str) -> Derivation:
         ins = [s for s, _ in at[node.id][0]]
         outs = at[node.id][1]
         changed = False
-        if kind in ("crystallizer", "solid-separation"):
+        if kind in ("crystallizer", "solid-separation", "dryer"):
             if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
                 changed |= solids(node, ins, outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
