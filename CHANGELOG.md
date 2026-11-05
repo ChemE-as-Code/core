@@ -22,7 +22,11 @@
   form, the Rayleigh integral with Raoult's law, and the constant-level swap's closed form
   (`tests/test_batch_still.py`). PharmaPy was reviewed and not used (Assimulo is not
   installable with uv on Python 3.12+). Every BFD/PFD needs `cheme process build` once (the
-  process generator's code changed).
+  process generator's code changed). One stage covers solvent strips and swaps
+  (`examples/process-solvent-swap`: methanol to toluene under vacuum at constant level, the
+  recipe's distil from the still). Product purification by fractional batch distillation still
+  needs a column (`process simulate` or a specified split) until the constant-reflux
+  follow-up (core#173).
 
 ## 1.7.0 (2026-11-05)
 

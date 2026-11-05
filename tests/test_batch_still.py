@@ -533,12 +533,7 @@ RECIPE = {
 def test_the_recipe_takes_the_boilup_time_per_batch(tmp_path):
     """The batch is 4 hours of the flowsheet's flows (400 kg of S1 at 100 kg/h): a still
     boiling 20 kmol/h takes 4 times as long as on the one-hour basis."""
-    flowsheet = FLOWSHEET.replace("units: {flow: kmol/h}", "units: {flow: kg/h}").replace(
-        "flow: {value: 100, provenance: given}\n        composition: {basis: mole_fraction, "
-        "values: {A: 0.8, P: 0.2}",
-        "flow: {value: 100, provenance: given}\n        composition: {basis: mole_fraction, "
-        "values: {A: 0.8, P: 0.2}",
-    )
+    flowsheet = FLOWSHEET.replace("units: {flow: kmol/h}", "units: {flow: kg/h}")
     plain = _plant(tmp_path / "plain", flowsheet=flowsheet)
     (alone,) = still_report(plain.root).units
     ws = _plant(tmp_path / "recipe", flowsheet=flowsheet, recipe=RECIPE)
@@ -560,3 +555,327 @@ def test_the_recipe_takes_the_boilup_time_per_batch(tmp_path):
     process, _ = load(ws.root)
     found = [f for f in rules(process) if f.rule == "cheme.recipe-reference"]
     assert any("is a still" in f.message for f in found)
+    nostill = json.loads(json.dumps(RECIPE))
+    nostill["unit_procedures"][0]["operations"][1]["from"] = "F"
+    ws = _plant(tmp_path / "nostill", flowsheet=flowsheet, recipe=nostill)
+    process, _ = load(ws.root)
+    found = [f for f in rules(process) if f.rule == "cheme.recipe-reference"]
+    assert any("F is no still" in f.message for f in found), [f.format() for f in found]
+
+
+# -- review fixes ---------------------------------------------------------------------------------
+
+
+def _ternary(end):
+    return _still(
+        volatility={
+            "model": "constant",
+            "alpha": {"L": 4.0, "M": 2.0, "H": 1.0},
+            "provenance": "assumed",
+        },
+        end=end,
+    )
+
+
+def test_a_residue_end_takes_its_direction_from_the_target():
+    """An intermediate key first rises (its vapour leaner than the liquid), then falls: a
+    target below its share now is reached on the way down, not at once."""
+    charge = {"L": 30, "M": 30, "H": 40}
+    result = solve_still(
+        _ternary({"residue": {"key": "M", "mole_fraction": 0.2}}), charge, None, {}, None
+    )
+    assert result.residue["M"] / sum(result.residue.values()) == pytest.approx(0.2, rel=1e-8)
+    distilled = sum(result.cuts[0].moles.values())
+    assert distilled == pytest.approx(82.305, rel=1e-4)
+    assert not any("reached when it starts" in n for n in result.notes)
+    # the same still in two steps: a first cut, then the same residue end
+    two = solve_still(
+        Still.model_validate(
+            _ternary({"distilled": 0.3}).model_dump(mode="json", exclude={"end", "outlets"})
+            | {
+                "outlets": {"residue": "bottom"},
+                "cuts": [
+                    {"outlet": "c1", "end": {"distilled": 0.3}},
+                    {"outlet": "c2", "end": {"residue": {"key": "M", "mole_fraction": 0.2}}},
+                ],
+            }
+        ),
+        charge,
+        None,
+        {},
+        None,
+    )
+    assert sum(two.residue.values()) == pytest.approx(100 - distilled, rel=1e-7)
+    # the heaviest key never falls: a target below its share now boils the still dry
+    with pytest.raises(StillError, match="boils dry before its end"):
+        solve_still(
+            _ternary({"residue": {"key": "H", "mole_fraction": 0.3}}), charge, None, {}, None
+        )
+    # it rises to a target above its share now
+    rich = solve_still(
+        _ternary({"residue": {"key": "H", "mole_fraction": 0.8}}), charge, None, {}, None
+    )
+    assert rich.residue["H"] / sum(rich.residue.values()) == pytest.approx(0.8, rel=1e-8)
+    # a key falling already below its target has reached it (a swap's old solvent)
+    done = solve_still(
+        _ternary({"residue": {"key": "L", "mole_fraction": 0.5}}), charge, None, {}, None
+    )
+    assert sum(done.cuts[0].moles.values()) == 0
+    assert any("reached when it starts" in n for n in done.notes)
+
+
+def test_each_cut_takes_its_own_heat():
+    raoult = {"model": "raoult", "provenance": "given", "source": "NIST WebBook"}
+    spec = _still(
+        volatility=raoult,
+        end=None,
+        outlets={"residue": "bottom"},
+        cuts=[
+            {"outlet": "c1", "end": {"distilled": 0.3}},
+            {"outlet": "c2", "end": {"distilled": 0.6}},
+        ],
+    )
+    result = solve_still(spec, {"A": 50, "B": 50}, None, _components(), 101.325)
+    first, second = result.cuts
+    assert first.energy + second.energy == pytest.approx(result.energy, rel=1e-12)
+    # each cut's heat is its 30 kmol's latent heat, between the pure components'
+    for cut in (first, second):
+        assert LATENT["A"] * 30 < cut.energy < LATENT["B"] * 30
+
+
+TEMPLATE_W = MATERIALS.replace(
+    "  - {{id: P, name: product, formula: C10H8, molar_mass: 128.17}}".replace("{{", "{").replace(
+        "}}", "}"
+    ),
+    "  - {id: P, name: product, formula: C10H8, molar_mass: 128.17}\n"
+    "  - {id: W, name: water, formula: H2O, molar_mass: 18.015}",
+).replace("components: [A, B, P]}", "components: [A, B, P, W]}")
+
+
+def test_a_template_component_no_inlet_carries_is_not_the_stills(tmp_path):
+    assert "W, name: water" in TEMPLATE_W and "[A, B, P, W]" in TEMPLATE_W
+    ws = _plant(tmp_path, materials=TEMPLATE_W)
+    assert not _findings(ws)
+    process, _ = load(ws.root)
+    (basis,) = [b for b in model_bases(process) if b.id == "S"]
+    assert basis.sourced, basis.detail
+    # a stream without a composition in any case yet can carry its template's
+    flowsheet = FLOWSHEET.replace(
+        "        composition: {basis: mole_fraction, values: {B: 1.0}, provenance: given}\n", ""
+    )
+    messages = [f.message for f in _findings(_plant(tmp_path / "b", flowsheet, TEMPLATE_W))]
+    assert any("W lack a vapour_pressure" in m for m in messages), messages
+
+
+def _stale(ws):
+    process, _ = load(ws.root)
+    return [f.ids for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+
+
+def test_the_boilup_makes_the_outlets_stale_only_through_an_end_at_a_time(tmp_path):
+    for name, flowsheet, stale in (
+        ("residue", FLOWSHEET, False),
+        (
+            "time",
+            FLOWSHEET.replace(
+                "end: {residue: {key: A, mole_fraction: 0.01}}", "end: {time: 30000}"
+            ),
+            True,
+        ),
+    ):
+        ws = _plant(tmp_path / name, flowsheet=flowsheet)
+        process, _ = load(ws.root)
+        assert run(ws, process, "design", write=True).written == 2
+        assert not _stale(ws)
+        path = ws.root / "process/flowsheet.yaml"
+        text = path.read_text()
+        # the source texts and provenance are no inputs
+        text = text.replace("source: jacket estimate", "source: vendor figure")
+        text = text.replace(
+            "source: NIST WebBook}\n      nonvolatile", "source: DDB}\n      nonvolatile"
+        )
+        path.write_text(text)
+        assert not _stale(ws), name
+        path.write_text(text.replace("value: 20, unit: kmol/h", "value: 25, unit: kmol/h"))
+        assert bool(_stale(ws)) is stale, name
+    # a vapour pressure's fitted range drives notes only
+    ws = _plant(tmp_path / "range")
+    process, _ = load(ws.root)
+    run(ws, process, "design", write=True)
+    path = ws.root / "process/materials.yaml"
+    path.write_text(path.read_text().replace("[287.7, 354.07]", "[280.0, 360.0]"))
+    assert not _stale(ws)
+
+
+def test_a_time_end_on_the_stills_own_batch_is_circular(tmp_path):
+    flowsheet = FLOWSHEET.replace(
+        "end: {residue: {key: A, mole_fraction: 0.01}}", "end: {time: 12000}"
+    )
+    recipe = json.loads(json.dumps(RECIPE))
+    recipe["batch_size"] = {"value": 4000, "unit": "kg", "stream": "S4", "provenance": "assumed"}
+    ws = _plant(tmp_path, flowsheet=flowsheet, recipe=recipe)
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert result.written == 0
+    (finding,) = [f for f in result.findings if f.rule == "cheme.process-propagate-still"]
+    assert "circular" in finding.message
+    (unit,) = still_report(ws.root).units
+    assert "circular" in unit["problem"]
+    # on the charge it is not: the still waits for the batch's hours, then solves once
+    recipe["batch_size"]["stream"] = "S1"
+    ws = _plant(tmp_path / "charge", flowsheet=flowsheet, recipe=recipe)
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written == 2
+    (unit,) = still_report(ws.root).units
+    assert unit["solution"]["hours_of_flows_per_batch"] == pytest.approx(
+        4000 / (80 * 78.11 + 20 * 128.17), rel=1e-4
+    )
+    assert not unit["differences"]
+
+
+def test_a_still_that_fails_in_a_later_pass_writes_nothing(tmp_path, monkeypatch):
+    from chemeascode.domains.process import batch_still
+
+    real = batch_still.solve_node
+    calls = []
+
+    def flaky(*args, **kwargs):
+        calls.append(1)
+        if len(calls) > 1:
+            raise StillError("no bubble point: the still boils dry (nothing volatile left)")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(batch_still, "solve_node", flaky)
+    ws = _plant(tmp_path)
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert len(calls) > 1
+    assert result.written == 0
+    assert any(f.rule == "cheme.process-propagate-still" for f in result.findings)
+    streams = yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())["streams"]
+    assert "state" not in streams[2] and "state" not in streams[3]
+
+
+def test_a_heat_of_vaporization_in_kj_per_mol_is_flagged(tmp_path):
+    ws = _plant(
+        tmp_path,
+        materials=MATERIALS.replace("heat_of_vaporization: 30720", "heat_of_vaporization: 30.72"),
+    )
+    (warning,) = _findings(ws)
+    assert warning.level == "warning" and warning.file == "process/materials.yaml"
+    assert "A: heat_of_vaporization 30.72" in warning.message
+    assert "multiply by 1000" in warning.hint and warning.line is not None
+
+
+CUTS = (
+    FLOWSHEET.replace(
+        "      feed: {stream: S2, mode: constant_level}\n"
+        "      end: {residue: {key: A, mole_fraction: 0.01}}\n"
+        "      outlets: {distillate: top, residue: bottom}\n",
+        "      cuts:\n"
+        "        - {outlet: top, end: {distilled: 0.3, basis: mass}}\n"
+        "        - {outlet: mid, end: {residue: {key: A, mole_fraction: 0.05}}}\n"
+        "      outlets: {residue: bottom}\n",
+    )
+    .replace(
+        "      - {id: swap, direction: in}\n",
+        "      - {id: mid, direction: out}\n",
+    )
+    .replace("    to: S.swap\n", "    to: S.in\n")
+    .replace(
+        "  - id: S4\n",
+        "  - id: S5\n    from: S.mid\n    to: D2.in\n    template: liquid\n  - id: S4\n",
+    )
+    .replace(
+        "  - {id: R, ports: [{id: in, direction: in}]}\n",
+        "  - {id: R, ports: [{id: in, direction: in}]}\n"
+        "  - {id: D2, ports: [{id: in, direction: in}]}\n",
+    )
+)
+
+
+def test_propagate_writes_cuts_in_turn_with_a_kg_h_boilup(tmp_path):
+    # one charge: the toluene stream goes to a mixer-free charge, so drop it here
+    flowsheet = CUTS.replace("value: 20, unit: kmol/h", "value: 1500, unit: kg/h")
+    start = flowsheet.index("  - id: S2\n")
+    end = flowsheet.index("  - id: S3\n")
+    flowsheet = flowsheet[:start] + flowsheet[end:]
+    flowsheet = flowsheet.replace("values: {A: 0.8, P: 0.2}", "values: {A: 0.4, B: 0.4, P: 0.2}")
+    ws = _plant(tmp_path, flowsheet=flowsheet)
+    assert not _findings(ws)
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert result.written == 3, [f.format() for f in result.findings]
+    streams = {
+        s["id"]: s
+        for s in yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())["streams"]
+    }
+    top, mid, bottom = (streams[i]["state"]["design"] for i in ("S3", "S5", "S4"))
+    charge = 40 * 78.11 + 40 * 92.14 + 20 * 128.17
+    flows = [s["flow"]["value"] for s in (top, mid, bottom)]
+    assert sum(flows) == pytest.approx(charge, rel=1e-5)
+    assert flows[0] == pytest.approx(0.3 * charge, rel=1e-5)  # a mass share distilled
+    assert bottom["composition"]["values"]["A"] == pytest.approx(0.05, rel=1e-4)
+    # the first cut is the richer in benzene
+    assert top["composition"]["values"]["A"] > mid["composition"]["values"]["A"]
+    assert not _stale(ws)
+    (unit,) = still_report(ws.root, "design").units
+    first, second = unit["solution"]["cuts"]
+    assert first["energy_kWh_per_batch"] + second["energy_kWh_per_batch"] == pytest.approx(
+        unit["solution"]["energy_kWh_per_batch"], rel=1e-9
+    )
+    # 1500 kg/h of vapour: the time is the mass distilled over the rate
+    distilled = sum(flows[:2])
+    assert unit["solution"]["boilup_time_h"] == pytest.approx(distilled / 1500, rel=1e-6)
+
+
+def test_propagate_writes_a_put_and_take_swap(tmp_path):
+    flowsheet = FLOWSHEET.replace(
+        "feed: {stream: S2, mode: constant_level}",
+        "feed: {stream: S2, mode: portions, portions: 3, down_to: 0.5}",
+    )
+    ws = _plant(tmp_path, flowsheet=flowsheet)
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written == 2
+    streams = yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())["streams"]
+    top, bottom = (s["state"]["design"] for s in streams[2:])
+    charge = 80 * 78.11 + 20 * 128.17 + 120 * 92.14
+    assert top["flow"]["value"] + bottom["flow"]["value"] == pytest.approx(charge, rel=1e-5)
+    assert bottom["composition"]["values"]["A"] == pytest.approx(0.01, rel=1e-4)
+    (unit,) = still_report(ws.root).units
+    assert "portions" in unit["detail"] and not unit["differences"]
+    assert not _stale(ws)
+
+
+def test_the_command_takes_a_case_and_refuses_an_unknown_one(tmp_path, monkeypatch):
+    from chemeascode.interfaces.cli import app
+
+    ws = _plant(tmp_path)
+    monkeypatch.chdir(ws.root)
+    out = CliRunner().invoke(app, ["process", "stills", "--case", "design"])
+    assert out.exit_code == 0, out.output
+    assert "solvent swap S" in out.output
+    out = CliRunner().invoke(app, ["process", "stills", "--case", "nope"])
+    assert out.exit_code == 2
+    assert "unknown case" in out.output
+
+
+def test_the_solvent_swap_example_is_current():
+    from pathlib import Path
+
+    from chemeascode.project.validate import validate_workspace
+
+    example = Path(__file__).parents[1] / "examples/process-solvent-swap"
+    report = validate_workspace(Workspace(example))
+    assert not [f.format() for f in report.findings if f.level != "info"]
+    process, _ = load(example)
+    assert not [f.format() for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+    (unit,) = still_report(example).units
+    sol = unit["solution"]
+    assert unit["model"] == "solvent swap" and unit["sourced"] and not unit["differences"]
+    assert sol["residue"]["mole_fractions"]["MEOH"] == pytest.approx(0.005, rel=1e-6)
+    assert not sol["notes"]
+    recipe = recipe_report(example)
+    swap = next(s for s in recipe.steps if s.operation == "swap")
+    assert swap.basis == "calculated"
+    assert swap.end - swap.start == pytest.approx(sol["boilup_time_h"], rel=1e-9)

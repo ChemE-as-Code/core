@@ -462,10 +462,13 @@ def derive(process: Process, case: str) -> Derivation:
             changed |= put(s, "composition", _mix(work, shape), kind, node.id, [inlet], extra)
         return changed
 
+    waiting: dict[str, str] = {}  # still -> why its batch's hours are not known yet
+
     def still(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
         """The cuts and the residue of batch still *node* (:mod:`.batch_still`)."""
         from chemeascode.domains.process.batch_still import (
             StillError,
+            hours_pending,
             node_outlets,
             outlet_shapes,
             solve_node,
@@ -473,11 +476,24 @@ def derive(process: Process, case: str) -> Derivation:
 
         if any(stream_flows(work, s, case).components is None for s in ins):
             return False
+        # an end at a time waits for the recipe's batch (its hours of flows), so that the
+        # outlets are not put from one hour of flows and kept when the hours come later
+        if (pending := hours_pending(work, node, case)) is not None:
+            waiting[node.id] = pending
+            return False
+        waiting.pop(node.id, None)
         try:
             result, extra = solve_node(work, node, ins, case)
         except StillError as failure:
             if (node.id, str(failure)) not in found.stills:
                 found.stills.append((node.id, str(failure)))
+            # nothing of a still that does not solve is written: drop what it put earlier
+            for s, _ in outs:
+                for name in ("flow", "composition"):
+                    value = found.values.get((s.id, name))
+                    if value is not None and value.source.startswith(f"{SOURCE}: still {node.id} "):
+                        del found.values[(s.id, name)]
+                        setattr(s.state[case], name, None)
             return False
         ports = node_outlets(work, node.still, result)
         shapes = outlet_shapes(work, node.still, result)
@@ -628,6 +644,8 @@ def derive(process: Process, case: str) -> Derivation:
             changed |= step(node)
         if not changed:
             break
+    for node_id, message in waiting.items():
+        found.stills.append((node_id, message))
     for node in nodes:
         kind = kinds[node.id]
         ends = [s for s, _ in at[node.id][0] + at[node.id][1]]

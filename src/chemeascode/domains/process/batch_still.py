@@ -75,6 +75,9 @@ PROFILE_POINTS = 50
 TOLERANCE = 1e-9
 #: K: the still's temperature is searched below this.
 HOTTEST = 2000.0
+#: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
+#: cryogens such as hydrogen and helium are below).
+LEAST_LATENT = 2000.0
 
 
 class StillError(ValueError):
@@ -84,8 +87,9 @@ class StillError(ValueError):
 @dataclass
 class Cut:
     """One distillate cut: kmol (per hour of flows) by component, when it ends (s of boil-up
-    from the start, the still's temperature K), the heat per batch it took (kJ) and the vapour
-    leaving at its end (mole fractions: an empty cut's composition)."""
+    from the start, the still's temperature K), the heat per batch it took itself (kJ, from the
+    end of the cut before; the cuts' sum to the still's energy) and the vapour leaving at its
+    end (mole fractions: an empty cut's composition)."""
 
     outlet: str
     moles: dict[str, float]
@@ -325,6 +329,7 @@ def solve_still(
     boiled = 0.0  # kmol per hour of flows boiled up so far
     fed = [0.0] * k
     removed = [0.0] * k  # distilled into the cuts closed so far
+    energy_before = 0.0  # kJ per batch taken by the cuts closed so far
     peak = 0.0
     key = _profile_key(spec, names, phase, n0)
     ki = names.index(key) if key in names else None
@@ -371,8 +376,12 @@ def solve_still(
                 new, error = _dopri_step(f, state, h)
                 new[:k] = [max(v, 0.0) for v in new[:k]]
                 phase.vapour(new[:k])
-            except StillError:
+            except StillError as failure:
                 if h < 1e-9 * (total0 + total_feed):
+                    if stop is not None and ("empty" in str(failure) or "dry" in str(failure)):
+                        raise StillError(
+                            f"the still boils dry before its end ({failure})"
+                        ) from failure
                     raise
                 h /= 4.0
                 continue
@@ -454,9 +463,14 @@ def solve_still(
         if key not in names:
             raise StillError(f"the residue's key {key} is not in the still")
         i = names.index(key)
-        # the key's share falls while the vapour is richer in it than the liquid, else rises
+        # the direction comes from the target: the key's share falls to a target below its
+        # share now (an intermediate key may first rise, then fall; a target it never reaches
+        # ends in "boils dry before its end"), and rises to one above it while it rises (the
+        # vapour leaner in it than the liquid). A key falling already below its target (a
+        # swap's old solvent once the feed is in) has reached it.
+        x_now = state[i] / sum(state[:k])
         y, _ = phase.vapour(state[:k])
-        sign = -1.0 if y[i] > state[i] / sum(state[:k]) else 1.0
+        sign = 1.0 if target > x_now and y[i] < x_now else -1.0
         return lambda s, b: sign * (s[i] / sum(s[:k]) - target) if sum(s[:k]) > 0 else 1.0
 
     for port, end in ends:
@@ -483,10 +497,11 @@ def solve_still(
                 moles,
                 state[k],
                 t,
-                state[k + 1] if energy_known else None,
+                state[k + 1] - energy_before if energy_known else None,
                 dict(zip(names, y, strict=True)),
             )
         )
+        energy_before = state[k + 1]
     result.fed = dict(zip(names, fed, strict=True))
     result.residue = dict(zip(names, state[:k], strict=True))
     result.time = state[k]
@@ -591,15 +606,83 @@ def batch_hours(process: Any, case: str) -> tuple[float, str]:
     return found, "process/recipe.yaml batch size"
 
 
+def outlets_need_hours(spec: Any) -> bool:
+    """Whether still *spec*'s outlets depend on the hours of flows per batch: an end at a time
+    with a boil-up of the still (not a specific rate, 1/h). Otherwise the hours scale only its
+    time and energy per batch."""
+    timed = any(e is not None and e.time is not None for _, e in spec.ends())
+    return timed and spec.boilup.unit != "1/h"
+
+
+def _downstream(process: Any, node: Any) -> set[str]:
+    """The ids of the streams out of *node* and of every stream downstream of them."""
+    found: set[str] = set()
+    todo = [node.id]
+    seen: set[str] = set()
+    while todo:
+        at = todo.pop()
+        if at in seen:
+            continue
+        seen.add(at)
+        for s in process.flowsheet.streams:
+            a, b = process.ends(s)
+            if a is not None and a.node == at and s.id not in found:
+                found.add(s.id)
+                if b is not None:
+                    todo.append(b.node)
+    return found
+
+
+def hours_pending(process: Any, node: Any, case: str) -> str | None:
+    """Why the hours of flows per batch still *node*'s outlets depend on are not known yet (the
+    recipe's batch-size stream has no flow yet), else None. propagate waits for them."""
+    from chemeascode.domains.process.recipe import hours_per_batch
+
+    if not outlets_need_hours(node.still) or _circular_hours(process, node) is not None:
+        return None  # a circular batch is refused when solved
+    try:
+        hours_per_batch(process, case)
+    except ValueError as failure:
+        return f"its end at a time needs the hours of flows per batch: {failure}"
+    return None
+
+
+def _circular_hours(process: Any, node: Any) -> str | None:
+    """Why still *node*'s outlets cannot follow from the recipe's batch: its batch-size stream
+    is an outlet of the still or downstream of it, while an end at a time makes the outlets
+    depend on the hours of flows that stream gives."""
+    from chemeascode.domains.process.recipe import load_recipe
+
+    if not outlets_need_hours(node.still):
+        return None
+    try:
+        recipe, _, _ = load_recipe(process.root)
+    except (OSError, ValueError):
+        return None
+    if recipe is None:
+        return None
+    stream = recipe.batch_size.stream
+    if stream in _downstream(process, node):
+        return (
+            f"its end at a time depends on the hours of flows per batch, and the recipe's "
+            f"batch-size stream {stream} is the still's outlet or downstream of it: circular; "
+            "put the batch size on its charge (or upstream), or end it otherwise"
+        )
+    return None
+
+
 def solve_node(
     process: Any, node: Any, inlets: list[Any], case: str
 ) -> tuple[StillResult, dict[str, Any]]:
     """Still *node* fed by *inlets* (its charge and a swap's feed) in *case*, and what it was
-    solved from (the inputs of its outlets' fingerprint). Raises StillError."""
+    solved from (the inputs of its outlets' fingerprint: only what the outlets depend on).
+    Raises StillError."""
     from chemeascode.domains.process.solids import solid_components
 
     spec = node.still
     charge, feed = split_inlets(node, inlets)
+    if (circular := _circular_hours(process, node)) is not None:
+        raise StillError(circular)
     moles = _moles(process, charge, case)
     fed = _moles(process, feed, case) if feed is not None else None
     pressure = spec.pressure if spec.pressure is not None else _pressure(process, charge, case)
@@ -615,21 +698,27 @@ def solve_node(
     if not basis.startswith("process/recipe.yaml"):
         result.notes.append(f"one batch: {basis}")
     names = sorted({*moles, *(fed or {})})
+    # the fingerprint holds what the outlets' flows and compositions depend on: not the
+    # provenance and source texts, not the vapour pressures' fitted ranges (notes only), and
+    # the boil-up only through an end at a time
     inputs: dict[str, Any] = {
-        "still": spec.model_dump(mode="json"),
+        "still": spec.model_dump(
+            mode="json",
+            exclude={"boilup": True, "provenance": True, "source": True, "volatility": _TEXTS},
+        ),
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
         "nonvolatile": sorted(nonvolatile & set(names)),
     }
     if spec.volatility.model == "raoult":
         inputs["pressure"] = pressure
         inputs["vapour_pressure"] = {
-            n: vp.model_dump(mode="json")
+            n: vp.model_dump(mode="json", exclude={*_TEXTS, "temperature_range"})
             if (vp := getattr(comps.get(n), "vapour_pressure", None))
             else None
             for n in names
         }
-    # the outlets depend on the boil-up's rate only through an end at a time
     if any(e is not None and e.time is not None for _, e in spec.ends()):
+        inputs["boilup"] = spec.boilup.model_dump(mode="json", include={"value", "unit"})
         if spec.boilup.unit != "1/h":
             inputs["hours"] = hours
         if spec.boilup.unit == "kW":
@@ -637,6 +726,10 @@ def solve_node(
                 n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
             }
     return result, inputs
+
+
+#: Fields of a still's data that are text about it, not inputs of its outlets.
+_TEXTS = {"provenance", "source"}
 
 
 def node_outlets(process: Any, spec: Any, result: StillResult) -> dict[str, dict[str, float]]:
@@ -669,16 +762,23 @@ def _ports(node: Any, direction: str) -> list[str]:
 
 
 def _present(process: Any, streams: list[Any]) -> set[str]:
-    """The components *streams* can carry: their compositions' (every case) and templates'."""
+    """The components *streams* carry: those with a non-zero value in a composition of theirs
+    (any case). A stream without a composition in any case yet (not propagated) can carry its
+    template's: a template shared by many streams lists components a still never receives."""
     found: set[str] = set()
     templates = process.templates()
     for s in streams:
-        template = templates.get(s.template or "")
-        found |= set(template.components if template else [])
-        for state in s.state.values():
-            comp = getattr(state, "composition", None)
-            if comp is not None:
-                found |= {n for n, v in comp.values.items() if v}
+        own = {
+            n
+            for state in s.state.values()
+            if (comp := getattr(state, "composition", None)) is not None
+            for n, v in comp.values.items()
+            if v
+        }
+        if not own and not any(getattr(st, "composition", None) for st in s.state.values()):
+            template = templates.get(s.template or "")
+            own = set(template.components if template else [])
+        found |= own
     return found
 
 
@@ -705,6 +805,26 @@ def rules(process: Any) -> list[Finding]:
                 hint=hint,
             )
         )
+
+    # kJ/kmol: a value in kJ/mol (NIST WebBook's, cheme chemistry props') is 1000 times too
+    # small, and makes the duty 1000 times too small or a boil-up in kW 1000 times too fast
+    for i, comp in enumerate(process.materials.components if process.materials else []):
+        h = getattr(comp, "heat_of_vaporization", None)
+        if h is not None and h < LEAST_LATENT:
+            findings.append(
+                Finding(
+                    MATERIALS_FILE,
+                    "warning",
+                    "cheme.process-still",
+                    f"{comp.id}: heat_of_vaporization {h:g} kJ/kmol is implausibly small "
+                    f"(below {LEAST_LATENT:g} kJ/kmol: no process liquid but a cryogen)",
+                    line=_yaml_line(
+                        process.materials_doc, ["components", i, "heat_of_vaporization"]
+                    ),
+                    ids=[comp.id],
+                    hint="the unit is kJ/kmol: NIST gives kJ/mol, multiply by 1000",
+                )
+            )
 
     nodes = [("steps", i, n) for i, n in enumerate(fs.steps)]
     nodes += [("blocks", i, n) for i, n in enumerate(fs.blocks)]

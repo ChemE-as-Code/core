@@ -1140,7 +1140,13 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     (`cheme.process-still-unsolved`, `-outlet`, `-note`).
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
-    those otherwise it is info, no duty.
+    those otherwise it is info, no duty. The components it checks are those its inlets'
+    compositions carry (an inlet's template only while it has none). A `heat_of_vaporization`
+    below 2000 kJ/kmol is a warning: NIST gives kJ/mol, times 1000.
+  - A residue end's direction is the target's: the key falls to a target below its share, or
+    rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
+    energy is its own. An end at a time with the recipe's batch-size stream downstream of the
+    still is circular and refused.
   - Not modelled: rectification with reflux, activity coefficients (azeotropes), heat-up,
     sensible heat and losses, constant level by volume. `process simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene

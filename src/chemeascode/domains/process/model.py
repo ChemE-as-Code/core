@@ -23,7 +23,8 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   be vapour (:func:`.crystallization.rules`);
 - ``process-still``: a batch still whose ports, charge, feed or references do not fit, or
   whose volatile components lack the volatility data (vapour pressures, relative volatilities)
-  or, for a boil-up in kW, heats of vaporization (info: no duty) (:func:`.batch_still.rules`);
+  or, for a boil-up in kW, heats of vaporization (info: no duty), and (warning) a
+  heat_of_vaporization too small for kJ/kmol (one in kJ/mol) (:func:`.batch_still.rules`);
 - ``process-energy-balance`` (warning), ``process-energy-balance-unsupported`` (info): the
   energy balance of a block or step whose streams carry enthalpies (:mod:`.energy`): enthalpy
   flows against the energy streams crossing it; a reacting node or an inconsistent enthalpy

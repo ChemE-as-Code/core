@@ -163,7 +163,8 @@ still:
 
 - Raoult needs each volatile component's Antoine `vapour_pressure` in `materials.yaml`, with
   its source and `temperature_range`. `cheme chemistry props` gives the NIST form, which is the
-  default. A boil-up in kW needs `heat_of_vaporization`.
+  default. A boil-up in kW needs `heat_of_vaporization`, in kJ/kmol: NIST and
+  `cheme chemistry props` give kJ/mol, so multiply by 1000 (benzene 30.72 kJ/mol is 30720).
 - Without these data, `validate` names them (`cheme.process-still`). Look them up (skill
   `property-retrieval`), or declare the component `nonvolatile` when it really stays in the
   still. Never invent a relative volatility to make the step pass. An assumed `alpha` states

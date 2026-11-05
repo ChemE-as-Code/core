@@ -151,8 +151,9 @@ class Component(Strict):
     heat_of_vaporization: float | None = Field(
         default=None,
         gt=0,
-        description="kJ/kmol near the still's temperature: a batch still's boil-up from its "
-        "duty, and its duty from its boil-up.",
+        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000) near the "
+        "still's temperature: a batch still's boil-up from its duty, and its duty from its "
+        "boil-up.",
         exclude_if=lambda value: value is None,
     )
     phase: Literal["solid"] | None = Field(
