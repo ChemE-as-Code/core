@@ -1036,7 +1036,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
   (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
   accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
-  cooling-failure temperature at the worst moment (ADR 0048); a batch keeps `X_ac = 1`.
+  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1057,7 +1057,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   propagate` solves the extents of its parallel and series reactions
   (`chemistry.reactions.selectivity_extents`), refusing selectivities the reactions cannot give.
 - **Batch recipe**: **`cheme process recipe [--case C] [--svg FILE] [--json]`** reads
-  `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0049): the `batch_size` (kg, t or m3 of one
+  `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0051): the `batch_size` (kg, t or m3 of one
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
   `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
   dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
@@ -1072,7 +1072,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   sizes) and check its `jacket` (U, area or wetted shell, coolant and heating temperatures)
   against the model's peak duty (`cheme.recipe-jacket`, `-vessel`); a `heat` or `cool`
   operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
-  writes a batch reactor's volume and peak duty from it (ADR 0050).
+  writes a batch reactor's volume and peak duty from it (ADR 0052).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1082,7 +1082,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   dosed streams are inlets of the step, the other inlet the charge, `time`/`target` the
   post-reaction. `process reactors` adds the accumulation of the dosed reactant over time and
   its maximum, the worst cooling-failure temperature and the peak cooling duty per m3
-  (`stirred_tank.solve_batch` with doses; ADR 0048). `process simulate` does not couple it.
+  (`stirred_tank.solve_batch` with doses; ADR 0050). `process simulate` does not couple it.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or

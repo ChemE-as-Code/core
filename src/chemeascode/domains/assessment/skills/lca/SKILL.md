@@ -163,6 +163,11 @@ gate `lca` fails.
    publication minimum. A v1 dataset (`schema: cheme/lca/v1`) still loads with a warning:
    `cheme migrate --write` rewrites a hand-written one.
 
+   A batch plant (with `process/recipe.yaml`) gives what it uses per batch and the flowsheet
+   does not carry (cleaning solvent, rinse water, nitrogen purges, off-spec make-up) as
+   `consumables:` with `per_batch:` instead of `per_year`; the batches per year come from the
+   recipe.
+
 11. **Wastes and end of life**. What goes in also comes out: give every replaced or
    charged consumable (adsorbent, catalyst) and the construction materials a `disposal:`
    (`kind: waste | recyclable`, `route`, its treatment background or `missing:`), classify

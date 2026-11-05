@@ -1,4 +1,4 @@
-# 0049. A batch recipe in process/recipe.yaml derives the cycle time; the flowsheet holds year averages
+# 0051. A batch recipe in process/recipe.yaml derives the cycle time; the flowsheet holds year averages
 
 - **Status:** Proposed
 - **Date:** 2026-11-05
@@ -7,7 +7,7 @@
 
 A batch plant's TEA took `operation.batch.cycle_time` by hand, and nothing in cheme-as-code
 derived it (core#158). The flowsheet's rates had no stated relation to a batch. The TEA read
-them as "one batch over `basis_hours`", and the semi-batch model (ADR 0048) reads them as "per
+them as "one batch over `basis_hours`", and the semi-batch model (ADR 0050) reads them as "per
 hour of charge". The balance, the LCI per kg and the TEA could therefore rest on different
 bases without any check saying so. The process library's batch entries (fine chemicals, NBS
 first) need a declared batch size, a recipe and a cycle time from it.
@@ -78,7 +78,7 @@ cheme-as-code takes option 3 (`domains/process/recipe.py`, schema `cheme/recipe/
 
 ## Evidence
 
-- core#158 (plan), this ADR's PR (stacked on ADR 0048's).
+- core#158 (plan), this ADR's PR (stacked on ADR 0050's).
 - `src/chemeascode/domains/process/recipe.py`, `interfaces/cli/process.py` (`process recipe`),
   `domains/process/model.py` (rules), `domains/assessment/tea/build.py` (`_recipe_batch`),
   `domains/assessment/tea/schemas.py` (`Batch.recipe`).
