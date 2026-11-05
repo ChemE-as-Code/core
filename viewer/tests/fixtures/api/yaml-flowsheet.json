@@ -444,7 +444,7 @@
     "$defs": {
       "Batch": {
         "additionalProperties": false,
-        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing).",
+        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as\nthey form, by a second outlet.",
         "properties": {
           "time": {
             "anyOf": [
@@ -501,6 +501,18 @@
             },
             "title": "Dosing",
             "type": "array"
+          },
+          "vent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Vent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
           },
           "provenance": {
             "enum": [
@@ -1469,6 +1481,21 @@
             "minimum": 0,
             "title": "Start",
             "type": "number"
+          },
+          "absorbed": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+            "title": "Absorbed"
           }
         },
         "required": [
@@ -3086,6 +3113,40 @@
           "kind"
         ],
         "title": "UtilityLevel",
+        "type": "object"
+      },
+      "Vent": {
+        "additionalProperties": false,
+        "description": "The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the\nliquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They\ndo not accumulate in the liquid and count in neither its volume nor its concentrations; a\n``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.",
+        "properties": {
+          "stream": {
+            "description": "The outlet stream of the step the gas leaves by.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "components": {
+            "description": "The components that leave the liquid as they form.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Components",
+            "type": "array"
+          },
+          "fraction": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component -> the share of what forms that leaves (default 1).",
+            "title": "Fraction",
+            "type": "object"
+          }
+        },
+        "required": [
+          "stream",
+          "components"
+        ],
+        "title": "Vent",
         "type": "object"
       },
       "ViewItem": {

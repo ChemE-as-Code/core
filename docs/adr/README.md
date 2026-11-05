@@ -99,4 +99,5 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0051](0051-batch-recipe-derives-the-cycle-time.md) | A batch recipe in process/recipe.yaml derives the cycle time; the flowsheet holds year averages | Proposed | 2026-11-05 |
 | [0052](0052-batch-vessel-and-jacket-from-the-recipe.md) | Batch vessels and jackets are sized in the recipe, from the reactor model's content | Proposed | 2026-11-05 |
 | [0053](0053-per-batch-lca-consumables.md) | Per-batch LCA exchanges are consumables per batch of the recipe | Proposed | 2026-11-05 |
+| [0054](0054-gas-evolution-and-gas-dosing-in-a-batch.md) | Gas evolution and gas dosing in a batch: a vent outlet the gas leaves by as it forms | Proposed | 2026-11-05 |
 | [0056](0056-precipitation-from-a-mixed-liquor.md) | Precipitation from a mixed liquor in the crystallizer; phase changes are not screened as reactions | Proposed | 2026-11-05 |

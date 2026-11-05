@@ -16,6 +16,10 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
   its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
   then and ``dT_ad`` of the whole batch, charge and doses;
+- a vented batch or semi-batch (``batch.vent``, ADR 0054): the vented gas leaves as it forms,
+  so it adds nothing to the content's heat capacity nor to the MTSR, and a dosed gas counts
+  only with its absorbed share; neither sets the MTT. The notes give the vent's peak gas rate:
+  with the vent blocked that gas pressurises the vessel, which this screening does not assess;
 - ``MTT`` from the reactor's ``hazard.mtt``, else the lowest normal boiling point of a
   liquid-phase reactor's components at about atmospheric pressure (110 kPa(a) at most);
   ``TD24`` from ``hazard.td24`` only (calorimetry; never estimated);
@@ -280,6 +284,7 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
             entry.notes.append("accumulation: the unconverted key in the (first) tank")
     if model == "batch":
         entry.notes.append("accumulation 1: all charged, cooling fails at the start")
+        _vent_note(process, item, entry, inlet, case)
     elif model != "cstr":
         entry.notes.append("accumulation 1: the fresh feed, at the inlet's temperature")
     entry.process_temperature = t_p
@@ -308,12 +313,18 @@ def _screen_semibatch(
     comps = process.components()
     moles: dict[str, float] = {}
     p_in = None
+    # a dosed gas counts with the share the liquid takes up; the rest passes to the vent
+    absorbed = {d.stream: d.absorbed for d in item.batch.dosing if d.absorbed is not None}
+    through: set[str] = set()
     try:
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
+            share = absorbed.get(stream.id, 1.0)
+            if share < 1:
+                through |= {n for n, v in found.items() if v > 0}
             for n, v in found.items():
                 if v > 0:  # a template's component the stream does not carry is not there
-                    moles[n] = moles.get(n, 0.0) + v
+                    moles[n] = moles.get(n, 0.0) + v * share
             p_in = kpa if p_in is None else min(p_in, kpa)
         solved, _ = solve_node(process, item, inlets, case)
     except TankError as failure:
@@ -339,8 +350,42 @@ def _screen_semibatch(
         entry.notes.append("MTSR: T_p + X_ac dT_ad (no cooling-failure temperature over the run)")
     else:
         entry.missing.append("the accumulation of a dosed reactant")
-    _limits(entry, item, reactions, moles, comps, p_in)
+    boiling = moles
+    if item.batch.vent is not None:
+        _vent_note(process, item, entry, inlets, case, solved)
+        gases = set(item.batch.vent.components) | through
+        boiling = {n: v for n, v in moles.items() if n not in gases}
+    _limits(entry, item, reactions, boiling, comps, p_in)
     return entry
+
+
+def _vent_note(
+    process: Any, item: Any, entry: HazardEntry, inlet: Any, case: str, solved: Any = None
+) -> None:
+    """The notes of a vented batch or semi-batch (ADR 0054): its gas leaves as it forms, adds
+    nothing to the MTSR, and its peak rate is a pressure hazard with the vent blocked."""
+    vent = getattr(item.batch, "vent", None) if item.batch is not None else None
+    if vent is None:
+        return
+    if solved is None:
+        from chemeascode.domains.process.stirred_tank import TankError, solve_node
+
+        try:
+            solved, _ = solve_node(process, item, inlet, case)
+        except TankError as failure:
+            entry.missing.append(f"the vented batch: {failure}")
+            return
+    rate = solved.peak_vent_rate
+    entry.notes.append(
+        f"vent {vent.stream}: {', '.join(vent.components)} leave(s) as formed, no part of the "
+        "heat capacity or the MTSR"
+        + (
+            f"; peak gas rate {rate:.4g} kmol/(s m3) at {solved.peak_vent_time:.6g} s"
+            if rate
+            else ""
+        )
+        + " (with the vent blocked it pressurises the vessel: not screened here)"
+    )
 
 
 def _limits(
