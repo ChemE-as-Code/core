@@ -107,8 +107,8 @@ class TankResult:
     tanks: list[dict[str, Any]] = field(default_factory=list)
     #: batch: (time s, temperature K, pressure kPa(a), conversion of the key or first reactant)
     profile: list[tuple[float, float, float, float]] = field(default_factory=list)
-    #: batch: kJ released per kmol of charge (positive: exothermic), and the largest rate of
-    #: heat release per m3 of the batch (kW/m3)
+    #: batch: kJ released per kmol of charge, a semi-batch's charge and doses together
+    #: (positive: exothermic), and the largest rate of heat release per m3 of the batch (kW/m3)
     heat_released: float | None = None
     peak_heat_rate: float | None = None
     notes: list[str] = field(default_factory=list)
@@ -513,6 +513,8 @@ def solve_batch(
     total0 = sum(n0)
     if total0 <= 0:
         raise TankError("the charge is empty")
+    if not doses and batch.time is None and batch.target is None:
+        raise TankError("a batch needs its time or target (batch.dosing makes a semibatch)")
     if doses and mix.liquid is None:
         raise TankError("a semi-batch holds liquid-phase reactions (phase: liquid)")
     dose_moles = [[max(d.moles.get(n, 0.0), 0.0) for n in names] for d in doses]
@@ -609,10 +611,14 @@ def solve_batch(
     worst_known = bool(doses) and known
     missing_cooling = ""
     if worst_known:
+        # every component that can be in the vessel: charged, dosed or formed
+        present = {
+            n: 1.0
+            for i, n in enumerate(names)
+            if n0[i] > 0 or dosed[i] > 0 or any(nu[i][j] > 0 for j in range(m))
+        }
         try:
-            mix.capacity(dict(zip(names, n0, strict=True)), temperature)
-            for d in doses:
-                mix.capacity(d.moles, d.temperature)
+            mix.capacity(present, temperature)
         except TankError as failure:
             worst_known = False
             missing_cooling = str(failure)
@@ -723,7 +729,10 @@ def solve_batch(
         if reagent is not None and reagent_total > 0:
             result.accumulation.append((clock, moles[names.index(reagent)] / reagent_total))
         if worst_known:
-            reached = t + potential(moles, t)
+            try:
+                reached = t + potential(moles, t)
+            except TankError:
+                return  # no heat capacity of what is there: no value at this step
             if not worst or reached > worst[2]:
                 worst[:] = [clock, t, reached]
 
@@ -969,6 +978,8 @@ def solve_moles(
         raise TankError(f"reactor {kind} without {'tank' if kind == 'cstr' else 'batch'}:")
     if kind == "semibatch" and not doses:
         raise TankError("a semibatch without doses (batch.dosing: and their inlet streams)")
+    if kind == "batch" and spec.dosing:
+        raise TankError("a batch with dosing: set reactor: semibatch, or remove batch.dosing")
     reactions, unknown = process.reactions_of(node.id)
     if unknown:
         raise TankError("undeclared reactions " + ", ".join(unknown))
