@@ -116,7 +116,7 @@ cheme check                                   # engineering-step gates (checks/c
 cheme cause-effect                            # build/cause-effect.html + .csv
 cheme process build                           # BFD and PFD from process/materials.yaml + flowsheet.yaml
 cheme process streams [--md]                  # stream table with provenance, block balances
-cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
+cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors; recycles at tears:
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
 cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
@@ -909,8 +909,9 @@ Their source is two YAML files, schema `cheme/process/v1`:
   `normal_conditions`), cases, the balance tolerance, `feeds` and `products` (DEXPI `Source` and
   `Sink`), `blocks` and `steps` with explicit `ports` (in/out, material/energy/information),
   `streams` from port to port with a per-case `state` (pressure, temperature, flow, duty,
-  composition, phase), `links` to the lists and sheets, and `layout.bfd` / `layout.pfd` pins.
-  Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
+  composition, phase), `links` to the lists and sheets, `layout.bfd` / `layout.pfd` pins, and
+  optionally `tears` and `convergence` (the recycle loops `process propagate` converges, ADR
+  0060). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
   A value or composition may give an `uncertainty` (the LCA's shape, e.g. `{gsd2: 1.2}` or
   `{distribution: triangular, low: 0.9, high: 1.1}`); `cheme assess lca` samples a feed's or
   product's flow with it, and no calculated value's fingerprint includes it. An optional
@@ -1377,9 +1378,48 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
   are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
   prints the run as an adapter result (`cheme/adapter-result/v1`, `cheme schema
-  adapter-result`): `converged` when every node is solved, else `not-converged` with the
-  unsolved nodes in `messages` and `units`; `iterations` the sweeps through the flowsheet; per
-  stream the derived values and those written (`filled`). It writes no file of its own.
+  adapter-result`): `converged` when every node is solved (and every torn loop converged), else
+  `not-converged` with the unsolved nodes in `messages` and `units`; `iterations` the sweeps
+  through the flowsheet (with tears: the loop's iterations); per stream the derived values and
+  those written (`filled`). It writes no file of its own.
+  - **Recycles** (ADR 0060). A loop is torn at a stream named in the flowsheet's `tears:`, one
+    per loop, with an optional first guess (default an empty stream):
+
+    ```yaml
+    tears:
+      - stream: S11
+        initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.6, NAOH: 0.4}}
+    convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
+    ```
+
+    Propagate sets each tear to its guess, sweeps the flowsheet, and compares what the loop
+    gives back with the guess, per component in kg/h. It repeats by successive substitution
+    (`method: substitution`, optional `damping` below 1) or Wegstein's method (the default; q
+    per component bounded to [-5, 0]) until every component and the total are within
+    `convergence.tolerance` (default: the flowsheet's), at most `max_iterations` times (default
+    100). The iterations round nothing; the values written come from one more sweep from the
+    converged guess, rounded to six digits as every propagated value. A tear
+    value is `calculated`, with source `recycle <node> from <inlets> (tear, <method>)`, and is
+    fingerprinted on the loop's inputs, not on the iterate. The iterations always start from
+    `initial`, so a converged plant derives the same values again and is not stale. A given or
+    assumed flow or composition of a tear stays fixed (a design specification), and only the
+    other is iterated. `cheme.process-recycle` is info for a converged loop (iterations, worst
+    residual against its tolerance). It is a warning for a loop that does not converge (with
+    its residual), or that does not close because the guess leaves the tear's source without
+    values: an empty guess can leave a splitter remainder negative, or a still, reactor or
+    filter with nothing to work on (give a closer `initial`). An open tear never moves, so the
+    iterations stop as soon as the other tears converge. Nothing that depends on an unconverged
+    loop is written, and `--json` is then `not-converged`; a tear left out of the iterations
+    (below) does not change the status. `cheme validate` reports a tear that cannot be iterated
+    as `cheme.process-tear`: an unknown, energy, feed or product stream, one named twice, or a
+    guess in undeclared components or flow units or whose fractions do not sum to 1 (within
+    0.001) are errors; a tear whose flow and composition are both given is a warning. The
+    tolerance applies to the residual: a loop whose gain is near 1 stops up to
+    tolerance / (1 - gain) from its fixed point, so tighten it there. Tear each loop once: two
+    tears in one loop converge, but only as fast as plain substitution (each tear's slope is 0
+    for Wegstein). Tears are declared, never chosen.
+    `examples/process-purge-loop` is a loop reactor with a recycle split whose steady state is
+    analytic (`tests/test_recycle.py`).
 - **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
   vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
   process's property package (`property_method.package` in `materials.yaml`, else the package

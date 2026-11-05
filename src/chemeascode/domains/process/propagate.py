@@ -28,6 +28,13 @@ is fully determined by their streams, by the DEXPI class:
 
 Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
 them), never solved.
+
+- recycle loops torn at the streams the flowsheet names in ``tears:``: the sweep is repeated
+  from a guess of each tear stream until what the loop gives back matches it within the
+  tolerance (successive substitution or Wegstein, :mod:`.recycle`, ADR 0060);
+  ``cheme.process-recycle`` reports the iterations, or the residual of a loop that does not
+  converge (nothing that depends on it is then written).
+
 Derived values get provenance ``calculated``, source ``cheme process propagate: <rule>
 <step> from <streams>`` and an input fingerprint. They never overwrite a given or assumed value
 and become stale (``cheme.process-calculated-stale``) when their inputs change. The YAML is
@@ -36,6 +43,7 @@ edited in place: only the ``composition:`` and ``flow:`` entries of a state chan
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,7 +58,8 @@ from chemeascode.domains.chemistry.reactions import convert
 from chemeascode.domains.chemistry.thermochemistry import independent_reactions, missing, outside
 from chemeascode.domains.chemistry.thermochemistry import ln_k as ln_k_of_stoichiometry
 from chemeascode.domains.process import FLOWSHEET_FILE
-from chemeascode.domains.process.fill import PropsResult, _child, _dump, _flow, _last_line, _sig
+from chemeascode.domains.process.fill import PropsResult, _child, _dump, _flow, _last_line
+from chemeascode.domains.process.fill import _sig as _six
 from chemeascode.domains.process.model import Process, stream_flows
 from chemeascode.domains.process.reactors import equilibrium_conditions
 from chemeascode.domains.process.schema import (
@@ -65,6 +74,18 @@ from chemeascode.foundation.provenance import NOT_INPUTS, value_fingerprint, wri
 from chemeascode.foundation.schemas.run import AdapterResult, Solver, finding_dict
 from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 from chemeascode.foundation.yamlsource import _yaml_line
+
+#: True while :func:`.recycle.converge` iterates: a sweep then rounds nothing, so that what a
+#: loop gives back is a smooth function of its guess (six-digit values would make it a
+#: staircase, and the iterations would stop up to 1e-6/(1 - gain) from the fixed point,
+#: whatever the tolerance). The written values come from one rounded sweep after convergence.
+_EXACT: ContextVar[bool] = ContextVar("exact", default=False)
+
+
+def _sig(value: float) -> float:
+    """*value* to the six significant digits propagate writes (unrounded in an exact sweep)."""
+    return value if _EXACT.get() else _six(value)
+
 
 SOURCE = "cheme process propagate"
 FIELDS = ("composition", "flow")
@@ -149,6 +170,12 @@ class Derivation:
     stills: list[tuple[str, str]] = field(default_factory=list)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
     passes: int = 0
+    #: The loops torn at ``tears:`` and how they converged (:mod:`.recycle`); None without.
+    recycle: Any = None
+    #: Tear stream id -> (component kg/h its loop gave back, kg/h it was given) in one sweep.
+    torn: dict[str, tuple[dict[str, float] | None, dict[str, float] | None]] = field(
+        default_factory=dict
+    )
 
 
 def _inputs(case: str, streams: list[StreamDef], extra: Any = None) -> str:
@@ -205,7 +232,35 @@ def _converted(
 
 def derive(process: Process, case: str) -> Derivation:
     """Every value propagate derives in *case*, from the given and assumed values (values it
-    wrote earlier are derived again, not used)."""
+    wrote earlier are derived again, not used); the loops torn at ``tears:`` converged
+    (:func:`.recycle.converge`, ADR 0060)."""
+    if not process.flowsheet.tears:
+        return _sweep(process, case)
+    from chemeascode.domains.process.recycle import converge
+
+    return converge(process, case)
+
+
+def _sweep(
+    process: Process,
+    case: str,
+    guesses: dict[str, State] | None = None,
+    *,
+    rounded: bool = True,
+) -> Derivation:
+    """:func:`derive` without recycles: sweeps through the nodes until nothing more can be
+    derived. With *guesses* (tear stream id -> its iterated flow and composition), each tear
+    stream holds its guess for the node it enters, and the node it leaves writes a copy of it
+    (:attr:`Derivation.torn`), so that one call evaluates the loops once. Not *rounded*, the
+    derived values keep every digit (the iterations of :func:`.recycle.converge`)."""
+    token = _EXACT.set(not rounded)
+    try:
+        return _swept(process, case, guesses)
+    finally:
+        _EXACT.reset(token)
+
+
+def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Derivation:
     fs = process.flowsheet.model_copy(deep=True)
     work = Process(process.root, process.materials, fs, reactions=process.reactions)
     work.catalysts = process.catalysts
@@ -216,6 +271,13 @@ def derive(process: Process, case: str) -> Derivation:
             for name in WRITTEN:
                 if ours(getattr(state, name)):
                     setattr(state, name, None)
+    shadows: dict[str, StreamDef] = {}
+    for sid, guess in (guesses or {}).items():
+        shadows[sid] = streams[sid].model_copy(deep=True)
+        state = streams[sid].state.setdefault(case, State())
+        for name in FIELDS:
+            if getattr(guess, name) is not None:
+                setattr(state, name, getattr(guess, name))
     nodes = [*fs.steps, *(b for b in fs.blocks if not work.inside(b.id))]
     at: dict[str, tuple[list[tuple[StreamDef, str]], list[tuple[StreamDef, str]]]] = {
         n.id: ([], []) for n in nodes
@@ -223,7 +285,7 @@ def derive(process: Process, case: str) -> Derivation:
     for s in streams.values():
         a, b = work.ends(s)
         if a is not None and a.node in at:
-            at[a.node][1].append((s, a.port))
+            at[a.node][1].append((shadows.get(s.id, s), a.port))
         if b is not None and b.node in at:
             at[b.node][0].append((s, b.port))
     found = Derivation()
@@ -715,6 +777,14 @@ def derive(process: Process, case: str) -> Derivation:
                     f"{len(at[node.id][1])} out"
                 )
             found.unsolved.append((node.id, label, lacking))
+    for sid, shadow in shadows.items():
+        # what the loop gives back (the shadow) and what it was given (the guess)
+        found.torn[sid] = (
+            stream_flows(work, shadow, case).components,
+            stream_flows(work, streams[sid], case).components,
+        )
+        for name in FIELDS:
+            found.values.pop((sid, name), None)
     return found
 
 
@@ -826,6 +896,8 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
                 )
     keys = {n.id: ("steps", j) for j, n in enumerate(fs.steps)}
     keys.update({n.id: ("blocks", j) for j, n in enumerate(fs.blocks)})
+    for level, message, loc, ids, hint in recycle_findings(found, case):
+        add(level, "recycle", message, loc, ids, hint)
     for node, message in found.problems:
         add(
             "warning",
@@ -886,6 +958,79 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
     return result
 
 
+def recycle_findings(
+    found: Derivation, case: str, *, declared: bool = True
+) -> list[tuple[str, str, list, list, str]]:
+    """(level, message, location, ids, hint) of the ``cheme.process-recycle`` findings of
+    *found*: a tear that cannot be iterated (unless not *declared*: those say nothing about
+    whether the loops converged), a loop that does not close or does not converge (warnings,
+    with the residual), and a converged loop (info, with the iterations)."""
+    recycle = found.recycle
+    if recycle is None:
+        return []
+    out = []
+    for i, level, sid, message in recycle.declared if declared else []:
+        out.append(
+            (
+                "warning",
+                f"{message} ({case}); left out of the iterations"
+                if level == "error"
+                else f"{message}; kept as given",
+                ["tears", i],
+                [sid],
+                "correct tears: (cheme validate reports it as cheme.process-tear)",
+            )
+        )
+    for i, sid, message in recycle.problems:
+        out.append(
+            (
+                "warning",
+                f"{message} ({case}); the loop is not converged",
+                ["tears", i] if i is not None else ["tears"],
+                [sid],
+                "give the tear an initial: guess of the right order (an empty first guess "
+                "can leave a splitter remainder negative, or a still, a reactor or a filter "
+                "with nothing to work on, so that a node of the loop derives nothing), and see "
+                "the not-solved findings; nothing that depends on the loop is written",
+            )
+        )
+    if not recycle.tears or recycle.problems:
+        return out
+    where = f"{recycle.where[0]} {recycle.where[1]}" if recycle.where else "?"
+    residual = (
+        f"worst residual {recycle.residual:.3g} kg/h ({where}) against a tolerance of "
+        f"{recycle.allowed:.3g} kg/h"
+    )
+    torn = ", ".join(recycle.tears)
+    if recycle.converged:
+        out.append(
+            (
+                "info",
+                f"recycle torn at {torn} ({case}): converged in {recycle.iterations} "
+                f"iteration(s) ({recycle.method}); {residual}",
+                ["tears"],
+                list(recycle.tears),
+                "the tear values are calculated (cheme process propagate --fill writes them); "
+                "convergence: sets the method, the iterations and the tolerance",
+            )
+        )
+    else:
+        out.append(
+            (
+                "warning",
+                f"recycle torn at {torn} ({case}): not converged in {recycle.iterations} "
+                f"iteration(s) ({recycle.method}); {residual}; nothing that depends on the "
+                "loop is written",
+                ["tears"],
+                list(recycle.tears),
+                "raise convergence.max_iterations, start from a closer initial: guess, or damp "
+                "it (method: substitution, damping: 0.5); a component the loop has no exit for "
+                "(no purge, no reaction) has no steady state",
+            )
+        )
+    return out
+
+
 def _solver() -> Solver:
     from chemeascode.foundation.workspace import installed_version
 
@@ -922,8 +1067,9 @@ def _adapter_result(
     filled: dict[str, list[str]],
     result: PropsResult,
 ) -> AdapterResult:
-    """The run as an adapter result: converged when every node is solved, else not-converged
-    with the nodes left unsolved in ``messages`` and ``units``; ``iterations`` the sweeps."""
+    """The run as an adapter result: converged when every node is solved (and every torn loop
+    converged), else not-converged with the nodes left unsolved in ``messages`` and ``units``;
+    ``iterations`` the sweeps (with tears: the iterations of the loops)."""
     from chemeascode.domains.process.simulation.record import stream_values
 
     units: list[dict[str, Any]] = []
@@ -948,13 +1094,20 @@ def _adapter_result(
     for node, message in found.stills:
         messages.append(f"{node} (still): not solved: {message}")
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
+    # a tear declaration left out (or a fully specified one kept as given) is a validate
+    # finding, not a loop that failed to converge
+    for level, message, *_ in recycle_findings(found, case, declared=False):
+        if level == "warning":
+            messages.append(message)
+    recycle = found.recycle
+    iterations = recycle.iterations if recycle is not None and recycle.tears else found.passes
     shown = stream_values(process, found.values)
     return AdapterResult(
         case=case,
         status="not-converged" if messages else "converged",
         solver=_solver(),
         inputs=_inputs_of(root),
-        iterations=found.passes,
+        iterations=iterations,
         messages=messages,
         units=units,
         streams=[

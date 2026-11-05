@@ -809,7 +809,8 @@ def propagate(
 ) -> None:
     """Derive missing compositions and flows through steps their streams fully determine:
     pass-through steps (compressors, coolers, heaters, pumps, filters), mixers, splitters
-    (`split:` fractions per outlet port, else the mass balance remainder).
+    (`split:` fractions per outlet port, else the mass balance remainder), and recycle loops
+    torn at the flowsheet's `tears:` (Wegstein or substitution, `convergence:`).
 
     Separators and reactors are only checked, never solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1

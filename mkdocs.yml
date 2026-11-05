@@ -196,4 +196,5 @@ nav:
       - "0056 Precipitation from a mixed liquor": adr/0056-precipitation-from-a-mixed-liquor.md
       - "0057 Filter-dryer and recipe units over several steps": adr/0057-filter-dryer-and-recipe-units-over-several-steps.md
       - "0058 Semi-batch thermal screening": adr/0058-semi-batch-thermal-screening.md
+      - "0060 Recycle convergence with tear streams": adr/0060-recycle-convergence-with-tear-streams.md
       - Template: adr/template.md

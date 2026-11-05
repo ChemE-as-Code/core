@@ -1294,6 +1294,51 @@
         "title": "CompositionValue",
         "type": "object"
       },
+      "Convergence": {
+        "additionalProperties": false,
+        "description": "How ``cheme process propagate`` converges the loops torn at ``tears`` (ADR 0060).",
+        "properties": {
+          "method": {
+            "default": "wegstein",
+            "description": "Successive substitution, accelerated by Wegstein's method per component (q bounded to [-5, 0]) or not.",
+            "enum": [
+              "wegstein",
+              "substitution"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "max_iterations": {
+            "default": 100,
+            "maximum": 10000,
+            "minimum": 1,
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "damping": {
+            "default": 1.0,
+            "description": "Substitution only: the share of the step to the new iterate taken.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Damping",
+            "type": "number"
+          },
+          "tolerance": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Tolerance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Per component of every tear stream, kg/h; default: the flowsheet's."
+          }
+        },
+        "title": "Convergence",
+        "type": "object"
+      },
       "Crystallizer": {
         "additionalProperties": false,
         "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed. ``spectators`` are other\ndissolved components carried unchanged (a precipitation from a reaction liquor); its\ninlets are taken together (a reslurry wash: the cake and the wash liquid).",
@@ -3545,6 +3590,79 @@
         "title": "Tank",
         "type": "object"
       },
+      "Tear": {
+        "additionalProperties": false,
+        "description": "A stream at which ``cheme process propagate`` tears a recycle loop (ADR 0060): its flow\nand composition are iterated until the loop closes, then written as calculated. A given or\nassumed flow or composition of the stream stays fixed (a design specification).",
+        "properties": {
+          "stream": {
+            "description": "A material stream between two steps (or blocks).",
+            "title": "Stream",
+            "type": "string"
+          },
+          "initial": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/TearGuess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The first guess; default: an empty stream (flow 0)."
+          }
+        },
+        "required": [
+          "stream"
+        ],
+        "title": "Tear",
+        "type": "object"
+      },
+      "TearGuess": {
+        "additionalProperties": false,
+        "description": "The first guess of a tear stream, where its loop's iterations start (ADR 0060).",
+        "properties": {
+          "flow": {
+            "default": 0.0,
+            "description": "In `unit`; 0: an empty recycle.",
+            "minimum": 0,
+            "title": "Flow",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A flow unit; default: units.flow.",
+            "title": "Unit"
+          },
+          "basis": {
+            "default": "mass_fraction",
+            "enum": [
+              "mole_fraction",
+              "mass_fraction"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "composition": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component id -> fraction on `basis`.",
+            "title": "Composition",
+            "type": "object"
+          }
+        },
+        "title": "TearGuess",
+        "type": "object"
+      },
       "Terminal": {
         "additionalProperties": false,
         "description": "An external feed (DEXPI Source) or product (DEXPI Sink).",
@@ -4116,6 +4234,26 @@
         },
         "title": "Streams",
         "type": "array"
+      },
+      "tears": {
+        "description": "Recycle loops torn for cheme process propagate (ADR 0060).",
+        "items": {
+          "$ref": "#/$defs/Tear"
+        },
+        "title": "Tears",
+        "type": "array"
+      },
+      "convergence": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Convergence"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "How propagate converges the torn loops; default: Wegstein, 100 iterations, the flowsheet's tolerance."
       },
       "bfd": {
         "anyOf": [
