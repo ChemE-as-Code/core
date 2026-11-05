@@ -122,7 +122,23 @@ with units, fallback, notes and the test that solves each arrangement):
   azeotrope the package misses is predicted wrong: check with `phase-calculation`), or, for
   crystallization, a `crystallizer:` with `basis: solubility` on the flowsheet step (sourced
   solubility data, one solute in one solvent; `cheme process propagate` fills its outlets and
-  `cheme process crystallizers` reports yield, recovery, balances and duty);
+  `cheme process crystallizers` reports yield, recovery, balances and duty). A precipitation
+  from a reaction liquor declares the other dissolved components as `spectators:` (carried
+  unchanged) with a solubility measured in that liquor (`measured_in: mother_liquor`, units
+  `kg/kg_solvent`, `kg/kg_liquor` or `mass_fraction`) or the pure solvent's with
+  `salting_out: {coefficients: {SPECTATOR: k}}` (Setschenow, kg/mol, molal scale, every
+  spectator once, 0 stated); a pure-water value alone is an error, never used silently. A
+  reslurry wash is a crystallizer fed by the cake and the wash water (two inlets; the crystals
+  dissolve to saturation), its own `separation:` or a following `solid_separation:` the
+  re-filtration. Never write a precipitation or a wash loss as a conversion reaction;
+- **specified, solids**: a filter or centrifuge as `solid_separation:` (solid recovery and cake
+  liquid; with `filtration:` and a specific cake resistance, Ruth's filtration time for the
+  recipe), and a filter-dryer or vacuum dryer as `dryer:` (the volatiles dried to a
+  `residual_moisture`; the duty from the cake's heat capacity, the latent heats and the
+  vessel; the drying time for the recipe from a `drying_rate` and the vessel's heated area).
+  In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
+  holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
+  (ADR 0057);
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
 - **specified split**: a `component_separator` with given recoveries (`basis: specified`, a
   `basis_source` and an `operating_basis`); its convergence closes balances, it predicts
@@ -164,8 +180,8 @@ established capability: say so when reporting it, and do not claim it as validat
 | Liquid-liquid extraction | predictive | tested | `extraction` (`cheme process extract`) |  | solvent regeneration (a separate unit); in the flowsheet still a `component_separator` (specified split) citing the extraction result; qualified only for a benchmarked LLE system (`--systems`) |
 | Membrane separation | specified split | untested | `component_separator` |  | permeance, selectivity, area |
 | Adsorption | specified split | tested | `component_separator` |  | isotherms, breakthrough, PSA/TSA cycle |
-| Crystallization | predictive | tested | `crystallizer` (flowsheet) |  | population balance, kinetics, several solutes or impurities |
-| Drying | specified split | untested | `component_separator` |  | dryer, solids |
+| Crystallization | predictive | tested | `crystallizer` (flowsheet) |  | population balance, kinetics, several crystallizing solutes (other solutes: `spectators:`) |
+| Drying | specified split | tested | `dryer` (flowsheet), `component_separator` |  | drying curve, sorption isotherm |
 | Solid-fluid separation | specified split | tested | `solid_separation` (flowsheet) |  | filtration, centrifuge, cyclone and settling models |
 
 Report the representation of the selected method beside the ranking; when it is a specified

@@ -138,13 +138,49 @@ Type compositions and flows only where they are design inputs; `cheme process pr
 `Mixing` sums the mass flows and mixes the compositions; `SplittingMaterial` keeps the
 composition and splits the flow by `split: {outlet port: fraction}` on the step (else the one
 missing outlet flow is the mass balance remainder); a reactor naming `reactions:` with a
-conversion for each (skill `reactions`) gets its outlet from the conversions. Separators, and
+conversion for each (skill `reactions`) gets its outlet from the conversions. A batch still or
+solvent swap (`still:` on the step, below) gets its cuts and residue. A step with
+`crystallizer:`, `solid_separation:` or `dryer:` (a batch filter-dryer or vacuum dryer: its
+`volatiles` dried to a `residual_moisture`, ADR 0057) gets its outlets from that model, and
+`cheme process crystallizers` reports their balances and duties. A filter-dryer's filter, wash,
+re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
+procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
+dryer. Other separators, and
 reactors without conversions, are never solved (`cheme.process-propagate-not-solved` lists
 their streams lacking values): give those values yourself. Derived values are `calculated` with source `cheme process propagate: ...`
 and a fingerprint; never edit them by hand (give the value as `assumed` instead, which propagate
 never overwrites), and rerun `--fill` when `validate` reports them stale. A component balance
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
 in `DESIGN.md`. Run propagate before `props --fill`.
+
+**Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
+`still:` instead of typing the distillate and the residue:
+
+```yaml
+still:
+  volatility: {model: raoult, provenance: given, source: NIST WebBook}   # or constant + alpha
+  nonvolatile: [PRODUCT]
+  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kg/h, kW, 1/h
+  feed: {stream: S12, mode: constant_level}        # a solvent swap; or portions: 4, down_to: 0.5
+  end: {residue: {key: OLD_SOLVENT, mole_fraction: 0.005}}  # or distilled, time, temperature
+  outlets: {distillate: top, residue: bottom}      # or cuts: [{outlet, end}], outlets: {residue}
+  provenance: assumed
+```
+
+- Raoult needs each volatile component's Antoine `vapour_pressure` in `materials.yaml`, with
+  its source and `temperature_range`. `cheme chemistry props` gives the NIST form, which is the
+  default. A boil-up in kW needs `heat_of_vaporization`, in kJ/kmol: NIST and
+  `cheme chemistry props` give kJ/mol, so multiply by 1000 (benzene 30.72 kJ/mol is 30720).
+- Without these data, `validate` names them (`cheme.process-still`). Look them up (skill
+  `property-retrieval`), or declare the component `nonvolatile` when it really stays in the
+  still. Never invent a relative volatility to make the step pass. An assumed `alpha` states
+  its basis in its source.
+- The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
+- `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
+  batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
+  `from:` the still.
+- The model is one stage, ideal liquid. A column with reflux, or an azeotrope, needs a
+  specified split or `process simulate`. Record that in `DESIGN.md`.
 
 `cheme process simulate --fill` solves the whole flowsheet in DWSIM, separators, exchangers,
 columns and recycles included, from the feeds and the specs in `process/simulation.yaml`; see

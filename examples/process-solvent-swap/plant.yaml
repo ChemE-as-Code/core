@@ -1,0 +1,6 @@
+name: process-solvent-swap
+description: A product's methanol solution swapped to toluene under vacuum at constant level, the boil-up time taken by the recipe (cheme process, still)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

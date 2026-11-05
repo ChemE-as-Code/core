@@ -58,9 +58,6 @@ either: after every merge to `main` here, the `project-template` workflow regene
 `cheme init` and pushes it (secret `PROJECT_TEMPLATE_TOKEN`). If that workflow cannot run, for
 example while GitHub Actions is unavailable, the template falls behind until the next run.
 
-While this repository is private, people need read access to it, and a plant's CI needs the
-secret `PLANTCODE_READ_TOKEN` (see the plant's `.github/workflows/validate.yml`).
-
 ## Install
 
 ```sh
@@ -121,7 +118,9 @@ cheme process build                           # BFD and PFD from process/materia
 cheme process streams [--md]                  # stream table with provenance, block balances
 cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
+cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
 cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
+cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
@@ -1036,7 +1035,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
   (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
   accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
-  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`.
+  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`. A
+  reaction with `kind: phase-change` (or one component into one other of the same formula, one
+  of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
+  reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
+  JSON `phase_changes`), a step with both is screened on its reactions alone (ADR 0056).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1061,7 +1064,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
   `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
   dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
-  semi-batch step's model). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  semi-batch step's model; for dry and filter, `from:` a dryer or a filter with `filtration:`,
+  ADR 0057; a unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  distil, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
+  batch or semi-batch step's model, for distil `from:` a still step's boil-up time). It gives each unit's occupancy, the cycle time (the bottleneck), the
   batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
@@ -1083,6 +1089,22 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   post-reaction. `process reactors` adds the accumulation of the dosed reactant over time and
   its maximum, the worst cooling-failure temperature and the peak cooling duty per m3
   (`stirred_tank.solve_batch` with doses; ADR 0050). `process simulate` does not couple it.
+  A liquid batch or semi-batch that gives off gas takes `batch.vent: {stream, components,
+  fraction}` (ADR 0054): the listed components leave the liquid as they form (a `fraction` of
+  what each reaction forms, default 1; a reaction consuming one takes it from the liquid), by
+  the vent `stream`, the step's second outlet; they count in neither the liquid's volume,
+  concentrations nor heat capacity, and their `heat_of_reaction` forms them as gas at the
+  vessel's temperature. A dose may give `absorbed: share`: that share dissolves, the rest passes
+  through to the vent. A dissolving dose adds no heat of absorption or condensation: write the
+  `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
+  closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
+  content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
+  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (a note gives its
+  peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
+  more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
+  a vent stream whose template lacks a vent component or a passing dose's component, (warning)
+  one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
+  does not couple a vented batch.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
@@ -1096,8 +1118,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `Na2CO3(H2O)10`), a separate component from the same substance dissolved; every stream then
   divides into dry solid and liquid (mother liquor or moisture) with their compositions
   (`domains/process/solids.py`; no particle size or population balance). A block or step with
-  `crystallizer:` (one solute, one solvent, one material inlet) is a cooling and/or evaporative
-  crystallizer with an optional specified filter or centrifuge (`separation:` solid recovery
+  `crystallizer:` (one solute, one solvent, its material inlets taken together) is a cooling
+  and/or evaporative crystallizer with an optional specified filter or centrifuge (`separation:` solid recovery
   and cake liquid) and mother-liquor `recycle:`; `basis: solubility` predicts the crystals from
   sourced solubility data (the mother liquor leaves saturated; points interpolated in
   temperature, never extrapolated), `basis: yield` imposes them (specified, compared with the
@@ -1107,10 +1129,99 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `solid-split` (specified). **`cheme process crystallizers [--case C] [--json]`** reports the
   crystals formed (and at equilibrium), recovery, loop iterations, mass, solute and element
   residuals, the lumped duty (with `energy:`), the outlets as dry solid, liquid and moisture,
-  and refuses impurities, several solutes or a temperature outside the data
-  (`cheme.process-crystallizer-unsupported`). Qualified against Felder & Rousseau Example 4.5-2
-  and Geankoplis Examples 12.11-1 and 12.11-2 (`tests/test_crystallization.py`;
+  and refuses undeclared impurities, several crystallizing solutes or a temperature outside the
+  data (`cheme.process-crystallizer-unsupported`). Qualified against Felder & Rousseau Example
+  4.5-2 and Geankoplis Examples 12.11-1 and 12.11-2 (`tests/test_crystallization.py`;
   `docs/adr/0025-solid-components-and-a-bounded-crystallizer-adapter.md`).
+- **Precipitation from a mixed liquor** (ADR 0056): `crystallizer.spectators: [ids]` names the
+  other dissolved components of the liquor (a salt, a base, unreacted reagent); they pass with
+  the liquor unchanged, never crystallize or evaporate, and appear in the balances and the
+  report, text and `--json` (`mother_liquor`: solubility basis, declared value and value at
+  the solution, salting-out factor, molalities; `solubility_kg_per_kg_solvent` is then the
+  mother liquor's per kg of free solvent). A block holding a crystallizer and a reacting step
+  balances with the crystallization as a phase change next to its reactions. The
+  solubility then holds in that liquor: `measured_in: mother_liquor` (unit `kg/kg_solvent`,
+  `kg/kg_liquor` per kg of solute-free liquor, or `mass_fraction` in the saturated liquor:
+  `C = (S - s (W + P)) / (a - s (1 - a))`), or the pure solvent's with `salting_out:
+  {coefficients: {id: k}, log: log10 | ln, provenance, source}` (Setschenow, `log10(s0/s) =
+  sum k_i m_i`, molal scale, every spectator once). A pure-solvent value alone is
+  `cheme.process-crystallizer` (error) and refused by propagate. A crystallizer takes several
+  inlets together (their mass-weighted mean temperature for the energy balance), so a reslurry
+  wash is a crystallizer fed by the cake and the wash, its crystals dissolving to saturation
+  (`tests/test_precipitation.py`).
+
+- **Filter-dryers and dryers**: a block or step with `dryer:` (one wet-cake inlet, `outlets:
+  {product, vapour}`) dries its `volatiles` to a `residual_moisture` (`mass_fraction` of the
+  product or `per_kg_solid`). The volatiles kept have the inlet's ratio, and everything else
+  (the solid and what the cake liquid held dissolved) stays in the product. `process propagate
+  --fill` writes both outlets, and the model basis is `residual-moisture` (specified).
+  - With `energy: {heat_capacity, latent_heat: {id: kJ/kg}, inlet_temperature,
+    vessel_heat_capacity, efficiency, port}`, `process crystallizers` reports the duty `(m cp
+    (T - T_in) + sum W lambda + C_v (T - T_in) / h_batch) / eta`. A latent heat that is not
+    declared comes from the component's `critical` constants (Pitzer, Poling et al. 2001, eq.
+    7-9.4). The vessel's heat is per batch of `process/recipe.yaml`. The duty is compared with
+    the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
+    everything but the volatiles, so its moisture is the residual moisture.
+  - A recipe `dry` operation with `from:` the dryer takes one batch's vapour over
+    `drying_rate` (kg/(m2 h)) times the heated area of the unit procedure's vessel
+    (`vessel.heated_area`, the jacket's area, or the shell and bottom the cake wets), or the
+    dryer's `drying_time`. The vessel is sized, when it gives no `volume`, from the largest
+    content of one batch: the wet cake over `cake_density`, or what a step of the unit
+    procedure takes in (the slurry, a reslurry wash) from the liquid molar volumes. A given
+    `volume` is checked against the same content (`cheme.recipe-vessel`).
+  - A `solid_separation:` with `filtration: {specific_cake_resistance, medium_resistance,
+    pressure_difference, viscosity, filtrate_density, area}` gives a `filter` `from:` its
+    Ruth time `mu (alpha M V / (2 A^2) + R_m V / A) / dP`, with the area defaulting to the
+    vessel's bottom.
+  - A unit procedure may name `units: [F101, W101, F102, D101]` instead of `unit:`: the steps of
+    one vessel, whose occupancy is counted once. A step in two vessels is
+    `cheme.recipe-reference`. Rules: `cheme.process-dryer` (also a `latent_heat` keyed by a
+    component that is not a volatile), `cheme.process-dryer-duty`.
+  - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
+    `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
+
+- **Batch still and solvent swap**: a block or step with `still:` (ADR 0055,
+  `domains/process/batch_still.py`) is a batch (Rayleigh) still: one equilibrium stage, total
+  condenser, no reflux, `dN_i/ds = -y_i` over the moles boiled up. The vapour comes from
+  Raoult's law at the still's bubble point (`volatility: {model: raoult}`, each volatile
+  component's Antoine `vapour_pressure: {a, b, c, form: log10 | ln, pressure_unit: bar | kPa |
+  Pa | mmHg, temperature_unit: K | degC, temperature_range}` in `materials.yaml`, by default
+  the NIST form `log10(P/bar) = a - b/(T/K + c)`), or from a constant relative volatility
+  (`{model: constant, alpha: {component: value}}`). `nonvolatile:` components (and solid
+  components) stay in the still.
+  - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
+    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol) or 1/h (kmol of vapour
+    per hour per kmol of charge).
+  - The still stops at `end:` (one of `distilled` with `basis: mole | mass`, `residue: {key,
+    mole_fraction}`, `time` s of boil-up, `temperature` K), or `cuts: [{outlet, end}]` collect
+    the distillate in turn. `outlets: {distillate, residue}` (with cuts: `residue` only) maps
+    the roles to the step's ports.
+  - `feed: {stream, mode: constant_level | portions, portions, down_to}` makes it a solvent
+    swap. The feed is an inlet stream (its flow per hour of charge, as a semi-batch's dose).
+    At constant level it is fed as fast as the still boils up, after distilling down to
+    `down_to` of the charge. With portions (put and take) the still distils down to the level
+    and adds a portion, in turn. The ends apply once the feed is in.
+  - One batch is the hours of flows the recipe's batch size makes (else one hour). The boil-up
+    time and the energy per batch scale with it; a 1/h boil-up does not.
+  - `process propagate --fill` writes the cuts and the residue. A recipe `distil` operation
+    takes the boil-up time `from:` the still.
+  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive),
+    the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
+    time, the mean and peak duty, the energy per batch and the still's temperatures
+    (`cheme.process-still-unsolved`, `-outlet`, `-note`).
+  - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
+    missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
+    those otherwise it is info, no duty. The components it checks are those its inlets'
+    compositions carry (an inlet's template only while it has none). A `heat_of_vaporization`
+    below 2000 kJ/kmol is a warning: NIST gives kJ/mol, times 1000.
+  - A residue end's direction is the target's: the key falls to a target below its share, or
+    rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
+    energy is its own. An end at a time with the recipe's batch-size stream downstream of the
+    still is circular and refused.
+  - Not modelled: rectification with reflux, activity coefficients (azeotropes), heat-up,
+    sensible heat and losses, constant level by volume. `process simulate` does not couple it.
+    Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
+    and the constant-level swap's closed form (`tests/test_batch_still.py`).
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
   `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
   records the searches, sources, observations, candidate routes, conflicts and the model basis

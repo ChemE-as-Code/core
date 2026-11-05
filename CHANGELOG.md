@@ -13,6 +13,93 @@
   as built and says "generated, not formatted (cheme process build)", so formatting a freshly
   built BFD/PFD is no edit (`cheme.generated-edited`).
 
+### Added
+
+- Gas evolution and gas dosing in a batch or semi-batch (ADR 0054, #174): `batch.vent:
+  {stream, components, fraction}` on a liquid `reactor: batch` or `semibatch`. The listed
+  components (HCl, CO2, HBr) leave the liquid as they form, a `fraction` of what forms (default
+  1, a share of the gross formation, reaction by reaction: a reaction that consumes a vented gas
+  takes it from the liquid, never back from the vent), by the vent stream, a second outlet of
+  the step: they do not accumulate in the liquid and
+  count in neither its volume, concentrations nor heat capacity, and their `heat_of_reaction`
+  forms them as gas at the vessel's temperature. A dose may give `absorbed: share` (a dosed gas
+  such as phosgene or Cl2): that share dissolves on entry, the rest passes through to the vent,
+  its sensible heat to the vessel's temperature from its ideal-gas cp (else noted). `process
+  propagate` writes both outlets (composition, flow, temperature, pressure) and the balance
+  closes over them; `process reactors` reports the vent (kmol/h, peak kmol/(s m3) and when),
+  `process recipe` the off-gas per batch (peak kmol/s and m3/h at the vessel's conditions, kg
+  and kmol per batch), and `process reactor-hazards` leaves the vented and passing gas out of
+  the MTSR and the MTT, with a note of the peak gas rate. New `cheme.process-reactor` findings:
+  the vent stream no outlet of the step or its only one, more than two outlets, an undeclared
+  vent component, a vented batch on gas-phase reactions, a vent stream whose template lacks a
+  vent component or a passing dose's component, (warning) a vent component no reaction forms,
+  a dose with `absorbed` below 1 and no vent. A dissolving dose adds no heat of absorption or
+  condensation: write its reactions' `heat_of_reaction` with the dosed gas as a gas. `process
+  simulate` refuses a vented batch. An unvented batch or semi-batch solves and fingerprints as
+  before. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
+- Precipitation from a mixed liquor (ADR 0056, core#165): `crystallizer.spectators: [ids]`
+  carries other dissolved components (salts, base, unreacted reagent) unchanged in the mother
+  liquor. The solubility is either measured in that liquor (`solubility.measured_in:
+  mother_liquor`, units `kg/kg_solvent`, `mass_fraction` or the new `kg/kg_liquor`), or the
+  pure solvent's corrected by `solubility.salting_out: {coefficients: {id: k}}` (Setschenow,
+  molal scale). A pure-solvent value alone is `cheme.process-crystallizer` (error) and refused
+  by propagate. A crystallizer takes several inlets together, so a reslurry wash is a
+  crystallizer fed by the cake and the wash. `cheme process crystallizers` (text and `--json`)
+  reports the spectators' balances and molalities; with spectators its
+  `solubility_kg_per_kg_solvent` is the mother liquor's per kg of free solvent (the declared
+  value under `mother_liquor.declared_solubility`). A block holding a crystallizer next to a
+  reacting step (a precipitation in the reactor vessel) balances, the crystallization fitted
+  as a phase change beside the block's reactions. Every BFD/PFD needs `cheme process build`
+  once (the process schema changed).
+- `kind: phase-change` on a reaction of `process/reactions.yaml`. A reaction of one component
+  into one other with the same formula, one of them `phase: solid`, counts as one without the
+  field unless it declares a `heat_of_reaction` (then it stays screened, its heat in dT_ad).
+  `cheme process reactor-hazards` no longer screens a step whose reactions are all
+  phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
+  a step with both on its reactions alone.
+- Filter-dryer and vacuum dryer (ADR 0057, core#165): a block or step may give `dryer:
+  {volatiles, residual_moisture, temperature, energy, drying_rate | drying_time, cake_density,
+  outlets: {product, vapour}}`. `cheme process propagate` writes the dried product (the
+  volatiles down to the residual moisture, the dissolved solids dried onto the crystals) and
+  the vapour. `cheme process crystallizers` reports the duty: the cake's sensible heat, the
+  latent heat (declared, else Pitzer's correlation from the critical constants) and the
+  vessel's heat per batch, over an efficiency. It compares the duty with the heating stream at
+  `energy.port` (`cheme.process-dryer-duty`). Model basis `residual-moisture`; rules
+  `cheme.process-dryer`. A
+  `solid_separation:` may give `filtration:` (specific cake resistance and more) for Ruth's
+  filtration time.
+- Recipe (ADR 0057): a `dry` operation takes `from:` a dryer (one batch's vapour over the
+  drying rate times the vessel's heated area, or its drying time) and a `filter` operation
+  takes `from:` a filter with `filtration:`. A unit procedure may give `units: [steps]` that
+  share one vessel (a filter-dryer: filter, wash, re-filter, dry), its occupancy counted once
+  (NBS lesson L-3). `vessel.heated_area` is new, and a filter-dryer's vessel is sized from the
+  largest content of one batch: the dryer's wet cake over its `cake_density`, or the slurry or
+  reslurry wash a step of the vessel takes in. Every BFD/PFD needs `cheme process build` once
+  (the process generator's code changed).
+- Batch still and solvent swap (ADR 0055, core#165): a block or step with `still:` is a batch
+  (Rayleigh) still, shortcut level (one equilibrium stage, total condenser, no reflux). The
+  vapour comes from Raoult's law with the components' new Antoine `vapour_pressure` in
+  `materials.yaml` (the NIST form by default), or from a constant relative volatility
+  (`volatility: {model: constant, alpha}`). The boil-up is constant: kmol/h, kmol/s, kg/h, kW
+  (with the new `heat_of_vaporization`) or 1/h of the charge. The still stops at its `end`
+  (a share `distilled`, a `residue` key's mole fraction, a `time` or a `temperature`), or
+  collects `cuts` in turn. `feed: {stream, mode: constant_level | portions, down_to}` makes
+  it a solvent swap. `cheme process propagate --fill` writes the cuts and the residue.
+  **`cheme process stills [--case] [--json]`** reports the charge, feed, cuts and residue per
+  batch, the boil-up time, the duty and the energy per batch (one batch from
+  `process/recipe.yaml`'s batch size) and the still's temperatures. A recipe `distil`
+  operation takes its time `from:` the still. `cheme validate` checks it
+  (`cheme.process-still`): the ports, the charge and feed, and the missing vapour pressures,
+  relative volatilities or heats of vaporization. Qualified against Rayleigh's binary closed
+  form, the Rayleigh integral with Raoult's law, and the constant-level swap's closed form
+  (`tests/test_batch_still.py`). PharmaPy was reviewed and not used (Assimulo is not
+  installable with uv on Python 3.12+). Every BFD/PFD needs `cheme process build` once (the
+  process generator's code changed). One stage covers solvent strips and swaps
+  (`examples/process-solvent-swap`: methanol to toluene under vacuum at constant level, the
+  recipe's distil from the still). Product purification by fractional batch distillation still
+  needs a column (`process simulate` or a specified split) until the constant-reflux
+  follow-up (core#173).
+
 ## 1.7.0 (2026-11-05)
 
 Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a

@@ -130,9 +130,11 @@ def crystallizers(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
-    """Each crystallizer and filter or centrifuge (crystallizer:, solid_separation:): its basis
-    (solubility-equilibrium, imposed-yield or solid-split), crystals, recovery, the outlets as dry
-    solid and liquid, the balances and the duty. Exit 1 on an error finding."""
+    """Each crystallizer, filter or centrifuge and dryer (crystallizer:, solid_separation:,
+    dryer:): its basis (solubility-equilibrium, imposed-yield, solid-split or residual-moisture),
+    crystals, recovery, the outlets as dry solid and liquid, the balances and the duty (a dryer:
+    sensible, latent and vessel heat, per batch with process/recipe.yaml). Exit 1 on an error
+    finding."""
     from chemeascode.domains.process.crystallization import (
         UnknownCase,
         crystallizer_report,
@@ -150,6 +152,33 @@ def crystallizers(
     if not as_json:
         for finding in report.findings:
             if finding.rule.startswith("cheme.process-crystallizer"):
+                typer.echo(finding.format())
+    if any(f.level == "error" for f in report.findings):
+        raise typer.Exit(1)
+
+
+@process_app.command("stills")
+def stills(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """Each batch still and solvent swap (still:): its basis (rayleigh), the charge, the swap's
+    feed, the distillate cuts and the residue (amounts per batch and compositions), the boil-up
+    time, the duty and the energy per batch (the batch from process/recipe.yaml), the still's
+    temperatures. Exit 1 on an error finding."""
+    from chemeascode.domains.process.batch_still import UnknownCase, report_text, still_report
+
+    workspace = _workspace()
+    try:
+        report = still_report(workspace.root, case)
+    except UnknownCase as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    _refuse_unloaded(report.process, report.findings)
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if not as_json:
+        for finding in report.findings:
+            if finding.rule.startswith("cheme.process-still"):
                 typer.echo(finding.format())
     if any(f.level == "error" for f in report.findings):
         raise typer.Exit(1)

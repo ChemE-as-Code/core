@@ -125,6 +125,7 @@ gets a basis. For a simulated separator it follows the translation's basis
 | `solubility-equilibrium` (a `crystallizer:` with `basis: solubility`, solved by `cheme process propagate`: the mother liquor leaves saturated; never inside the simulation, so it fails `predictive.model-basis` as "not in the simulation") | yes | its solubility and its filter or centrifuge (`separation:`) are `given` with a source and, with solubility points, the temperature lies inside them |
 | `imposed-yield` (a `crystallizer:` with `basis: yield`: the fraction of the solute that crystallizes, given) | no | its yield and its `separation:` are `given` with a source |
 | `solid-split` (a `solid_separation:`: a filter or centrifuge with given solid recovery and cake liquid) | no | it is `given` with a source |
+| `residual-moisture` (a `dryer:`: a batch (filter-)dryer or vacuum dryer to a given residual moisture, solved by `cheme process propagate`) | no | its `residual_moisture` is `given` with a source |
 | `adsorption-equilibrium` (a component separator whose recoveries follow from core's equilibrium TSA cycle in `process/adsorption.yaml`, below; never simulated) | yes | every input of the entry is given with a source |
 | `external-performance` (a component separator whose recoveries follow from an external performance model in `process/adsorption.yaml`) | no | every input of the entry is given with a source |
 | `stream-values` (outlet values as written) | no | every outlet flow and composition is `given` with a source |

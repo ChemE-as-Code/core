@@ -20,10 +20,16 @@ missing.
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this beyond what other skills give:
-shortcut and rigorous columns are `process-simulation` and `separation-method-selection`
-(downstream representation), column stage estimates are `cheme datasheets fill` (Fenske-Underwood-
-Gilliland), phase and azeotrope checks `phase-calculation`.
+Mostly engineering guidance. Core's calculations for this are:
+
+- shortcut and rigorous columns: `process-simulation` and `separation-method-selection`
+  (downstream representation);
+- column stage estimates: `cheme datasheets fill` (Fenske-Underwood-Gilliland);
+- phase and azeotrope checks: `phase-calculation`;
+- a batch still without reflux, its cuts and a solvent swap: `still:` on the flowsheet step
+  (skill `process-design`). It is a Rayleigh balance with Raoult's law or a constant relative
+  volatility, solved by `cheme process propagate` and reported by `cheme process stills`
+  (boil-up time and duty per batch).
 
 Arrangement:
 

@@ -321,28 +321,42 @@ _ROWS = (
         "Crystallization",
         "predictive",
         ("crystallizer",),
-        fallback="several solutes, impurities or a solubility outside the data: a "
-        "component_separator (or crystallizer basis: yield) with recoveries given with their "
-        "source.",
+        fallback="several crystallizing solutes, or a solubility outside the data or without "
+        "data for the liquor: a component_separator (or crystallizer basis: yield) with "
+        "recoveries given with their source.",
         notes="A crystallizer: (basis: solubility) solved by cheme process propagate: one "
         "solute in one solvent, anhydrous or a hydrate, cooling and/or evaporative, saturated "
         "mother liquor from sourced solubility data (interpolated, never extrapolated), with a "
         "specified filter or centrifuge and mother-liquor recycle; basis: yield imposes the "
-        "yield (specified). No population balance, kinetics or several solutes; not part of "
-        "the DWSIM simulation.",
+        "yield (specified). Spectator solutes (a precipitation from a reaction liquor) pass "
+        "unchanged, the solubility measured in that liquor or corrected by Setschenow "
+        "salting-out coefficients (ADR 0056); a reslurry wash is a crystallizer fed by the cake "
+        "and the wash. No population balance, kinetics or several crystallizing solutes; not "
+        "part of the DWSIM simulation.",
         tested=(
             "tests/test_crystallization.py::test_felder_4_5_2_evaporative_crystallizer_filter_"
             "and_recycle",
             "tests/test_crystallization.py::test_geankoplis_12_11_1_decahydrate_yield",
+            "tests/test_precipitation.py::test_the_nbs_precipitation_and_reslurry_wash_"
+            "propagate_and_balance",
         ),
         aliases=("Crystallisation",),
     ),
     TechniqueCoverage(
         "Drying",
         "specified_split",
-        ("component_separator",),
-        fallback="no dryer model (solids, drying curves): give the moisture split with its source.",
-        aliases=("Dryer",),
+        ("dryer", "component_separator"),
+        fallback="a gas or liquid dried on an adsorbent: a component_separator with the moisture "
+        "split and its source (see Adsorption).",
+        notes="A dryer: (a batch filter-dryer or vacuum dryer of a wet cake) solved by cheme "
+        "process propagate: the volatiles down to a specified residual moisture, the duty "
+        "(sensible, latent, vessel per batch) in cheme process crystallizers, the drying time "
+        "from a drying rate and the recipe vessel's heated area (ADR 0057). No drying curve "
+        "or sorption isotherm.",
+        tested=(
+            "tests/test_dryer.py::test_propagate_fills_the_dryer_and_the_report_closes_the_balance",
+        ),
+        aliases=("Dryer", "Filter-dryer", "Vacuum dryer"),
     ),
     TechniqueCoverage(
         "Solid-fluid separation",

@@ -6,12 +6,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      # cheme-as-code is private while in development. It is read with the fine-grained token in
-      # the secret PLANTCODE_READ_TOKEN (contents: read on ChemE-as-Code/core).
-      - run: |
-          git config --global url."https://x-access-token:${PLANTCODE_READ_TOKEN}@github.com/ChemE-as-Code/core".insteadOf "https://github.com/ChemE-as-Code/core"
-        env:
-          PLANTCODE_READ_TOKEN: ${{ secrets.PLANTCODE_READ_TOKEN }}
       - uses: astral-sh/setup-uv@v6
       - run: uv tool install git+https://github.com/ChemE-as-Code/core.git
       - run: cheme fmt --check
