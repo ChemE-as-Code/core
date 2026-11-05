@@ -151,21 +151,26 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     lacking: list[str] = []
     t_in = [_state_value(process, s, case, "temperature") for s in ins]
     t_out = [_state_value(process, s, case, "temperature") for s in outs]
-    p_out = [_state_value(process, s, case, "pressure") for s in outs]
-    t = t_out[0] if len(t_out) == 1 else None
-    p = p_out[0] if len(p_out) == 1 else None
-    if len(outs) == 1:
+    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other
+    vent = getattr(getattr(item, "batch", None), "vent", None)
+    liquid_outs = [s for s in outs if vent is None or s.id != vent.stream]
+    t_liquid = [_state_value(process, s, case, "temperature") for s in liquid_outs]
+    p_liquid = [_state_value(process, s, case, "pressure") for s in liquid_outs]
+    t = t_liquid[0] if len(t_liquid) == 1 else None
+    p = p_liquid[0] if len(p_liquid) == 1 else None
+    if len(liquid_outs) == 1:
         with contextlib.suppress(ValueError):  # what is missing is reported below
-            t, p = equilibrium_conditions(process.flowsheet.units, case, ins, outs[0])
+            t, p = equilibrium_conditions(process.flowsheet.units, case, ins, liquid_outs[0])
     approach = getattr(item, "approach", 0.0) or 0.0
     if t is None:
         lacking.append("one outlet with a temperature")
     entries = []
     moles_out = [_moles(process, s, case) for s in outs]
     y = None
-    if len(outs) == 1 and moles_out[0] is not None:
-        total = sum(moles_out[0].values())
-        y = {n: v / total for n, v in moles_out[0].items()} if total > 0 else None
+    moles_liquid = [_moles(process, s, case) for s in liquid_outs]
+    if len(liquid_outs) == 1 and moles_liquid[0] is not None:
+        total = sum(moles_liquid[0].values())
+        y = {n: v / total for n, v in moles_liquid[0].items()} if total > 0 else None
     phi = None
     real_gas_unknown = False
     if getattr(item, "fugacity", "ideal") == "peng_robinson" and y and t is not None and p:
@@ -346,6 +351,8 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             }
             if solved_tank.kind == "semibatch":
                 tank_entry |= semibatch_entry(solved_tank)
+            if vent is not None:
+                tank_entry |= vent_entry(solved_tank, vent.stream)
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
     return {
@@ -458,6 +465,15 @@ def reactor_text(report: ReactorReport) -> str:
                 )
                 + (f"; {'; '.join(tank['notes'])}" if tank["notes"] and not semi else "")
             )
+            if tank.get("vent"):
+                gas = tank["vent"]
+                lines.append(
+                    f"    vent {gas['stream']}: "
+                    + ", ".join(f"{n} {v:.4g}" for n, v in gas["kmol_h"].items())
+                    + " kmol/h; peak "
+                    + num(gas["peak_rate_kmol_s_m3"], " kmol/(s m3)", ".4g")
+                    + (f" at {gas['peak_time_s']:.6g} s" if gas["peak_time_s"] is not None else "")
+                )
             if semi:
                 worst = tank["cooling_failure"]
                 x = tank["max_accumulation"]
@@ -482,6 +498,20 @@ def reactor_text(report: ReactorReport) -> str:
     if not report.reactors:
         lines.append("no reactors (no block or step names reactions or a reactor model)")
     return "\n".join(lines)
+
+
+def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
+    """What ``process reactors`` adds for a vented batch or semi-batch (ADR 0054): what left by
+    the vent (kmol/h, the flowsheet's basis) and its peak rate per m3 of the content at the end,
+    for sizing the off-gas line and its scrubber (per batch: ``cheme process recipe``)."""
+    return {
+        "vent": {
+            "stream": stream,
+            "kmol_h": dict(solved.vent),
+            "peak_rate_kmol_s_m3": solved.peak_vent_rate,
+            "peak_time_s": solved.peak_vent_time,
+        }
+    }
 
 
 def semibatch_entry(solved: Any) -> dict[str, Any]:

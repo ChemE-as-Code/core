@@ -28,7 +28,10 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
 - ``process-terminal``: a terminal gives ``utility:`` without ``category: utility``;
 - ``process-reactor``: a reactor model (``reactor:``) that cannot be solved as declared:
   conversion without a conversion per reaction, equilibrium without reactions, an irreversible
-  reaction at equilibrium (warning), a Gibbs reactor naming reactions;
+  reaction at equilibrium (warning), a Gibbs reactor naming reactions; a vented batch or
+  semi-batch whose ``batch.vent`` stream is no outlet of it or its only one, whose vent
+  components are not declared (or, warning, formed by none of its reactions), or a dose that
+  passes gas through without a vent (ADR 0054);
 - ``process-heat-of-reaction`` (warning): a given heat of reaction more than 2 % (and
   1000 kJ/kmol) from the one of the components' ideal-gas formation data;
 - ``process-catalyst``: a reactor names a catalyst ``process/catalysts.yaml`` does not declare,
@@ -1024,6 +1027,7 @@ def _reactor_rules(out: _Out) -> None:
                     )
             if model in ("batch", "semibatch"):
                 _dosing_rules(out, item, [key, i], model, reactions)
+                _vent_rules(out, item, [key, i], reactions)
             for kind, field_name in (("cstr", "tank"), ("batch", "batch")):
                 spec = getattr(item, field_name, None)
                 if model == kind or (kind == "batch" and model == "semibatch"):
@@ -1200,6 +1204,77 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
             [item.id],
             hint="a semibatch: batch.dosing [{stream, time or profile}] naming its dosed inlet "
             "streams; its other inlet is the charge; liquid-phase reactions",
+        )
+
+
+def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> None:
+    """A vented batch or semi-batch (ADR 0054): the vent an outlet of the step besides the
+    liquid's, its components declared and formed, liquid-phase reactions; a dose that passes
+    gas through (``absorbed`` below 1) needs the vent."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    batch = item.batch
+    if batch is None:
+        return
+    vent = batch.vent
+    hint = (
+        "batch.vent: {stream: the step's gas outlet, components: [ids formed], fraction: "
+        "{id: share}}; the step's other outlet is the liquid"
+    )
+    if vent is None:
+        if passing := [d.stream for d in batch.dosing if d.absorbed is not None and d.absorbed < 1]:
+            out.add(
+                "error",
+                "reactor",
+                f"{what}: the dose(s) {', '.join(passing)} pass gas through (absorbed below 1) "
+                "but there is no batch.vent",
+                [*at, "batch", "dosing"],
+                [item.id],
+                hint=hint,
+            )
+        return
+    outlets = [
+        s.id
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[0]) is not None and end.node == item.id and s.kind == "material"
+    ]
+    problems = []
+    if vent.stream not in outlets:
+        problems.append(f"the vent stream {vent.stream} is no outlet of it")
+    elif len(outlets) == 1:
+        problems.append(
+            f"the vent stream {vent.stream} is its only outlet: the liquid needs its own"
+        )
+    elif len(outlets) > 2:
+        problems.append(f"{len(outlets)} outlets (a vented batch has the liquid's and the vent)")
+    declared = process.components()
+    if unknown := [n for n in vent.components if n not in declared]:
+        problems.append("the vent component(s) " + ", ".join(unknown) + " not declared")
+    if gas := [r.id for r in reactions if r.phase != "liquid"]:
+        problems.append("a vent and the reaction(s) " + ", ".join(gas) + " not liquid-phase")
+    for problem in problems:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: vent with {problem}",
+            [*at, "batch", "vent"],
+            [item.id],
+            hint=hint,
+        )
+    unformed = [
+        n
+        for n in vent.components
+        if n in declared and not any(r.stoichiometry.get(n, 0) > 0 for r in reactions)
+    ]
+    if unformed:
+        out.add(
+            "warning",
+            "reactor",
+            f"{what}: vent component(s) {', '.join(unformed)} formed by none of its reactions "
+            "(nothing of it vents)",
+            [*at, "batch", "vent", "components"],
+            [item.id, *unformed],
+            hint="list the gases the reactions form; a dosed gas passes through by dosing.absorbed",
         )
 
 

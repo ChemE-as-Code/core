@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Gas evolution and gas dosing in a batch or semi-batch (ADR 0054, core#165): `batch.vent:
+  {stream, components, fraction}` on a liquid `reactor: batch` or `semibatch`. The listed
+  components (HCl, CO2, HBr) leave the liquid as they form, a `fraction` of what forms (default
+  1), by the vent stream, a second outlet of the step: they do not accumulate in the liquid and
+  count in neither its volume, concentrations nor heat capacity, and their `heat_of_reaction`
+  forms them as gas at the vessel's temperature. A dose may give `absorbed: share` (a dosed gas
+  such as phosgene or Cl2): that share dissolves on entry, the rest passes through to the vent,
+  its sensible heat to the vessel's temperature from its ideal-gas cp (else noted). `process
+  propagate` writes both outlets (composition, flow, temperature, pressure) and the balance
+  closes over them; `process reactors` reports the vent (kmol/h, peak kmol/(s m3) and when),
+  `process recipe` the off-gas per batch (peak kmol/s and m3/h at the vessel's conditions, kg
+  and kmol per batch), and `process reactor-hazards` leaves the vented and passing gas out of
+  the MTSR and the MTT, with a note of the peak gas rate. New `cheme.process-reactor` findings:
+  the vent stream no outlet of the step or its only one, an undeclared vent component, (warning)
+  a vent component no reaction forms, a dose with `absorbed` below 1 and no vent. `process
+  simulate` refuses a vented batch. An unvented batch or semi-batch solves and fingerprints as
+  before. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
+
 ## 1.7.0 (2026-11-05)
 
 Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a
