@@ -1,0 +1,22 @@
+# The hydrolysis of acetic anhydride, the usual test reaction of reaction calorimeters: pseudo
+# first order in the anhydride in excess water. The rate constant, activation energy and heat of
+# reaction are of the order published for it; here they are illustrative (provenance assumed).
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: HYD
+    title: Acetic anhydride hydrolysis
+    equation: C4H6O3 + H2O -> 2 C2H4O2
+    stoichiometry: {AC2O: -1, H2O: -1, ACOH: 2}
+    phase: liquid
+    heat_of_reaction: {value: -58000, provenance: assumed, source: "order of magnitude of published calorimetry; illustrative"}
+    rate:
+      form: power_law
+      basis: volume
+      driving: concentration
+      # k = 2.5e-3 1/s at 298 K
+      k: {A: 1.42e6, Ea: 50000}
+      orders: {AC2O: 1}
+      temperature_range: [283.15, 333.15]
+      provenance: assumed
+      source: "pseudo-first-order in the anhydride, of the order published; illustrative"

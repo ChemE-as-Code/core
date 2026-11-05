@@ -220,7 +220,7 @@ def _reactor_basis(
 ) -> UnitBasis:
     reactions, unknown = process.reactions_of(node.id)
     model = node.reactor
-    if model in ("pfr", "cstr", "batch"):
+    if model in ("pfr", "cstr", "batch", "semibatch"):
         lacking = [r.id for r in reactions if r.rate is None]
         unsourced = [
             r.id
@@ -238,7 +238,11 @@ def _reactor_basis(
             spec = node.tank if model == "cstr" else node.batch
             declared = "tank" if model == "cstr" else "batch"
             limitations = [] if spec is not None else [f"no {declared} declared"]
-            what = "stirred tank (CSTR)" if model == "cstr" else "batch (stirred, well mixed)"
+            what = {
+                "cstr": "stirred tank (CSTR)",
+                "batch": "batch (stirred, well mixed)",
+                "semibatch": "semi-batch (stirred, well mixed, dosed feeds)",
+            }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
         coupled = _coupled(runs)
         if coupled:

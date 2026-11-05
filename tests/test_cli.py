@@ -365,6 +365,7 @@ def test_schema_lists_kinds(plant: Path, monkeypatch):
         "process-simulation",
         "process-reactions",
         "process-catalysts",
+        "process-recipe",
         "process-assays",
         "process-cells",
         "process-duties",
