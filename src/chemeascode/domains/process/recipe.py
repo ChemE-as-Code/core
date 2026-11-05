@@ -46,9 +46,9 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 - ``recipe-schema``: the file does not follow ``cheme/recipe/v1``;
 - ``recipe-reference``: a unit, stream or ``from:`` step that is not in the flowsheet, a
   ``from:`` on a step that is no batch or semi-batch (a ``distil``: no still; a ``dry``: no
-  dryer; a ``filter``: no filter with filtration), a ``dose`` from a step without dosing, a ``start.after`` that is no
-  earlier unit procedure, a duplicate id, a step in the ``units`` of one vessel and named by
-  another unit procedure;
+  dryer; a ``filter``: no filter with filtration), a ``dose`` from a step without dosing, a
+  ``start.after`` that is no earlier unit procedure, a duplicate id, a step in the ``units`` of
+  one vessel and named by another unit procedure;
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
 - ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
@@ -161,7 +161,8 @@ class Operation(Strict):
         if self.from_ is not None and self.kind not in FROM_KINDS:
             raise ValueError(
                 f"operation {self.id}: from: gives a dose's or a reaction's time only (and a "
-                "distil's boil-up, a filtration's or a drying time); give the duration of a " + self.kind
+                "distil's boil-up, a filtration's or a drying time); give the duration of a "
+                + self.kind
             )
         return self
 
