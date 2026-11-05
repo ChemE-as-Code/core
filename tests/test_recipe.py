@@ -1,4 +1,4 @@
-"""The batch recipe (``process/recipe.yaml``, ADR 0049): the cycle time from the unit
+"""The batch recipe (``process/recipe.yaml``, ADR 0051): the cycle time from the unit
 procedures, the bottleneck and parallel units, durations from a semi-batch's model, the basis
 check against the flowsheet, the Gantt chart and the TEA's batch operation taken from it."""
 

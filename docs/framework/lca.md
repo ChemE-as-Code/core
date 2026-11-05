@@ -65,7 +65,7 @@ scenarios.
     its `unit` (plus an `initial_charge` spread over the plant's life), and has a background.
     A batch plant's per-batch use (cleaning solvent, rinse water, a nitrogen purge, the
     make-up of an off-spec share) gives `per_batch`: times the batches per year over the hours
-    of `process/recipe.yaml`, the basis of the flowsheet's year averages (ADR 0051); without a
+    of `process/recipe.yaml`, the basis of the flowsheet's year averages (ADR 0053); without a
     recipe it is the error `cheme.lca-per-batch`.
     A catalyst says `catalyst: true` and its `metals: {Pt: 0.003}` (mass fractions).
     `disposal:` says what leaves the plant of it (see [Wastes, by-products and end of

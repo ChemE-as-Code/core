@@ -1,4 +1,4 @@
-# 0050. Batch vessels and jackets are sized in the recipe, from the reactor model's content
+# 0052. Batch vessels and jackets are sized in the recipe, from the reactor model's content
 
 - **Status:** Proposed
 - **Date:** 2026-11-05
@@ -7,7 +7,7 @@
 
 Core sized a vessel as a cylinder and a residence time (`domains/equipment/sizing.py`). A batch
 reactor's datasheet volume and duty stayed TBD, because they depend on the batch size and the
-cycle (`equipment/fill.py`). With the semi-batch model (ADR 0048) and the recipe (ADR 0049),
+cycle (`equipment/fill.py`). With the semi-batch model (ADR 0050) and the recipe (ADR 0051),
 both are known: the model gives the content per hour of the flowsheet's flows and the peak
 duty per m3, and the recipe gives the batch size. A dosed exothermic step is often limited by
 its jacket, and its heat-up and cool-down times are part of the cycle (core#158 package 3).
@@ -54,7 +54,7 @@ its jacket, and its heat-up and cool-down times are part of the cycle (core#158 
 
 ## Evidence
 
-- core#158 package 3; this ADR's PR (stacked on ADR 0049's).
+- core#158 package 3; this ADR's PR (stacked on ADR 0051's).
 - `src/chemeascode/domains/process/recipe.py` (`Vessel`, `Jacket`, `_content`, `_vessel`,
   `_jacket_time`, `preferred`, `wetted_area`), `domains/equipment/fill.py` (`_recipe_vessel`,
   input `recipe:`).

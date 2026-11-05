@@ -1,4 +1,4 @@
-# 0051. Per-batch LCA exchanges are consumables per batch of the recipe
+# 0053. Per-batch LCA exchanges are consumables per batch of the recipe
 
 - **Status:** Proposed
 - **Date:** 2026-11-05
@@ -28,7 +28,7 @@ Options considered:
   `per_year` or `per_replacement`, alone or with an `initial_charge`. The name follows the
   consumable's own `per_year`; it means what the TEA's `per: batch` means.
 - Per hour of the flowsheet's year averages it is `per_batch x batches per year / hours`, taken
-  from `process/recipe.yaml` (`cheme process recipe`, ADR 0049). That is the same basis as the
+  from `process/recipe.yaml` (`cheme process recipe`, ADR 0051). That is the same basis as the
   flowsheet, so the LCI per kg does not depend on `operation.hours_per_year` of the study. The
   exchange's source records the arithmetic ("500 kg per batch x 1000 batches in 8000 h
   (process/recipe.yaml, bottleneck ...)").
@@ -48,7 +48,7 @@ Options considered:
 
 ## Evidence
 
-- core#158 package 5; this ADR's PR (stacked on ADR 0050's).
+- core#158 package 5; this ADR's PR (stacked on ADR 0052's).
 - `src/chemeascode/domains/assessment/lca/schemas.py` (`Consumable.per_batch`),
   `inventory.py` (`_batches`, `_supplies`).
 - `tests/test_lca_inventory.py::test_a_consumable_per_batch_follows_the_recipe`.
