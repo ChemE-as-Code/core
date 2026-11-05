@@ -252,6 +252,7 @@ def sample_node(
     fs = process.flowsheet
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
     if model == "semibatch":  # the charge and its doses: solve_node splits them
+        inlets = [s for s in inlets if s.kind == "material"]
         inlet: Any = inlets
     elif len(inlets) != 1:
         raise SamplingError(f"{node} has {len(inlets)} inlet streams; sampling takes one")

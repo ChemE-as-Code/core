@@ -817,9 +817,11 @@ def _released(
 
 def tank_inlet(node: Any, inlets: Sequence[Any]) -> Any:
     """What :func:`solve_node` takes of tank or batch *node*'s inlet streams: the one inlet, or
-    a semi-batch's every inlet (its charge and its doses). Raises TankError."""
+    a semi-batch's every inlet (its charge and its doses). Energy and information streams (an
+    agitator's power) are no inlet of the content. Raises TankError."""
+    inlets = [s for s in inlets if getattr(s, "kind", "material") == "material"]
     if node.reactor == "semibatch":
-        return list(inlets)
+        return inlets
     if len(inlets) != 1:
         raise TankError(f"a {node.reactor} takes one inlet stream (mix the feeds before it)")
     return inlets[0]
@@ -827,7 +829,9 @@ def tank_inlet(node: Any, inlets: Sequence[Any]) -> Any:
 
 def split_inlets(node: Any, inlets: Sequence[Any]) -> tuple[Any, list[tuple[Any, Any]]]:
     """A semi-batch's charge stream and its (dosing, stream) pairs among *inlets*. Raises
-    TankError when a dosed stream is no inlet, or the charge is not one stream."""
+    TankError when a dosed stream is no inlet, or the charge is not one stream. Energy and
+    information streams are left out."""
+    inlets = [s for s in inlets if getattr(s, "kind", "material") == "material"]
     by_id = {s.id: s for s in inlets}
     dosing = node.batch.dosing if node.batch is not None else []
     if lacking := [d.stream for d in dosing if d.stream not in by_id]:

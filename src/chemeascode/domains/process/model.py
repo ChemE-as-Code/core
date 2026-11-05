@@ -1179,7 +1179,7 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
     inlets = [
         s.id
         for s in process.flowsheet.streams
-        if (end := process.ends(s)[1]) is not None and end.node == item.id
+        if (end := process.ends(s)[1]) is not None and end.node == item.id and s.kind == "material"
     ]
     if stray := [d.stream for d in dosing if d.stream not in inlets]:
         problems.append("the dosed stream(s) " + ", ".join(stray) + " are no inlet of it")
