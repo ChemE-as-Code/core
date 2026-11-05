@@ -1548,6 +1548,14 @@ def _kinetic_spec(process: Process, node: Any, spec: UnitSpec, fail: Any) -> dic
             "doses mixed into the charge (no accumulation then)",
         )
         return {}
+    if getattr(node, "reactor", None) == "batch" and getattr(node.batch, "vent", None):
+        fail(
+            "a vented batch's two outlets (the liquid and the vent) are not coupled to the "
+            "DWSIM solve (its reactors give one outlet)",
+            "solve it with cheme process propagate, or leave out batch.vent and separate the "
+            "gas in a flash after it",
+        )
+        return {}
     if getattr(node, "reactor", None) in ("cstr", "batch"):
         return _tank_spec(process, node, spec, fail)
     try:

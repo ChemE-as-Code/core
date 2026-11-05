@@ -7,6 +7,7 @@ stream property its provenance: ``given`` (a design input), ``assumed`` or ``cal
 
 from __future__ import annotations
 
+import math
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -67,6 +68,41 @@ class Versioned(Strict):
 # -- materials.yaml -----------------------------------------------------------------------------
 
 
+#: kPa per unit of an Antoine pressure.
+ANTOINE_PRESSURE = {"bar": 100.0, "kPa": 1.0, "Pa": 0.001, "mmHg": 0.133322368}
+
+
+class VapourPressure(Strict):
+    """A component's vapour pressure, Antoine: ``log10(P) = a - b / (T + c)`` (or ``ln``), P in
+    ``pressure_unit``, T in ``temperature_unit``. The default form is the NIST WebBook's (and
+    ``cheme chemistry props``'): log10, bar, K."""
+
+    a: float
+    b: float
+    c: float = 0.0
+    form: Literal["log10", "ln"] = "log10"
+    pressure_unit: Literal["bar", "kPa", "Pa", "mmHg"] = "bar"
+    temperature_unit: Literal["K", "degC"] = "K"
+    temperature_range: tuple[float, float] | None = Field(
+        default=None, description="(K, K) the parameters were fitted over."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    def kpa(self, kelvin: float) -> float:
+        """kPa at *kelvin* K (0 where T + c is not positive: the form has no value there)."""
+        t = kelvin - 273.15 if self.temperature_unit == "degC" else kelvin
+        if t + self.c <= 0:
+            return 0.0
+        exponent = self.a - self.b / (t + self.c)
+        value = 10.0**exponent if self.form == "log10" else math.exp(exponent)
+        return value * ANTOINE_PRESSURE[self.pressure_unit]
+
+    def covers(self, kelvin: float) -> bool:
+        low, high = self.temperature_range or (0.0, math.inf)
+        return low <= kelvin <= high
+
+
 class Component(Strict):
     id: str
     name: str
@@ -105,6 +141,20 @@ class Component(Strict):
         default=None,
         description="Formation data and ideal-gas heat capacity: heats of reaction, equilibrium "
         "constants and reactor duties (cheme chemistry thermo prints it).",
+    )
+    vapour_pressure: VapourPressure | None = Field(
+        default=None,
+        description="Antoine vapour pressure: Raoult's law in a batch still (still: with "
+        "volatility: raoult).",
+        exclude_if=lambda value: value is None,  # a component's dump stays as it was
+    )
+    heat_of_vaporization: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000) near the "
+        "still's temperature: a batch still's boil-up from its duty, and its duty from its "
+        "boil-up.",
+        exclude_if=lambda value: value is None,
     )
     phase: Literal["solid"] | None = Field(
         default=None,
@@ -388,6 +438,14 @@ class Dosing(Strict):
         exclude_if=lambda value: not value,
     )
     start: float = Field(default=0.0, ge=0, description="s after the charge the dosing starts")
+    absorbed: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="A dosed gas: the share of the dose the liquid takes up (it dissolves on "
+        "entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+        exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
+    )
 
     @model_validator(mode="after")
     def _form(self) -> Dosing:
@@ -408,6 +466,37 @@ class Dosing(Strict):
         return found
 
 
+class Vent(Strict):
+    """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
+    liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
+    do not accumulate in the liquid and count in neither its volume nor its concentrations; a
+    ``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved."""
+
+    stream: str = Field(description="The outlet stream of the step the gas leaves by.")
+    components: list[str] = Field(
+        min_length=1, description="The components that leave the liquid as they form."
+    )
+    fraction: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> the share of what forms that leaves (default 1).",
+        exclude_if=lambda value: not value,
+    )
+
+    @model_validator(mode="after")
+    def _shares(self) -> Vent:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.components: each component once")
+        if stray := sorted(set(self.fraction) - set(self.components)):
+            raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
+        if any(not 0 < f <= 1 for f in self.fraction.values()):
+            raise ValueError("vent.fraction: a share above 0, at most 1")
+        return self
+
+    def shares(self) -> dict[str, float]:
+        """Component -> the share of what forms that leaves."""
+        return {n: self.fraction.get(n, 1.0) for n in self.components}
+
+
 class Batch(Strict):
     """A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge
     (its flow the charge per hour), the outlet its composition when the batch ends, after
@@ -416,7 +505,8 @@ class Batch(Strict):
 
     A semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its
     ``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the
-    dosing)."""
+    dosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as
+    they form, by a second outlet."""
 
     time: float | None = Field(default=None, gt=0, description="s of reaction")
     target: BatchTarget | None = None
@@ -428,6 +518,12 @@ class Batch(Strict):
         default_factory=list,
         description="reactor: semibatch: the dosed feeds.",
         exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
+    )
+    vent: Vent | None = Field(
+        default=None,
+        description="A liquid batch or semi-batch that gives off gas: {stream, components, "
+        "fraction} (ADR 0054).",
+        exclude_if=lambda value: value is None,  # an unvented batch's fingerprint stays
     )
     provenance: Provenance
     source: str = ""
@@ -562,20 +658,55 @@ class Reacting(Strict):
     )
 
 
+class SaltingOut(Strict):
+    """The Setschenow correction of a pure-solvent solubility for the spectator solutes of the
+    mother liquor: ``log10(s0 / s) = sum_i k_i m_i`` (``log: ln``: the natural logarithm), with
+    ``m_i`` the molality of spectator ``i`` in the mother liquor (mol per kg of free solvent)
+    and ``k_i`` its coefficient on the molal scale (kg/mol; a molar-scale constant in L/mol is
+    converted with its source's liquor density beforehand)."""
+
+    coefficients: dict[str, float] = Field(
+        min_length=1,
+        description="Spectator id -> k_i (kg/mol, positive salting out, negative salting in); "
+        "every spectator of the crystallizer once, 0 stated where it has no effect.",
+    )
+    log: Literal["log10", "ln"] = "log10"
+    provenance: Provenance
+    source: str = ""
+
+
 class Solubility(Strict):
     """The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,
     value), interpolated linearly at the crystallizer's temperature and never extrapolated, or
     one ``value`` that holds at the crystallizer's conditions as stated by its source (the
-    saturated mother liquor; no temperature dependence claimed)."""
+    saturated mother liquor; no temperature dependence claimed).
 
-    unit: Literal["kg/kg_solvent", "mass_fraction"] = Field(
-        description="kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the "
-        "solute's mass fraction in the saturated solution."
+    With spectator solutes (``crystallizer.spectators``), the solubility is either measured in
+    that mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a
+    ``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is
+    refused (``cheme.process-crystallizer``)."""
+
+    unit: Literal["kg/kg_solvent", "mass_fraction", "kg/kg_liquor"] = Field(
+        description="kg of anhydrous solute per kg of solvent (g/100 g divided by 100), the "
+        "solute's mass fraction in the saturated solution (spectators included), or kg per kg "
+        "of solute-free liquor (solvent plus spectators; measured_in: mother_liquor)."
     )
     points: list[tuple[float, float]] = Field(
         default_factory=list, description="(K, value) pairs, increasing in temperature."
     )
     value: float | None = Field(default=None, gt=0)
+    measured_in: Literal["pure_solvent", "mother_liquor"] = Field(
+        default="pure_solvent",
+        description="Where the data were measured: in the pure solvent, or in the crystallizer's "
+        "mother liquor with its spectator solutes (at the composition its source states).",
+        exclude_if=lambda value: value == "pure_solvent",  # fingerprints stay as they were
+    )
+    salting_out: SaltingOut | None = Field(
+        default=None,
+        description="Setschenow coefficients that correct the pure-solvent data for the "
+        "spectators' molality in the mother liquor.",
+        exclude_if=lambda value: value is None,
+    )
     provenance: Provenance
     source: str = ""
 
@@ -583,6 +714,15 @@ class Solubility(Strict):
     def _form(self) -> Solubility:
         if bool(self.points) == (self.value is not None):
             raise ValueError("give points or value, one of them")
+        if self.unit == "kg/kg_liquor" and self.measured_in != "mother_liquor":
+            raise ValueError(
+                "unit kg/kg_liquor: data measured in the mother liquor (measured_in: mother_liquor)"
+            )
+        if self.salting_out is not None and self.measured_in != "pure_solvent":
+            raise ValueError(
+                "salting_out corrects pure-solvent data: not with measured_in: "
+                "mother_liquor (the liquor's data already hold the spectators)"
+            )
         temperatures = [t for t, _ in self.points]
         if any(t <= 0 for t in temperatures) or temperatures != sorted(set(temperatures)):
             raise ValueError("points: temperatures in K, positive and strictly increasing")
@@ -644,6 +784,26 @@ class CakeLiquid(Strict):
         return self
 
 
+class Filtration(Strict):
+    """A constant-pressure cake filtration (Ruth): the time to pass one batch's filtrate,
+    ``t = mu (alpha M V / (2 A^2) + R_m V / A) / dP`` with M the dry solid of the cake and V
+    the filtrate's volume per batch (:mod:`.dryer`; ``filter`` ``from:`` this step in
+    ``process/recipe.yaml``). The split itself stays the specified one."""
+
+    specific_cake_resistance: float = Field(gt=0, description="alpha, m/kg (incompressible)")
+    medium_resistance: float = Field(default=0.0, ge=0, description="R_m, 1/m")
+    pressure_difference: float = Field(gt=0, description="kPa across cake and medium")
+    viscosity: float = Field(gt=0, description="mPa s of the filtrate")
+    filtrate_density: float | None = Field(
+        default=None, gt=0, description="kg/m3; default: the components' liquid_molar_volume"
+    )
+    area: float | None = Field(
+        default=None, gt=0, description="m2; default: the recipe vessel's bottom (a Nutsche)"
+    )
+    provenance: Provenance
+    source: str = ""
+
+
 class SolidSeparation(Strict):
     """A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid
     the cake holds, specified (no filtration or centrifuge model); the liquid divides with the
@@ -655,6 +815,11 @@ class SolidSeparation(Strict):
     outlets: dict[Literal["cake", "filtrate"], str] = Field(default_factory=dict)
     provenance: Provenance
     source: str = ""
+    filtration: Filtration | None = Field(
+        default=None,
+        description="The filtration time of a batch (Ruth), for a recipe's filter from:.",
+        exclude_if=lambda value: value is None,  # a filter's fingerprint stays as it was
+    )
 
 
 class MotherLiquorRecycle(Strict):
@@ -692,7 +857,9 @@ class Crystallizer(Strict):
     solvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``
     (the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a
     filter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``
-    outlet; ``recycle`` returns part of the filtrate to the feed."""
+    outlet; ``recycle`` returns part of the filtrate to the feed. ``spectators`` are other
+    dissolved components carried unchanged (a precipitation from a reaction liquor); its
+    inlets are taken together (a reslurry wash: the cake and the wash liquid)."""
 
     solute: str = Field(description="The dissolved component that crystallizes.")
     solvent: str
@@ -707,6 +874,13 @@ class Crystallizer(Strict):
     separation: SolidSeparation | None = None
     recycle: MotherLiquorRecycle | None = None
     energy: CrystallizerEnergy | None = None
+    spectators: list[str] = Field(
+        default_factory=list,
+        description="Dissolved components besides the solute and solvent (salts, base, "
+        "unreacted reagent): carried unchanged in the mother liquor, never crystallized or "
+        "evaporated; the solubility then needs measured_in: mother_liquor or salting_out:.",
+        exclude_if=lambda value: not value,  # a single-solute crystallizer's fingerprint stays
+    )
     outlets: dict[Literal["slurry", "cake", "mother_liquor", "vapour"], str] = Field(
         description="Role -> the step's outlet port."
     )
@@ -734,11 +908,128 @@ class Crystallizer(Strict):
             raise ValueError(f"outlets: give exactly {', '.join(sorted(want))}")
         if len({self.solute, self.solvent, self.crystal}) != 3:
             raise ValueError("solute, solvent and crystal must be three different components")
+        if len(set(self.spectators)) != len(self.spectators) or {
+            self.solute,
+            self.solvent,
+            self.crystal,
+        } & set(self.spectators):
+            raise ValueError("spectators: each once, none the solute, solvent or crystal")
+        salting = self.solubility.salting_out if self.solubility is not None else None
+        if salting is not None and set(salting.coefficients) != set(self.spectators):
+            raise ValueError(
+                "solubility.salting_out.coefficients: one coefficient for each spectator "
+                "(0 where it has no effect), no others"
+            )
+        return self
+
+
+class ResidualMoisture(Strict):
+    """The volatiles a dried product keeps: the dryer's specification."""
+
+    value: float = Field(ge=0)
+    basis: Literal["mass_fraction", "per_kg_solid"] = Field(
+        description="mass_fraction: volatiles over the dried product's mass (below 1); "
+        "per_kg_solid: kg of volatiles per kg of dry solid (everything not volatile)."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _range(self) -> ResidualMoisture:
+        if self.basis == "mass_fraction" and self.value >= 1:
+            raise ValueError("a residual moisture mass fraction must be below 1")
+        return self
+
+
+class Declared(Strict):
+    """One positive figure with its provenance."""
+
+    value: float = Field(gt=0)
+    provenance: Provenance
+    source: str = ""
+
+
+class DryingTime(Strict):
+    value: float = Field(gt=0)
+    unit: Literal["h", "min", "s"] = "h"
+    provenance: Provenance
+    source: str = ""
+
+
+class DryerEnergy(Strict):
+    """The dryer's heat: the wet cake from its inlet temperature to the drying temperature,
+    the volatiles evaporated at it, and (per batch) the vessel, over an efficiency."""
+
+    heat_capacity: float = Field(gt=0, description="kJ/(kg K) of the wet cake, constant")
+    latent_heat: dict[str, float] = Field(
+        default_factory=dict,
+        description="kJ per kg evaporated, per volatile at the drying temperature; default: "
+        "from the component's critical constants (Pitzer's corresponding states).",
+    )
+    inlet_temperature: float | None = Field(
+        default=None, gt=0, description="K of the wet cake; default: the inlet stream's"
+    )
+    vessel_heat_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/K of the vessel heated with each batch (its metal mass x cp); "
+        "counted per batch of process/recipe.yaml.",
+    )
+    efficiency: float = Field(
+        default=1.0, gt=0, le=1, description="Heat to the cake over the heat supplied"
+    )
+    port: str | None = Field(
+        default=None, description="The energy inlet port of the heat: its duty is compared."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> DryerEnergy:
+        if any(v <= 0 for v in self.latent_heat.values()):
+            raise ValueError("latent_heat: kJ/kg, positive")
+        return self
+
+
+class Dryer(Strict):
+    """A batch (filter-)dryer or vacuum dryer (:mod:`.dryer`): one wet-cake inlet, the dried
+    product and the vapour out. The ``volatiles`` leave as vapour down to the
+    ``residual_moisture``; every other component (the solid, and what the cake liquid held
+    dissolved) stays in the product. The energy (``energy:``) is the cake's sensible heat to
+    the drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's
+    heat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a
+    batch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given
+    ``drying_time``."""
+
+    volatiles: list[str] = Field(min_length=1, description="The components that evaporate.")
+    residual_moisture: ResidualMoisture
+    temperature: float = Field(gt=0, description="K: the drying temperature (product, vapour)")
+    energy: DryerEnergy | None = None
+    drying_rate: Declared | None = Field(
+        default=None, description="kg evaporated per m2 of heated area and hour, constant"
+    )
+    drying_time: DryingTime | None = None
+    cake_density: Declared | None = Field(
+        default=None,
+        description="kg/m3 of the wet cake (bulk): sizes the recipe's vessel and its heated area",
+    )
+    outlets: dict[Literal["product", "vapour"], str] = Field(
+        description="Role -> the step's outlet port."
+    )
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Dryer:
+        if set(self.outlets) != {"product", "vapour"}:
+            raise ValueError("dryer.outlets: give product and vapour")
+        if self.drying_rate is not None and self.drying_time is not None:
+            raise ValueError("give drying_rate or drying_time, not both")
+        if len(set(self.volatiles)) != len(self.volatiles):
+            raise ValueError("dryer.volatiles: each component once")
         return self
 
 
 class Solids(Strict):
-    """The solid-handling models of a block or step (:mod:`.crystallization`)."""
+    """The solid-handling models of a block or step (:mod:`.crystallization`, :mod:`.dryer`)."""
 
     crystallizer: Crystallizer | None = Field(
         default=None, description="A crystallizer (with its filter and recycle)."
@@ -746,11 +1037,19 @@ class Solids(Strict):
     solid_separation: SolidSeparation | None = Field(
         default=None, description="A filter or centrifuge on its own."
     )
+    dryer: Dryer | None = Field(
+        default=None,
+        description="A batch (filter-)dryer or vacuum dryer to a residual moisture.",
+        exclude_if=lambda value: value is None,  # other nodes' fingerprints stay as they were
+    )
 
     @model_validator(mode="after")
     def _one_model(self) -> Solids:
-        if self.crystallizer is not None and self.solid_separation is not None:
-            raise ValueError("give crystallizer or solid_separation, not both")
+        given = [n for n in ("crystallizer", "solid_separation", "dryer") if getattr(self, n)]
+        if len(given) > 1:
+            if "dryer" not in given:
+                raise ValueError("give crystallizer or solid_separation, not both")
+            raise ValueError("give one of crystallizer, solid_separation or dryer")
         if self.solid_separation is not None and set(self.solid_separation.outlets) != {
             "cake",
             "filtrate",
@@ -759,7 +1058,165 @@ class Solids(Strict):
         return self
 
 
-class Block(Node, Reacting, Solids):
+class Volatility(Strict):
+    """How a batch still's vapour follows from its liquid: ``raoult`` (each volatile
+    component's ``vapour_pressure`` in materials.yaml, the still at its bubble point at its
+    pressure) or ``constant`` (a relative volatility per volatile component, to any common
+    reference: ``alpha``)."""
+
+    model: Literal["raoult", "constant"]
+    alpha: dict[str, float] = Field(
+        default_factory=dict,
+        description="constant: component -> relative volatility (positive).",
+        exclude_if=lambda value: not value,
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _form(self) -> Volatility:
+        if (self.model == "constant") != bool(self.alpha):
+            raise ValueError("alpha: with model constant, and only then")
+        if any(v <= 0 for v in self.alpha.values()):
+            raise ValueError(
+                "alpha: relative volatilities are positive (a non-volatile "
+                "component goes in nonvolatile:)"
+            )
+        return self
+
+
+class Boilup(Strict):
+    """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
+    its heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol
+    of vapour per hour per kmol of the charge)."""
+
+    value: float = Field(gt=0)
+    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h"]
+    provenance: Provenance
+    source: str = ""
+
+
+class ResidueEnd(Strict):
+    key: str = Field(description="The component whose mole fraction in the still ends it.")
+    mole_fraction: float = Field(ge=0, lt=1)
+
+
+class StillEnd(Strict):
+    """When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all
+    charged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole
+    fraction in the still reaches the value), ``time`` (s of boil-up from the start) or
+    ``temperature`` (K of the still, at its bubble point: volatility raoult)."""
+
+    distilled: float | None = Field(default=None, gt=0, lt=1)
+    basis: Literal["mole", "mass"] = "mole"
+    residue: ResidueEnd | None = None
+    time: float | None = Field(default=None, gt=0, description="s of boil-up from the start")
+    temperature: float | None = Field(default=None, gt=0, description="K of the still")
+
+    @model_validator(mode="after")
+    def _one(self) -> StillEnd:
+        given = [n for n in ("distilled", "residue", "time", "temperature") if getattr(self, n)]
+        if len(given) != 1:
+            raise ValueError("give one of distilled, residue, time or temperature")
+        return self
+
+
+class StillCut(Strict):
+    """One distillate cut: its outlet port, collected until its ``end``."""
+
+    outlet: str = Field(description="The step's outlet port the cut leaves by.")
+    end: StillEnd
+
+
+class StillFeed(Strict):
+    """A solvent swap: an inlet stream of the step fed into the still while it boils,
+    ``constant_level`` (as fast as it boils up, the content's moles held at ``down_to`` of
+    the charge's) or ``portions`` (put and take: distil down to ``down_to`` of the charge's
+    moles, add one of the equal ``portions``, again, until all is in). The stream's flow is
+    the amount fed per hour of charge (the flowsheet's basis, as a semi-batch's dose)."""
+
+    stream: str
+    mode: Literal["constant_level", "portions"]
+    portions: int | None = Field(default=None, ge=1, description="portions: how many")
+    down_to: float = Field(
+        default=1.0,
+        gt=0,
+        le=1,
+        description="The level: the still's content before each portion (constant_level: "
+        "while fed), as a share of the charge's moles.",
+    )
+
+    @model_validator(mode="after")
+    def _form(self) -> StillFeed:
+        if (self.mode == "portions") != (self.portions is not None):
+            raise ValueError("portions: with mode portions, and only then")
+        if self.mode == "portions" and self.down_to >= 1:
+            raise ValueError("mode portions: give down_to below 1 (the level to distil to)")
+        return self
+
+
+class Still(Strict):
+    """A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge
+    (the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed
+    totally (one equilibrium stage, no reflux); ``outlets`` maps ``distillate`` and
+    ``residue`` to the step's outlet ports, or ``cuts`` collect the distillate in turn (then
+    ``outlets`` names the residue only). With a ``feed`` it is a solvent swap: the ends apply
+    once all of the feed is in (no end: it stops then; portions: down to the level)."""
+
+    pressure: float | None = Field(
+        default=None, gt=0, description="kPa(a) of the still; default: the charge's"
+    )
+    volatility: Volatility
+    nonvolatile: list[str] = Field(
+        default_factory=list,
+        description="Components that stay in the still (solid components always do).",
+    )
+    boilup: Boilup
+    end: StillEnd | None = None
+    cuts: list[StillCut] = Field(default_factory=list)
+    feed: StillFeed | None = None
+    outlets: dict[Literal["distillate", "residue"], str] = Field(
+        description="Role -> the step's outlet port."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Still:
+        if self.cuts and self.end is not None:
+            raise ValueError("give end or cuts, not both")
+        if self.cuts and set(self.outlets) != {"residue"}:
+            raise ValueError("with cuts, outlets names the residue only (each cut its outlet)")
+        if not self.cuts and set(self.outlets) != {"distillate", "residue"}:
+            raise ValueError("outlets: give distillate and residue")
+        if not self.cuts and self.end is None and self.feed is None:
+            raise ValueError("give end (or cuts): when the still stops")
+        ends = [self.end] if self.end is not None else [c.end for c in self.cuts]
+        if self.volatility.model == "constant" and any(e.temperature for e in ends):
+            raise ValueError("an end at a temperature needs volatility raoult")
+        ports = [c.outlet for c in self.cuts]
+        if len(set(ports)) != len(ports):
+            raise ValueError("cuts: each outlet once")
+        return self
+
+    def ends(self) -> list[tuple[str, StillEnd | None]]:
+        """(outlet port, end) of each cut in turn; one cut without cuts:."""
+        if self.cuts:
+            return [(c.outlet, c.end) for c in self.cuts]
+        return [(self.outlets["distillate"], self.end)]
+
+
+class Distilling(Strict):
+    """The batch still of a block or step (:mod:`.batch_still`)."""
+
+    still: Still | None = Field(
+        default=None,
+        description="A batch (Rayleigh) still or solvent swap.",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -779,7 +1236,7 @@ class Block(Node, Reacting, Solids):
     )
 
 
-class Step(Node, Reacting, Solids):
+class Step(Node, Reacting, Solids, Distilling):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(

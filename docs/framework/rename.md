@@ -23,8 +23,8 @@ names do not work any more, and a plant repository has to be migrated once.
 | agent permission | `Bash(plantcode:*)` | `Bash(cheme:*)` |
 
 Unchanged: the GitHub repositories (`ChemE-as-Code/core`, `viewer`, the plant and template
-repositories), the CI secret `PLANTCODE_READ_TOKEN` (set by the owner), the git diff driver
-`dexpi`, pyDEXPI and every command, option and endpoint apart from its name.
+repositories), the git diff driver `dexpi`, pyDEXPI and every command, option and endpoint apart
+from its name.
 
 ## What an old repository gets
 
@@ -55,8 +55,7 @@ repositories), the CI secret `PLANTCODE_READ_TOKEN` (set by the owner), the git 
 5. Generator scripts: `from plantcode.` -> `from chemeascode.`.
 6. Commands in `AGENTS.md`, `README.md`, `.claude/settings.json` (`Bash(cheme:*)`),
    `scripts/agent-run/` (`CHEME` for the command) and `.github/workflows/*.yml`:
-   `plantcode <cmd>` -> `cheme <cmd>`. The CI installs the same git URL; keep the secret name
-   `PLANTCODE_READ_TOKEN`.
+   `plantcode <cmd>` -> `cheme <cmd>`. The CI installs the same git URL.
 7. Skills: `cheme skills update` (or `--force` for skills not changed locally) installs the
    renamed bundled skills; the manifest knows the earlier versions, so unchanged old copies show
    as outdated, not modified.

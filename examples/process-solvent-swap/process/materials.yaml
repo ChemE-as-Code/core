@@ -1,0 +1,26 @@
+# Data for the solvent swap. The Antoine vapour pressures are the NIST WebBook's (log10 bar, K,
+# as `cheme chemistry props` gives them); the heats of vaporization are in kJ/kmol (NIST gives
+# kJ/mol: times 1000), typical values near the still's temperature (illustrative). The product
+# is a generic non-volatile solute (illustrative).
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: MEOH
+    name: Methanol
+    formula: CH4O
+    cas: 67-56-1
+    molar_mass: 32.042
+    heat_of_vaporization: 37400
+    vapour_pressure: {a: 5.20409, b: 1581.341, c: -33.5, temperature_range: [288.1, 356.83], provenance: given, source: "NIST WebBook, Ambrose and Sprake (1970)"}
+  - id: TOL
+    name: Toluene
+    formula: C7H8
+    cas: 108-88-3
+    molar_mass: 92.141
+    heat_of_vaporization: 37100
+    vapour_pressure: {a: 4.07827, b: 1343.943, c: -53.773, temperature_range: [308.52, 384.66], provenance: given, source: "NIST WebBook, Besley and Bottomley (1974)"}
+  - id: PROD
+    name: Product (non-volatile solute, illustrative)
+    molar_mass: 250.0
+templates:
+  - {id: solution, components: [MEOH, TOL, PROD]}

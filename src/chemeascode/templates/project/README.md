@@ -50,8 +50,6 @@ not engineering advice.
   finds them here. After upgrading (`uv tool upgrade cheme-as-code`), run `cheme skills update` to
   refresh them; `cheme skills status` shows which are out of date. A skill you changed here is
   kept.
-- **While cheme-as-code is private**, you need read access to it, and the CI needs the secrets
-  named in `.github/workflows/validate.yml`.
 
 ## Quick start
 
