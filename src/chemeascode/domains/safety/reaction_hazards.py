@@ -161,7 +161,8 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     entry = HazardEntry(node, model)
     reactions, _ = process.reactions_of(node)
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
-    if model == "semibatch":
+    if model == "semibatch":  # its charge and doses: the material inlets
+        inlets = [s for s in inlets if s.kind == "material"]
         return _screen_semibatch(process, item, entry, reactions, inlets, case)
     if len(inlets) != 1:
         entry.missing.append("one inlet stream")

@@ -379,3 +379,30 @@ def test_the_semibatch_example_is_current_and_screens_low():
     # dosed over 2 h the anhydride hardly accumulates; all at once it would boil the water
     assert entry.accumulation < 0.1 and entry.mtsr < entry.mtt
     assert entry.process_temperature + entry.adiabatic_rise > entry.mtt
+
+
+def test_an_energy_stream_into_the_semibatch_is_no_charge(tmp_path):
+    """An agitator's power into the reactor (an energy stream) is neither the charge nor a dose
+    (found by the NBS pilot, process-library#370)."""
+    powered = (
+        FLOWSHEET.replace(
+            "  - {id: G, ports: [{id: out, direction: out}]}\n",
+            "  - {id: G, ports: [{id: out, direction: out}]}\n"
+            "  - {id: PWR, ports: [{id: q, direction: out, kind: energy}]}\n",
+        )
+        .replace(
+            "{id: dose, direction: in}, ",
+            "{id: dose, direction: in}, {id: power, direction: in, kind: energy}, ",
+        )
+        .replace(
+            "  - id: S3\n",
+            "  - {id: Q1, from: PWR.q, to: R.power, kind: energy}\n  - id: S3\n",
+        )
+    )
+    ws = _plant(tmp_path, powered)
+    assert not _messages(ws)
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert result.written >= 1, [f.format() for f in result.findings]
+    (entry,) = screen(ws.root).entries
+    assert entry.accumulation == pytest.approx(0.02778, rel=1e-3)
