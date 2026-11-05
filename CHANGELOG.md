@@ -54,6 +54,14 @@
   line); `sensing_points=[...]` gives its bends. Generator scripts that relied on the old drawing
   draw differently when rerun (`cheme regen`).
 
+### Fixed
+
+- `cheme export-static --exclude`: the `checks` answer no longer names an excluded file. A
+  stage sign-off's `review` is null when its review record is excluded, a check's `evidence`
+  loses the excluded `path`, and its `detail` says "(a file not in this snapshot)" instead;
+  the results stay. The Process Atlas's public check failed on ammonia-1, whose sign-offs name
+  their `reviews/` records.
+
 ## 1.5.0 (2026-11-04)
 
 Minor release: electrochemical measurements, measured-performance cells, dynamic electrolysis
