@@ -1216,7 +1216,21 @@ class Distilling(Strict):
     )
 
 
-class Block(Node, Reacting, Solids, Distilling):
+class Energetic(Strict):
+    """Which energy stream carries the duty of a block's or step's model (ADR 0059)."""
+
+    energy_port: str | None = Field(
+        default=None,
+        description="A batch or semi-batch reactor, batch still, crystallizer or conversion "
+        "step: the energy port whose stream carries the model's year-average duty (cheme "
+        "process propagate writes it, or compares a given one); default: its one heat stream "
+        "(an energy stream from or to a heating or cooling utility, or another block or "
+        "step).",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling, Energetic):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -1236,7 +1250,7 @@ class Block(Node, Reacting, Solids, Distilling):
     )
 
 
-class Step(Node, Reacting, Solids, Distilling):
+class Step(Node, Reacting, Solids, Distilling, Energetic):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(

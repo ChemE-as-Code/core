@@ -195,4 +195,5 @@ nav:
       - "0055 Batch still and solvent swap": adr/0055-batch-still-and-solvent-swap.md
       - "0056 Precipitation from a mixed liquor": adr/0056-precipitation-from-a-mixed-liquor.md
       - "0057 Filter-dryer and recipe units over several steps": adr/0057-filter-dryer-and-recipe-units-over-several-steps.md
+      - "0059 Batch models write their energy streams": adr/0059-batch-models-write-their-energy-streams.md
       - Template: adr/template.md

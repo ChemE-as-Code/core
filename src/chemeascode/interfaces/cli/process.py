@@ -112,7 +112,8 @@ def reactors(
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Each reactor: model, extents, heats of reaction, ln K and ln(Q/K) at the outlet, and the
-    duty H(out) - H(in) on the elements basis (ideal gas)."""
+    duty H(out) - H(in) on the elements basis (ideal gas); a batch's or conversion step's
+    year-average duty from its model and its energy stream (ADR 0059)."""
     from chemeascode.domains.process.reactors import UnknownCase, reactor_report, reactor_text
 
     workspace = _workspace()
@@ -811,7 +812,10 @@ def propagate(
     pass-through steps (compressors, coolers, heaters, pumps, filters), mixers, splitters
     (`split:` fractions per outlet port, else the mass balance remainder).
 
-    Separators and reactors are only checked, never solved. Derived values are `calculated`
+    A batch or semi-batch, still, crystallizer or conversion step writes its year-average duty
+    on its energy stream (`energy_port:`, else its one heat stream); a given duty is compared
+    (cheme.process-duty, ADR 0059). Other separators and reactors are only checked, never
+    solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1
     on a warning (stale propagated values). --json prints the run as an adapter result
     (cheme/adapter-result/v1) per case, same exit codes."""

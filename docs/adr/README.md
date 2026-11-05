@@ -103,3 +103,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0055](0055-batch-still-and-solvent-swap.md) | A batch (Rayleigh) still and solvent swap as a flowsheet step, solved natively | Proposed | 2026-11-05 |
 | [0056](0056-precipitation-from-a-mixed-liquor.md) | Precipitation from a mixed liquor in the crystallizer; phase changes are not screened as reactions | Proposed | 2026-11-05 |
 | [0057](0057-filter-dryer-and-recipe-units-over-several-steps.md) | A filter-dryer step to a residual moisture, and recipe units over several steps | Proposed | 2026-11-05 |
+| [0059](0059-batch-models-write-their-energy-streams.md) | Batch models write and check the duty of their energy streams | Proposed | 2026-11-05 |

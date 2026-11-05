@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Batch models write and check their energy streams (ADR 0059, #180). `cheme process propagate
+  --fill` writes the year-average duty (kW per hour of the flowsheet's flows, `calculated`
+  with a fingerprint) of an isothermal `reactor: batch` or `semibatch` (the heat its reactions
+  release and the doses warmed), a `still:` (its boil-up's latent heat), a `crystallizer:`
+  with `energy:` and a conversion step (its declared heats of reaction at the outlet's
+  temperature and the streams' sensible heat, or ideal-gas `H(out) - H(in)`) on the energy
+  stream at the step's new `energy_port:`, else on its one heat stream (to or from a heating or
+  cooling utility, or another block or step; not electricity). A duty is positive in its
+  stream's direction; a model whose heat flows against it is a warning, never a negative duty.
+  A given or assumed duty is never overwritten: one beyond the flowsheet's relative tolerance
+  is `cheme.process-duty` (warning, naming both values); several heat streams or missing data
+  are `cheme.process-duty` (info). `validate` adds `cheme.process-energy-port`. A flow-style
+  energy stream is written in place. `cheme process reactors` shows a batch's or conversion
+  step's duty and its stream where the ideal-gas duty was `?`, and `cheme process stills` the
+  year-average duty. Plants without such heat streams solve, report and fingerprint as in
+  1.8.0; a plant whose batch step has one heat stream with a typed duty gets a warning where
+  the duty differs from the model's. Every BFD/PFD needs `cheme process build` once (the
+  process generator's code changed).
+
 ## 1.8.0 (2026-11-05)
 
 Minor release: batch work-up (#165) and gas evolution (#174). A batch or semi-batch vents the

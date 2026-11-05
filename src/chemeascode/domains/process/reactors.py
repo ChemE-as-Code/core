@@ -35,6 +35,13 @@ from chemeascode.domains.chemistry.thermochemistry import (
     reaction_enthalpy,
 )
 from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
+from chemeascode.domains.process.duties import (
+    batch_duty,
+    conversion_duty,
+    duty_model,
+    report_entry,
+    report_lines,
+)
 from chemeascode.domains.process.model import Process, balance_of, stream_flows
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.provenance import SourceRevision, source_revision
@@ -327,6 +334,7 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         except BedError as failure:
             lacking.append(f"the bed: {failure}")
     tank_entry = None
+    model_duty = None
     if with_bed and getattr(item, "reactor", None) in ("cstr", "batch", "semibatch"):
         from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
         from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
@@ -353,9 +361,13 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 tank_entry |= semibatch_entry(solved_tank)
             if vent is not None:
                 tank_entry |= vent_entry(solved_tank, vent.stream)
+            if item.reactor in ("batch", "semibatch"):
+                model_duty = report_entry(process, item, case, batch_duty(item, solved_tank))
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
-    return {
+    if with_bed and duty_model(item) == "conversion" and not process.inside(node):
+        model_duty = report_entry(process, item, case, conversion_duty(process, item, case)[0])
+    found = {
         "node": node,
         "kind": process.kinds.get(node),
         "bed": bed_entry,
@@ -379,6 +391,9 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         ),
         "missing": lacking,
     }
+    if model_duty is not None:  # ADR 0059; other reactors' entries stay as they were
+        found["model_duty"] = model_duty
+    return found
 
 
 def reactor_report(root: Path, case: str | None = None) -> ReactorReport:
@@ -421,7 +436,7 @@ def reactor_text(report: ReactorReport) -> str:
             f"{r['kind']} {r['node']} ({r['model'] or 'holds reactors'}): balance {r['balance']}; "
             f"T out {num(r['temperature_out_K'], ' K')}, P out {num(r['pressure_out_kPa'], ' kPa')}"
             + (f", approach {r['approach_K']:g} K" if r["approach_K"] else "")
-            + f"; duty {num(r['duty_kW'], ' kW')}"
+            + f"; duty {_duty_shown(r, num)}"
             + "".join(f" ({note})" for note in r.get("duty_assumptions", []))
         )
         for e in r["reactions"]:
@@ -493,11 +508,22 @@ def reactor_text(report: ReactorReport) -> str:
                     + f"; peak cooling duty {num(tank['peak_cooling_duty_kW_m3'], ' kW/m3')}"
                     + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
                 )
+        if r.get("model_duty"):
+            lines += report_lines(r["model_duty"])
         if r["missing"]:
             lines.append("  missing: " + "; ".join(dict.fromkeys(r["missing"])))
     if not report.reactors:
         lines.append("no reactors (no block or step names reactions or a reactor model)")
     return "\n".join(lines)
+
+
+def _duty_shown(r: dict[str, Any], num: Any) -> str:
+    """The header's duty: the ideal-gas H(out) - H(in), else the model's year-average duty
+    (ADR 0059), else ?."""
+    model = (r.get("model_duty") or {}).get("heat_in_kW")
+    if r["duty_kW"] is None and model is not None:
+        return f"{model:.6g} kW ({r['model_duty']['model']} model, year average)"
+    return num(r["duty_kW"], " kW")
 
 
 def vent_entry(solved: Any, stream: str) -> dict[str, Any]:

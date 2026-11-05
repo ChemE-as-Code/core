@@ -1,4 +1,4 @@
-<!-- cheme-process {"generator_version": "6", "generator_sha256": "e6276965a4f27244d6a5dea524b2d6c52cbf0a0731afe00030c2d1757322de9c", "schema": "cheme/process/v1", "view": "bfd", "case": "design", "source_sha256": "de483f9e70f046162ff1bb8c0bfe1a51e7ba2f53d7912f318f8ff2e86ca4fdf0", "output_sha256": "61e761909884ea7578ee528dbb413d902ea5765807e47e6305bcc7bd86786a14"} -->
+<!-- cheme-process {"generator_version": "6", "generator_sha256": "eab1c23023416d91da2df046d1b6d887b9dc4a69605165cc75b310076f8b545b", "schema": "cheme/process/v1", "view": "bfd", "case": "design", "source_sha256": "de483f9e70f046162ff1bb8c0bfe1a51e7ba2f53d7912f318f8ff2e86ca4fdf0", "output_sha256": "61e761909884ea7578ee528dbb413d902ea5765807e47e6305bcc7bd86786a14"} -->
 <!-- Generated with pyDEXPI 2.1.0 - https://github.com/process-intelligence-research/pyDEXPI -->
 <Model name="example" uri="http://www.example.org">
   <Import prefix="Core" source="https://data.dexpi.org/models/2.0.1/Core.xml"/>

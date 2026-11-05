@@ -153,6 +153,21 @@ never overwrites), and rerun `--fill` when `validate` reports them stale. A comp
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
 in `DESIGN.md`. Run propagate before `props --fill`.
 
+**Duties from the models (ADR 0059).** Do not copy a reactor's, still's or crystallizer's duty
+from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
+process propagate --fill` write the year-average duty of an isothermal batch or semi-batch
+(the reaction heat and the doses' warming), a `still:` (its boil-up's latent heat), a
+`crystallizer:` with `energy:` or a conversion step (its declared heats of reaction and the
+streams' sensible heat). It goes on the stream at the step's `energy_port: PORT`, else on its
+one energy stream to a heating or cooling utility (steam, cooling water, refrigerant...): give
+`energy_port` when the step has several, such as a reactor heated up by steam and cooled by
+brine, or a still with condensers. Direction matters: a cooling stream runs from the step to
+the utility, a heating stream from the utility to the step; the duty is positive. A duty you
+keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
+`cheme.process-duty` names both values when they differ: record the difference in
+`DESIGN.md`. The charge's heat-up, agitation, condensers and the dryer (its own
+`energy.port`) are not written: give those streams yourself.
+
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:
 
