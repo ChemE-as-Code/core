@@ -414,8 +414,9 @@ def derive(process: Process, case: str) -> Derivation:
             return equilibrate_real(stoich, ks, moles, kpa, gas_t, critical)[0]
         return equilibrate(stoich, ks, moles, kpa)[0]
 
-    def solids(node: Any, inlet: StreamDef, outs: list[tuple[StreamDef, str]]) -> bool:
-        """The outlets of crystallizer or filter *node* (:mod:`.crystallization`)."""
+    def solids(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
+        """The outlets of crystallizer or filter *node* (:mod:`.crystallization`); a
+        crystallizer takes its inlets together."""
         from chemeascode.domains.process.crystallization import (
             CrystallizationError,
             node_outlets,
@@ -424,12 +425,13 @@ def derive(process: Process, case: str) -> Derivation:
             solve_node,
         )
 
-        if stream_flows(work, inlet, case).components is None:
+        if any(stream_flows(work, s, case).components is None for s in ins):
             return False
+        inlet = ins[0]
         shapes: dict[str, dict[str, float]] = {}
         try:
             if node.crystallizer is not None:
-                result, extra = solve_node(work, node, inlet, case)
+                result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 ports = node_outlets(node.crystallizer, result)
                 shapes = {
                     port: outlet_shape(node.crystallizer, role, result)
@@ -444,15 +446,15 @@ def derive(process: Process, case: str) -> Derivation:
         changed = False
         kind = kinds[node.id]
         names = sorted({n for mass in ports.values() for n in mass})
-        extra |= {"inlet": _converted(work, case, [inlet], components=names)}
+        extra |= {"inlet": _converted(work, case, ins, components=names)}
         for s, port in outs:
             mass = ports.get(port)
             if mass is None:
                 continue
             total = sum(mass.values())
-            changed |= put(s, "flow", kg_h(total), kind, node.id, [inlet], extra)
+            changed |= put(s, "flow", kg_h(total), kind, node.id, ins, extra)
             shape = mass if total > 0 else shapes.get(port) or mass
-            changed |= put(s, "composition", _mix(work, shape), kind, node.id, [inlet], extra)
+            changed |= put(s, "composition", _mix(work, shape), kind, node.id, ins, extra)
         return changed
 
     def step(node: Any) -> bool:
@@ -461,8 +463,8 @@ def derive(process: Process, case: str) -> Derivation:
         outs = at[node.id][1]
         changed = False
         if kind in ("crystallizer", "solid-separation"):
-            if len(ins) == 1 and outs:
-                changed |= solids(node, ins[0], outs)
+            if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
+                changed |= solids(node, ins, outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
             a, b = ins[0], outs[0][0]
             for name in FIELDS:

@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Precipitation from a mixed liquor (ADR 0056, core#165): `crystallizer.spectators: [ids]`
+  carries other dissolved components (salts, base, unreacted reagent) unchanged in the mother
+  liquor. The solubility is either measured in that liquor (`solubility.measured_in:
+  mother_liquor`, units `kg/kg_solvent`, `mass_fraction` or the new `kg/kg_liquor`), or the
+  pure solvent's corrected by `solubility.salting_out: {coefficients: {id: k}}` (Setschenow,
+  molal scale). A pure-solvent value alone is `cheme.process-crystallizer` (error) and refused
+  by propagate. A crystallizer takes several inlets together, so a reslurry wash is a
+  crystallizer fed by the cake and the wash. `cheme process crystallizers` reports the
+  spectators' balances and molalities. Every BFD/PFD needs `cheme process build` once (the
+  process schema changed).
+- `kind: phase-change` on a reaction of `process/reactions.yaml`. A reaction of one component
+  into one other with the same formula, one of them `phase: solid`, counts as one without the
+  field. `cheme process reactor-hazards` no longer screens a step whose reactions are all
+  phase changes (`cheme.reactor-hazard-phase-change`, info; JSON `phase_changes`), and screens
+  a step with both on its reactions alone.
+
 ## 1.7.0 (2026-11-05)
 
 Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a

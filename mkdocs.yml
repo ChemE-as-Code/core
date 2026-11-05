@@ -191,4 +191,5 @@ nav:
       - "0051 Batch recipe derives the cycle time": adr/0051-batch-recipe-derives-the-cycle-time.md
       - "0052 Batch vessel and jacket from the recipe": adr/0052-batch-vessel-and-jacket-from-the-recipe.md
       - "0053 Per-batch LCA consumables": adr/0053-per-batch-lca-consumables.md
+      - "0056 Precipitation from a mixed liquor": adr/0056-precipitation-from-a-mixed-liquor.md
       - Template: adr/template.md

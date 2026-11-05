@@ -25,11 +25,18 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
 - for a cooled fixed bed: the hot spot's sensitivity ``d T_hot / d T_coolant`` (1 K steps);
   above 5 the bed is near runaway (parametric sensitivity, Morbidelli and Varma).
 
+Phase changes are not reactions (ADR 0056): a step whose reactions are all phase changes
+(``kind: phase-change``, or one component into one other of the same formula, one of them
+``phase: solid``, e.g. a precipitation ``NBS -> NBS_S`` written as a conversion) is not
+screened; a step with reactions
+and phase changes is screened on its reactions alone.
+
 Rules (``cheme.reactor-hazard-*``, findings on ``process/flowsheet.yaml``): ``-class``
 (info for classes 1 and 2, warning for 3 to 5), ``-mtsr`` (warning: the MTSR above the MTT or
 the TD24 where the class cannot be given), ``-sensitivity`` (warning), ``-missing`` (info: what
-the screening lacks). These are screening values for a concept or basic design: they do not
-replace calorimetry or a reaction-hazard study, and decide nothing.
+the screening lacks), ``-phase-change`` (info: a step not screened, its reactions all phase
+changes). These are screening values for a concept or basic design: they do not replace
+calorimetry or a reaction-hazard study, and decide nothing.
 """
 
 from __future__ import annotations
@@ -68,15 +75,25 @@ class HazardEntry:
 
 
 @dataclass
+class PhaseChangeStep:
+    """A step not screened: its reactions are all phase changes (reaction id -> why)."""
+
+    node: str
+    reactions: dict[str, str]
+
+
+@dataclass
 class HazardReport:
     entries: list[HazardEntry]
     findings: list[Finding]
     source: SourceRevision | None = None
+    phase_changes: list[PhaseChangeStep] = field(default_factory=list)
 
     def to_json(self) -> str:
         return json.dumps(
             {
                 "reactors": [asdict(e) for e in self.entries],
+                "phase_changes": [asdict(p) for p in self.phase_changes],
                 "findings": [
                     {
                         "file": f.file,
@@ -150,8 +167,21 @@ def _adiabatic_rise(
     return best / capacity if capacity > 0 else None, lacking
 
 
+def phase_changes(process: Any, node: str) -> dict[str, str]:
+    """Reaction id -> why it is a phase change, of the reactions of *node* that are."""
+    from chemeascode.domains.chemistry.reactions import phase_change
+    from chemeascode.domains.process.solids import solid_components
+
+    reactions, _ = process.reactions_of(node)
+    formulas = process.formulas()
+    solids = solid_components(process)
+    found = {r.id: phase_change(r, formulas, solids) for r in reactions}
+    return {k: v for k, v in found.items() if v}
+
+
 def screen_node(process: Any, node: str, case: str) -> HazardEntry:
-    """The screening of reactor *node* in *case* (see the module docstring)."""
+    """The screening of reactor *node* in *case* (see the module docstring); its phase
+    changes take no part (the screening of its reactions alone)."""
     from chemeascode.domains.process.model import stream_flows
     from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 
@@ -160,6 +190,9 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     model = getattr(item, "reactor", None) or "conversion"
     entry = HazardEntry(node, model)
     reactions, _ = process.reactions_of(node)
+    if changes := phase_changes(process, node):
+        reactions = [r for r in reactions if r.id not in changes]
+        entry.notes.append("phase changes not screened as reactions: " + ", ".join(sorted(changes)))
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
     if model == "semibatch":  # its charge and doses: the material inlets
         inlets = [s for s in inlets if s.kind == "material"]
@@ -338,12 +371,34 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
         return HazardReport([], found)
     case = case or process.flowsheet.default_case()
     fs = process.flowsheet
-    entries = [
-        screen_node(process, n.id, case)
-        for n in [*fs.blocks, *fs.steps]
-        if process.reactive(n.id) and (n.reactions or getattr(n, "reactor", None))
-    ]
+    entries: list[HazardEntry] = []
+    skipped: list[PhaseChangeStep] = []
+    for n in [*fs.blocks, *fs.steps]:
+        if not (process.reactive(n.id) and (n.reactions or getattr(n, "reactor", None))):
+            continue
+        reactions, _ = process.reactions_of(n.id)
+        changes = phase_changes(process, n.id)
+        if reactions and len(changes) == len(reactions):
+            skipped.append(PhaseChangeStep(n.id, dict(sorted(changes.items()))))
+        else:
+            entries.append(screen_node(process, n.id, case))
     findings: list[Finding] = []
+    for p in skipped:
+        findings.append(
+            Finding(
+                FLOWSHEET,
+                "info",
+                "cheme.reactor-hazard-phase-change",
+                f"{p.node}: not screened: its reactions are phase changes ("
+                + ", ".join(f"{r}: {why}" for r, why in p.reactions.items())
+                + "), no reaction heat to run away",
+                line=_yaml_line(process.flowsheet_doc, _location(process, p.node)),
+                ids=[p.node],
+                hint="model a precipitation or a reslurry wash as a crystallizer: (spectators, "
+                "a solubility in the liquor) rather than conversion reactions; a phase change "
+                "that stays a reaction says kind: phase-change in process/reactions.yaml",
+            )
+        )
     for e in entries:
         line = _yaml_line(process.flowsheet_doc, _location(process, e.node))
 
@@ -406,7 +461,7 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
     from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
 
     paths = [FLOWSHEET_FILE, MATERIALS_FILE, "process/reactions.yaml", "process/catalysts.yaml"]
-    return HazardReport(entries, findings, source_revision(root, paths))
+    return HazardReport(entries, findings, source_revision(root, paths), skipped)
 
 
 def hazard_text(report: HazardReport) -> str:
@@ -431,7 +486,9 @@ def hazard_text(report: HazardReport) -> str:
             )
         )
         lines += [f"  note: {n}" for n in e.notes]
-    if not report.entries:
+    for p in report.phase_changes:
+        lines.append(f"{p.node}: not screened (phase changes: {', '.join(p.reactions)})")
+    if not report.entries and not report.phase_changes:
         lines.append("no reactors")
     lines += [f.format() for f in report.findings]
     lines.append("screening values: they do not replace calorimetry or a reaction-hazard study")

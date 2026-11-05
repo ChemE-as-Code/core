@@ -211,7 +211,13 @@ each value taken from the evidence cites its observation in `source`.
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays
    open (`cheme.reactor-hazard-missing`). These are screening values for the HAZOP study, not a
-   reaction-hazard assessment.
+   reaction-hazard assessment. A phase change is no reaction: a precipitation, dissolution or
+   wash loss belongs in a `crystallizer:` on the step (`spectators:` for the other solutes of
+   the liquor; skill `separation-method-selection`). Where one stays written as a reaction,
+   give it `kind: phase-change` (one component into one other of the same formula, one of them
+   `phase: solid`, is recognised as one): a step whose reactions are all phase changes is not
+   screened (`cheme.reactor-hazard-phase-change`, info), and a step with both is screened on
+   its reactions alone.
 9. Where the reaction data are uncertain (a fit's intervals, a literature range), give them:
    `rate.uncertainty: {A: {gsd2: 3}, Ea: {distribution: normal, cv: 0.05}}`, and an
    `uncertainty:` on `heat_of_reaction`, `equilibrium_constant` (of K) or `conversion` (the
