@@ -451,7 +451,11 @@ def reactor_text(report: ReactorReport) -> str:
             lines.append(
                 f"  {tank['kind']}: {tank['time_s']:.6g} s to conversion {end:.4g}, outlet "
                 f"{tank['outlet_temperature_K']:.6g} K"
-                + (f", heat released {heat:.6g} kJ/kmol of charge" if heat is not None else "")
+                + (
+                    f", heat released {heat:.6g} kJ/kmol of charge{' and doses' if semi else ''}"
+                    if heat is not None
+                    else ""
+                )
                 + (f"; {'; '.join(tank['notes'])}" if tank["notes"] and not semi else "")
             )
             if semi:
