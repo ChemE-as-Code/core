@@ -21,7 +21,8 @@ ones and never promote either on convergence alone:
 - crystallizers and filters (``crystallizer:``, ``solid_separation:``; :mod:`.crystallization`):
   ``solubility-equilibrium`` (predictive within its solubility data: the mother liquor leaves
   saturated), ``imposed-yield`` and ``solid-split`` (specified); solved by ``cheme process
-  propagate``, never simulated;
+  propagate``, never simulated; a dryer (``dryer:``; :mod:`.dryer`): ``residual-moisture``
+  (specified), solved the same way;
 - batch stills and solvent swaps (``still:``; :mod:`.batch_still`): ``rayleigh`` (predictive:
   one equilibrium stage, Raoult's law with Antoine vapour pressures or a constant relative
   volatility); sourced when its volatility data carry a source; solved by ``cheme process
@@ -544,10 +545,30 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     ``cheme process propagate`` solves them."""
     from chemeascode.domains.process.crystallization import (
         ASSUMPTIONS,
+        LIQUOR_ASSUMPTIONS,
         SEPARATION_ASSUMPTIONS,
     )
 
     outside = "not part of a converged simulation: solved by cheme process propagate"
+    dryer = node.dryer
+    if dryer is not None:
+        from chemeascode.domains.process.dryer import ASSUMPTIONS as DRYER_ASSUMPTIONS
+
+        moisture = dryer.residual_moisture
+        sourced = _sourced(moisture)
+        return UnitBasis(
+            node.id,
+            "separator",
+            "residual-moisture",
+            False,
+            sourced,
+            detail=f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
+            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
+            + ("" if sourced else " (not given with a source: assumed)"),
+            sources=[moisture.source] if sourced else [],
+            assumptions=list(DRYER_ASSUMPTIONS),
+            limitations=["specified moisture: no drying curve or sorption isotherm", outside],
+        )
     sep = node.solid_separation
     if sep is not None:
         sourced = _sourced(sep)
@@ -569,7 +590,12 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     lacking: list[str] = []
     limitations = [outside, "no population balance (crystal size distribution not modelled)"]
     parts = [spec.solubility if spec.basis == "solubility" else spec.yield_, spec.separation]
-    for part, what in zip(parts, (spec.basis, "separation"), strict=True):
+    whats = [spec.basis, "separation"]
+    salting = spec.solubility.salting_out if spec.solubility is not None else None
+    if spec.basis == "solubility" and salting is not None:
+        parts.append(salting)
+        whats.append("salting_out")
+    for part, what in zip(parts, whats, strict=True):
         if part is None:
             continue
         if _sourced(part):
@@ -603,6 +629,24 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         limitations.append("specified separation: no filtration or centrifuge model")
     if spec.recycle is not None:
         detail += f"; mother liquor recycle {spec.recycle.fraction:g}"
+    assumptions = list(ASSUMPTIONS)
+    if spec.spectators:
+        sol = spec.solubility
+        how = (
+            "solubility measured in the mother liquor"
+            if sol is not None and sol.measured_in == "mother_liquor"
+            else "pure-solvent solubility with Setschenow salting-out"
+            if salting is not None
+            else "no solubility in the liquor"
+        )
+        detail += f"; spectators {', '.join(spec.spectators)} ({how})"
+        if sol is not None and sol.measured_in == "pure_solvent" and salting is None:
+            lacking.append("a solubility in the mixed liquor")
+        assumptions += LIQUOR_ASSUMPTIONS
+        limitations.append(
+            "mixed liquor: the solubility data hold at the liquor composition their source "
+            "states; no electrolyte activity model"
+        )
     if lacking:
         detail += "; not sourced: " + ", ".join(lacking)
     return UnitBasis(
@@ -613,7 +657,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         not lacking,
         detail=detail,
         sources=sources,
-        assumptions=list(ASSUMPTIONS),
+        assumptions=assumptions,
         limitations=limitations,
     )
 
@@ -690,7 +734,11 @@ def model_bases(
             unit = cells[node.id]
         elif node.still is not None:
             unit = still_basis(process, node)
-        elif node.crystallizer is not None or node.solid_separation is not None:
+        elif (
+            node.crystallizer is not None
+            or node.solid_separation is not None
+            or node.dryer is not None
+        ):
             unit = solids_basis(process, node)
         elif reacting:
             unit = _reactor_basis(process, node, simulated, (runs or {}).get(node.id, []))

@@ -29,7 +29,7 @@ from the process domain.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -123,6 +123,7 @@ class EquilibriumConstant(Strict):
 #: What :meth:`Reaction.inputs_dump` leaves out.
 INPUTS_EXCLUDE = {
     "mechanism": True,
+    "kind": True,
     "conversion": {"uncertainty"},
     "heat_of_reaction": {"uncertainty"},
     "equilibrium_constant": {"uncertainty"},
@@ -139,6 +140,15 @@ class Reaction(Strict):
         description="Component id -> coefficient: negative reactants, positive products.",
     )
     phase: Literal["vapor", "liquid", "mixed"] | None = None
+    kind: Literal["reaction", "phase-change"] = Field(
+        default="reaction",
+        description="phase-change: no chemical change, a component going from one phase to "
+        "another (a precipitation NBS(aq) -> NBS(s), a dissolution, a hydrate forming): the "
+        "thermal screening (cheme process reactor-hazards) does not screen it as a reaction. "
+        "A reaction of one component into one other of the same formula, one of them phase: "
+        "solid, counts as one unless it declares a heat_of_reaction (then it is screened).",
+        exclude_if=lambda value: value == "reaction",
+    )
     reversible: bool = False
     conversion: Conversion | None = None
     heat_of_reaction: HeatOfReaction | None = None
@@ -213,6 +223,27 @@ class Reactions(Strict):
 
 
 # -- checks -------------------------------------------------------------------------------------
+
+
+def phase_change(
+    reaction: Reaction, formulas: Mapping[str, str], solids: Collection[str] = ()
+) -> str | None:
+    """Why *reaction* is a phase change, not a chemical reaction: ``declared`` (``kind:
+    phase-change``) or ``same formula`` (one component into one other, coefficient for
+    coefficient, with the same atoms, one of them a solid component of *solids* and the other
+    not: ``A(aq) -> A(s)``, never an isomerisation); None for a reaction."""
+    if reaction.kind == "phase-change":
+        return "declared"
+    stoich = reaction.stoichiometry
+    if len(stoich) != 2:
+        return None
+    (a, nu_a), (b, nu_b) = stoich.items()
+    if nu_a != -nu_b or (a in solids) == (b in solids):
+        return None
+    atoms = [parse_formula(formulas.get(n) or "") for n in (a, b)]
+    if atoms[0] and atoms[0] == atoms[1]:
+        return "same formula"
+    return None
 
 
 def key_component(reaction: Reaction) -> str | None:

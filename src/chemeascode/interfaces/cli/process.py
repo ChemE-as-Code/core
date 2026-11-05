@@ -130,9 +130,11 @@ def crystallizers(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
-    """Each crystallizer and filter or centrifuge (crystallizer:, solid_separation:): its basis
-    (solubility-equilibrium, imposed-yield or solid-split), crystals, recovery, the outlets as dry
-    solid and liquid, the balances and the duty. Exit 1 on an error finding."""
+    """Each crystallizer, filter or centrifuge and dryer (crystallizer:, solid_separation:,
+    dryer:): its basis (solubility-equilibrium, imposed-yield, solid-split or residual-moisture),
+    crystals, recovery, the outlets as dry solid and liquid, the balances and the duty (a dryer:
+    sensible, latent and vessel heat, per batch with process/recipe.yaml). Exit 1 on an error
+    finding."""
     from chemeascode.domains.process.crystallization import (
         UnknownCase,
         crystallizer_report,

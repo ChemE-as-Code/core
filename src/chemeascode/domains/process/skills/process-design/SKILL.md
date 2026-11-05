@@ -139,7 +139,13 @@ Type compositions and flows only where they are design inputs; `cheme process pr
 composition and splits the flow by `split: {outlet port: fraction}` on the step (else the one
 missing outlet flow is the mass balance remainder); a reactor naming `reactions:` with a
 conversion for each (skill `reactions`) gets its outlet from the conversions. A batch still or
-solvent swap (`still:` on the step, below) gets its cuts and residue. Other separators, and
+solvent swap (`still:` on the step, below) gets its cuts and residue. A step with
+`crystallizer:`, `solid_separation:` or `dryer:` (a batch filter-dryer or vacuum dryer: its
+`volatiles` dried to a `residual_moisture`, ADR 0057) gets its outlets from that model, and
+`cheme process crystallizers` reports their balances and duties. A filter-dryer's filter, wash,
+re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
+procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
+dryer. Other separators, and
 reactors without conversions, are never solved (`cheme.process-propagate-not-solved` lists
 their streams lacking values): give those values yourself. Derived values are `calculated` with source `cheme process propagate: ...`
 and a fingerprint; never edit them by hand (give the value as `assumed` instead, which propagate

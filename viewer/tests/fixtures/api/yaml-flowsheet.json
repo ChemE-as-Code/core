@@ -444,7 +444,7 @@
     "$defs": {
       "Batch": {
         "additionalProperties": false,
-        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing).",
+        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as\nthey form, by a second outlet.",
         "properties": {
           "time": {
             "anyOf": [
@@ -501,6 +501,18 @@
             },
             "title": "Dosing",
             "type": "array"
+          },
+          "vent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Vent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
           },
           "provenance": {
             "enum": [
@@ -784,6 +796,18 @@
             ],
             "default": null,
             "description": "A filter or centrifuge on its own."
+          },
+          "dryer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Dryer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch (filter-)dryer or vacuum dryer to a residual moisture."
           },
           "reactions": {
             "description": "Reaction ids of process/reactions.yaml that take place here: the balance is reactive (elements and extents instead of components).",
@@ -1272,7 +1296,7 @@
       },
       "Crystallizer": {
         "additionalProperties": false,
-        "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed.",
+        "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed. ``spectators`` are other\ndissolved components carried unchanged (a precipitation from a reaction liquor); its\ninlets are taken together (a reslurry wash: the cake and the wash liquid).",
         "properties": {
           "solute": {
             "description": "The dissolved component that crystallizes.",
@@ -1376,6 +1400,14 @@
             ],
             "default": null
           },
+          "spectators": {
+            "description": "Dissolved components besides the solute and solvent (salts, base, unreacted reagent): carried unchanged in the mother liquor, never crystallized or evaporated; the solubility then needs measured_in: mother_liquor or salting_out:.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Spectators",
+            "type": "array"
+          },
           "outlets": {
             "additionalProperties": {
               "type": "string"
@@ -1469,6 +1501,37 @@
         "title": "CrystallizerEnergy",
         "type": "object"
       },
+      "Declared": {
+        "additionalProperties": false,
+        "description": "One positive figure with its provenance.",
+        "properties": {
+          "value": {
+            "exclusiveMinimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "title": "Declared",
+        "type": "object"
+      },
       "Dosing": {
         "additionalProperties": false,
         "description": "A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,\nits flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over\n``time``, or in the ``profile``'s segments one after the other.",
@@ -1516,12 +1579,248 @@
             "minimum": 0,
             "title": "Start",
             "type": "number"
+          },
+          "absorbed": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+            "title": "Absorbed"
           }
         },
         "required": [
           "stream"
         ],
         "title": "Dosing",
+        "type": "object"
+      },
+      "Dryer": {
+        "additionalProperties": false,
+        "description": "A batch (filter-)dryer or vacuum dryer (:mod:`.dryer`): one wet-cake inlet, the dried\nproduct and the vapour out. The ``volatiles`` leave as vapour down to the\n``residual_moisture``; every other component (the solid, and what the cake liquid held\ndissolved) stays in the product. The energy (``energy:``) is the cake's sensible heat to\nthe drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's\nheat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a\nbatch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given\n``drying_time``.",
+        "properties": {
+          "volatiles": {
+            "description": "The components that evaporate.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Volatiles",
+            "type": "array"
+          },
+          "residual_moisture": {
+            "$ref": "#/$defs/ResidualMoisture"
+          },
+          "temperature": {
+            "description": "K: the drying temperature (product, vapour)",
+            "exclusiveMinimum": 0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DryerEnergy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "drying_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Declared"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg evaporated per m2 of heated area and hour, constant"
+          },
+          "drying_time": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DryingTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "cake_density": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Declared"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg/m3 of the wet cake (bulk): sizes the recipe's vessel and its heated area"
+          },
+          "outlets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Role -> the step's outlet port.",
+            "propertyNames": {
+              "enum": [
+                "product",
+                "vapour"
+              ]
+            },
+            "title": "Outlets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "volatiles",
+          "residual_moisture",
+          "temperature",
+          "outlets"
+        ],
+        "title": "Dryer",
+        "type": "object"
+      },
+      "DryerEnergy": {
+        "additionalProperties": false,
+        "description": "The dryer's heat: the wet cake from its inlet temperature to the drying temperature,\nthe volatiles evaporated at it, and (per batch) the vessel, over an efficiency.",
+        "properties": {
+          "heat_capacity": {
+            "description": "kJ/(kg K) of the wet cake, constant",
+            "exclusiveMinimum": 0,
+            "title": "Heat Capacity",
+            "type": "number"
+          },
+          "latent_heat": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "kJ per kg evaporated, per volatile at the drying temperature; default: from the component's critical constants (Pitzer's corresponding states).",
+            "title": "Latent Heat",
+            "type": "object"
+          },
+          "inlet_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K of the wet cake; default: the inlet stream's",
+            "title": "Inlet Temperature"
+          },
+          "vessel_heat_capacity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kJ/K of the vessel heated with each batch (its metal mass x cp); counted per batch of process/recipe.yaml.",
+            "title": "Vessel Heat Capacity"
+          },
+          "efficiency": {
+            "default": 1.0,
+            "description": "Heat to the cake over the heat supplied",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Efficiency",
+            "type": "number"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The energy inlet port of the heat: its duty is compared.",
+            "title": "Port"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "heat_capacity",
+          "provenance"
+        ],
+        "title": "DryerEnergy",
+        "type": "object"
+      },
+      "DryingTime": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "exclusiveMinimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "default": "h",
+            "enum": [
+              "h",
+              "min",
+              "s"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "title": "DryingTime",
         "type": "object"
       },
       "EnthalpyReference": {
@@ -1639,6 +1938,87 @@
           "provenance"
         ],
         "title": "Evaporation",
+        "type": "object"
+      },
+      "Filtration": {
+        "additionalProperties": false,
+        "description": "A constant-pressure cake filtration (Ruth): the time to pass one batch's filtrate,\n``t = mu (alpha M V / (2 A^2) + R_m V / A) / dP`` with M the dry solid of the cake and V\nthe filtrate's volume per batch (:mod:`.dryer`; ``filter`` ``from:`` this step in\n``process/recipe.yaml``). The split itself stays the specified one.",
+        "properties": {
+          "specific_cake_resistance": {
+            "description": "alpha, m/kg (incompressible)",
+            "exclusiveMinimum": 0,
+            "title": "Specific Cake Resistance",
+            "type": "number"
+          },
+          "medium_resistance": {
+            "default": 0.0,
+            "description": "R_m, 1/m",
+            "minimum": 0,
+            "title": "Medium Resistance",
+            "type": "number"
+          },
+          "pressure_difference": {
+            "description": "kPa across cake and medium",
+            "exclusiveMinimum": 0,
+            "title": "Pressure Difference",
+            "type": "number"
+          },
+          "viscosity": {
+            "description": "mPa s of the filtrate",
+            "exclusiveMinimum": 0,
+            "title": "Viscosity",
+            "type": "number"
+          },
+          "filtrate_density": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kg/m3; default: the components' liquid_molar_volume",
+            "title": "Filtrate Density"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2; default: the recipe vessel's bottom (a Nutsche)",
+            "title": "Area"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "specific_cake_resistance",
+          "pressure_difference",
+          "viscosity",
+          "provenance"
+        ],
+        "title": "Filtration",
         "type": "object"
       },
       "ImposedYield": {
@@ -2062,6 +2442,47 @@
         "title": "ReactionHazard",
         "type": "object"
       },
+      "ResidualMoisture": {
+        "additionalProperties": false,
+        "description": "The volatiles a dried product keeps: the dryer's specification.",
+        "properties": {
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "basis": {
+            "description": "mass_fraction: volatiles over the dried product's mass (below 1); per_kg_solid: kg of volatiles per kg of dry solid (everything not volatile).",
+            "enum": [
+              "mass_fraction",
+              "per_kg_solid"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "basis",
+          "provenance"
+        ],
+        "title": "ResidualMoisture",
+        "type": "object"
+      },
       "ResidueEnd": {
         "additionalProperties": false,
         "properties": {
@@ -2082,6 +2503,50 @@
           "mole_fraction"
         ],
         "title": "ResidueEnd",
+        "type": "object"
+      },
+      "SaltingOut": {
+        "additionalProperties": false,
+        "description": "The Setschenow correction of a pure-solvent solubility for the spectator solutes of the\nmother liquor: ``log10(s0 / s) = sum_i k_i m_i`` (``log: ln``: the natural logarithm), with\n``m_i`` the molality of spectator ``i`` in the mother liquor (mol per kg of free solvent)\nand ``k_i`` its coefficient on the molal scale (kg/mol; a molar-scale constant in L/mol is\nconverted with its source's liquor density beforehand).",
+        "properties": {
+          "coefficients": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Spectator id -> k_i (kg/mol, positive salting out, negative salting in); every spectator of the crystallizer once, 0 stated where it has no effect.",
+            "minProperties": 1,
+            "title": "Coefficients",
+            "type": "object"
+          },
+          "log": {
+            "default": "log10",
+            "enum": [
+              "log10",
+              "ln"
+            ],
+            "title": "Log",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coefficients",
+          "provenance"
+        ],
+        "title": "SaltingOut",
         "type": "object"
       },
       "Selectivity": {
@@ -2213,6 +2678,18 @@
             "default": "",
             "title": "Source",
             "type": "string"
+          },
+          "filtration": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Filtration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The filtration time of a batch (Ruth), for a recipe's filter from:."
           }
         },
         "required": [
@@ -2225,13 +2702,14 @@
       },
       "Solubility": {
         "additionalProperties": false,
-        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).",
+        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).\n\nWith spectator solutes (``crystallizer.spectators``), the solubility is either measured in\nthat mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a\n``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is\nrefused (``cheme.process-crystallizer``).",
         "properties": {
           "unit": {
-            "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the solute's mass fraction in the saturated solution.",
+            "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), the solute's mass fraction in the saturated solution (spectators included), or kg per kg of solute-free liquor (solvent plus spectators; measured_in: mother_liquor).",
             "enum": [
               "kg/kg_solvent",
-              "mass_fraction"
+              "mass_fraction",
+              "kg/kg_liquor"
             ],
             "title": "Unit",
             "type": "string"
@@ -2266,6 +2744,28 @@
             ],
             "default": null,
             "title": "Value"
+          },
+          "measured_in": {
+            "default": "pure_solvent",
+            "description": "Where the data were measured: in the pure solvent, or in the crystallizer's mother liquor with its spectator solutes (at the composition its source states).",
+            "enum": [
+              "pure_solvent",
+              "mother_liquor"
+            ],
+            "title": "Measured In",
+            "type": "string"
+          },
+          "salting_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SaltingOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Setschenow coefficients that correct the pure-solvent data for the spectators' molality in the mother liquor."
           },
           "provenance": {
             "enum": [
@@ -2408,6 +2908,18 @@
             ],
             "default": null,
             "description": "A filter or centrifuge on its own."
+          },
+          "dryer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Dryer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch (filter-)dryer or vacuum dryer to a residual moisture."
           },
           "reactions": {
             "description": "Reaction ids of process/reactions.yaml that take place here: the balance is reactive (elements and extents instead of components).",
@@ -3335,6 +3847,40 @@
           "kind"
         ],
         "title": "UtilityLevel",
+        "type": "object"
+      },
+      "Vent": {
+        "additionalProperties": false,
+        "description": "The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the\nliquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They\ndo not accumulate in the liquid and count in neither its volume nor its concentrations; a\n``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.",
+        "properties": {
+          "stream": {
+            "description": "The outlet stream of the step the gas leaves by.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "components": {
+            "description": "The components that leave the liquid as they form.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Components",
+            "type": "array"
+          },
+          "fraction": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component -> the share of what forms that leaves (default 1).",
+            "title": "Fraction",
+            "type": "object"
+          }
+        },
+        "required": [
+          "stream",
+          "components"
+        ],
+        "title": "Vent",
         "type": "object"
       },
       "ViewItem": {
