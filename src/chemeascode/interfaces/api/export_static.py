@@ -23,7 +23,8 @@ Contract with the viewer (``src/dataSource.ts``):
   and the run manifest stay.
 - ``manifest.json`` records the ``excluded`` globs (sorted): paths matching one are absent from
   the ``tree`` answer, are not exported as ``file`` or ``yaml``, and are left out of the file
-  list and findings of ``validate`` and ``impact`` (see :func:`path_matches`). Every other
+  list and findings of ``validate`` and ``impact`` and from the ``checks`` answer's sign-offs
+  (:func:`_prune_checks`; see :func:`path_matches`). Every other
   answer built from an excluded file (the server records which files an answer reads) is
   withheld and listed under ``withheld`` (:meth:`_Exporter.get`), except ``repo``; ``kinetics``
   and ``datasheets`` leave the excluded data files and datasheets out instead. The drawing of a
@@ -192,6 +193,54 @@ def _prune_report(
                 and _excluded(str(finding.get("file")), patterns, ignore_case)
             )
         ]
+    return pruned
+
+
+#: What a ``checks`` answer says instead of an excluded path in a check's ``detail``.
+NOT_IN_SNAPSHOT = "(a file not in this snapshot)"
+_PATH_TOKEN = re.compile(r"[^\s:,;()'\"]*[^\s:,;()'\".]")  # no sentence's full stop
+
+
+def _prune_checks(
+    answer: dict[str, Any], patterns: Sequence[str], ignore_case: bool = False
+) -> dict[str, Any]:
+    """A ``checks`` answer that names no excluded file: a sign-off's ``review`` becomes null, a
+    check's ``evidence`` loses an excluded ``path`` and its ``detail`` says
+    :data:`NOT_IN_SNAPSHOT` instead. The results themselves stay."""
+
+    def hidden(value: Any) -> bool:
+        return isinstance(value, str) and _excluded(value, patterns, ignore_case)
+
+    def check(entry: Any) -> Any:
+        if not isinstance(entry, dict):
+            return entry
+        entry = dict(entry)
+        evidence = entry.get("evidence")
+        if isinstance(evidence, dict) and hidden(evidence.get("path")):
+            entry["evidence"] = {k: v for k, v in evidence.items() if k != "path"}
+        if isinstance(entry.get("detail"), str):
+            entry["detail"] = _PATH_TOKEN.sub(
+                lambda m: NOT_IN_SNAPSHOT if hidden(m.group()) else m.group(), entry["detail"]
+            )
+        return entry
+
+    def checks(entries: Any) -> Any:
+        return [check(e) for e in entries] if isinstance(entries, list) else entries
+
+    pruned = dict(answer)
+    if "checks" in answer:
+        pruned["checks"] = checks(answer["checks"])
+    if isinstance(answer.get("stages"), dict):
+        pruned["stages"] = {
+            name: {
+                **record,
+                "checks": checks(record.get("checks")),
+                **({"review": None} if hidden(record.get("review")) else {}),
+            }
+            if isinstance(record, dict)
+            else record
+            for name, record in answer["stages"].items()
+        }
     return pruned
 
 
@@ -639,7 +688,9 @@ def _export(
         if excluded and exporter.entries["tree"]["status"] == 200:
             tree = _prune_tree(tree, excluded, ignore_case)
             exporter.replace("tree", tree)
-        exporter.get("checks")
+        checks = exporter.get("checks")
+        if excluded and isinstance(checks, dict):  # sign-offs name their review records
+            exporter.replace("checks", _prune_checks(checks, excluded, ignore_case))
         exporter.get("interlocks")  # a 404 is recorded: the plant has no cause-and-effect list
         if not rev:  # these read the working tree only
             for endpoint in ("validate", "impact"):

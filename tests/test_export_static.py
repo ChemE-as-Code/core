@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from chemeascode.domains.piping.fmt import format_file
 from chemeascode.interfaces.api.export_static import (
+    NOT_IN_SNAPSHOT,
     SNAPSHOT_SCHEMA,
     ExportError,
     ExportWarning,
@@ -623,6 +624,39 @@ def test_an_excluded_status_file_withholds_the_checks(committed: Path, tmp_path:
     (committed / "checks" / "status.json").write_text('{"checks": [{"id": "secret"}]}')
     manifest = export_static(committed, tmp_path / "snap", exclude=["checks/status.json"])
     assert "checks" not in manifest["entries"] and "checks" in _withheld(manifest)
+
+
+def test_checks_name_no_excluded_review(committed: Path, tmp_path: Path):
+    """A sign-off's review record is excluded: the results stay, its path does not."""
+    review = "reviews/2026-10-30-design.md"
+    signed = {
+        "id": "design-review",
+        "status": "pass",
+        "detail": f"{review}: agent review of 1f4df32436f4 (agent-reviewed only)",
+        "evidence": {"path": review, "reviewer_kind": "agent"},
+    }
+    other = {"id": "docs", "status": "pass", "detail": "see docs/keep.md and PROGRESS.md."}
+    status = {
+        "stages": {"basic": {"stage": "basic", "review": review, "checks": [signed, other]}},
+        "checks": [signed, other],
+    }
+    (committed / "checks" / "status.json").write_text(json.dumps(status))
+    out = tmp_path / "snap"
+    manifest = export_static(committed, out, exclude=["reviews/**", "PROGRESS.md"])
+    checks = json.loads(read(out, manifest, "checks"))
+    assert review.encode() not in read(out, manifest, "checks")
+    first = checks["checks"][0]
+    assert first["status"] == "pass"
+    assert (
+        first["detail"] == f"{NOT_IN_SNAPSHOT}: agent review of 1f4df32436f4 (agent-reviewed only)"
+    )
+    assert first["evidence"] == {"reviewer_kind": "agent"}
+    assert checks["checks"][1]["detail"] == f"see docs/keep.md and {NOT_IN_SNAPSHOT}."
+    assert checks["stages"]["basic"]["review"] is None
+    assert checks["stages"]["basic"]["checks"] == checks["checks"]
+
+    plain = export_static(committed, tmp_path / "plain")
+    assert json.loads(read(tmp_path / "plain", plain, "checks")) == status
 
 
 def test_a_failed_move_restores_the_previous_snapshot(committed: Path, tmp_path: Path, monkeypatch):
