@@ -23,6 +23,10 @@ ones and never promote either on convergence alone:
   saturated), ``imposed-yield`` and ``solid-split`` (specified); solved by ``cheme process
   propagate``, never simulated; a dryer (``dryer:``; :mod:`.dryer`): ``residual-moisture``
   (specified), solved the same way;
+- batch stills and solvent swaps (``still:``; :mod:`.batch_still`): ``rayleigh`` (predictive:
+  one equilibrium stage, Raoult's law with Antoine vapour pressures or a constant relative
+  volatility); sourced when its volatility data carry a source; solved by ``cheme process
+  propagate``, never simulated;
 - an adsorber with an entry in ``process/adsorption.yaml`` (:mod:`.separations.adsorption`):
   ``adsorption-equilibrium`` (predictive, not simulated: core's equilibrium TSA cycle gives the
   recoveries, inside every isotherm's range, meeting the specification, and the simulator's
@@ -67,6 +71,7 @@ PREDICTIVE = (
     "shortcut",
     "solubility-equilibrium",
     "adsorption-equilibrium",
+    "rayleigh",
 )
 #: The propagate tool's source: its values follow from others and decide nothing here.
 _PROPAGATE = "cheme process propagate"
@@ -480,6 +485,59 @@ def _sourced(value: Any) -> bool:
     return value is not None and value.provenance == "given" and bool(value.source.strip())
 
 
+def still_basis(process: Process, node: Any) -> UnitBasis:
+    """The basis of a batch still or solvent swap (``rayleigh``, predictive: one equilibrium
+    stage); :mod:`.batch_still`. Sourced when the volatility data are given with a source: the
+    relative volatilities, or the vapour pressure of every volatile component it holds."""
+    from chemeascode.domains.process.batch_still import ASSUMPTIONS, _present, inlets_of
+    from chemeascode.domains.process.solids import solid_components
+
+    spec = node.still
+    vol = spec.volatility
+    sources: list[str] = []
+    lacking: list[str] = []
+    if vol.model == "constant":
+        detail = "constant relative volatility " + ", ".join(
+            f"{n} {a:g}" for n, a in vol.alpha.items()
+        )
+        if _sourced(vol):
+            sources.append(vol.source)
+        else:
+            lacking.append("relative volatilities")
+    else:
+        detail = "Raoult's law, Antoine vapour pressures"
+        comps = process.components()
+        stays = set(spec.nonvolatile) | solid_components(process)
+        for name in sorted(_present(process, inlets_of(process, node)) - stays):
+            vp = getattr(comps.get(name), "vapour_pressure", None)
+            if _sourced(vp):
+                if vp.source not in sources:
+                    sources.append(vp.source)
+            else:
+                lacking.append(f"vapour pressure of {name}")
+    detail += f"; boil-up {spec.boilup.value:g} {spec.boilup.unit}"
+    if spec.feed is not None:
+        detail += f"; solvent swap ({spec.feed.mode.replace('_', ' ')})"
+    if spec.cuts:
+        detail += f"; {len(spec.cuts)} cuts"
+    if lacking:
+        detail += "; not sourced: " + ", ".join(lacking)
+    return UnitBasis(
+        node.id,
+        "separator",
+        "rayleigh",
+        True,
+        not lacking,
+        detail=detail,
+        sources=sources,
+        assumptions=list(ASSUMPTIONS),
+        limitations=[
+            "not part of a converged simulation: solved by cheme process propagate",
+            "no rectification: a column above the still (reflux) is not modelled",
+        ],
+    )
+
+
 def solids_basis(process: Process, node: Any) -> UnitBasis:
     """The basis of a crystallizer (``solubility-equilibrium``, predictive within its
     solubility data; ``imposed-yield``, specified) or of a filter or centrifuge on its own
@@ -674,6 +732,8 @@ def model_bases(
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]
+        elif node.still is not None:
+            unit = still_basis(process, node)
         elif (
             node.crystallizer is not None
             or node.solid_separation is not None

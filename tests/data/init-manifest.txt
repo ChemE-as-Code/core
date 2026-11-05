@@ -74,7 +74,7 @@ cd0e1a327b90b1453d3360c5f45c67fe24efbd47062100c8d01c3654c4e1d0ce  .claude/skills
 81d11f6e4145f2318535c9685b6463ac7dc398e5c6a071a52bac8dec467bbfe9  .claude/skills/pid-review-commissioning-readiness/SKILL.md
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md
 1a4ccaae67d432572a692e594ddd1fed5cd0b1f107d588e2fbeabdc2ff61862d  .claude/skills/pipe-routing/SKILL.md
-08dfa923fb10fe415e3f0de86e6fd571fb9444d5db661609b37528f2f824587d  .claude/skills/process-design/SKILL.md
+862c6a6b82644d2d901797ca1f737a4b4429bc0add4ec3cd855d8fd62106ef96  .claude/skills/process-design/SKILL.md
 53c51f4c1d7a1a1107b2c3f04df14979fda3d31a70d039e5d1c78eb1dde55132  .claude/skills/process-safety/SKILL.md
 4c88c41848b8470751933c17f4f892e3addfeed0d1851f4eb5b3787cb5d94875  .claude/skills/process-simulation/SKILL.md
 cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills/property-retrieval/SKILL.md
@@ -124,7 +124,7 @@ d1c11c5daf9932582e62e6392d74686cf1654887d77b894c8a724efe4465c8a6  .claude/skills
 bcf0c0f9a32551c2483a47cf99676dd2a677ca6adea01e049476e4d37ee25046  .claude/skills/unit-operations/SKILL.md
 cde3dce36b5b1d1a913486b978ddbf609e2953f741f1577f7e9c79ec4d6707c5  .claude/skills/unit-ops-absorption-and-stripping/SKILL.md
 db611618fc47dd31eb9cbb8b6b3b2d4feb60b699429bd4fafd8d5320cd2d33df  .claude/skills/unit-ops-adsorption-and-drying/SKILL.md
-d9e1aa476ef219b986f9e11578ba39a7aca5bd2313c5c144723e75302d37199c  .claude/skills/unit-ops-distillation/SKILL.md
+bc6d2ffa75042e6364ad795e4b5fe2c9e92ed021fe40ee5d155733a82b9927a9  .claude/skills/unit-ops-distillation/SKILL.md
 dfda8df6de6797527d02b1a0d71a8556f32db4a5779483e9276e84dde5229414  .claude/skills/unit-ops-evaporation/SKILL.md
 a2fb2860bf57c0de3d49703cbcbbdbaadcefe7be2647c2ef779e11116f627e75  .claude/skills/unit-ops-heat-transfer/SKILL.md
 6a922bf619e275379c1b1dc6423d20b6e3c52a3c1dbfae2c41b82ce3526ace0a  .claude/skills/unit-ops-liquid-liquid-extraction/SKILL.md

@@ -119,6 +119,8 @@ cheme process streams [--md]                  # stream table with provenance, bl
 cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
+cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
+cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
@@ -1064,6 +1066,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
   semi-batch step's model; for dry and filter, `from:` a dryer or a filter with `filtration:`,
   ADR 0057; a unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  distil, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
+  batch or semi-batch step's model, for distil `from:` a still step's boil-up time). It gives each unit's occupancy, the cycle time (the bottleneck), the
   batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
@@ -1175,6 +1179,49 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     component that is not a volatile), `cheme.process-dryer-duty`.
   - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
     `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
+
+- **Batch still and solvent swap**: a block or step with `still:` (ADR 0055,
+  `domains/process/batch_still.py`) is a batch (Rayleigh) still: one equilibrium stage, total
+  condenser, no reflux, `dN_i/ds = -y_i` over the moles boiled up. The vapour comes from
+  Raoult's law at the still's bubble point (`volatility: {model: raoult}`, each volatile
+  component's Antoine `vapour_pressure: {a, b, c, form: log10 | ln, pressure_unit: bar | kPa |
+  Pa | mmHg, temperature_unit: K | degC, temperature_range}` in `materials.yaml`, by default
+  the NIST form `log10(P/bar) = a - b/(T/K + c)`), or from a constant relative volatility
+  (`{model: constant, alpha: {component: value}}`). `nonvolatile:` components (and solid
+  components) stay in the still.
+  - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
+    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol) or 1/h (kmol of vapour
+    per hour per kmol of charge).
+  - The still stops at `end:` (one of `distilled` with `basis: mole | mass`, `residue: {key,
+    mole_fraction}`, `time` s of boil-up, `temperature` K), or `cuts: [{outlet, end}]` collect
+    the distillate in turn. `outlets: {distillate, residue}` (with cuts: `residue` only) maps
+    the roles to the step's ports.
+  - `feed: {stream, mode: constant_level | portions, portions, down_to}` makes it a solvent
+    swap. The feed is an inlet stream (its flow per hour of charge, as a semi-batch's dose).
+    At constant level it is fed as fast as the still boils up, after distilling down to
+    `down_to` of the charge. With portions (put and take) the still distils down to the level
+    and adds a portion, in turn. The ends apply once the feed is in.
+  - One batch is the hours of flows the recipe's batch size makes (else one hour). The boil-up
+    time and the energy per batch scale with it; a 1/h boil-up does not.
+  - `process propagate --fill` writes the cuts and the residue. A recipe `distil` operation
+    takes the boil-up time `from:` the still.
+  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive),
+    the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
+    time, the mean and peak duty, the energy per batch and the still's temperatures
+    (`cheme.process-still-unsolved`, `-outlet`, `-note`).
+  - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
+    missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
+    those otherwise it is info, no duty. The components it checks are those its inlets'
+    compositions carry (an inlet's template only while it has none). A `heat_of_vaporization`
+    below 2000 kJ/kmol is a warning: NIST gives kJ/mol, times 1000.
+  - A residue end's direction is the target's: the key falls to a target below its share, or
+    rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
+    energy is its own. An end at a time with the recipe's batch-size stream downstream of the
+    still is circular and refused.
+  - Not modelled: rectification with reflux, activity coefficients (azeotropes), heat-up,
+    sensible heat and losses, constant level by volume. `process simulate` does not couple it.
+    Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
+    and the constant-level swap's closed form (`tests/test_batch_still.py`).
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
   `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
   records the searches, sources, observations, candidate routes, conflicts and the model basis

@@ -1,0 +1,97 @@
+# A solvent swap from methanol to toluene in one batch still at 30 kPa(a). The product's
+# methanol solution (S1) is charged and distilled down to half its moles; toluene (S2) is then
+# fed as fast as it boils up (constant level), and the still distils on until methanol is
+# 0.5 % (mole) of the residue. The flows are the year averages of the recipe
+# (process/recipe.yaml, `cheme process recipe`: a batch of 2633 kg every 6.1 h), the swap's
+# feed the toluene per hour of charge. `cheme process propagate --fill` integrates the still
+# (Rayleigh, Raoult's law) and writes the distillate and the residue; `cheme process stills`
+# gives the amounts, the boil-up time (2.6 h, the recipe's distil) and the duty per batch.
+# One stage swaps solvents; it does not purify a product (that needs a column). Regenerate the
+# sheets with `cheme process build`.
+schema: cheme/process/v1
+kind: flowsheet
+title: Solvent swap
+units: {pressure: kPa(a), temperature: K, flow: kmol/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - {id: CRUDE, title: Product in methanol, ports: [{id: out, direction: out}]}
+  - {id: TOLUENE, title: Fresh toluene, ports: [{id: out, direction: out}]}
+products:
+  - {id: SOLVENTS, title: Recovered solvents, ports: [{id: in, direction: in}]}
+  - {id: SWAPPED, title: Product in toluene, ports: [{id: in, direction: in}]}
+
+blocks:
+  - id: SWAP
+    title: Solvent swap
+    class: Distilling
+    ports:
+      - {id: in, direction: in}
+      - {id: swap, direction: in}
+      - {id: top, direction: out}
+      - {id: bottom, direction: out}
+
+steps:
+  - id: ST1
+    block: SWAP
+    title: Swap still
+    class: Distilling
+    still:
+      pressure: 30
+      volatility: {model: raoult, provenance: given, source: NIST WebBook Antoine (materials.yaml)}
+      nonvolatile: [PROD]
+      boilup: {value: 30, unit: kmol/h, provenance: assumed, source: "jacket and condenser estimate: illustrative"}
+      feed: {stream: S2, mode: constant_level, down_to: 0.5}
+      end: {residue: {key: MEOH, mole_fraction: 0.005}}
+      outlets: {distillate: top, residue: bottom}
+      provenance: assumed
+      source: "one-stage swap, no column: illustrative"
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: swap, direction: in, delegates: swap}
+      - {id: top, direction: out, delegates: top}
+      - {id: bottom, direction: out, delegates: bottom}
+
+streams:
+  - id: S1
+    title: Methanol solution
+    from: CRUDE.out
+    to: ST1.in
+    template: solution
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 10, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {MEOH: 0.95, PROD: 0.05}, provenance: given, source: basis of design}
+  - id: S2
+    title: Toluene feed
+    from: TOLUENE.out
+    to: ST1.swap
+    template: solution
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 5, provenance: assumed, source: "toluene per hour of charge: enough for 0.5 % methanol"}
+        composition: {basis: mole_fraction, values: {TOL: 1.0}, provenance: given, source: basis of design}
+  - id: S3
+    title: Methanol and toluene distillate
+    from: ST1.top
+    to: SOLVENTS.in
+    template: solution
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {MEOH: 0.73708, TOL: 0.26292, PROD: 0.0}, provenance: calculated, source: 'cheme process propagate: still ST1 from S1 S2', fingerprint: 945c82fde5c3094d}
+        flow: {value: 615.947, unit: kg/h, provenance: calculated, source: 'cheme process propagate: still ST1 from S1 S2', fingerprint: 945c82fde5c3094d}
+  - id: S4
+    title: Product in toluene
+    from: ST1.bottom
+    to: SWAPPED.in
+    template: solution
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {MEOH: 0.005, TOL: 0.759786, PROD: 0.235214}, provenance: calculated, source: 'cheme process propagate: still ST1 from S1 S2', fingerprint: 945c82fde5c3094d}
+        flow: {value: 274.157, unit: kg/h, provenance: calculated, source: 'cheme process propagate: still ST1 from S1 S2', fingerprint: 945c82fde5c3094d}

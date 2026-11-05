@@ -23,6 +23,9 @@ is fully determined by their streams, by the DEXPI class:
   specified filter, the internal mother-liquor recycle); dryers (``dryer:``): the dried
   product and the vapour at the residual moisture (:mod:`chemeascode.domains.process.dryer`).
 
+- batch stills and solvent swaps (a block or step with ``still:``, its charge and a swap's
+  feed in): the distillate cuts and the residue by :mod:`.batch_still` (Rayleigh).
+
 Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
 them), never solved.
 Derived values get provenance ``calculated``, source ``cheme process propagate: <rule>
@@ -142,6 +145,8 @@ class Derivation:
     problems: list[tuple[str, str]] = field(default_factory=list)
     #: (node id, message) for crystallizers and filters that cannot be solved as declared.
     solids: list[tuple[str, str]] = field(default_factory=list)
+    #: (node id, message) for batch stills that cannot be solved as declared.
+    stills: list[tuple[str, str]] = field(default_factory=list)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
     passes: int = 0
 
@@ -223,7 +228,9 @@ def derive(process: Process, case: str) -> Derivation:
             at[b.node][0].append((s, b.port))
     found = Derivation()
     kinds = {
-        n.id: "crystallizer"
+        n.id: "still"
+        if n.still is not None
+        else "crystallizer"
         if n.crystallizer is not None
         else "solid-separation"
         if n.solid_separation is not None
@@ -470,6 +477,54 @@ def derive(process: Process, case: str) -> Derivation:
             changed |= put(s, "composition", _mix(work, shape), kind, node.id, ins, extra)
         return changed
 
+    waiting: dict[str, str] = {}  # still -> why its batch's hours are not known yet
+
+    def still(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
+        """The cuts and the residue of batch still *node* (:mod:`.batch_still`)."""
+        from chemeascode.domains.process.batch_still import (
+            StillError,
+            hours_pending,
+            node_outlets,
+            outlet_shapes,
+            solve_node,
+        )
+
+        if any(stream_flows(work, s, case).components is None for s in ins):
+            return False
+        # an end at a time waits for the recipe's batch (its hours of flows), so that the
+        # outlets are not put from one hour of flows and kept when the hours come later
+        if (pending := hours_pending(work, node, case)) is not None:
+            waiting[node.id] = pending
+            return False
+        waiting.pop(node.id, None)
+        try:
+            result, extra = solve_node(work, node, ins, case)
+        except StillError as failure:
+            if (node.id, str(failure)) not in found.stills:
+                found.stills.append((node.id, str(failure)))
+            # nothing of a still that does not solve is written: drop what it put earlier
+            for s, _ in outs:
+                for name in ("flow", "composition"):
+                    value = found.values.get((s.id, name))
+                    if value is not None and value.source.startswith(f"{SOURCE}: still {node.id} "):
+                        del found.values[(s.id, name)]
+                        setattr(s.state[case], name, None)
+            return False
+        ports = node_outlets(work, node.still, result)
+        shapes = outlet_shapes(work, node.still, result)
+        names = sorted({n for mass in ports.values() for n in mass})
+        extra |= {"inlet": _converted(work, case, ins, components=names)}
+        changed = False
+        for s, port in outs:
+            mass = ports.get(port)
+            if mass is None:
+                continue
+            total = sum(mass.values())
+            changed |= put(s, "flow", kg_h(total), "still", node.id, ins, extra)
+            shape = mass if total > 0 else shapes.get(port) or mass
+            changed |= put(s, "composition", _mix(work, shape), "still", node.id, ins, extra)
+        return changed
+
     def outlets_of(node: Any) -> tuple[StreamDef, StreamDef | None] | None:
         """A reactor's liquid (or only) outlet and a vented batch's vent stream (ADR 0054); None
         when the reactor does not have them: one outlet, or a vented batch's two."""
@@ -490,7 +545,10 @@ def derive(process: Process, case: str) -> Derivation:
         ins = [s for s, _ in at[node.id][0]]
         outs = at[node.id][1]
         changed = False
-        if kind in ("crystallizer", "solid-separation", "dryer"):
+        if kind == "still":
+            if ins and outs:
+                changed |= still(node, ins, outs)
+        elif kind in ("crystallizer", "solid-separation", "dryer"):
             if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
                 changed |= solids(node, ins, outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
@@ -627,6 +685,8 @@ def derive(process: Process, case: str) -> Derivation:
             changed |= step(node)
         if not changed:
             break
+    for node_id, message in waiting.items():
+        found.stills.append((node_id, message))
     for node in nodes:
         kind = kinds[node.id]
         ends = [s for s, _ in at[node.id][0] + at[node.id][1]]
@@ -645,6 +705,7 @@ def derive(process: Process, case: str) -> Derivation:
                 and any(p[0] == node.id for p in found.problems)
             )
             or any(p[0] == node.id for p in found.solids)
+            or any(p[0] == node.id for p in found.stills)
         )
         if not solved:
             label = kind or f"class {node.class_}"
@@ -784,6 +845,16 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             "correct the specification or the inlet; cheme process crystallizers shows the "
             "model's scope",
         )
+    for node, message in found.stills:
+        add(
+            "warning",
+            "propagate-still",
+            f"{node} (still): not solved: {message}",
+            list(keys.get(node, ())),
+            [node],
+            "correct the still's specification, its data or the inlets; cheme process stills "
+            "reports it",
+        )
     for node, kind, lacking in found.unsolved:
         how = (
             "only checked (cheme validate balances it), never solved"
@@ -873,6 +944,9 @@ def _adapter_result(
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
     for node, message in found.solids:
         messages.append(f"{node} (crystallizer or filter): not solved: {message}")
+        units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
+    for node, message in found.stills:
+        messages.append(f"{node} (still): not solved: {message}")
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
     shown = stream_values(process, found.values)
     return AdapterResult(

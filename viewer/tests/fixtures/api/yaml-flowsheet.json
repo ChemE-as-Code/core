@@ -761,6 +761,18 @@
       "Block": {
         "additionalProperties": false,
         "properties": {
+          "still": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Still"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch (Rayleigh) still or solvent swap."
+          },
           "crystallizer": {
             "anyOf": [
               {
@@ -1013,6 +1025,49 @@
           "id"
         ],
         "title": "Block",
+        "type": "object"
+      },
+      "Boilup": {
+        "additionalProperties": false,
+        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge).",
+        "properties": {
+          "value": {
+            "exclusiveMinimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "enum": [
+              "kmol/h",
+              "kmol/s",
+              "kg/h",
+              "kW",
+              "1/h"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "provenance"
+        ],
+        "title": "Boilup",
         "type": "object"
       },
       "CakeLiquid": {
@@ -2428,6 +2483,28 @@
         "title": "ResidualMoisture",
         "type": "object"
       },
+      "ResidueEnd": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "The component whose mole fraction in the still ends it.",
+            "title": "Key",
+            "type": "string"
+          },
+          "mole_fraction": {
+            "exclusiveMaximum": 1,
+            "minimum": 0,
+            "title": "Mole Fraction",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "mole_fraction"
+        ],
+        "title": "ResidueEnd",
+        "type": "object"
+      },
       "SaltingOut": {
         "additionalProperties": false,
         "description": "The Setschenow correction of a pure-solvent solubility for the spectator solutes of the\nmother liquor: ``log10(s0 / s) = sum_i k_i m_i`` (``log: ln``: the natural logarithm), with\n``m_i`` the molality of spectator ``i`` in the mother liquor (mol per kg of free solvent)\nand ``k_i`` its coefficient on the molal scale (kg/mol; a molar-scale constant in L/mol is\nconverted with its source's liquor density beforehand).",
@@ -2796,6 +2873,18 @@
       "Step": {
         "additionalProperties": false,
         "properties": {
+          "still": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Still"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch (Rayleigh) still or solvent swap."
+          },
           "crystallizer": {
             "anyOf": [
               {
@@ -3032,6 +3121,241 @@
           "block"
         ],
         "title": "Step",
+        "type": "object"
+      },
+      "Still": {
+        "additionalProperties": false,
+        "description": "A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge\n(the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed\ntotally (one equilibrium stage, no reflux); ``outlets`` maps ``distillate`` and\n``residue`` to the step's outlet ports, or ``cuts`` collect the distillate in turn (then\n``outlets`` names the residue only). With a ``feed`` it is a solvent swap: the ends apply\nonce all of the feed is in (no end: it stops then; portions: down to the level).",
+        "properties": {
+          "pressure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kPa(a) of the still; default: the charge's",
+            "title": "Pressure"
+          },
+          "volatility": {
+            "$ref": "#/$defs/Volatility"
+          },
+          "nonvolatile": {
+            "description": "Components that stay in the still (solid components always do).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Nonvolatile",
+            "type": "array"
+          },
+          "boilup": {
+            "$ref": "#/$defs/Boilup"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StillEnd"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "cuts": {
+            "items": {
+              "$ref": "#/$defs/StillCut"
+            },
+            "title": "Cuts",
+            "type": "array"
+          },
+          "feed": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StillFeed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "outlets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Role -> the step's outlet port.",
+            "propertyNames": {
+              "enum": [
+                "distillate",
+                "residue"
+              ]
+            },
+            "title": "Outlets",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "volatility",
+          "boilup",
+          "outlets",
+          "provenance"
+        ],
+        "title": "Still",
+        "type": "object"
+      },
+      "StillCut": {
+        "additionalProperties": false,
+        "description": "One distillate cut: its outlet port, collected until its ``end``.",
+        "properties": {
+          "outlet": {
+            "description": "The step's outlet port the cut leaves by.",
+            "title": "Outlet",
+            "type": "string"
+          },
+          "end": {
+            "$ref": "#/$defs/StillEnd"
+          }
+        },
+        "required": [
+          "outlet",
+          "end"
+        ],
+        "title": "StillCut",
+        "type": "object"
+      },
+      "StillEnd": {
+        "additionalProperties": false,
+        "description": "When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all\ncharged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole\nfraction in the still reaches the value), ``time`` (s of boil-up from the start) or\n``temperature`` (K of the still, at its bubble point: volatility raoult).",
+        "properties": {
+          "distilled": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1,
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Distilled"
+          },
+          "basis": {
+            "default": "mole",
+            "enum": [
+              "mole",
+              "mass"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "residue": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ResidueEnd"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "time": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "s of boil-up from the start",
+            "title": "Time"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K of the still",
+            "title": "Temperature"
+          }
+        },
+        "title": "StillEnd",
+        "type": "object"
+      },
+      "StillFeed": {
+        "additionalProperties": false,
+        "description": "A solvent swap: an inlet stream of the step fed into the still while it boils,\n``constant_level`` (as fast as it boils up, the content's moles held at ``down_to`` of\nthe charge's) or ``portions`` (put and take: distil down to ``down_to`` of the charge's\nmoles, add one of the equal ``portions``, again, until all is in). The stream's flow is\nthe amount fed per hour of charge (the flowsheet's basis, as a semi-batch's dose).",
+        "properties": {
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "constant_level",
+              "portions"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "portions": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "portions: how many",
+            "title": "Portions"
+          },
+          "down_to": {
+            "default": 1.0,
+            "description": "The level: the still's content before each portion (constant_level: while fed), as a share of the charge's moles.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Down To",
+            "type": "number"
+          }
+        },
+        "required": [
+          "stream",
+          "mode"
+        ],
+        "title": "StillFeed",
         "type": "object"
       },
       "StreamDef": {
@@ -3660,6 +3984,48 @@
           }
         },
         "title": "ViewItem",
+        "type": "object"
+      },
+      "Volatility": {
+        "additionalProperties": false,
+        "description": "How a batch still's vapour follows from its liquid: ``raoult`` (each volatile\ncomponent's ``vapour_pressure`` in materials.yaml, the still at its bubble point at its\npressure) or ``constant`` (a relative volatility per volatile component, to any common\nreference: ``alpha``).",
+        "properties": {
+          "model": {
+            "enum": [
+              "raoult",
+              "constant"
+            ],
+            "title": "Model",
+            "type": "string"
+          },
+          "alpha": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "constant: component -> relative volatility (positive).",
+            "title": "Alpha",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "provenance"
+        ],
+        "title": "Volatility",
         "type": "object"
       }
     },
