@@ -1183,9 +1183,18 @@ def input_data(
         procedures = [u for u in (recipe.unit_procedures if recipe else []) if u.id == name]
         if not procedures:
             return None
+        # the batch's content is the batch size over this stream's rate: its state counts too
+        stream = next(
+            (s for s in process.flowsheet.streams if s.id == recipe.batch_size.stream), None
+        )
         return _stripped(
             {
                 "batch_size": recipe.batch_size.model_dump(mode="json"),
+                "batch_size_stream": (
+                    {c: q.model_dump(mode="json") for c, q in stream.state.items()}
+                    if stream is not None
+                    else None
+                ),
                 "unit_procedure": procedures[0].model_dump(mode="json", by_alias=True),
             }
         )

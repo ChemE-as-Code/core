@@ -371,12 +371,9 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     charged, _, _ = stream_moles(process, charge, case)
     end_volume = (solved.volume or 0.0) * hours
     charge_volume = (solved.charge_volume or solved.volume or 0.0) * hours
-    if node.batch.heat != "isothermal":
-        peak = None
-    elif model == "semibatch":
-        peak = (solved.peak_cooling_duty or 0.0) * end_volume
-    else:
-        peak = (solved.peak_heat_rate or 0.0) * end_volume
+    rate = solved.peak_cooling_duty if model == "semibatch" else solved.peak_heat_rate
+    # None: not isothermal, or the heat released is not known (no heat of reaction)
+    peak = rate * end_volume if node.batch.heat == "isothermal" and rate is not None else None
     return _Content(
         capacity(charged),
         capacity(solved.outlet),
@@ -569,6 +566,15 @@ def evaluate(
         dosed = False
         for j, op in enumerate(up.operations):
             dosed |= op.kind == "dose"
+            if op.id in names:
+                add(
+                    "error",
+                    "reference",
+                    f"{up.id}: operation {op.id} twice",
+                    [*at, "operations", j, "id"],
+                    "one id each",
+                )
+            names.add(op.id)
             if op.temperatures is not None:
                 if content is None:
                     continue
@@ -592,15 +598,6 @@ def evaluate(
                     continue
                 ops.append((op, hours, "calculated"))
                 continue
-            if op.id in names:
-                add(
-                    "error",
-                    "reference",
-                    f"{up.id}: operation {op.id} twice",
-                    [*at, "operations", j, "id"],
-                    "one id each",
-                )
-            names.add(op.id)
             if op.duration is not None:
                 ops.append((op, op.duration.hours(), op.duration.provenance))
                 continue
@@ -712,6 +709,16 @@ def _vessel_findings(up: UnitProcedure, found: VesselResult, at: list[Any], add:
                 "batch",
                 [up.id],
             )
+    elif vessel.jacket is not None and found.peak_duty is None:
+        add(
+            "info",
+            "jacket",
+            f"{up.id}: no jacket check: the model of {up.unit} gives no peak duty (not "
+            "isothermal, or no heat of reaction)",
+            [*at, "vessel", "jacket"],
+            "give the reactions' heat_of_reaction (an isothermal batch)",
+            [up.id],
+        )
     elif vessel.jacket is not None and found.peak_duty is not None:
         add(
             "info",

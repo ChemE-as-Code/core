@@ -143,3 +143,16 @@ def test_a_batch_takes_its_vessel_and_peak_duty_from_the_recipe(plant: Path):
     assert specific["volume_m3"]["value"] == pytest.approx(10.0)
     assert "process/recipe.yaml" in specific["volume_m3"]["source"]
     assert specific["duty_kw"]["value"] < 0
+
+
+def test_the_recipe_vessel_goes_stale_with_the_batch_size_stream(plant: Path):
+    from chemeascode.domains.equipment.fill import input_data
+    from chemeascode.domains.process.model import load
+
+    test_a_batch_takes_its_vessel_and_peak_duty_from_the_recipe(plant)
+    process, _ = load(plant)
+    before = input_data("recipe:REACT", {}, process, None, {})
+    path = plant / "process/flowsheet.yaml"
+    path.write_text(path.read_text().replace("flow: {value: 36,", "flow: {value: 40,"))
+    process, _ = load(plant)
+    assert input_data("recipe:REACT", {}, process, None, {}) != before

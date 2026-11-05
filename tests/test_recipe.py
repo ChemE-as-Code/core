@@ -357,3 +357,26 @@ def test_heat_up_and_cool_down_times_from_the_jacket(tmp_path):
                 ]
             }
         )
+
+
+def test_no_heat_of_reaction_means_no_jacket_check_said_as_info(tmp_path):
+    ws = _plant(tmp_path, _jacketed(coolant=299.0))
+    path = ws.root / "process/reactions.yaml"
+    path.write_text(
+        path.read_text().replace(
+            "     heat_of_reaction: {value: -100000, provenance: assumed},\n", ""
+        )
+    )
+    result = recipe_report(ws.root)
+    (vessel,) = result.vessels
+    assert vessel.peak_duty is None
+    (finding,) = [f for f in result.findings if f.rule == "cheme.recipe-jacket"]
+    assert finding.level == "info" and "no peak duty" in finding.message
+
+
+def test_a_duplicate_operation_id_is_found_with_jacket_times(tmp_path):
+    recipe = _jacketed()
+    ops = recipe["unit_procedures"][0]["operations"]
+    ops.insert(1, {"id": "charge", "kind": "heat", "temperatures": [290, 300]})
+    messages = [f.message for f in _recipe_findings(_plant(tmp_path, recipe))]
+    assert any("operation charge twice" in m for m in messages)
