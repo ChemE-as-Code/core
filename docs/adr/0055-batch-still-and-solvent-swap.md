@@ -118,7 +118,8 @@ not used: no code is copied from it, and its papers are cited as literature only
 - Positive: a batch distillation, a cut sequence and a solvent swap are flowsheet steps with
   calculated outlets, a boil-up time for the cycle and a duty per batch. Solvent strips and
   swaps (TsCl, TBSCl, NaN3's methanol strip) need neither a specified split nor a script
-  (`examples/process-solvent-swap`).
+  (`examples/process-solvent-swap` shows the method; its pair is not an ideal liquid, see
+  below).
 - Negative: product purification by fractional batch distillation (acetyl chloride, benzoyl
   chloride, benzyl bromide, MeI, Boc2O) still needs a column (`process simulate` or a
   specified split) until the constant-reflux follow-up (core#173). One stage cannot reach a
@@ -132,7 +133,11 @@ not used: no code is copied from it, and its papers are cited as literature only
   construction (`tests/test_batch_still.py`).
 - Negative: an ideal liquid only. There are no activity coefficients, so no azeotropes. A
   component without Antoine data must be declared non-volatile or given a relative
-  volatility.
+  volatility. A pair outside the ideal liquid declares the volatility `provenance: assumed`,
+  and the still's basis is then not sourced. The example's methanol-toluene is such a pair (a
+  minimum azeotrope, Horsley): its outlets, end temperature and boil-up time show the method
+  and are not predictive (Dortmund UNIFAC gives about twice the residue, a distillate of
+  0.89 rather than 0.74 methanol and a boil-up near 2.2 h rather than 2.6 h).
 - Limitations:
   - one stage, no rectification: constant-reflux or constant-distillate operation on core's
     Fenske-Underwood-Gilliland shortcut (Diwekar) is a follow-up (core#173);

@@ -1210,9 +1210,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     time and the energy per batch scale with it; a 1/h boil-up does not.
   - `process propagate --fill` writes the cuts and the residue. A recipe `distil` operation
     takes the boil-up time `from:` the still.
-  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive),
-    the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
-    time, the mean and peak duty, the energy per batch and the still's temperatures
+  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive;
+    sourced when the relative volatilities, or for Raoult's law the volatility itself and every
+    volatile component's vapour pressure, are `given` with a source: an ideal liquid declared
+    `assumed`, as for a pair with an azeotrope, is not sourced), the charge, feed, cuts and
+    residue (per batch and per hour, mole fractions), the boil-up time, the mean and peak duty,
+    the energy per batch and the still's temperatures
     (`cheme.process-still-unsolved`, `-outlet`, `-note`).
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without

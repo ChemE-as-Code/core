@@ -8,6 +8,12 @@
 # gives the amounts, the boil-up time (2.6 h, the recipe's distil) and the duty per batch.
 # One stage swaps solvents; it does not purify a product (that needs a column). Regenerate the
 # sheets with `cheme process build`.
+# Illustrative, not predictive: Raoult's law is an ideal liquid, and methanol-toluene is not
+# one (a minimum azeotrope near 64 C and 88 % (mole) methanol at 1 atm, Horsley). An
+# activity-coefficient model (UNIFAC) gives a methanol-richer distillate, about twice the
+# residue and a shorter boil-up for the same end, so the outlets S3/S4, the end temperature and
+# the boil-up time (and with it the recipe's distil and cycle) only show the method. The
+# volatility is therefore `assumed` and `cheme process stills` reports the basis not sourced.
 schema: cheme/process/v1
 kind: flowsheet
 title: Solvent swap
@@ -40,7 +46,7 @@ steps:
     class: Distilling
     still:
       pressure: 30
-      volatility: {model: raoult, provenance: given, source: NIST WebBook Antoine (materials.yaml)}
+      volatility: {model: raoult, provenance: assumed, source: "ideal liquid, NIST WebBook Antoine (materials.yaml); methanol-toluene forms a minimum azeotrope (Horsley), outside ADR 0055's ideal-liquid scope: illustrative"}
       nonvolatile: [PROD]
       boilup: {value: 30, unit: kmol/h, provenance: assumed, source: "jacket and condenser estimate: illustrative"}
       feed: {stream: S2, mode: constant_level, down_to: 0.5}

@@ -667,6 +667,20 @@ def test_a_template_component_no_inlet_carries_is_not_the_stills(tmp_path):
     assert any("W lack a vapour_pressure" in m for m in messages), messages
 
 
+def test_an_assumed_ideal_liquid_is_not_sourced(tmp_path):
+    # Raoult's law with sourced vapour pressures is still an ideal liquid: a pair outside it
+    # (an azeotrope) declares the volatility assumed, and the basis says so.
+    flowsheet = FLOWSHEET.replace(
+        "volatility: {model: raoult, provenance: given, source: NIST WebBook}",
+        'volatility: {model: raoult, provenance: assumed, source: "ideal liquid: illustrative"}',
+    )
+    assert flowsheet != FLOWSHEET
+    ws = _plant(tmp_path, flowsheet)
+    process, _ = load(ws.root)
+    (basis,) = [b for b in model_bases(process) if b.id == "S"]
+    assert not basis.sourced and "ideal liquid (volatility assumed)" in basis.detail
+
+
 def _stale(ws):
     process, _ = load(ws.root)
     return [f.ids for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
@@ -872,7 +886,8 @@ def test_the_solvent_swap_example_is_current():
     assert not [f.format() for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
     (unit,) = still_report(example).units
     sol = unit["solution"]
-    assert unit["model"] == "solvent swap" and unit["sourced"] and not unit["differences"]
+    # methanol-toluene has a minimum azeotrope: the ideal liquid is assumed, not sourced
+    assert unit["model"] == "solvent swap" and not unit["sourced"] and not unit["differences"]
     assert sol["residue"]["mole_fractions"]["MEOH"] == pytest.approx(0.005, rel=1e-6)
     assert not sol["notes"]
     recipe = recipe_report(example)
