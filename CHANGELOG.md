@@ -1,12 +1,6 @@
 # Changelog
 
-## 1.6.0 (2026-11-05)
-
-Minor release: the PFD drawn as an engineering sheet (ADR 0046) with per-step symbols, the
-drawing lint `cheme.line-through-valve` and orthogonal measuring and signal lines in the
-authoring API, and `cheme export-static --exclude` keeping excluded review records out of the
-checks answer. Every BFD/PFD needs `cheme process build` once (generator 6); repositories made
-with an earlier template keep their own `drawing-clean` gate.
+## Unreleased
 
 ### Added
 
@@ -14,7 +8,6 @@ with an earlier template keep their own `drawing-clean` gate.
   `per_batch` instead of `per_year`: per hour of the flowsheet's year averages it is per batch x
   batches per year / hours of `process/recipe.yaml`, the arithmetic in the exchange's source;
   without a recipe that gives a cycle it is `cheme.lca-per-batch` (error).
-
 - Batch vessels and jackets (ADR 0052, core#158 package 3): a unit procedure of
   `process/recipe.yaml` on a batch or semi-batch step may give `vessel: {fill_fraction,
   aspect_ratio, nominal, volume, jacket: {u, area, coolant_temperature, heating_temperature}}`.
@@ -24,7 +17,6 @@ with an earlier template keep their own `drawing-clean` gate.
   operation may give `temperatures: [start, end]` instead of a duration: its time from the
   jacket's UA and medium temperature. `cheme datasheets fill` takes a batch reactor's volume and
   peak duty from the recipe's vessel (input `recipe:<unit procedure>`).
-
 - Batch recipe (ADR 0051, core#158): `process/recipe.yaml` (`cheme/recipe/v1`) declares the
   batch size (kg, t or m3 of one stream), the operating hours and the unit procedures with their
   ordered operations (charge, heat, dose, react, cool, transfer, filter, dry, clean, hold,
@@ -36,7 +28,6 @@ with an earlier template keep their own `drawing-clean` gate.
   `-duration` (errors). `cheme schema process-recipe`. The TEA's `operation.batch: {recipe:
   true}` takes its cycle time and batches per year from it (`cheme.tea-batch-recipe`); the
   hand-entered form stays valid. `examples/process-semibatch` has a recipe.
-
 - `reactor: semibatch` (ADR 0050, core#158): a liquid batch with feeds dosed into its charge,
   `batch.dosing: [{stream, time | profile, start}]`, each dosed stream an inlet of the step and
   the other inlet the charge; `batch.time` or `target` is the post-reaction. The same rate laws
@@ -51,6 +42,14 @@ with an earlier template keep their own `drawing-clean` gate.
   take one inlet). Rules: a batch with `dosing`, a semi-batch without it, a dosed stream that is
   no inlet, not one charge stream, a gas-phase reaction (`cheme.process-reactor`, errors).
   Example `examples/process-semibatch` (acetic anhydride dosed into water).
+
+## 1.6.0 (2026-11-05)
+
+Minor release: the PFD drawn as an engineering sheet (ADR 0046) with per-step symbols, the
+drawing lint `cheme.line-through-valve` and orthogonal measuring and signal lines in the
+authoring API, and `cheme export-static --exclude` keeping excluded review records out of the
+checks answer. Every BFD/PFD needs `cheme process build` once (generator 6); repositories made
+with an earlier template keep their own `drawing-clean` gate.
 
 ### Changed
 
