@@ -10,7 +10,7 @@ authors:
     given-names: Artur M.
     affiliation: Process Intelligence Research, Delft University of Technology
 license: AGPL-3.0-or-later
-version: 1.7.0
+version: 1.8.0
 repository-code: https://github.com/ChemE-as-Code/core
 preferred-citation:
   type: article
