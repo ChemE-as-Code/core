@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 (2026-11-05)
+
+Minor release: the PFD drawn as an engineering sheet (ADR 0046) with per-step symbols, the
+drawing lint `cheme.line-through-valve` and orthogonal measuring and signal lines in the
+authoring API, and `cheme export-static --exclude` keeping excluded review records out of the
+checks answer. Every BFD/PFD needs `cheme process build` once (generator 6); repositories made
+with an earlier template keep their own `drawing-clean` gate.
 
 ### Changed
 
