@@ -12,6 +12,68 @@
   `cheme fmt` (also with paths, `--check` and `cheme run --fmt`) leaves such a generated sheet
   as built and says "generated, not formatted (cheme process build)", so formatting a freshly
   built BFD/PFD is no edit (`cheme.generated-edited`).
+
+## 1.7.0 (2026-11-05)
+
+Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a
+charge and gives the thermal screening the accumulation of the dosed reactant and the MTSR at
+the worst moment (ADR 0050); `process/recipe.yaml` and `cheme process recipe` derive the cycle
+time, the batches per year and a Gantt chart, and the TEA takes them (ADR 0051); the recipe
+sizes batch vessels and checks their jackets (ADR 0052); LCA consumables may be given
+`per_batch` (ADR 0053). Every BFD/PFD needs `cheme process build` once (the process
+generator's code changed).
+
+### Added
+
+- Per-batch LCA exchanges (ADR 0053, core#158 package 5): an `lca.yaml` consumable may give
+  `per_batch` instead of `per_year`: per hour of the flowsheet's year averages it is per batch x
+  batches per year / hours of `process/recipe.yaml`, the arithmetic in the exchange's source;
+  without a recipe that gives a cycle it is `cheme.lca-per-batch` (error).
+- Batch vessels and jackets (ADR 0052, core#158 package 3): a unit procedure of
+  `process/recipe.yaml` on a batch or semi-batch step may give `vessel: {fill_fraction,
+  aspect_ratio, nominal, volume, jacket: {u, area, coolant_temperature, heating_temperature}}`.
+  `cheme process recipe` sizes it from the batch content (the model's content times batch size /
+  the flowsheet's rate), rounded up to the R10 preferred numbers, and checks the jacket against
+  the model's peak duty (`cheme.recipe-jacket`, `cheme.recipe-vessel`). A `heat` or `cool`
+  operation may give `temperatures: [start, end]` instead of a duration: its time from the
+  jacket's UA and medium temperature. `cheme datasheets fill` takes a batch reactor's volume and
+  peak duty from the recipe's vessel (input `recipe:<unit procedure>`).
+- Batch recipe (ADR 0051, core#158): `process/recipe.yaml` (`cheme/recipe/v1`) declares the
+  batch size (kg, t or m3 of one stream), the operating hours and the unit procedures with their
+  ordered operations (charge, heat, dose, react, cool, transfer, filter, dry, clean, hold,
+  other), each with a duration or, for dose and react, `from:` a batch or semi-batch step.
+  `cheme process recipe [--svg FILE] [--json]` derives each unit's occupancy, the cycle time and
+  bottleneck (with parallel units), the batches per year, one batch's timeline and its Gantt
+  chart (SVG, light and dark). `cheme.recipe-basis` (warning) when the flowsheet's rate of the
+  batch-size stream differs from batch size x batches / hours; `-schema`, `-reference`,
+  `-duration` (errors). `cheme schema process-recipe`. The TEA's `operation.batch: {recipe:
+  true}` takes its cycle time and batches per year from it (`cheme.tea-batch-recipe`); the
+  hand-entered form stays valid. `examples/process-semibatch` has a recipe.
+- `reactor: semibatch` (ADR 0050, core#158): a liquid batch with feeds dosed into its charge,
+  `batch.dosing: [{stream, time | profile, start}]`, each dosed stream an inlet of the step and
+  the other inlet the charge; `batch.time` or `target` is the post-reaction. The same rate laws
+  and integrator as `reactor: batch` (`stirred_tank.solve_batch` with doses, the doses'
+  sensible heat in the energy balance). `cheme process reactors` reports the accumulation of
+  the dosed reactant over time and its maximum, the cooling-failure temperature at the worst
+  moment and the peak cooling duty per m3. `cheme process reactor-hazards` takes `X_ac` from
+  that maximum and the MTSR from the worst moment (Stoessel's semi-batch treatment), so a
+  dosing-controlled step no longer screens as an all-charged batch; a batch keeps `X_ac = 1`.
+  `process propagate --fill`, `process reactor-uncertainty`, `datasheets fill` (volume and duty
+  TBD, as a batch) and the model basis take it; `process simulate` refuses it (DWSIM's reactors
+  take one inlet). Rules: a batch with `dosing`, a semi-batch without it, a dosed stream that is
+  no inlet, not one charge stream, a gas-phase reaction (`cheme.process-reactor`, errors).
+  Example `examples/process-semibatch` (acetic anhydride dosed into water).
+
+## 1.6.0 (2026-11-05)
+
+Minor release: the PFD drawn as an engineering sheet (ADR 0046) with per-step symbols, the
+drawing lint `cheme.line-through-valve` and orthogonal measuring and signal lines in the
+authoring API, and `cheme export-static --exclude` keeping excluded review records out of the
+checks answer. Every BFD/PFD needs `cheme process build` once (generator 6); repositories made
+with an earlier template keep their own `drawing-clean` gate.
+
+### Changed
+
 - The PFD is drawn as an engineering sheet (ADR 0046; generator 6: every BFD/PFD needs
   `cheme process build`): the smallest ISO 216 or ISO 5457 elongated sheet that holds it, with
   frame, zone markers and a title block; a stream table (phase, °C, bar, mass flow, the
@@ -61,6 +123,14 @@
   measuring line leaves its line at right angles and stays orthogonal (it was a slanted straight
   line); `sensing_points=[...]` gives its bends. Generator scripts that relied on the old drawing
   draw differently when rerun (`cheme regen`).
+
+### Fixed
+
+- `cheme export-static --exclude`: the `checks` answer no longer names an excluded file. A
+  stage sign-off's `review` is null when its review record is excluded, a check's `evidence`
+  loses the excluded `path`, and its `detail` says "(a file not in this snapshot)" instead;
+  the results stay. The Process Atlas's public check failed on ammonia-1, whose sign-offs name
+  their `reviews/` records.
 
 ## 1.5.0 (2026-11-04)
 

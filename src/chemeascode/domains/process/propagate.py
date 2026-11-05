@@ -274,7 +274,7 @@ def derive(process: Process, case: str) -> Derivation:
             return ("gibbs", [], {})
         if not reactions:
             return None
-        if model in ("equilibrium", "pfr", "cstr", "batch"):
+        if model in ("equilibrium", "pfr", "cstr", "batch", "semibatch"):
             return (model, reactions, {})
         if getattr(node, "selectivity", None) is not None:
             return ("selectivity", reactions, {})
@@ -340,13 +340,12 @@ def derive(process: Process, case: str) -> Derivation:
         return equilibrate_liquid(stoich, ks, bases, moles, liquid_t, liquid_of(work))[0]
 
     def tank(node, ins, extra):
-        """The outlet of stirred tank or batch *node* (:func:`.stirred_tank.solve_node`), its
+        """The outlet of stirred tank or (semi-)batch *node* (:func:`.stirred_tank.solve_node`), its
         temperature and pressure kept in ``beds`` (written as a bed's are)."""
         from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
+        from chemeascode.domains.process.stirred_tank import tank_inlet
 
-        if len(ins) != 1:
-            raise ValueError(f"a {node.reactor} takes one inlet stream (mix the feeds before it)")
-        result, inputs = solve_tank(work, node, ins[0], case)
+        result, inputs = solve_tank(work, node, tank_inlet(node, ins), case)
         extra |= inputs
         beds[node.id] = result
         return result.outlet
@@ -376,7 +375,7 @@ def derive(process: Process, case: str) -> Derivation:
             return selectivity_outlet(reactions, spec.key, spec.conversion, spec.products, moles)
         if model == "pfr":
             return bed(node, ins, extra)
-        if model in ("cstr", "batch"):
+        if model in ("cstr", "batch", "semibatch"):
             return tank(node, ins, extra)
         mixed = [r.id for r in reactions if r.phase == "mixed"]
         if mixed:

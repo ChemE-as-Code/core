@@ -121,7 +121,20 @@ each value taken from the evidence cites its observation in `source`.
      `catalyst_loading`). A target the reactions cannot reach (equilibrium, a reactant used up)
      is reported, not extrapolated. `process reactors` gives the profile, the heat released per
      kmol of charge and the largest heat release per m3.
-   Tanks and batches hold gas-phase or liquid-phase reactions (one phase). A liquid needs
+   - `semibatch`: a liquid batch with feeds dosed into its charge (an exothermic reagent fed to
+     a charge, the usual fine-chemical step): give `batch:` with `dosing: [{stream, time}]` (or
+     `profile: [[s, share], ...]` of constant-rate segments, shares adding up to 1; `start` s
+     delays a dose). Each dosed `stream` is an inlet of the step, its flow the amount dosed per
+     hour of charge; the step's one other inlet is the charge. `time` or `target` is then the
+     post-reaction after the last dose (neither: the batch ends with the dosing). `process
+     reactors` gives the accumulation of the dosed reactant over time and its maximum, the
+     cooling-failure temperature at the worst moment (the MTSR of a semi-batch, the dosing
+     stopped) and, isothermal, the peak cooling duty per m3 of the final content, the reaction's
+     heat and the doses' warming together. A slow reaction accumulates the reagent: dose more
+     slowly, or raise the temperature within the rate law's range, until the accumulation is
+     low. Not coupled to the DWSIM solve (its reactors take one inlet); `process propagate`
+     solves it.
+   Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A
    gas uses the ideal-gas data. `process simulate` couples them to the DWSIM solve as external
@@ -192,7 +205,8 @@ each value taken from the evidence cites its observation in `source`.
    de Vusse kinetics: a CSTR before a PFR). It is a candidate, not a proven region.
 8. For an exothermic reaction, run `cheme process reactor-hazards`: the adiabatic temperature
    rise, the MTSR after a cooling failure (a batch: all its charge; a CSTR: its unconverted
-   key), the MTT (the reactor's `hazard.mtt`, else the lowest normal boiling point at about
+   key; a semi-batch: the dosed reactant at its largest accumulation, at the worst moment over
+   the run, so a dosing-controlled step screens lower than its batch), the MTT (the reactor's `hazard.mtt`, else the lowest normal boiling point at about
    atmospheric pressure) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays

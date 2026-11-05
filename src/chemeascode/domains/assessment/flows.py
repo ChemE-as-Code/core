@@ -384,7 +384,7 @@ def boundary_gaps(process: Process) -> BoundaryReport:
     reactors: list[str] = []  # reported unassigned, and mode: adiabatic could exempt them
     for i, step in enumerate(fs.steps):
         reacting = reactor_unit(step)
-        if getattr(step, "reactor", None) in ("cstr", "batch"):
+        if getattr(step, "reactor", None) in ("cstr", "batch", "semibatch"):
             reacting = "conversion_reactor"  # what DWSIM sees of a coupled tank: it has a duty
         unit = reacting or unit_of(step.class_, inlets.get(step.id, 1))
         if unit not in STEP_DUTY_UNITS or step.id in adiabatic:

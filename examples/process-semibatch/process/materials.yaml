@@ -1,0 +1,32 @@
+# Liquid data for the semi-batch: molar volumes from the densities at 25 C, heat capacities and
+# normal boiling points as typical handbook values (provenance assumed: illustrative, check them
+# against your own data before a design).
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: H2O
+    name: Water
+    formula: H2O
+    cas: 7732-18-5
+    molar_mass: 18.015
+    liquid_molar_volume: 0.01807
+    liquid_heat_capacity: 75.3
+    normal_boiling_point: 373.15
+  - id: AC2O
+    name: Acetic anhydride
+    formula: C4H6O3
+    cas: 108-24-7
+    molar_mass: 102.09
+    liquid_molar_volume: 0.0944
+    liquid_heat_capacity: 168.0
+    normal_boiling_point: 412.7
+  - id: ACOH
+    name: Acetic acid
+    formula: C2H4O2
+    cas: 64-19-7
+    molar_mass: 60.052
+    liquid_molar_volume: 0.0573
+    liquid_heat_capacity: 123.1
+    normal_boiling_point: 391.1
+templates:
+  - {id: liquid, components: [H2O, AC2O, ACOH]}
