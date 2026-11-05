@@ -85,7 +85,8 @@
   installable with uv on Python 3.12+). Every BFD/PFD needs `cheme process build` once (the
   process generator's code changed). One stage covers solvent strips and swaps
   (`examples/process-solvent-swap`: methanol to toluene under vacuum at constant level, the
-  recipe's distil from the still). Product purification by fractional batch distillation still
+  recipe's distil from the still; illustrative, since methanol-toluene forms an azeotrope and the
+  ideal liquid is declared `assumed`). Product purification by fractional batch distillation still
   needs a column (`process simulate` or a specified split) until the constant-reflux
   follow-up (core#173).
 

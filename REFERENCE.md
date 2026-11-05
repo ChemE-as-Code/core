@@ -119,7 +119,6 @@ cheme process streams [--md]                  # stream table with provenance, bl
 cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
-cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
 cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
@@ -1063,12 +1062,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0051): the `batch_size` (kg, t or m3 of one
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
   `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
-  dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
-  semi-batch step's model; for dry and filter, `from:` a dryer or a filter with `filtration:`,
-  ADR 0057; a unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's occupancy, the cycle time (the bottleneck), the
   distil, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
-  batch or semi-batch step's model, for distil `from:` a still step's boil-up time). It gives each unit's occupancy, the cycle time (the bottleneck), the
-  batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
+  batch or semi-batch step's model; for dry and filter, `from:` a dryer or a filter with
+  `filtration:`, ADR 0057; for distil, `from:` a still step's boil-up time, ADR 0055; a unit
+  procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's
+  occupancy, the cycle time (the bottleneck), the batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
   `-duration` and `-basis` (warning: the flowsheet's rate of that stream differs from batch size
@@ -1205,8 +1203,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     time and the energy per batch scale with it; a 1/h boil-up does not.
   - `process propagate --fill` writes the cuts and the residue. A recipe `distil` operation
     takes the boil-up time `from:` the still.
-  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive),
-    the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
+  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive;
+    sourced when the relative volatilities, or for Raoult's law the volatility itself and every
+    volatile component's vapour pressure, are `given` with a source: an ideal liquid declared
+    `assumed`, as for a pair with an azeotrope, is not sourced), the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
     time, the mean and peak duty, the energy per batch and the still's temperatures
     (`cheme.process-still-unsolved`, `-outlet`, `-note`).
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
