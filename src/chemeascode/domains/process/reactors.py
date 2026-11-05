@@ -391,7 +391,13 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         ),
         "missing": lacking,
     }
-    if model_duty is not None:  # ADR 0059; other reactors' entries stay as they were
+    # ADR 0059: only where the model knows a duty or a stream wants one; other reactors'
+    # entries stay as they were
+    if model_duty is not None and (
+        model_duty["heat_in_kW"] is not None
+        or model_duty["stream"] is not None
+        or model_duty["stream_note"]
+    ):
         found["model_duty"] = model_duty
     return found
 

@@ -16,20 +16,27 @@ supplied, negative: removed):
 - a **crystallizer** with ``energy:`` (:mod:`.crystallization`): its lumped duty (the feed's
   sensible heat, the heat of crystallization, the solvent evaporated);
 - a **conversion step** (``reactions:`` with conversions, ``reactor: conversion`` or a
-  ``selectivity:``): with every reaction's ``heat_of_reaction``, the reactions at the outlet's
-  temperature (the heat as declared, as the batch models take it) and each stream's sensible
-  heat to or from it, ``Q = sum_j dHr_j xi_j + sum_in n cp (T_r - T_in) + sum_out n cp (T_out -
-  T_r)`` (a liquid_heat_capacity, or the ideal-gas enthalpy for a stream said to be vapour or a
-  component with no liquid one); else, a gas-phase step whose components all have ideal-gas
-  data, ``H(out) - H(in)`` on the elements basis; else nothing.
+  ``selectivity:``): with every reaction's ``heat_of_reaction``, the reactions at its declared
+  temperature ``T_ref`` (one for all of them) and each stream's sensible heat to or from it,
+  ``H(out) - H(in) = sum_j dHr_j xi_j + sum_in n cp (T_ref - T_in) + sum_out n cp (T_out -
+  T_ref)`` (a liquid_heat_capacity, or the ideal-gas enthalpy for a stream said to be vapour or
+  a component with no liquid one; heats at different temperatures, or a component in a vapour
+  stream on one side and a liquid one on the other, leave it unknown); else, a gas-phase step
+  (no stream said to hold a liquid, no reaction of phase liquid or mixed) whose components
+  all have ideal-gas data, ``H(out) - H(in)`` on the elements basis; else nothing. Its heat
+  is ``Q = H(out) - H(in) - W``, W the energy its other energy streams bring in (their
+  duties, signed by their direction: an electrolyser's DC power, a shaft's work); an other
+  energy stream without a duty leaves Q unknown.
 
 The duty goes on the energy stream at the node's ``energy_port``, else on its one heat stream:
 an energy stream whose other end is a heating or cooling utility (steam, hot oil, fired heat,
-cooling water, air cooling, refrigerant) or another block or step; electricity, fuel and
-terminals without a utility are not heat. An energy stream's ``duty`` is positive in its own
-direction (:mod:`.energy`): a stream into the node carries ``Q``, a stream out of it ``-Q``.
-A model whose heat flows against the stream's direction is reported, never written as a
-negative duty.
+cooling water, air cooling, refrigerant). An energy stream to or from another block or step
+(a furnace heating a cracker, a rectifier feeding a cell) is heat only where ``energy_port``
+names it; electricity, fuel and terminals without a utility are not heat. An energy stream's
+``duty`` is positive in its own direction (:mod:`.energy`): a stream into the node carries
+``Q``, a stream out of it ``-Q``. A model whose heat flows against the stream's direction is
+reported, never written as a negative duty, and two models that give one stream different
+duties are reported, neither written.
 """
 
 from __future__ import annotations
@@ -51,10 +58,11 @@ STILL_BASIS = (
     "flowsheet's flows; the heat-up to the bubble point and heat losses not included"
 )
 CONVERSION_BASIS = (
-    "conversion step: the declared heats of reaction at the outlet's temperature, each stream "
+    "conversion step: the declared heats of reaction at their temperature, each stream "
     "brought to or from it at its heat capacity; heats of mixing not included"
 )
 IDEAL_GAS_BASIS = "conversion step: H(out) - H(in) of ideal gases on the elements basis"
+OTHER_BASIS = "; less the energy its other energy streams bring in (their duties)"
 
 
 @dataclass
@@ -123,12 +131,11 @@ def _energy_ends(process: Any, node: Any) -> list[tuple[Any, str, bool, str | No
 
 
 def is_heat(process: Any, other: str | None) -> bool:
-    """Whether an energy stream to or from *other* is heat: a block or step, or a terminal
-    whose utility is a heating or cooling one."""
-    if other is None:
+    """Whether an energy stream to or from *other* is heat by default: a terminal whose utility
+    is a heating or cooling one. One to or from a block or step is heat only where
+    ``energy_port`` names it (it may be a rectifier's DC power, a drive's shaft work)."""
+    if other is None or process.kinds.get(other) in ("block", "step"):
         return False
-    if process.kinds.get(other) in ("block", "step"):
-        return True
     utility = getattr(process.nodes.get(other), "utility", None)
     return utility is not None and utility.kind in HEAT_UTILITIES
 
@@ -153,7 +160,35 @@ def target(process: Any, node: Any) -> tuple[Target | None, str]:
             f"{len(heat)} heat streams ({', '.join(e[0].id for e in heat)}): name the one the "
             "model's duty goes on in energy_port"
         )
+    joins = [e[0].id for e in ends if process.kinds.get(e[3]) in ("block", "step")]
+    if joins:
+        return None, (
+            f"no heat stream to a heating or cooling utility; {', '.join(joins)} joins another "
+            "block or step, heat only where energy_port names it"
+        )
     return None, ""
+
+
+def other_energy(process: Any, node: Any, case: str) -> tuple[float, dict[str, Any], list[str]]:
+    """The kW *node*'s energy streams other than its heat stream bring into it (their duties,
+    signed by their direction: an electrolyser's DC power, a shaft's work), what that depends
+    on (the fingerprint) and the streams without a duty. Without a chosen heat stream, the
+    streams that are not heat by default (:func:`is_heat`)."""
+    goal, _ = target(process, node)
+    ends = _energy_ends(process, node)
+    if goal is not None:
+        rest = [e for e in ends if e[0].id != goal.stream.id]
+    else:
+        rest = [e for e in ends if not is_heat(process, e[3])]
+    total, used, lacking = 0.0, {}, []
+    for stream, _, into, _ in rest:
+        given = given_duty(process, stream, case)
+        if given is None:
+            lacking.append(stream.id)
+            continue
+        total += given[0] if into else -given[0]
+        used[stream.id] = [given[0], into]
+    return total, used, lacking
 
 
 # -- the models' duties -------------------------------------------------------------------------
@@ -261,9 +296,24 @@ def conversion_duty(process: Any, node: Any, case: str) -> tuple[ModelDuty, dict
         return duty, {}
     data = process.ideal_gas()
     names = sorted({n for m in moles.values() for n in m})  # type: ignore[union-attr]
-    gas_phase = all(r.phase != "liquid" for r in reactions)
+    phases = {
+        s.id: p.value if (p := getattr(s.state.get(case), "phase", None)) else None
+        for s in ins + outs
+    }
+    work, others, no_duty = other_energy(process, node, case)
+    if no_duty:
+        duty.missing = [
+            "the duty of its other energy stream(s) " + ", ".join(no_duty) + " (electricity, "
+            "work: what they bring in is not heat; or name the heat stream in energy_port)"
+        ]
+        return duty, {}
     extra: dict[str, Any] = {"reactions": [r.inputs_dump() for r in reactions]}
-    if gas_phase and not missing(names, data):
+    if others:
+        extra["other_energy"] = others
+    liquid = any(p in ("liquid", "two-phase") for p in phases.values()) or any(
+        r.phase in ("liquid", "mixed") for r in reactions
+    )
+    if not liquid and not missing(names, data):
         beyond = [n for s in ins + outs for n in outside(list(moles[s.id]), data, temps[s.id])]  # type: ignore[arg-type]
         if beyond:
             duty.missing = ["a temperature inside the ideal_gas range of " + ", ".join(beyond)]
@@ -271,15 +321,28 @@ def conversion_duty(process: Any, node: Any, case: str) -> tuple[ModelDuty, dict
         h_out = sum(mixture_enthalpy(moles[s.id], data, temps[s.id]) for s in outs)  # type: ignore[arg-type]
         h_in = sum(mixture_enthalpy(moles[s.id], data, temps[s.id]) for s in ins)  # type: ignore[arg-type]
         extra["ideal_gas"] = {n: data[n].model_dump(mode="json") for n in names}
-        duty.heat_kW, duty.basis = h_out - h_in, IDEAL_GAS_BASIS
+        extra["phases"] = phases
         duty.terms_kW = {"enthalpy": h_out - h_in}
-        return duty, extra
+        duty.basis = IDEAL_GAS_BASIS
+        return _less_work(duty, work, others), extra
     if lacking := [r.id for r in reactions if r.heat_of_reaction is None]:
         duty.missing = ["the heat_of_reaction of " + ", ".join(lacking)]
         return duty, {}
-    t_out = {temps[s.id] for s in outs}
-    t_r = temps[outs[0].id]
-    assert t_r is not None
+    at = {r.id: r.heat_of_reaction.temperature for r in reactions}  # type: ignore[union-attr]
+    if len(set(at.values())) > 1:
+        duty.missing = [
+            "the heats of reaction at one temperature ("
+            + ", ".join(f"{r} at {t:g} K" for r, t in at.items())
+            + ")"
+        ]
+        return duty, {}
+    t_r = next(iter(at.values()))
+    if changing := _phase_changes(ins, outs, moles, phases):  # type: ignore[arg-type]
+        duty.missing = [
+            "the latent heat of " + ", ".join(changing) + " (vapour on one side of the step, "
+            "liquid on the other: the model has no phase change; give the stream's duty)"
+        ]
+        return duty, {}
     reaction = sum(
         balance.extents[r.id] * r.heat_of_reaction.value  # type: ignore[union-attr]
         for r in reactions
@@ -310,16 +373,37 @@ def conversion_duty(process: Any, node: Any, case: str) -> tuple[ModelDuty, dict
         ]
         for n in names
     }
-    extra["phases"] = {
-        s.id: p.value if (p := getattr(s.state.get(case), "phase", None)) else None
-        for s in ins + outs
-    }
-    duty.heat_kW = (reaction + sensible) / 3600.0
+    extra["phases"] = phases
     duty.terms_kW = {"reaction": reaction / 3600.0, "sensible": sensible / 3600.0}
-    duty.basis = CONVERSION_BASIS + (
-        "" if len(t_out) == 1 else f"; the reactions at {t_r:g} K, the first outlet's"
+    duty.basis = CONVERSION_BASIS + (f" ({t_r:g} K)" if abs(t_r - 298.15) > 1e-9 else "")
+    return _less_work(duty, work, others), extra
+
+
+def _phase_changes(
+    ins: list[Any],
+    outs: list[Any],
+    moles: dict[str, dict[str, float]],
+    phases: dict[str, str | None],
+) -> list[str]:
+    """The components in a stream said to be vapour on one side of the step and in one said
+    to be liquid on the other (their latent heat is not in the declared-heat path)."""
+
+    def held(streams: list[Any], phase: str) -> set[str]:
+        return {n for s in streams if phases[s.id] == phase for n, v in moles[s.id].items() if v}
+
+    return sorted(
+        (held(ins, "vapor") & held(outs, "liquid")) | (held(ins, "liquid") & held(outs, "vapor"))
     )
-    return duty, extra
+
+
+def _less_work(duty: ModelDuty, work: float, others: dict[str, Any]) -> ModelDuty:
+    """*duty* with its terms summed into its heat, less the *work* (kW) its other energy
+    streams bring in."""
+    if others:
+        duty.terms_kW["other energy streams"] = -work
+        duty.basis += OTHER_BASIS + " (" + ", ".join(others) + ")"
+    duty.heat_kW = sum(duty.terms_kW.values())
+    return duty
 
 
 # -- the comparison -----------------------------------------------------------------------------
@@ -398,7 +482,8 @@ def report_lines(entry: dict[str, Any]) -> list[str]:
 
 def rules(process: Any) -> list[Any]:
     """``cheme.process-energy-port`` findings: an ``energy_port`` that names no energy port of
-    its block or step (error), or sits on one no model gives a duty (warning)."""
+    its block or step (error), or sits on one no model gives a duty (warning); and
+    ``cheme.process-duty`` (:func:`duty_rules`)."""
     from chemeascode.domains.process import FLOWSHEET_FILE
     from chemeascode.foundation.findings import Finding
     from chemeascode.foundation.yamlsource import _yaml_line
@@ -436,6 +521,55 @@ def rules(process: Any) -> list[Any]:
                     ids=[node.id],
                     hint="energy_port is for a batch or semi-batch reactor, a still:, a "
                     "crystallizer: or a conversion step (without steps inside); remove it",
+                )
+            )
+    return findings + duty_rules(process)
+
+
+def duty_rules(process: Any) -> list[Any]:
+    """``cheme.process-duty`` warnings of ``cheme validate``, as ``cheme process propagate``
+    gives them: a given or assumed duty the model differs from beyond the flowsheet's relative
+    tolerance, and two models that give one stream different duties. Derived (propagate's
+    :func:`~.propagate.derivation`, which the staleness check shares) only in a case where a
+    modelled block's or step's energy stream holds a duty propagate did not write, or an
+    energy stream joins two modelled nodes."""
+    from chemeascode.domains.process import FLOWSHEET_FILE
+    from chemeascode.domains.process.propagate import derivation, ours
+    from chemeascode.foundation.findings import Finding
+    from chemeascode.foundation.yamlsource import _yaml_line
+
+    fs = process.flowsheet
+    nodes = [("steps", i, n) for i, n in enumerate(fs.steps)]
+    nodes += [("blocks", i, n) for i, n in enumerate(fs.blocks) if not process.inside(n.id)]
+    keys = {n.id: [key, i] for key, i, n in nodes}
+    goals: dict[str, list[Any]] = {}
+    for _, _, node in nodes:
+        if duty_model(node) is not None:
+            goal, _ = target(process, node)
+            if goal is not None:
+                goals.setdefault(goal.stream.id, []).append(goal.stream)
+    cases = [fs.default_case()] if any(len(g) > 1 for g in goals.values()) else []
+    for group in goals.values():
+        stream = group[0]
+        for case, state in stream.state.items():
+            q = getattr(state, "duty", None)
+            if (len(group) > 1 or (q is not None and not ours(q))) and case not in cases:
+                cases.append(case)
+    findings = []
+    default = fs.default_case()
+    for case in cases:
+        for node, level, message, hint, what in derivation(process, case).duties:
+            if what not in ("given", "models"):
+                continue
+            findings.append(
+                Finding(
+                    FLOWSHEET_FILE,
+                    level,  # type: ignore[arg-type]
+                    "cheme.process-duty",
+                    message if case == default else f"{message} (case {case})",
+                    line=_yaml_line(process.flowsheet_doc, keys.get(node, [])),
+                    ids=[node],
+                    hint=hint,
                 )
             )
     return findings

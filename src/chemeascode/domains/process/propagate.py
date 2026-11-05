@@ -154,10 +154,12 @@ class Derivation:
     solids: list[tuple[str, str]] = field(default_factory=list)
     #: (node id, message) for batch stills that cannot be solved as declared.
     stills: list[tuple[str, str]] = field(default_factory=list)
-    #: (node id, level, message, hint) about a model's duty and its energy stream (ADR 0059):
-    #: a given duty the model differs from, a heat that flows against the stream, a duty not
-    #: known or a stream not chosen.
-    duties: list[tuple[str, str, str, str]] = field(default_factory=list)
+    #: (node id, level, message, hint, what) about a model's duty and its energy stream (ADR
+    #: 0059), *what* one of: ``given`` (a given or assumed duty the model differs from;
+    #: ``cheme validate`` reports it too), ``models`` (two models give one stream different
+    #: duties; validate too), ``direction`` (a heat that flows against the stream), ``info``
+    #: (a duty not known or a stream not chosen).
+    duties: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     #: node id -> the model's duty (:class:`.duties.ModelDuty`), where it has a target stream.
     model_duties: dict[str, Any] = field(default_factory=dict)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
@@ -706,8 +708,12 @@ def derive(process: Process, case: str) -> Derivation:
             break
     for node_id, message in waiting.items():
         found.stills.append((node_id, message))
-    for node in nodes:
-        _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, put, found)
+    candidates = [
+        c
+        for node in nodes
+        if (c := _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, found))
+    ]
+    _put_duties(work, candidates, put, found)
     for node in nodes:
         kind = kinds[node.id]
         ends = [s for s, _ in at[node.id][0] + at[node.id][1]]
@@ -739,6 +745,19 @@ def derive(process: Process, case: str) -> Derivation:
     return found
 
 
+@dataclass
+class _Candidate:
+    """A model's duty for its energy stream, not yet written (:func:`_put_duties`)."""
+
+    node: str
+    label: str
+    model: str
+    stream: StreamDef
+    value: float  # kW in the stream's direction
+    used: list[StreamDef]
+    extra: dict[str, Any]
+
+
 def _duty(
     work: Process,
     node: Any,
@@ -747,18 +766,18 @@ def _duty(
     beds: dict[str, Any],
     solutions: dict[str, Any],
     solved_inputs: dict[str, Any],
-    put: Any,
     found: Derivation,
-) -> None:
-    """The duty of *node*'s model on its energy stream (:mod:`.duties`, ADR 0059): put where
-    the stream has none, compared where it has a given or assumed one."""
+) -> _Candidate | None:
+    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059): compared
+    where the stream has a given or assumed one, else the candidate :func:`_put_duties`
+    writes; None (and why, in *found*) when there is nothing to write."""
     from chemeascode.domains.process import duties
     from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
     from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
 
     model = duties.duty_model(node)
     if model is None:
-        return
+        return None
     goal, why = duties.target(work, node)
     label = f"{node.id} ({model})"
     if goal is None:
@@ -769,9 +788,10 @@ def _duty(
                     "info",
                     f"{label}: its model's duty is not written: {why}",
                     "set energy_port: to the port of the energy stream that carries it",
+                    "info",
                 )
             )
-        return
+        return None
     ins = [s for s, _ in ends[0]]
     outs = [s for s, _ in ends[1]]
     used = list(ins)
@@ -784,7 +804,7 @@ def _duty(
             duty = duties.batch_duty(node, result)
         elif model in ("still", "crystallizer"):
             if node.id not in solutions:
-                return  # not solved: propagate reports the still or crystallizer already
+                return None  # not solved: propagate reports the still or crystallizer already
             result, inputs = solutions[node.id]
             if model == "still":
                 duty = duties.still_duty(node, result)
@@ -807,9 +827,10 @@ def _duty(
                 "info",
                 f"{label}: no duty for {goal.stream.id}: {failure}",
                 "correct the model's data; cheme process reactors reports it",
+                "info",
             )
         )
-        return
+        return None
     found.model_duties[node.id] = duty
     stream = goal.stream
     if duty.heat_kW is None:
@@ -819,9 +840,10 @@ def _duty(
                 "info",
                 f"{label}: no duty for {stream.id}: missing " + "; ".join(duty.missing),
                 "give the missing data, or the stream's duty (given or assumed)",
+                "info",
             )
         )
-        return
+        return None
     value = goal.duty(duty.heat_kW)
     if value < -1e-9:
         flows = "into" if duty.heat_kW > 0 else "out of"
@@ -833,9 +855,10 @@ def _duty(
                 f"{label}: the model's heat flows {flows} it ({duty.heat_kW:.6g} kW in), "
                 f"energy stream {stream.id} runs {direction} it: its duty is not written",
                 "reverse the energy stream (from and to), or check the model's data",
+                "direction",
             )
         )
-        return
+        return None
     q = getattr(stream.state.get(case), "duty", None)
     if q is not None:
         given = duties.given_duty(work, stream, case)
@@ -848,18 +871,50 @@ def _duty(
                     f"({q.provenance}), the model gives {value:.6g} kW",
                     "remove the duty so cheme process propagate --fill writes the model's, or "
                     "correct the model's data (or the stream's value and source)",
+                    "given",
                 )
             )
-        return
+        return None
     extra |= inputs
     extra["temperature"] = {
         s.id: t.model_dump(mode="json", exclude=NOT_INPUTS)
         for s in used
         if (t := getattr(s.state.get(case), "temperature", None)) is not None
     }
-    unit = None if work.flowsheet.units.duty == "kW" else "kW"
-    quantity = Quantity(value=_sig(value), unit=unit, provenance="calculated")
-    put(stream, "duty", quantity, f"{model} duty", node.id, used, extra)
+    return _Candidate(node.id, label, model, stream, value, used, extra)
+
+
+def _put_duties(work: Process, candidates: list[_Candidate], put: Any, found: Derivation) -> None:
+    """Write each candidate duty on its stream; where two models give one stream (an energy
+    stream between two modelled blocks or steps), the first when they agree, neither (a
+    ``cheme.process-duty`` warning naming both) when they differ."""
+    from chemeascode.domains.process import duties
+
+    by_stream: dict[str, list[_Candidate]] = {}
+    for c in candidates:
+        by_stream.setdefault(c.stream.id, []).append(c)
+    for group in by_stream.values():
+        first = group[0]
+        apart = [c for c in group[1:] if duties.differs(work, first.value, c.value)]
+        if apart:
+            models = ", ".join(f"{c.label} {c.value:.6g} kW" for c in group)
+            for c in group:
+                found.duties.append(
+                    (
+                        c.node,
+                        "warning",
+                        f"{c.label}: energy stream {c.stream.id} gets different duties from "
+                        f"the models at its two ends ({models}): neither is written",
+                        "correct either model's data, give the stream's duty (given or "
+                        "assumed), or point one node's energy_port at another stream",
+                        "models",
+                    )
+                )
+            continue
+        unit = None if work.flowsheet.units.duty == "kW" else "kW"
+        quantity = Quantity(value=_sig(first.value), unit=unit, provenance="calculated")
+        rule = f"{first.model} duty"
+        put(first.stream, "duty", quantity, rule, first.node, first.used, first.extra)
 
 
 def derivation(process: Process, case: str) -> Derivation:
@@ -1014,7 +1069,7 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             "correct the still's specification, its data or the inlets; cheme process stills "
             "reports it",
         )
-    for node, level, message, hint in found.duties:
+    for node, level, message, hint, _ in found.duties:
         add(level, "duty", message, list(keys.get(node, ())), [node], hint)
     for node, kind, lacking in found.unsolved:
         how = (

@@ -157,11 +157,14 @@ in `DESIGN.md`. Run propagate before `props --fill`.
 from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
 process propagate --fill` write the year-average duty of an isothermal batch or semi-batch
 (the reaction heat and the doses' warming), a `still:` (its boil-up's latent heat), a
-`crystallizer:` with `energy:` or a conversion step (its declared heats of reaction and the
-streams' sensible heat). It goes on the stream at the step's `energy_port: PORT`, else on its
-one energy stream to a heating or cooling utility (steam, cooling water, refrigerant...): give
-`energy_port` when the step has several, such as a reactor heated up by steam and cooled by
-brine, or a still with condensers. Direction matters: a cooling stream runs from the step to
+`crystallizer:` with `energy:` or a conversion step (its declared heats of reaction at their
+`temperature`, the streams' sensible heat, less the power its other energy streams bring in,
+such as an electrolyser's DC feed: give those streams their duty). It goes on the stream at the
+step's `energy_port: PORT`, else on its one energy stream to a heating or cooling utility
+(steam, cooling water, refrigerant...): give `energy_port` when the step has several, such as a
+reactor heated up by steam and cooled by brine, or a still with condensers, and when its heat
+goes to or comes from another block or step (a furnace heating a cracker's coil). Declare a
+liquid step's heat of reaction on the liquid basis. Direction matters: a cooling stream runs from the step to
 the utility, a heating stream from the utility to the step; the duty is positive. A duty you
 keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
 `cheme.process-duty` names both values when they differ: record the difference in

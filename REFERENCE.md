@@ -1238,20 +1238,26 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - The heat: a batch's is minus the heat its reactions release over the batch plus each dose
     warmed to the batch's temperature (and a dosed gas passing to the vent; the charge's
     heat-up is the recipe's, not included); a still's the latent heat of its distillate, `sum
-    dHvap_i D_i`; a crystallizer's its lumped duty; a conversion step's `sum xi dHr` at the
-    outlet's temperature with every stream brought to or from it (`liquid_heat_capacity`, or
-    the ideal-gas enthalpy for a stream said to be vapour), or `H(out) - H(in)` of ideal gases
-    for a gas-phase step whose components all have `ideal_gas` data; without them nothing.
+    dHvap_i D_i`; a crystallizer's its lumped duty; a conversion step's (batch or continuous)
+    `sum xi dHr` at the heats' own `heat_of_reaction.temperature` with every inlet brought to
+    it and every outlet from it (`liquid_heat_capacity`, or the ideal-gas enthalpy for a stream
+    said to be vapour), or `H(out) - H(in)` of ideal gases for a gas-phase step (no stream said
+    to be liquid or two-phase, no liquid or mixed reaction) whose components all have
+    `ideal_gas` data; less the work `W` its other energy streams bring in (their duties, signed
+    by direction: an electrolyser's DC power, a pump's work; one without a duty leaves it
+    unknown). Heats at different temperatures, or a component vapour on one side of the step
+    and liquid on the other, leave it unknown; without the data nothing.
   - The stream: the one at the node's `energy_port: PORT`, else its one heat stream (an energy
     stream to or from a steam, hot-oil, fired-heat, cooling-water, air-cooling or refrigerant
-    utility, or another block or step; electricity, fuel and terminals without `utility:` are
-    not heat). A duty is positive in its stream's direction: a stream out of the step carries
+    utility; electricity, fuel and terminals without `utility:` are not heat, and a stream to or
+    from another block or step is heat only where `energy_port` names it). A duty is positive in its stream's direction: a stream out of the step carries
     the heat removed. A model whose heat flows against the stream is a warning, never a
     negative duty. A flow-style stream (`{id: Q1, ...}` on one line) is written in place.
   - A given or assumed duty is never overwritten: it is compared, and one beyond the
     flowsheet's relative tolerance is `cheme.process-duty` (warning, naming both values) in
-    `process propagate --fill` and `--check`; several heat streams, missing data or an
-    adiabatic batch are `cheme.process-duty` (info). `validate` reports
+    `process propagate --fill` and `--check` and in `validate`; two models giving one stream
+    different duties are a warning naming both (neither written); several heat streams,
+    missing data or an adiabatic batch are `cheme.process-duty` (info, propagate only). `validate` reports
     `cheme.process-energy-port`: a port that is no energy port of the node (error), or one on
     a node no model gives a duty (warning). `process reactors` shows a batch's or conversion
     step's duty, its terms and its stream where the ideal-gas duty is `?`, `process stills`

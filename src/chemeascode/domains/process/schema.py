@@ -1224,8 +1224,8 @@ class Energetic(Strict):
         description="A batch or semi-batch reactor, batch still, crystallizer or conversion "
         "step: the energy port whose stream carries the model's year-average duty (cheme "
         "process propagate writes it, or compares a given one); default: its one heat stream "
-        "(an energy stream from or to a heating or cooling utility, or another block or "
-        "step).",
+        "(an energy stream from or to a heating or cooling utility). A stream from or to "
+        "another block or step is heat only where energy_port names it.",
         exclude_if=lambda value: value is None,  # a node's dump stays as it was
     )
 

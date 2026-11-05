@@ -813,12 +813,12 @@ def propagate(
     (`split:` fractions per outlet port, else the mass balance remainder).
 
     A batch or semi-batch, still, crystallizer or conversion step writes its year-average duty
-    on its energy stream (`energy_port:`, else its one heat stream); a given duty is compared
-    (cheme.process-duty, ADR 0059). Other separators and reactors are only checked, never
-    solved. Derived values are `calculated`
+    on its energy stream (`energy_port:`, else its one stream to a heating or cooling utility);
+    a given duty is compared (cheme.process-duty, ADR 0059; validate compares it too). Other
+    separators and reactors are only checked, never solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1
-    on a warning (stale propagated values). --json prints the run as an adapter result
-    (cheme/adapter-result/v1) per case, same exit codes."""
+    on a warning (stale propagated values, a duty that differs from its model). --json prints
+    the run as an adapter result (cheme/adapter-result/v1) per case, same exit codes."""
     from chemeascode.domains.process.propagate import failed_result, run
 
     if fill == check:
