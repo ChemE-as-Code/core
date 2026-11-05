@@ -4,8 +4,7 @@
 
 ### Added
 
-- Gas evolution and gas dosing in a batch or semi-batch (ADR 0054; feature F1 of the route
-  review run against core#165, outside that issue's scope, which stays open): `batch.vent:
+- Gas evolution and gas dosing in a batch or semi-batch (ADR 0054, #174): `batch.vent:
   {stream, components, fraction}` on a liquid `reactor: batch` or `semibatch`. The listed
   components (HCl, CO2, HBr) leave the liquid as they form, a `fraction` of what forms (default
   1, a share of the gross formation, reaction by reaction: a reaction that consumes a vented gas

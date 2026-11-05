@@ -8,9 +8,8 @@
 Many batch routes still missing from the process library give off a gas as they react:
 HCl from phosgenation (benzyl chloroformate), chlorosulfonation (p-toluenesulfonyl chloride)
 and benzoyl chloride, CO2, HBr from a bromination. Several also dose a gas: phosgene, Cl2,
-methyl nitrite. The route scouting run against core#165 found this gap in all four candidates
-it checked. Gas evolution is outside #165's scope (batch work-up, the NBS lessons L-2, L-3 and
-L-5), which this ADR does not address; #165 stays open for it.
+methyl nitrite. The route scouting for the batch work-up (core#165) found this gap in all four candidates it
+checked; it is tracked as core#174.
 
 The semi-batch of ADR 0050 is liquid only: a gas phase is refused, and nothing leaves the
 vessel while it runs. The only workaround was to keep the gas as a dissolved liquid component
@@ -137,9 +136,8 @@ cites the PharmaPy papers as literature only.
 
 ## Evidence
 
-- Feature F1 of the route review run against core#165 (the scout reports place gas evolution
-  outside #165's scope and propose a dedicated core issue, "Gas evolution and gas dosing in a
-  batch or semi-batch"); this ADR's PR. #165 stays open for its work-up scope.
+- core#174 (gas evolution and gas dosing in a batch or semi-batch), found by the route scouting
+  for core#165; this ADR's PR.
 - `src/chemeascode/domains/process/schema.py` (`Vent`, `Batch.vent`, `Dosing.absorbed`),
   `stirred_tank.py` (`solve_batch`, `Dose.passing`, `_solve_node`), `propagate.py`
   (`outlets_of`), `model.py` (`_vent_rules`), `reactors.py` (`vent_entry`), `recipe.py`
