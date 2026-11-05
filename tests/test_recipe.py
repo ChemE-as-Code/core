@@ -1,9 +1,10 @@
-"""The batch recipe (``process/recipe.yaml``, ADR 0049): the cycle time from the unit
+"""The batch recipe (``process/recipe.yaml``, ADR 0051): the cycle time from the unit
 procedures, the bottleneck and parallel units, durations from a semi-batch's model, the basis
 check against the flowsheet, the Gantt chart and the TEA's batch operation taken from it."""
 
 import copy
 import json
+import math
 
 import pytest
 import yaml
@@ -164,7 +165,7 @@ def test_recipe_references(tmp_path):
     assert any("unit X is no block or step" in m for m in messages)
     assert any("C is no batch or semibatch" in m for m in messages)
     assert any("start.after UP9 is no earlier unit procedure" in m for m in messages)
-    with pytest.raises(ValueError, match="duration or from"):
+    with pytest.raises(ValueError, match="duration, from or temperatures"):
         Recipe.model_validate(
             RECIPE
             | {
@@ -266,3 +267,116 @@ def test_the_tea_takes_its_batches_from_the_recipe(tmp_path):
     (root / "process/recipe.yaml").unlink()
     report = tea_report(root)
     assert any(f.rule == "cheme.tea-batch-recipe" and f.level == "error" for f in report.findings)
+
+
+# -- vessels and jackets (core#158 package 3) ---------------------------------------------------
+
+
+def _jacketed(coolant=250.0, **vessel):
+    recipe = copy.deepcopy(RECIPE)
+    up = recipe["unit_procedures"][0]
+    up["vessel"] = {
+        "fill_fraction": 0.8,
+        "jacket": {
+            "u": 400,
+            "coolant_temperature": coolant,
+            "heating_temperature": 350,
+            "provenance": "assumed",
+        },
+        "provenance": "assumed",
+    } | vessel
+    return recipe
+
+
+def test_the_vessel_is_the_batch_over_the_fill_fraction_rounded_to_a_preferred_size(tmp_path):
+    from chemeascode.domains.process.recipe import preferred
+
+    assert [preferred(v) for v in (0.07, 1.0, 3.375, 9.0, 63.1)] == [0.08, 1.0, 4.0, 10.0, 80.0]
+    result = recipe_report(_plant(tmp_path, _jacketed()).root)
+    (vessel,) = result.vessels
+    # the batch is 4.5 h of the flowsheet's flows: 0.6 m3/h at the end of the dosing
+    assert vessel.working_volume == pytest.approx(2.7, rel=1e-6)
+    assert vessel.volume == pytest.approx(4.0) and vessel.rounded
+    assert vessel.fill == pytest.approx(2.7 / 4.0, rel=1e-6)
+    assert vessel.diameter == pytest.approx((16 / math.pi) ** (1 / 3), rel=1e-9)
+    # the semi-batch's peak cooling duty per m3 times the batch's end volume
+    assert vessel.peak_duty == pytest.approx(46.3 * 2.7, rel=2e-3)
+    d = vessel.diameter
+    bottom = math.pi * d**2 / 4
+    area = math.pi * d * (2.25 / bottom) + bottom  # wetted at the charge, 2.25 m3
+    assert vessel.jacket_area == pytest.approx(area, rel=1e-9)
+    assert vessel.removable == pytest.approx(0.4 * area * 50.0, rel=1e-9)
+    assert "preferred size" in recipe_text(result)
+
+
+def test_a_jacket_too_small_for_the_peak_duty_is_a_finding(tmp_path):
+    ws = _plant(tmp_path, _jacketed(coolant=280.0))
+    (finding,) = _recipe_findings(ws)
+    assert finding.rule == "cheme.recipe-jacket" and finding.level == "warning"
+    assert "exceeds what the jacket removes" in finding.message
+    ws = _plant(tmp_path / "b", _jacketed(volume=2.5))
+    messages = [f.message for f in _recipe_findings(ws) if f.rule == "cheme.recipe-vessel"]
+    assert messages and "108% full" in messages[0]
+
+
+def test_heat_up_and_cool_down_times_from_the_jacket(tmp_path):
+    recipe = _jacketed()
+    ops = recipe["unit_procedures"][0]["operations"]
+    ops.insert(1, {"id": "heatup", "kind": "heat", "temperatures": [290, 300]})
+    ops.insert(4, {"id": "cooldown", "kind": "cool", "temperatures": [300, 290]})
+    result = recipe_report(_plant(tmp_path, recipe).root)
+    d = (16 / math.pi) ** (1 / 3)
+    bottom = math.pi * d**2 / 4
+
+    def time(capacity, volume, medium, start, end):
+        ua = 0.4 * (math.pi * d * volume / bottom + bottom)
+        return capacity / ua * math.log((medium - start) / (medium - end)) / 3600
+
+    steps = {s.operation: s for s in result.steps if s.procedure == "UP1"}
+    heat, cool = steps["heatup"], steps["cooldown"]
+    # before the dose: the charge, 5 kmol/h x 150 kJ/(kmol K) x 4.5 h, in 2.25 m3
+    assert heat.end - heat.start == pytest.approx(time(5 * 150 * 4.5, 2.25, 350, 290, 300))
+    # after it: the end's content, 6 kmol/h, in 2.7 m3
+    assert cool.end - cool.start == pytest.approx(time(6 * 150 * 4.5, 2.7, 250, 300, 290))
+    assert heat.basis == cool.basis == "calculated"
+    assert steps["dose"].start == pytest.approx(heat.end)
+    # a medium that cannot reach the end temperature
+    ops[1]["temperatures"] = [290, 360]
+    messages = [f.message for f in _recipe_findings(_plant(tmp_path / "b", recipe))]
+    assert any("cannot heat the content to 360 K" in m for m in messages)
+    with pytest.raises(ValueError, match="rising to heat"):
+        Recipe.model_validate(
+            RECIPE
+            | {
+                "unit_procedures": [
+                    {
+                        "id": "U",
+                        "unit": "R",
+                        "operations": [{"id": "a", "kind": "heat", "temperatures": [300, 290]}],
+                    }
+                ]
+            }
+        )
+
+
+def test_no_heat_of_reaction_means_no_jacket_check_said_as_info(tmp_path):
+    ws = _plant(tmp_path, _jacketed(coolant=299.0))
+    path = ws.root / "process/reactions.yaml"
+    path.write_text(
+        path.read_text().replace(
+            "     heat_of_reaction: {value: -100000, provenance: assumed},\n", ""
+        )
+    )
+    result = recipe_report(ws.root)
+    (vessel,) = result.vessels
+    assert vessel.peak_duty is None
+    (finding,) = [f for f in result.findings if f.rule == "cheme.recipe-jacket"]
+    assert finding.level == "info" and "no peak duty" in finding.message
+
+
+def test_a_duplicate_operation_id_is_found_with_jacket_times(tmp_path):
+    recipe = _jacketed()
+    ops = recipe["unit_procedures"][0]["operations"]
+    ops.insert(1, {"id": "charge", "kind": "heat", "temperatures": [290, 300]})
+    messages = [f.message for f in _recipe_findings(_plant(tmp_path, recipe))]
+    assert any("operation charge twice" in m for m in messages)

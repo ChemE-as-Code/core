@@ -20,3 +20,6 @@ unit_procedures:
       - {id: cool, kind: cool, title: Cool to transfer, duration: {value: 1, provenance: assumed}}
       - {id: transfer, kind: transfer, title: Pump to storage, duration: {value: 30, unit: min, provenance: assumed}}
       - {id: clean, kind: clean, title: Rinse, duration: {value: 1.5, provenance: assumed}}
+    # the reactor sized for the batch: the largest content over 80 % fill, rounded up to a
+    # preferred size (give vessel.jacket {u, coolant_temperature} to check the cooling)
+    vessel: {fill_fraction: 0.8, aspect_ratio: 1.2, provenance: assumed, source: "usual fill of a stirred vessel: illustrative"}

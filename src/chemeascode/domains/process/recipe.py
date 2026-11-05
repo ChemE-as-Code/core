@@ -14,6 +14,16 @@ that rests on:
   ``react``, ``from:`` the step's batch or semi-batch model (its dosing time, its reaction time;
   :mod:`.stirred_tank`).
 
+A unit procedure on a batch or semi-batch step may size its ``vessel``: the batch's largest
+content (the model's volume per hour of flows times the hours of flows one batch makes, batch
+size / the flowsheet's rate of the batch-size stream) over the fill fraction, rounded up to the
+R10 preferred numbers (ISO 3) of m3, or a given volume; its ``jacket`` (U, area or the wetted
+shell and flat bottom of a vessel of the given aspect ratio, the media's temperatures) is checked
+against the model's peak duty, and a ``heat`` or ``cool`` operation may give ``temperatures``
+instead of a duration: ``t = C / (U A) ln((T_m - T_0) / (T_m - T_1))`` with the medium at a
+constant temperature, the content's heat capacity C (the charge's before a dose, else the
+end's).
+
 Derived (:func:`evaluate`): each unit's occupancy per batch, its cycle (occupancy over its
 parallel units), the plant's cycle time (the slowest unit: the bottleneck), the batches per
 year (hours over cycle time), each unit's utilisation, one batch's timeline from start to end
@@ -28,6 +38,10 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
   ``from:`` on a step that is no batch or semi-batch, a ``dose`` from a step without dosing,
   a ``start.after`` that is no earlier unit procedure, a duplicate id;
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
+- ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
+- ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
+  ``U A (T - T_coolant)`` of the jacket at the charge (the smallest wetted area); info without a
+  coolant temperature;
 - ``recipe-basis`` (warning): the flowsheet's flow of the batch-size stream differs from batch
   size x batches per year / hours by more than 1 % (the balance, the LCI per kg and the TEA
   then rest on different bases); info when the flow cannot be compared.
@@ -35,6 +49,7 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -101,11 +116,29 @@ class Operation(Strict):
         description="dose and react: the batch or semi-batch step whose model gives the "
         "duration (its dosing time; its reaction time, the post-reaction of a semi-batch).",
     )
+    temperatures: tuple[float, float] | None = Field(
+        default=None,
+        description="heat and cool: (start K, end K) of the content; the duration follows "
+        "from the unit's vessel.jacket (UA, the medium's temperature).",
+    )
 
     @model_validator(mode="after")
     def _duration(self) -> Operation:
-        if (self.duration is None) == (self.from_ is None):
-            raise ValueError(f"operation {self.id}: give duration or from, one of them")
+        given = [n for n in ("duration", "from_", "temperatures") if getattr(self, n) is not None]
+        if len(given) != 1:
+            raise ValueError(
+                f"operation {self.id}: give duration, from or temperatures, one of them"
+            )
+        if self.temperatures is not None:
+            if self.kind not in ("heat", "cool"):
+                raise ValueError(
+                    f"operation {self.id}: temperatures give a heat-up's or a cool-down's time only"
+                )
+            start, end = self.temperatures
+            if min(start, end) <= 0 or (end > start) != (self.kind == "heat"):
+                raise ValueError(
+                    f"operation {self.id}: temperatures in K, rising to heat, falling to cool"
+                )
         if self.from_ is not None and self.kind not in ("dose", "react"):
             raise ValueError(
                 f"operation {self.id}: from: gives a dose's or a reaction's time only; give "
@@ -123,6 +156,45 @@ class Start(Strict):
     )
 
 
+class Jacket(Strict):
+    """The jacket (or coil) of a unit's vessel: its overall coefficient, its area (else the
+    wetted area of the vessel's shell and bottom) and the medium's temperatures."""
+
+    u: float = Field(gt=0, description="W/(m2 K), overall, content to the jacket's medium.")
+    area: float | None = Field(
+        default=None, gt=0, description="m2; else the wetted shell and flat bottom."
+    )
+    coolant_temperature: float | None = Field(
+        default=None, gt=0, description="K of the cooling medium (taken as constant)."
+    )
+    heating_temperature: float | None = Field(
+        default=None, gt=0, description="K of the heating medium (taken as constant)."
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class Vessel(Strict):
+    """A unit's vessel, sized from its batch volume (the unit's batch or semi-batch model):
+    the working volume over the fill fraction, rounded up to a preferred size."""
+
+    fill_fraction: float = Field(
+        default=0.8, gt=0, le=1, description="Largest working volume over the vessel's."
+    )
+    aspect_ratio: float = Field(
+        default=1.0, gt=0, description="Straight-side height over diameter (the jacket's area)."
+    )
+    nominal: bool = Field(
+        default=True, description="Round up to the R10 preferred numbers (ISO 3) in m3."
+    )
+    volume: float | None = Field(
+        default=None, gt=0, description="m3: an existing vessel's, instead of sizing one."
+    )
+    jacket: Jacket | None = None
+    provenance: Provenance
+    source: str = ""
+
+
 class UnitProcedure(Strict):
     """What one unit (a flowsheet block or step) does per batch."""
 
@@ -138,6 +210,11 @@ class UnitProcedure(Strict):
         "it ends.",
     )
     operations: list[Operation] = Field(min_length=1)
+    vessel: Vessel | None = Field(
+        default=None,
+        description="Size the unit's vessel and check its jacket (the unit: a batch or "
+        "semibatch step).",
+    )
 
 
 class BatchSize(Strict):
@@ -195,6 +272,179 @@ class UnitCycle:
 
 
 @dataclass
+class VesselResult:
+    """A unit's vessel sized for one batch, and its jacket against the peak duty."""
+
+    procedure: str
+    unit: str
+    working_volume: float  # m3: the batch's largest content
+    volume: float  # m3: the vessel's
+    rounded: bool  # to a preferred size
+    fill: float  # working volume over the vessel's
+    diameter: float  # m
+    process_temperature: float  # K
+    peak_duty: float | None = None  # kW to remove at the peak (isothermal)
+    jacket_area: float | None = None  # m2 at the smallest content (the charge)
+    removable: float | None = None  # kW: U A (T - T_coolant) there
+    coolant_temperature: float | None = None
+
+
+@dataclass
+class _Content:
+    """What a unit's batch model gives per batch: kJ/K and m3 of the charge and of the content
+    at the end, the peak duty (kW) and the process temperature (K)."""
+
+    charge_capacity: float | None
+    end_capacity: float | None
+    charge_volume: float
+    end_volume: float
+    peak_duty: float | None
+    temperature: float
+
+
+#: The R10 preferred numbers (ISO 3) of one decade: the vessel sizes a volume is rounded to.
+R10 = (1.0, 1.25, 1.6, 2.0, 2.5, 3.15, 4.0, 5.0, 6.3, 8.0)
+
+
+def preferred(volume: float) -> float:
+    """The smallest R10 preferred number (ISO 3) of m3 at or above *volume*."""
+    decade = 10.0 ** math.floor(math.log10(volume))
+    for _ in range(2):
+        for r in R10:
+            if r * decade >= volume * (1 - 1e-12):
+                return r * decade
+        decade *= 10.0
+    return 10.0 * decade
+
+
+def _diameter(volume: float, aspect: float) -> float:
+    """m: the diameter of a cylinder of *volume* m3 with height = *aspect* x diameter."""
+    return (4.0 * volume / (math.pi * aspect)) ** (1.0 / 3.0)
+
+
+def wetted_area(content: float, diameter: float) -> float:
+    """m2: the shell and flat bottom wetted by *content* m3 in a vessel of *diameter* m (a
+    dished head's area is somewhat larger: a lower bound)."""
+    bottom = math.pi * diameter**2 / 4.0
+    return math.pi * diameter * content / bottom + bottom
+
+
+def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Content:
+    """The batch content of unit procedure *up*'s unit, a batch or semibatch step: its model's
+    figures (per hour of the flowsheet's flows) times the hours of flows one batch makes,
+    batch size / the flowsheet's rate of the batch-size stream. Raises ValueError."""
+    from chemeascode.domains.process.model import stream_flows
+    from chemeascode.domains.process.stirred_tank import (
+        solve_node,
+        split_inlets,
+        stream_moles,
+        tank_inlet,
+    )
+
+    node = process.nodes.get(up.unit)
+    model = getattr(node, "reactor", None)
+    if model not in ("batch", "semibatch") or node.batch is None:
+        raise _Reference(f"{up.unit} is no batch or semibatch: no batch content to size")
+    size = recipe.batch_size
+    stream = next((x for x in process.flowsheet.streams if x.id == size.stream), None)
+    flows = stream_flows(process, stream, case) if stream is not None else None
+    rate = None
+    if flows is not None:
+        rate = _volume_flow(process, flows.components) if size.unit == "m3" else flows.total
+    if not rate:
+        raise ValueError(f"no flow of {size.stream}: the batch's hours of flows are not known")
+    hours = size.value * (1000.0 if size.unit == "t" else 1.0) / rate
+    inlets = [
+        s for s in process.flowsheet.streams if (e := process.ends(s)[1]) and e.node == up.unit
+    ]
+    inlet = tank_inlet(node, inlets)
+    solved, _ = solve_node(process, node, inlet, case)
+    charge = split_inlets(node, inlets)[0] if model == "semibatch" else inlet
+    comps = process.components()
+
+    def capacity(moles: dict[str, float]) -> float | None:
+        cps = [(v, getattr(comps.get(n), "liquid_heat_capacity", None)) for n, v in moles.items()]
+        if any(v > 0 and not cp for v, cp in cps):
+            return None
+        return sum(v * (cp or 0.0) for v, cp in cps) * hours
+
+    charged, _, _ = stream_moles(process, charge, case)
+    end_volume = (solved.volume or 0.0) * hours
+    charge_volume = (solved.charge_volume or solved.volume or 0.0) * hours
+    rate = solved.peak_cooling_duty if model == "semibatch" else solved.peak_heat_rate
+    # None: not isothermal, or the heat released is not known (no heat of reaction)
+    peak = rate * end_volume if node.batch.heat == "isothermal" and rate is not None else None
+    return _Content(
+        capacity(charged),
+        capacity(solved.outlet),
+        charge_volume,
+        end_volume,
+        peak,
+        solved.temperature,
+    )
+
+
+def _vessel(up: UnitProcedure, content: _Content) -> VesselResult:
+    """The vessel of *up* for *content*: its volume (given, or the working volume over the
+    fill fraction, rounded up), and its jacket at the charge against the peak duty."""
+    vessel = up.vessel
+    working = max(content.charge_volume, content.end_volume)
+    if vessel.volume is not None:
+        volume, rounded = vessel.volume, False
+    else:
+        volume = working / vessel.fill_fraction
+        rounded = vessel.nominal
+        if rounded:
+            volume = preferred(volume)
+    diameter = _diameter(volume, vessel.aspect_ratio)
+    found = VesselResult(
+        up.id,
+        up.unit,
+        working,
+        volume,
+        rounded,
+        working / volume,
+        diameter,
+        content.temperature,
+        content.peak_duty,
+    )
+    jacket = vessel.jacket
+    if jacket is not None:
+        found.jacket_area = jacket.area or wetted_area(content.charge_volume, diameter)
+        found.coolant_temperature = jacket.coolant_temperature
+        if jacket.coolant_temperature is not None:
+            found.removable = (
+                jacket.u * found.jacket_area * (content.temperature - jacket.coolant_temperature)
+            ) / 1000.0
+    return found
+
+
+def _jacket_time(up: UnitProcedure, op: Operation, content: _Content, before_dose: bool) -> float:
+    """h to heat or cool the content by *op*'s temperatures in *up*'s jacketed vessel: ``t = C
+    / (U A) ln((T_m - T_0) / (T_m - T_1))``, the medium at its constant temperature, the
+    charge's content before the dose, else the end's. Raises ValueError."""
+    jacket = up.vessel.jacket if up.vessel is not None else None
+    if jacket is None:
+        raise ValueError(f"{up.id} has no vessel.jacket for a {op.kind} time")
+    medium = jacket.heating_temperature if op.kind == "heat" else jacket.coolant_temperature
+    if medium is None:
+        raise ValueError(
+            f"vessel.jacket has no {'heating' if op.kind == 'heat' else 'coolant'}_temperature"
+        )
+    start, end = op.temperatures or (0.0, 0.0)
+    if (medium - end) * (end - start) <= 0:
+        raise ValueError(f"the medium at {medium:g} K cannot {op.kind} the content to {end:g} K")
+    capacity = content.charge_capacity if before_dose else content.end_capacity
+    if capacity is None:
+        raise ValueError("no liquid_heat_capacity of the content")
+    volume = content.charge_volume if before_dose else content.end_volume
+    diameter = _diameter(_vessel(up, content).volume, up.vessel.aspect_ratio)
+    area = jacket.area or wetted_area(volume, diameter)
+    ua = jacket.u * area / 1000.0  # kW/K
+    return capacity / ua * math.log((medium - start) / (medium - end)) / 3600.0
+
+
+@dataclass
 class RecipeResult:
     title: str
     batch_size: float
@@ -209,6 +459,7 @@ class RecipeResult:
     flowsheet_rate: float | None = None
     units: list[UnitCycle] = field(default_factory=list)
     steps: list[Step] = field(default_factory=list)
+    vessels: list[VesselResult] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -297,7 +548,24 @@ def evaluate(
             )
         ops: list[tuple[Operation, float, str]] = []
         names: set[str] = set()
+        content: _Content | None = None
+        if up.vessel is not None or any(op.temperatures for op in up.operations):
+            try:
+                content = _content(process, recipe, up, case)
+            except ValueError as failure:
+                failed |= any(op.temperatures for op in up.operations)
+                add(
+                    "error",
+                    "reference" if isinstance(failure, _Reference) else "duration",
+                    f"{up.id}: no batch content of {up.unit}: {failure}",
+                    [*at, "vessel" if up.vessel is not None else "operations"],
+                    "a vessel or a jacket time needs a batch or semibatch unit that solves, and "
+                    "the batch-size stream's flow",
+                    [up.id],
+                )
+        dosed = False
         for j, op in enumerate(up.operations):
+            dosed |= op.kind == "dose"
             if op.id in names:
                 add(
                     "error",
@@ -307,6 +575,29 @@ def evaluate(
                     "one id each",
                 )
             names.add(op.id)
+            if op.temperatures is not None:
+                if content is None:
+                    continue
+                try:
+                    hours = _jacket_time(
+                        up,
+                        op,
+                        content,
+                        before_dose=not dosed and any(o.kind == "dose" for o in up.operations),
+                    )
+                except ValueError as failure:
+                    failed = True
+                    add(
+                        "error",
+                        "duration",
+                        f"{up.id}.{op.id}: no {op.kind} time: {failure}",
+                        [*at, "operations", j, "temperatures"],
+                        "give vessel.jacket (u, the medium's temperature), or the duration",
+                        [up.id],
+                    )
+                    continue
+                ops.append((op, hours, "calculated"))
+                continue
             if op.duration is not None:
                 ops.append((op, op.duration.hours(), op.duration.provenance))
                 continue
@@ -367,6 +658,10 @@ def evaluate(
         result.units.append(
             UnitCycle(up.id, up.unit, up.parallel, occupancy, occupancy / up.parallel)
         )
+        if up.vessel is not None and content is not None:
+            found = _vessel(up, content)
+            result.vessels.append(found)
+            _vessel_findings(up, found, at, add)
         clock_end = max(clock_end, clock)
     if failed:
         return result
@@ -386,6 +681,53 @@ def evaluate(
     result.rate /= recipe.hours_per_year.value
     _basis(process, recipe, result, case, add)
     return result
+
+
+def _vessel_findings(up: UnitProcedure, found: VesselResult, at: list[Any], add: Any) -> None:
+    """An overfilled given vessel; a jacket that cannot remove the peak duty."""
+    vessel = up.vessel
+    if vessel.volume is not None and found.fill > vessel.fill_fraction * (1 + 1e-9):
+        add(
+            "warning",
+            "vessel",
+            f"{up.id}: {found.working_volume:.4g} m3 of batch in the {found.volume:g} m3 vessel "
+            f"of {up.unit}, {found.fill:.0%} full (fill fraction {vessel.fill_fraction:g})",
+            [*at, "vessel", "volume"],
+            "a larger vessel, a smaller batch or more parallel units",
+            [up.id],
+        )
+    if found.removable is not None and found.peak_duty is not None:
+        if found.peak_duty > found.removable:
+            add(
+                "warning",
+                "jacket",
+                f"{up.id}: the peak duty {found.peak_duty:.4g} kW exceeds what the jacket removes "
+                f"at the charge, {found.removable:.4g} kW (U A {found.jacket_area:.3g} m2 x "
+                f"{found.process_temperature - (found.coolant_temperature or 0):.3g} K)",
+                [*at, "vessel", "jacket"],
+                "dose more slowly, a colder coolant, a coil or an external loop, or a smaller "
+                "batch",
+                [up.id],
+            )
+    elif vessel.jacket is not None and found.peak_duty is None:
+        add(
+            "info",
+            "jacket",
+            f"{up.id}: no jacket check: the model of {up.unit} gives no peak duty (not "
+            "isothermal, or no heat of reaction)",
+            [*at, "vessel", "jacket"],
+            "give the reactions' heat_of_reaction (an isothermal batch)",
+            [up.id],
+        )
+    elif vessel.jacket is not None and found.peak_duty is not None:
+        add(
+            "info",
+            "jacket",
+            f"{up.id}: no jacket check without vessel.jacket.coolant_temperature",
+            [*at, "vessel", "jacket"],
+            "give the coolant's temperature",
+            [up.id],
+        )
 
 
 def _basis(process: Any, recipe: Recipe, result: RecipeResult, case: str, add: Any) -> None:
@@ -514,6 +856,18 @@ def recipe_text(result: RecipeResult) -> str:
                     f"    {s.operation} ({s.kind}) {s.start:.4g}-{s.end:.4g} h"
                     + (" (from the model)" if s.basis == "calculated" else "")
                 )
+    for v in result.vessels:
+        lines.append(
+            f"  vessel of {v.unit} ({v.procedure}): {v.working_volume:.4g} m3 of batch in "
+            f"{v.volume:.4g} m3{' (preferred size)' if v.rounded else ''}, {v.fill:.0%} full, "
+            f"D {v.diameter:.3g} m"
+            + (
+                f"; peak duty {v.peak_duty:.4g} kW, jacket removes {v.removable:.4g} kW "
+                f"({v.jacket_area:.3g} m2 at the charge)"
+                if v.removable is not None and v.peak_duty is not None
+                else ""
+            )
+        )
     lines += [f.format() for f in result.findings]
     if not lines:
         lines.append("no recipe (process/recipe.yaml)")
