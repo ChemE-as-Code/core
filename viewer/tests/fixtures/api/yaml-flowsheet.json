@@ -444,7 +444,7 @@
     "$defs": {
       "Batch": {
         "additionalProperties": false,
-        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing).",
+        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as\nthey form, by a second outlet.",
         "properties": {
           "time": {
             "anyOf": [
@@ -501,6 +501,18 @@
             },
             "title": "Dosing",
             "type": "array"
+          },
+          "vent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Vent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
           },
           "provenance": {
             "enum": [
@@ -1229,7 +1241,7 @@
       },
       "Crystallizer": {
         "additionalProperties": false,
-        "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed.",
+        "description": "A cooling or evaporative crystallizer for one solute in one solvent (the model:\n:mod:`.crystallization`; no population balance, no kinetics): the crystals are the solid\ncomponent ``crystal`` (``phase: solid``; a hydrate's formula is the solute's plus n\nsolvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``\n(the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a\nfilter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``\noutlet; ``recycle`` returns part of the filtrate to the feed. ``spectators`` are other\ndissolved components carried unchanged (a precipitation from a reaction liquor); its\ninlets are taken together (a reslurry wash: the cake and the wash liquid).",
         "properties": {
           "solute": {
             "description": "The dissolved component that crystallizes.",
@@ -1332,6 +1344,14 @@
               }
             ],
             "default": null
+          },
+          "spectators": {
+            "description": "Dissolved components besides the solute and solvent (salts, base, unreacted reagent): carried unchanged in the mother liquor, never crystallized or evaporated; the solubility then needs measured_in: mother_liquor or salting_out:.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Spectators",
+            "type": "array"
           },
           "outlets": {
             "additionalProperties": {
@@ -1504,6 +1524,21 @@
             "minimum": 0,
             "title": "Start",
             "type": "number"
+          },
+          "absorbed": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+            "title": "Absorbed"
           }
         },
         "required": [
@@ -2393,6 +2428,50 @@
         "title": "ResidualMoisture",
         "type": "object"
       },
+      "SaltingOut": {
+        "additionalProperties": false,
+        "description": "The Setschenow correction of a pure-solvent solubility for the spectator solutes of the\nmother liquor: ``log10(s0 / s) = sum_i k_i m_i`` (``log: ln``: the natural logarithm), with\n``m_i`` the molality of spectator ``i`` in the mother liquor (mol per kg of free solvent)\nand ``k_i`` its coefficient on the molal scale (kg/mol; a molar-scale constant in L/mol is\nconverted with its source's liquor density beforehand).",
+        "properties": {
+          "coefficients": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Spectator id -> k_i (kg/mol, positive salting out, negative salting in); every spectator of the crystallizer once, 0 stated where it has no effect.",
+            "minProperties": 1,
+            "title": "Coefficients",
+            "type": "object"
+          },
+          "log": {
+            "default": "log10",
+            "enum": [
+              "log10",
+              "ln"
+            ],
+            "title": "Log",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coefficients",
+          "provenance"
+        ],
+        "title": "SaltingOut",
+        "type": "object"
+      },
       "Selectivity": {
         "additionalProperties": false,
         "description": "A conversion reactor given as reported: the per-pass ``conversion`` of the ``key``\ncomponent and the molar selectivity to each product, ``F_p formed / F_key converted``. The\nextents of the reactions follow (series and parallel side reactions in one step).",
@@ -2546,13 +2625,14 @@
       },
       "Solubility": {
         "additionalProperties": false,
-        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).",
+        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).\n\nWith spectator solutes (``crystallizer.spectators``), the solubility is either measured in\nthat mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a\n``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is\nrefused (``cheme.process-crystallizer``).",
         "properties": {
           "unit": {
-            "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the solute's mass fraction in the saturated solution.",
+            "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), the solute's mass fraction in the saturated solution (spectators included), or kg per kg of solute-free liquor (solvent plus spectators; measured_in: mother_liquor).",
             "enum": [
               "kg/kg_solvent",
-              "mass_fraction"
+              "mass_fraction",
+              "kg/kg_liquor"
             ],
             "title": "Unit",
             "type": "string"
@@ -2587,6 +2667,28 @@
             ],
             "default": null,
             "title": "Value"
+          },
+          "measured_in": {
+            "default": "pure_solvent",
+            "description": "Where the data were measured: in the pure solvent, or in the crystallizer's mother liquor with its spectator solutes (at the composition its source states).",
+            "enum": [
+              "pure_solvent",
+              "mother_liquor"
+            ],
+            "title": "Measured In",
+            "type": "string"
+          },
+          "salting_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SaltingOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Setschenow coefficients that correct the pure-solvent data for the spectators' molality in the mother liquor."
           },
           "provenance": {
             "enum": [
@@ -3421,6 +3523,40 @@
           "kind"
         ],
         "title": "UtilityLevel",
+        "type": "object"
+      },
+      "Vent": {
+        "additionalProperties": false,
+        "description": "The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the\nliquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They\ndo not accumulate in the liquid and count in neither its volume nor its concentrations; a\n``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.",
+        "properties": {
+          "stream": {
+            "description": "The outlet stream of the step the gas leaves by.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "components": {
+            "description": "The components that leave the liquid as they form.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Components",
+            "type": "array"
+          },
+          "fraction": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component -> the share of what forms that leaves (default 1).",
+            "title": "Fraction",
+            "type": "object"
+          }
+        },
+        "required": [
+          "stream",
+          "components"
+        ],
+        "title": "Vent",
         "type": "object"
       },
       "ViewItem": {

@@ -388,6 +388,14 @@ class Dosing(Strict):
         exclude_if=lambda value: not value,
     )
     start: float = Field(default=0.0, ge=0, description="s after the charge the dosing starts")
+    absorbed: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="A dosed gas: the share of the dose the liquid takes up (it dissolves on "
+        "entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+        exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
+    )
 
     @model_validator(mode="after")
     def _form(self) -> Dosing:
@@ -408,6 +416,37 @@ class Dosing(Strict):
         return found
 
 
+class Vent(Strict):
+    """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
+    liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
+    do not accumulate in the liquid and count in neither its volume nor its concentrations; a
+    ``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved."""
+
+    stream: str = Field(description="The outlet stream of the step the gas leaves by.")
+    components: list[str] = Field(
+        min_length=1, description="The components that leave the liquid as they form."
+    )
+    fraction: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> the share of what forms that leaves (default 1).",
+        exclude_if=lambda value: not value,
+    )
+
+    @model_validator(mode="after")
+    def _shares(self) -> Vent:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.components: each component once")
+        if stray := sorted(set(self.fraction) - set(self.components)):
+            raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
+        if any(not 0 < f <= 1 for f in self.fraction.values()):
+            raise ValueError("vent.fraction: a share above 0, at most 1")
+        return self
+
+    def shares(self) -> dict[str, float]:
+        """Component -> the share of what forms that leaves."""
+        return {n: self.fraction.get(n, 1.0) for n in self.components}
+
+
 class Batch(Strict):
     """A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge
     (its flow the charge per hour), the outlet its composition when the batch ends, after
@@ -416,7 +455,8 @@ class Batch(Strict):
 
     A semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its
     ``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the
-    dosing)."""
+    dosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as
+    they form, by a second outlet."""
 
     time: float | None = Field(default=None, gt=0, description="s of reaction")
     target: BatchTarget | None = None
@@ -428,6 +468,12 @@ class Batch(Strict):
         default_factory=list,
         description="reactor: semibatch: the dosed feeds.",
         exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
+    )
+    vent: Vent | None = Field(
+        default=None,
+        description="A liquid batch or semi-batch that gives off gas: {stream, components, "
+        "fraction} (ADR 0054).",
+        exclude_if=lambda value: value is None,  # an unvented batch's fingerprint stays
     )
     provenance: Provenance
     source: str = ""
@@ -562,20 +608,55 @@ class Reacting(Strict):
     )
 
 
+class SaltingOut(Strict):
+    """The Setschenow correction of a pure-solvent solubility for the spectator solutes of the
+    mother liquor: ``log10(s0 / s) = sum_i k_i m_i`` (``log: ln``: the natural logarithm), with
+    ``m_i`` the molality of spectator ``i`` in the mother liquor (mol per kg of free solvent)
+    and ``k_i`` its coefficient on the molal scale (kg/mol; a molar-scale constant in L/mol is
+    converted with its source's liquor density beforehand)."""
+
+    coefficients: dict[str, float] = Field(
+        min_length=1,
+        description="Spectator id -> k_i (kg/mol, positive salting out, negative salting in); "
+        "every spectator of the crystallizer once, 0 stated where it has no effect.",
+    )
+    log: Literal["log10", "ln"] = "log10"
+    provenance: Provenance
+    source: str = ""
+
+
 class Solubility(Strict):
     """The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,
     value), interpolated linearly at the crystallizer's temperature and never extrapolated, or
     one ``value`` that holds at the crystallizer's conditions as stated by its source (the
-    saturated mother liquor; no temperature dependence claimed)."""
+    saturated mother liquor; no temperature dependence claimed).
 
-    unit: Literal["kg/kg_solvent", "mass_fraction"] = Field(
-        description="kg of anhydrous solute per kg of solvent (g/100 g divided by 100), or the "
-        "solute's mass fraction in the saturated solution."
+    With spectator solutes (``crystallizer.spectators``), the solubility is either measured in
+    that mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a
+    ``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is
+    refused (``cheme.process-crystallizer``)."""
+
+    unit: Literal["kg/kg_solvent", "mass_fraction", "kg/kg_liquor"] = Field(
+        description="kg of anhydrous solute per kg of solvent (g/100 g divided by 100), the "
+        "solute's mass fraction in the saturated solution (spectators included), or kg per kg "
+        "of solute-free liquor (solvent plus spectators; measured_in: mother_liquor)."
     )
     points: list[tuple[float, float]] = Field(
         default_factory=list, description="(K, value) pairs, increasing in temperature."
     )
     value: float | None = Field(default=None, gt=0)
+    measured_in: Literal["pure_solvent", "mother_liquor"] = Field(
+        default="pure_solvent",
+        description="Where the data were measured: in the pure solvent, or in the crystallizer's "
+        "mother liquor with its spectator solutes (at the composition its source states).",
+        exclude_if=lambda value: value == "pure_solvent",  # fingerprints stay as they were
+    )
+    salting_out: SaltingOut | None = Field(
+        default=None,
+        description="Setschenow coefficients that correct the pure-solvent data for the "
+        "spectators' molality in the mother liquor.",
+        exclude_if=lambda value: value is None,
+    )
     provenance: Provenance
     source: str = ""
 
@@ -583,6 +664,15 @@ class Solubility(Strict):
     def _form(self) -> Solubility:
         if bool(self.points) == (self.value is not None):
             raise ValueError("give points or value, one of them")
+        if self.unit == "kg/kg_liquor" and self.measured_in != "mother_liquor":
+            raise ValueError(
+                "unit kg/kg_liquor: data measured in the mother liquor (measured_in: mother_liquor)"
+            )
+        if self.salting_out is not None and self.measured_in != "pure_solvent":
+            raise ValueError(
+                "salting_out corrects pure-solvent data: not with measured_in: "
+                "mother_liquor (the liquor's data already hold the spectators)"
+            )
         temperatures = [t for t, _ in self.points]
         if any(t <= 0 for t in temperatures) or temperatures != sorted(set(temperatures)):
             raise ValueError("points: temperatures in K, positive and strictly increasing")
@@ -717,7 +807,9 @@ class Crystallizer(Strict):
     solvent). ``basis: solubility`` predicts the yield from the solubility at ``temperature``
     (the mother liquor leaves saturated); ``basis: yield`` imposes it. With ``separation`` a
     filter or centrifuge follows (outlets ``cake`` and ``mother_liquor``), else one ``slurry``
-    outlet; ``recycle`` returns part of the filtrate to the feed."""
+    outlet; ``recycle`` returns part of the filtrate to the feed. ``spectators`` are other
+    dissolved components carried unchanged (a precipitation from a reaction liquor); its
+    inlets are taken together (a reslurry wash: the cake and the wash liquid)."""
 
     solute: str = Field(description="The dissolved component that crystallizes.")
     solvent: str
@@ -732,6 +824,13 @@ class Crystallizer(Strict):
     separation: SolidSeparation | None = None
     recycle: MotherLiquorRecycle | None = None
     energy: CrystallizerEnergy | None = None
+    spectators: list[str] = Field(
+        default_factory=list,
+        description="Dissolved components besides the solute and solvent (salts, base, "
+        "unreacted reagent): carried unchanged in the mother liquor, never crystallized or "
+        "evaporated; the solubility then needs measured_in: mother_liquor or salting_out:.",
+        exclude_if=lambda value: not value,  # a single-solute crystallizer's fingerprint stays
+    )
     outlets: dict[Literal["slurry", "cake", "mother_liquor", "vapour"], str] = Field(
         description="Role -> the step's outlet port."
     )
@@ -759,6 +858,18 @@ class Crystallizer(Strict):
             raise ValueError(f"outlets: give exactly {', '.join(sorted(want))}")
         if len({self.solute, self.solvent, self.crystal}) != 3:
             raise ValueError("solute, solvent and crystal must be three different components")
+        if len(set(self.spectators)) != len(self.spectators) or {
+            self.solute,
+            self.solvent,
+            self.crystal,
+        } & set(self.spectators):
+            raise ValueError("spectators: each once, none the solute, solvent or crystal")
+        salting = self.solubility.salting_out if self.solubility is not None else None
+        if salting is not None and set(salting.coefficients) != set(self.spectators):
+            raise ValueError(
+                "solubility.salting_out.coefficients: one coefficient for each spectator "
+                "(0 where it has no effect), no others"
+            )
         return self
 
 

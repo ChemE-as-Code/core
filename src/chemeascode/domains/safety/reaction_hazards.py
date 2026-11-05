@@ -16,6 +16,10 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
   its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
   then and ``dT_ad`` of the whole batch, charge and doses;
+- a vented batch or semi-batch (``batch.vent``, ADR 0054): the vented gas leaves as it forms,
+  so it adds nothing to the content's heat capacity nor to the MTSR, and a dosed gas counts
+  only with its absorbed share; neither sets the MTT. The notes give the vent's peak gas rate:
+  with the vent blocked that gas pressurises the vessel, which this screening does not assess;
 - ``MTT`` from the reactor's ``hazard.mtt``, else the lowest normal boiling point of a
   liquid-phase reactor's components at about atmospheric pressure (110 kPa(a) at most);
   ``TD24`` from ``hazard.td24`` only (calorimetry; never estimated);
@@ -25,11 +29,19 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
 - for a cooled fixed bed: the hot spot's sensitivity ``d T_hot / d T_coolant`` (1 K steps);
   above 5 the bed is near runaway (parametric sensitivity, Morbidelli and Varma).
 
+Phase changes are not reactions (ADR 0056): a step whose reactions are all phase changes
+(``kind: phase-change``, or one component into one other of the same formula, one of them
+``phase: solid``, e.g. a precipitation ``NBS -> NBS_S`` written as a conversion, that declares
+no heat of reaction) is not screened; a step with reactions and phase changes is screened on
+its reactions alone. A phase change detected by its formula that declares a heat of reaction
+(a caustic dissolution) is screened as a reaction: its heat counts in dT_ad.
+
 Rules (``cheme.reactor-hazard-*``, findings on ``process/flowsheet.yaml``): ``-class``
 (info for classes 1 and 2, warning for 3 to 5), ``-mtsr`` (warning: the MTSR above the MTT or
 the TD24 where the class cannot be given), ``-sensitivity`` (warning), ``-missing`` (info: what
-the screening lacks). These are screening values for a concept or basic design: they do not
-replace calorimetry or a reaction-hazard study, and decide nothing.
+the screening lacks), ``-phase-change`` (info: a step not screened, its reactions all phase
+changes). These are screening values for a concept or basic design: they do not replace
+calorimetry or a reaction-hazard study, and decide nothing.
 """
 
 from __future__ import annotations
@@ -68,15 +80,25 @@ class HazardEntry:
 
 
 @dataclass
+class PhaseChangeStep:
+    """A step not screened: its reactions are all phase changes (reaction id -> why)."""
+
+    node: str
+    reactions: dict[str, str]
+
+
+@dataclass
 class HazardReport:
     entries: list[HazardEntry]
     findings: list[Finding]
     source: SourceRevision | None = None
+    phase_changes: list[PhaseChangeStep] = field(default_factory=list)
 
     def to_json(self) -> str:
         return json.dumps(
             {
                 "reactors": [asdict(e) for e in self.entries],
+                "phase_changes": [asdict(p) for p in self.phase_changes],
                 "findings": [
                     {
                         "file": f.file,
@@ -150,8 +172,48 @@ def _adiabatic_rise(
     return best / capacity if capacity > 0 else None, lacking
 
 
+def _declared_heat(reaction: Any) -> float:
+    """kJ/kmol: the reaction's declared heat of reaction (0 when none is declared)."""
+    return reaction.heat_of_reaction.value if reaction.heat_of_reaction is not None else 0.0
+
+
+def _phase_changes(process: Any, node: str) -> dict[str, str]:
+    """Reaction id -> why it is a phase change, of every reaction of *node* that is one."""
+    from chemeascode.domains.chemistry.reactions import phase_change
+    from chemeascode.domains.process.solids import solid_components
+
+    reactions, _ = process.reactions_of(node)
+    formulas = process.formulas()
+    solids = solid_components(process)
+    found = {r.id: phase_change(r, formulas, solids) for r in reactions}
+    return {k: v for k, v in found.items() if v}
+
+
+def phase_changes(process: Any, node: str) -> dict[str, str]:
+    """Reaction id -> why it is a phase change, of the reactions of *node* not screened as
+    reactions: those declared ``kind: phase-change``, and those detected by their formula that
+    declare no heat of reaction. A detected one with a heat of reaction stays screened (a
+    dissolution of caustic or a dilution of acid can boil a batch): the author never said it
+    is no reaction, and its heat counts in dT_ad."""
+    reactions, _ = process.reactions_of(node)
+    heat = {r.id: _declared_heat(r) for r in reactions}
+    return {
+        k: why
+        for k, why in _phase_changes(process, node).items()
+        if why == "declared" or not heat.get(k)
+    }
+
+
+def heated_phase_changes(process: Any, node: str) -> list[str]:
+    """The reactions of *node* detected as phase changes by their formula that declare a heat
+    of reaction, so are screened as reactions."""
+    skipped = phase_changes(process, node)
+    return sorted(k for k in _phase_changes(process, node) if k not in skipped)
+
+
 def screen_node(process: Any, node: str, case: str) -> HazardEntry:
-    """The screening of reactor *node* in *case* (see the module docstring)."""
+    """The screening of reactor *node* in *case* (see the module docstring); its phase
+    changes take no part (the screening of its reactions alone)."""
     from chemeascode.domains.process.model import stream_flows
     from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 
@@ -160,6 +222,14 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     model = getattr(item, "reactor", None) or "conversion"
     entry = HazardEntry(node, model)
     reactions, _ = process.reactions_of(node)
+    if changes := phase_changes(process, node):
+        reactions = [r for r in reactions if r.id not in changes]
+        entry.notes.append("phase changes not screened as reactions: " + ", ".join(sorted(changes)))
+    if heated := heated_phase_changes(process, node):
+        entry.notes.append(
+            "phase changes screened for their declared heat of reaction (it counts in dT_ad): "
+            + ", ".join(heated)
+        )
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
     if model == "semibatch":  # its charge and doses: the material inlets
         inlets = [s for s in inlets if s.kind == "material"]
@@ -214,6 +284,7 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
             entry.notes.append("accumulation: the unconverted key in the (first) tank")
     if model == "batch":
         entry.notes.append("accumulation 1: all charged, cooling fails at the start")
+        _vent_note(process, item, entry, inlet, case)
     elif model != "cstr":
         entry.notes.append("accumulation 1: the fresh feed, at the inlet's temperature")
     entry.process_temperature = t_p
@@ -242,12 +313,18 @@ def _screen_semibatch(
     comps = process.components()
     moles: dict[str, float] = {}
     p_in = None
+    # a dosed gas counts with the share the liquid takes up; the rest passes to the vent
+    absorbed = {d.stream: d.absorbed for d in item.batch.dosing if d.absorbed is not None}
+    through: set[str] = set()
     try:
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
+            share = absorbed.get(stream.id, 1.0)
+            if share < 1:
+                through |= {n for n, v in found.items() if v > 0}
             for n, v in found.items():
                 if v > 0:  # a template's component the stream does not carry is not there
-                    moles[n] = moles.get(n, 0.0) + v
+                    moles[n] = moles.get(n, 0.0) + v * share
             p_in = kpa if p_in is None else min(p_in, kpa)
         solved, _ = solve_node(process, item, inlets, case)
     except TankError as failure:
@@ -273,8 +350,42 @@ def _screen_semibatch(
         entry.notes.append("MTSR: T_p + X_ac dT_ad (no cooling-failure temperature over the run)")
     else:
         entry.missing.append("the accumulation of a dosed reactant")
-    _limits(entry, item, reactions, moles, comps, p_in)
+    boiling = moles
+    if item.batch.vent is not None:
+        _vent_note(process, item, entry, inlets, case, solved)
+        gases = set(item.batch.vent.components) | through
+        boiling = {n: v for n, v in moles.items() if n not in gases}
+    _limits(entry, item, reactions, boiling, comps, p_in)
     return entry
+
+
+def _vent_note(
+    process: Any, item: Any, entry: HazardEntry, inlet: Any, case: str, solved: Any = None
+) -> None:
+    """The notes of a vented batch or semi-batch (ADR 0054): its gas leaves as it forms, adds
+    nothing to the MTSR, and its peak rate is a pressure hazard with the vent blocked."""
+    vent = getattr(item.batch, "vent", None) if item.batch is not None else None
+    if vent is None:
+        return
+    if solved is None:
+        from chemeascode.domains.process.stirred_tank import TankError, solve_node
+
+        try:
+            solved, _ = solve_node(process, item, inlet, case)
+        except TankError as failure:
+            entry.missing.append(f"the vented batch: {failure}")
+            return
+    rate = solved.peak_vent_rate
+    entry.notes.append(
+        f"vent {vent.stream}: {', '.join(vent.components)} leave(s) as formed, no part of the "
+        "heat capacity or the MTSR"
+        + (
+            f"; peak gas rate {rate:.4g} kmol/(s m3) at {solved.peak_vent_time:.6g} s"
+            if rate
+            else ""
+        )
+        + " (with the vent blocked it pressurises the vessel: not screened here)"
+    )
 
 
 def _limits(
@@ -338,12 +449,44 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
         return HazardReport([], found)
     case = case or process.flowsheet.default_case()
     fs = process.flowsheet
-    entries = [
-        screen_node(process, n.id, case)
-        for n in [*fs.blocks, *fs.steps]
-        if process.reactive(n.id) and (n.reactions or getattr(n, "reactor", None))
-    ]
+    entries: list[HazardEntry] = []
+    skipped: list[PhaseChangeStep] = []
+    heats: dict[str, dict[str, float]] = {}
+    for n in [*fs.blocks, *fs.steps]:
+        if not (process.reactive(n.id) and (n.reactions or getattr(n, "reactor", None))):
+            continue
+        reactions, _ = process.reactions_of(n.id)
+        changes = phase_changes(process, n.id)
+        if reactions and len(changes) == len(reactions):
+            skipped.append(PhaseChangeStep(n.id, dict(sorted(changes.items()))))
+            heats[n.id] = {r.id: h for r in reactions if (h := _declared_heat(r))}
+        else:
+            entries.append(screen_node(process, n.id, case))
     findings: list[Finding] = []
+    for p in skipped:
+        heat = heats.get(p.node) or {}
+        reason = (
+            "declared kind: phase-change, their declared heat ("
+            + ", ".join(f"{r} {h:g} kJ/kmol" for r, h in sorted(heat.items()))
+            + ") is not screened as a reaction"
+            if heat
+            else "no reaction heat declared to run away"
+        )
+        findings.append(
+            Finding(
+                FLOWSHEET,
+                "info",
+                "cheme.reactor-hazard-phase-change",
+                f"{p.node}: not screened: its reactions are phase changes ("
+                + ", ".join(f"{r}: {why}" for r, why in p.reactions.items())
+                + f"), {reason}",
+                line=_yaml_line(process.flowsheet_doc, _location(process, p.node)),
+                ids=[p.node],
+                hint="model a precipitation or a reslurry wash as a crystallizer: (spectators, "
+                "a solubility in the liquor) rather than conversion reactions; a phase change "
+                "that stays a reaction says kind: phase-change in process/reactions.yaml",
+            )
+        )
     for e in entries:
         line = _yaml_line(process.flowsheet_doc, _location(process, e.node))
 
@@ -406,7 +549,7 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
     from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
 
     paths = [FLOWSHEET_FILE, MATERIALS_FILE, "process/reactions.yaml", "process/catalysts.yaml"]
-    return HazardReport(entries, findings, source_revision(root, paths))
+    return HazardReport(entries, findings, source_revision(root, paths), skipped)
 
 
 def hazard_text(report: HazardReport) -> str:
@@ -431,7 +574,9 @@ def hazard_text(report: HazardReport) -> str:
             )
         )
         lines += [f"  note: {n}" for n in e.notes]
-    if not report.entries:
+    for p in report.phase_changes:
+        lines.append(f"{p.node}: not screened (phase changes: {', '.join(p.reactions)})")
+    if not report.entries and not report.phase_changes:
         lines.append("no reactors")
     lines += [f.format() for f in report.findings]
     lines.append("screening values: they do not replace calorimetry or a reaction-hazard study")

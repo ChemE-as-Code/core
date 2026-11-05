@@ -487,6 +487,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     ``cheme process propagate`` solves them."""
     from chemeascode.domains.process.crystallization import (
         ASSUMPTIONS,
+        LIQUOR_ASSUMPTIONS,
         SEPARATION_ASSUMPTIONS,
     )
 
@@ -531,7 +532,12 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     lacking: list[str] = []
     limitations = [outside, "no population balance (crystal size distribution not modelled)"]
     parts = [spec.solubility if spec.basis == "solubility" else spec.yield_, spec.separation]
-    for part, what in zip(parts, (spec.basis, "separation"), strict=True):
+    whats = [spec.basis, "separation"]
+    salting = spec.solubility.salting_out if spec.solubility is not None else None
+    if spec.basis == "solubility" and salting is not None:
+        parts.append(salting)
+        whats.append("salting_out")
+    for part, what in zip(parts, whats, strict=True):
         if part is None:
             continue
         if _sourced(part):
@@ -565,6 +571,24 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         limitations.append("specified separation: no filtration or centrifuge model")
     if spec.recycle is not None:
         detail += f"; mother liquor recycle {spec.recycle.fraction:g}"
+    assumptions = list(ASSUMPTIONS)
+    if spec.spectators:
+        sol = spec.solubility
+        how = (
+            "solubility measured in the mother liquor"
+            if sol is not None and sol.measured_in == "mother_liquor"
+            else "pure-solvent solubility with Setschenow salting-out"
+            if salting is not None
+            else "no solubility in the liquor"
+        )
+        detail += f"; spectators {', '.join(spec.spectators)} ({how})"
+        if sol is not None and sol.measured_in == "pure_solvent" and salting is None:
+            lacking.append("a solubility in the mixed liquor")
+        assumptions += LIQUOR_ASSUMPTIONS
+        limitations.append(
+            "mixed liquor: the solubility data hold at the liquor composition their source "
+            "states; no electrolyte activity model"
+        )
     if lacking:
         detail += "; not sourced: " + ", ".join(lacking)
     return UnitBasis(
@@ -575,7 +599,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         not lacking,
         detail=detail,
         sources=sources,
-        assumptions=list(ASSUMPTIONS),
+        assumptions=assumptions,
         limitations=limitations,
     )
 

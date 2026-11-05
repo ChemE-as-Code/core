@@ -417,8 +417,9 @@ def derive(process: Process, case: str) -> Derivation:
             return equilibrate_real(stoich, ks, moles, kpa, gas_t, critical)[0]
         return equilibrate(stoich, ks, moles, kpa)[0]
 
-    def solids(node: Any, inlet: StreamDef, outs: list[tuple[StreamDef, str]]) -> bool:
-        """The outlets of crystallizer or filter *node* (:mod:`.crystallization`)."""
+    def solids(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
+        """The outlets of crystallizer or filter *node* (:mod:`.crystallization`); a
+        crystallizer takes its inlets together."""
         from chemeascode.domains.process.crystallization import (
             CrystallizationError,
             node_outlets,
@@ -427,8 +428,9 @@ def derive(process: Process, case: str) -> Derivation:
             solve_node,
         )
 
-        if stream_flows(work, inlet, case).components is None:
+        if any(stream_flows(work, s, case).components is None for s in ins):
             return False
+        inlet = ins[0]
         shapes: dict[str, dict[str, float]] = {}
         try:
             if node.dryer is not None:
@@ -442,7 +444,7 @@ def derive(process: Process, case: str) -> Derivation:
                     raise CrystallizationError(str(failure)) from failure
                 ports = dried(node.dryer, solved)
             elif node.crystallizer is not None:
-                result, extra = solve_node(work, node, inlet, case)
+                result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 ports = node_outlets(node.crystallizer, result)
                 shapes = {
                     port: outlet_shape(node.crystallizer, role, result)
@@ -457,16 +459,31 @@ def derive(process: Process, case: str) -> Derivation:
         changed = False
         kind = kinds[node.id]
         names = sorted({n for mass in ports.values() for n in mass})
-        extra |= {"inlet": _converted(work, case, [inlet], components=names)}
+        extra |= {"inlet": _converted(work, case, ins, components=names)}
         for s, port in outs:
             mass = ports.get(port)
             if mass is None:
                 continue
             total = sum(mass.values())
-            changed |= put(s, "flow", kg_h(total), kind, node.id, [inlet], extra)
+            changed |= put(s, "flow", kg_h(total), kind, node.id, ins, extra)
             shape = mass if total > 0 else shapes.get(port) or mass
-            changed |= put(s, "composition", _mix(work, shape), kind, node.id, [inlet], extra)
+            changed |= put(s, "composition", _mix(work, shape), kind, node.id, ins, extra)
         return changed
+
+    def outlets_of(node: Any) -> tuple[StreamDef, StreamDef | None] | None:
+        """A reactor's liquid (or only) outlet and a vented batch's vent stream (ADR 0054); None
+        when the reactor does not have them: one outlet, or a vented batch's two."""
+        outs = [s for s, _ in at[node.id][1]]
+        batch = getattr(node, "batch", None)
+        model = getattr(node, "reactor", None)
+        vent = getattr(batch, "vent", None) if model in ("batch", "semibatch") else None
+        if vent is None:
+            return (outs[0], None) if len(outs) == 1 else None
+        gas = [s for s in outs if s.id == vent.stream]
+        liquid = [s for s in outs if s.id != vent.stream]
+        if len(gas) != 1 or len(liquid) != 1:
+            return None
+        return liquid[0], gas[0]
 
     def step(node: Any) -> bool:
         kind = kinds[node.id]
@@ -474,8 +491,8 @@ def derive(process: Process, case: str) -> Derivation:
         outs = at[node.id][1]
         changed = False
         if kind in ("crystallizer", "solid-separation", "dryer"):
-            if len(ins) == 1 and outs:
-                changed |= solids(node, ins[0], outs)
+            if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
+                changed |= solids(node, ins, outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
             a, b = ins[0], outs[0][0]
             for name in FIELDS:
@@ -497,12 +514,13 @@ def derive(process: Process, case: str) -> Derivation:
                         mass[n] = mass.get(n, 0.0) + v
                 converted = _converted(work, case, ins, components=list(mass))
                 changed |= put(out, "composition", _mix(work, mass), kind, node.id, ins, converted)
-        elif kind == "reactor" and ins and len(outs) == 1 and reactors[node.id] is not None:
-            out = outs[0][0]
+        elif kind == "reactor" and ins and reactors[node.id] is not None and outlets_of(node):
+            out, vent = outlets_of(node)  # type: ignore[misc]
             model, reactions, rates = reactors[node.id]  # type: ignore[misc]
             flows = [stream_flows(work, s, case) for s in ins]
             # mass is conserved whatever the reactions do: the outlet flow needs only the inlets
-            if all(f.total is not None for f in flows):
+            # (a vented batch's two outlets share it as the model says, below)
+            if vent is None and all(f.total is not None for f in flows):
                 total = sum(f.total or 0.0 for f in flows)
                 converted = _converted(work, case, ins)
                 changed |= put(out, "flow", kg_h(total), kind, node.id, ins, converted)
@@ -528,6 +546,15 @@ def derive(process: Process, case: str) -> Derivation:
                         out, "composition", _mix(work, result), kind, node.id, ins, extra
                     )
                     solved = beds.get(node.id)
+                    if vent is not None and solved is not None:
+                        gas = {n: v * (mw.get(n) or 1.0) for n, v in solved.vent.items()}
+                        for s, mass in ((out, result), (vent, gas)):
+                            total = sum(mass.values())
+                            changed |= put(s, "flow", kg_h(total), kind, node.id, ins, extra)
+                        if gas:
+                            changed |= put(
+                                vent, "composition", _mix(work, gas), kind, node.id, ins, extra
+                            )
                     if solved is not None:
                         for name, value, tol in (
                             ("temperature", solved.temperature, 1.0),
@@ -555,7 +582,8 @@ def derive(process: Process, case: str) -> Derivation:
                             ("pressure", solved.pressure, p_unit),
                         ):
                             q = Quantity(value=_sig(value), unit=unit, provenance="calculated")
-                            changed |= put(out, name, q, kind, node.id, ins, extra)
+                            for s in (out, vent) if vent is not None else (out,):
+                                changed |= put(s, name, q, kind, node.id, ins, extra)
         elif kind == "splitter" and len(ins) == 1 and outs:
             src = ins[0]
             comp = get(src, "composition")
@@ -612,7 +640,7 @@ def derive(process: Process, case: str) -> Derivation:
             or (
                 # a reactor whose conversions failed is reported as such, not again here
                 kind == "reactor"
-                and len(at[node.id][1]) == 1
+                and outlets_of(node) is not None
                 and reactors[node.id] is not None
                 and any(p[0] == node.id for p in found.problems)
             )

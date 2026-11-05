@@ -29,6 +29,10 @@ instead of a duration: ``t = C / (U A) ln((T_m - T_0) / (T_m - T_1))`` with the 
 constant temperature, the content's heat capacity C (the charge's before a dose, else the
 end's).
 
+A vented batch or semi-batch unit (``batch.vent``, ADR 0054) reports its off-gas per batch:
+the model's peak gas rate (kmol/s, and m3/h at the vessel's temperature and pressure) and
+what one batch gives off, for sizing the off-gas line and scrubber.
+
 Derived (:func:`evaluate`): each unit's occupancy per batch, its cycle (occupancy over its
 parallel units), the plant's cycle time (the slowest unit: the bottleneck), the batches per
 year (hours over cycle time), each unit's utilisation, one batch's timeline from start to end
@@ -333,6 +337,22 @@ class VesselResult:
 
 
 @dataclass
+class VentResult:
+    """A vented unit's off-gas per batch (ADR 0054), for sizing its line and scrubber."""
+
+    procedure: str
+    unit: str
+    stream: str
+    peak_rate: float  # kmol/s at the peak, one batch
+    peak_volume_flow: float  # m3/h of that gas at the vessel's temperature and pressure
+    peak_time: float | None  # s from the batch's start (the step's model)
+    kmol: dict[str, float]  # given off per batch, by component
+    kg: float  # given off per batch
+    temperature: float  # K
+    pressure: float  # kPa(a)
+
+
+@dataclass
 class _Content:
     """What a unit's batch model gives per batch: kJ/K and m3 of the charge and of the content
     at the end, the peak duty (kW) and the process temperature (K)."""
@@ -386,6 +406,43 @@ def batch_hours(process: Any, recipe: Recipe, case: str) -> float:
     if not rate:
         raise ValueError(f"no flow of {size.stream}: the batch's hours of flows are not known")
     return size.value * (1000.0 if size.unit == "t" else 1.0) / rate
+
+
+def _vent(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> VentResult | None:
+    """The vent of *up*'s batch or semibatch step per batch (ADR 0054): its model's peak gas
+    rate (kmol/s per m3 of the content at the end) times the content one batch ends with, and
+    what one batch gives off. None when the step has no vent or does not solve (its own findings
+    say why)."""
+    from chemeascode.domains.chemistry.thermochemistry import R
+    from chemeascode.domains.process.stirred_tank import TankError, solve_node, tank_inlet
+
+    unit = _tank(process, up)
+    node = process.nodes.get(unit)
+    vent = getattr(getattr(node, "batch", None), "vent", None)
+    if vent is None or getattr(node, "reactor", None) not in ("batch", "semibatch"):
+        return None
+    try:
+        hours = batch_hours(process, recipe, case)
+        solved, _ = solve_node(process, node, tank_inlet(node, _inlets(process, unit)), case)
+    except (TankError, ValueError):
+        return None
+    comps = process.components()
+    peak = (solved.peak_vent_flow or 0.0) * hours  # kmol/s of one batch
+    return VentResult(
+        up.id,
+        unit,
+        vent.stream,
+        peak,
+        peak * R * solved.temperature / solved.pressure * 3600.0,
+        solved.peak_vent_time,
+        {n: v * hours for n, v in solved.vent.items()},
+        sum(
+            v * hours * (getattr(comps.get(n), "molar_mass", None) or 0.0)
+            for n, v in solved.vent.items()
+        ),
+        solved.temperature,
+        solved.pressure,
+    )
 
 
 def _nodes(process: Any, up: UnitProcedure) -> list[Any]:
@@ -674,6 +731,7 @@ class RecipeResult:
     units: list[UnitCycle] = field(default_factory=list)
     steps: list[Step] = field(default_factory=list)
     vessels: list[VesselResult] = field(default_factory=list)
+    vents: list[VentResult] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -933,6 +991,8 @@ def evaluate(
         elif cake is not None:
             result.vessels.append(cake)
             _vessel_findings(up, cake, at, add, jacket=False)
+        if (gas := _vent(process, recipe, up, case)) is not None:
+            result.vents.append(gas)
         clock_end = max(clock_end, clock)
     if failed:
         return result
@@ -1151,6 +1211,15 @@ def recipe_text(result: RecipeResult) -> str:
                 if v.jacket_area is not None and v.coolant_temperature is None and _dries(result, v)
                 else ""
             )
+        )
+    for g in result.vents:
+        lines.append(
+            f"  vent of {g.unit} ({g.procedure}) by {g.stream}: peak {g.peak_rate:.4g} kmol/s "
+            f"({g.peak_volume_flow:.4g} m3/h at {g.temperature:.5g} K, {g.pressure:.5g} kPa)"
+            + (f" at {g.peak_time / 3600:.4g} h" if g.peak_time is not None else "")
+            + f"; {g.kg:.4g} kg per batch ("
+            + ", ".join(f"{n} {v:.4g} kmol" for n, v in g.kmol.items())
+            + ")"
         )
     lines += [f.format() for f in result.findings]
     if not lines:
