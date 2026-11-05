@@ -153,6 +153,51 @@ never overwrites), and rerun `--fill` when `validate` reports them stale. A comp
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
 in `DESIGN.md`. Run propagate before `props --fill`.
 
+**Recycles.** Propagate cannot start a loop on its own: the mixer waits for the recycle and the
+recycle for the mixer. Never converge a loop by hand (assumed tear values copied back over
+runs). Name one stream per loop in `tears:` and let propagate iterate it (ADR 0060):
+
+```yaml
+tears:
+  - stream: S11                     # the recycle, between two steps of the loop
+    initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.6, NAOH: 0.4}}
+convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
+```
+
+- Give the loop an exit for every component (a purge `split:`, a reaction, a product). A
+  component that only circulates has no steady state, and the loop does not converge.
+- A tear's flow or composition that is a design input (a charge ratio) stays `assumed`.
+  Propagate iterates only the other. Remove the old hand-converged values so it can.
+- Start from a guess of the right order (`initial:`), usually the hand estimate; its fractions
+  sum to 1 (`cheme.process-tear` otherwise). An empty recycle can leave a splitter remainder
+  negative, or a still, reactor or filter with nothing to work on, and then the loop does not
+  close (`cheme.process-recycle`, warning).
+- Tear each loop once. Two tears in one loop converge only as fast as plain substitution.
+- `cheme.process-recycle` (info) gives the iterations and the worst residual. Tighten
+  `convergence.tolerance` below the flowsheet's when the loop's gain is near 1: the tolerance
+  bounds the residual, so the converged loop is within tolerance / (1 - gain) of its steady
+  state. Record the tears and the tolerance in `DESIGN.md`.
+- Nothing that depends on a loop that does not converge is written. Raise
+  `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`.
+
+**Duties from the models (ADR 0059).** Do not copy a reactor's, still's or crystallizer's duty
+from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
+process propagate --fill` write the year-average duty of an isothermal batch or semi-batch
+(the reaction heat and the doses' warming), a `still:` (its boil-up's latent heat), a
+`crystallizer:` with `energy:` or a conversion step (its declared heats of reaction at their
+`temperature`, the streams' sensible heat, less the power its other energy streams bring in,
+such as an electrolyser's DC feed: give those streams their duty). It goes on the stream at the
+step's `energy_port: PORT`, else on its one energy stream to a heating or cooling utility
+(steam, cooling water, refrigerant...): give `energy_port` when the step has several, such as a
+reactor heated up by steam and cooled by brine, or a still with condensers, and when its heat
+goes to or comes from another block or step (a furnace heating a cracker's coil). Declare a
+liquid step's heat of reaction on the liquid basis. Direction matters: a cooling stream runs from the step to
+the utility, a heating stream from the utility to the step; the duty is positive. A duty you
+keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
+`cheme.process-duty` names both values when they differ: record the difference in
+`DESIGN.md`. The charge's heat-up, agitation, condensers and the dryer (its own
+`energy.port`) are not written: give those streams yourself.
+
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:
 

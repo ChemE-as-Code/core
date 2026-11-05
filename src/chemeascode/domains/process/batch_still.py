@@ -1045,6 +1045,8 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         "duty_kW": result.duty,
         "peak_duty_kW": result.peak_duty,
         "energy_kWh_per_batch": energy / 3600.0 if energy is not None else None,
+        # the year average its energy stream carries (ADR 0059): per hour of flows
+        "year_average_duty_kW": energy / (h * 3600.0) if energy is not None and h else None,
         "temperatures_K": list(result.temperatures) if result.temperatures else None,
         "key": result.key,
         "profile": [
@@ -1146,6 +1148,11 @@ def report_text(report: StillReport) -> str:
                 f"duty {num(sol['duty_kW'], ' kW', '.4g')} (peak "
                 f"{num(sol['peak_duty_kW'], ' kW', '.4g')}), "
                 f"{num(sol['energy_kWh_per_batch'], ' kWh', '.4g')}"
+                + (
+                    f", year average {sol['year_average_duty_kW']:.6g} kW"
+                    if sol.get("year_average_duty_kW") is not None
+                    else ""
+                )
                 + (
                     f", still {sol['temperatures_K'][0]:.5g} -> {sol['temperatures_K'][1]:.5g} K"
                     if sol["temperatures_K"]

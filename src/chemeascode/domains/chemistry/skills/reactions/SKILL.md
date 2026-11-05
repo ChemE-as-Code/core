@@ -236,12 +236,22 @@ each value taken from the evidence cites its observation in `source`.
    rise, the MTSR after a cooling failure (a batch: all its charge; a CSTR: its unconverted
    key; a semi-batch: the dosed reactant at its largest accumulation, at the worst moment over
    the run, so a dosing-controlled step screens lower than its batch; a vented gas leaves as it
-   forms and adds nothing to it, while its peak rate in the notes pressurises a vessel whose
-   vent is blocked, which the screening does not assess), the MTT (the reactor's `hazard.mtt`, else the lowest normal boiling point at about
-   atmospheric pressure, of what stays in the liquid: the gas that forms and leaves by the vent and a dose's passing share left out) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
+   forms and adds nothing to it), the MTT (the reactor's `hazard.mtt`, else the lowest boiling
+   point of what boils in the liquid at the reactor's pressure: the normal boiling point from
+   90 to 110 kPa(a), else Clausius-Clapeyron with `heat_of_vaporization`, which you give for
+   a pressurised or vacuum reactor; a vent component, a dosed gas and a dissolved gas (under
+   5 % of the liquid, boiling below the process temperature) are left out with a note, and
+   with nothing else left set `hazard.mtt`; a solvent at reflux sets it, at or below the
+   process temperature) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays
-   open (`cheme.reactor-hazard-missing`). These are screening values for the HAZOP study, not a
+   open (`cheme.reactor-hazard-missing`). With several reactions the output gives each one's
+   dT_ad and MTSR; where a slow side reaction sets the MTSR and the main reaction is what you
+   screen, say so with `hazard.reactions: [MAIN]` and give the reason in `source` (the side
+   reaction's value stays in the output). A semi-batch prints its MTSR over the batch (an
+   initiation charge, the end of each dosing segment). A vented batch reports its gas release
+   at the MTSR (`cheme.reactor-hazard-vent`): give `hazard.vent_capacity` (m3/h at the vessel's
+   pressure) from the vent sizing; the blocked-vent pressure is not screened. These are screening values for the HAZOP study, not a
    reaction-hazard assessment. A phase change is no reaction: a precipitation, dissolution or
    wash loss belongs in a `crystallizer:` on the step (`spectators:` for the other solutes of
    the liquor; skill `separation-method-selection`). Where one stays written as a reaction,
