@@ -1,7 +1,7 @@
 """The semi-batch (``reactor: semibatch``): the accumulation of a dosed reactant against its
 closed form, fast and slow reactions in the thermal screening, the energy balance of an
 adiabatic dosing, and its place in cheme process propagate, cheme validate and process
-reactors (ADR 0048)."""
+reactors (ADR 0050)."""
 
 import math
 

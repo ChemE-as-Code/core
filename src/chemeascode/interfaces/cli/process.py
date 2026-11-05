@@ -204,6 +204,32 @@ def reactor_hazards(
         raise typer.Exit(1)
 
 
+@process_app.command("recipe")
+def recipe(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    svg: Annotated[
+        Path | None, typer.Option("--svg", help="Write the Gantt chart of one batch here.")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """The batch cycle of process/recipe.yaml: each unit's occupancy per batch, the cycle time
+    (the bottleneck), the batches per year, one batch's timeline and the batch-size stream's
+    rate against the flowsheet's (domains/process/recipe.py). --svg writes the Gantt chart of
+    one batch. Exit 1 on a warning or error, 2 without a recipe."""
+    from chemeascode.domains.process.recipe import gantt_svg, recipe_report, recipe_text
+
+    workspace = _workspace()
+    result = recipe_report(workspace.root, case)
+    if result is None:
+        typer.echo("no process/recipe.yaml", err=True)
+        raise typer.Exit(2)
+    if svg is not None and result.steps:
+        svg.write_text(gantt_svg(result))
+    typer.echo(json.dumps(result.as_dict(), indent=2) if as_json else recipe_text(result))
+    if any(f.level in ("warning", "error") for f in result.findings):
+        raise typer.Exit(1)
+
+
 @process_app.command("reactor-choice")
 def reactor_choice(
     node: Annotated[str, typer.Argument(help="The reactor block or step.")],

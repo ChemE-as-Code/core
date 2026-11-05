@@ -1,4 +1,4 @@
-# 0048. A semi-batch reactor with dosed feeds, its accumulation taken by the thermal screening
+# 0050. A semi-batch reactor with dosed feeds, its accumulation taken by the thermal screening
 
 - **Status:** Proposed
 - **Date:** 2026-11-05
