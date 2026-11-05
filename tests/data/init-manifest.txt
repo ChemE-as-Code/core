@@ -55,6 +55,7 @@ a1cc4633b4212fd534625f93903c62069ee0e1d36d53c6c03c94e89faeb47448  .claude/skills
 a1d78705578a62202b7aeefcb1da09059bdb145c8823d186b12b468a9dbea5fd  .claude/skills/lists-sync/SKILL.md
 8ffa494dc7e7c107d3d52645f61a2565b67eed67633653f5f76e1a180daf9f8a  .claude/skills/materials/SKILL.md
 286824ea024e24826d8dcde82bef40124c813e5038639f1b5fbd7c4e59ade01e  .claude/skills/mto-estimate/SKILL.md
+a2c652c6e12a24951884b38d3a9148d0fcb740c2cedd5a4569669442da020343  .claude/skills/pfd-drawing/SKILL.md
 7c4d852b913a3c20f513637728339d54554f8f47a7a4beb4a682dd65b88fb1b1  .claude/skills/phase-calculation/SKILL.md
 e27a90846dd0d5c30bc52200aa710c5e569842ddd64cb9a7605483c9e1fbe53d  .claude/skills/pid-design-compressors/SKILL.md
 402370f9a26efeac10688430b6b384d8b56b901a8b8031484f33a16c350f5e9c  .claude/skills/pid-design-control-valve-selection/SKILL.md
@@ -68,6 +69,7 @@ cae33a1ca894d74c65ad3b118f53ad435cec728064b8245fdefa5cbd6b87e4dc  .claude/skills
 c751c117802de54b6a04fbbae4cecf8238379683aadf8b05f8f45890dcef04df  .claude/skills/pid-design-vessels-and-tanks/SKILL.md
 e52c79bc9d617f67775a78fd3064a51dcf0110121af37e7c619314ccc66458e2  .claude/skills/pid-design/SKILL.md
 f3879229cd719a38c6f50aaa4885a24a68c97377a2d272519c4e087c37ba8946  .claude/skills/pid-draft/SKILL.md
+0e5621cc82705da7a2c8539e56ac1606c52abcfd0d77625832e9484a02254088  .claude/skills/pid-drafting-standards/SKILL.md
 294f5e69d204834fd0f06e9aae56403f63ec2b493ef485804ff9f8ef6f6bbb12  .claude/skills/pid-edit/SKILL.md
 81d11f6e4145f2318535c9685b6463ac7dc398e5c6a071a52bac8dec467bbfe9  .claude/skills/pid-review-commissioning-readiness/SKILL.md
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md

@@ -136,6 +136,8 @@ def test_nested_block_is_drawn_inside_its_parent(nested):
         for end in ends:
             node = end.split(".")[0]
             holders |= {node, *process.ancestors(node)}
+        if key in pfd.stubs or key in pfd.port_points:  # a utility stub: in its step's band
+            holders |= pfd.hosts
         for node_id, node in nodes.items():
             if node_id not in holders:
                 assert not any(_through(s, node) for s in _segments(points)), (key, node_id)

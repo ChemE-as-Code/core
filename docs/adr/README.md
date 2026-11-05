@@ -93,3 +93,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0043](0043-dynamic-electrolysis-duties-and-anolyte-models.md) | Dynamic electrolysis duties with an anolyte model interface, on a concentration basis | Proposed | 2026-11-04 |
 | [0044](0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md) | Stack sizing in process/cells.yaml, skid equipment inputs through the equipment list | Proposed | 2026-11-04 |
 | [0045](0045-a-design-case-lci-dataset-with-its-own-identity.md) | A design case's LCI dataset, generated with an identity that names the case | Proposed | 2026-11-04 |
+| [0046](0046-pfd-drawn-as-an-engineering-sheet.md) | The PFD drawn as an engineering sheet: ISO frame, stream table, utility stubs, junctions | Proposed | 2026-11-05 |

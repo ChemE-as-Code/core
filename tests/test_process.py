@@ -297,6 +297,10 @@ def _foreign(process, placed):
         if stream is not None:
             for end in (stream.from_, stream.to):
                 holders.add(process.container(end.split(".")[0]))
+                if key in placed.stubs:  # a utility stub runs in its step's stub band
+                    holders.add(end.split(".")[0])
+        if key in placed.delegations and key.split(".")[0] in placed.hosts:
+            holders.add(key.split(".")[0])
         for node_id, node in placed.nodes.items():
             if node_id in holders:
                 continue

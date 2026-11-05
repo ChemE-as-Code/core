@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The PFD is drawn as an engineering sheet (ADR 0046; generator 6: every BFD/PFD needs
+  `cheme process build`): the smallest ISO 216 or ISO 5457 elongated sheet that holds it, with
+  frame, zone markers and a title block; a stream table (phase, °C, bar, mass flow, the
+  largest component flows, duties) below the drawing; utility terminals drawn as short stubs
+  with the utility's id on each step they serve instead of boxes with a line to every user;
+  mixing and splitting steps as junction tees; inlets aligned with their source (no small
+  jogs); wrapped titles; heavier process lines with arrowheads; process areas as light
+  dash-dot boundaries; layouts wider than an A0 wrapped into rows; each feed placed just before
+  its first consumer. The BFD gets the frame and
+  title block.
+- `cheme render` paints the backdrop in the sheet's own `BackgroundColor` (white) instead of
+  pyDEXPI's viewer grey, unless a filled shape on the sheet has that colour.
+
+### Added
+
+- A flowsheet step's optional `symbol:` (an ISO symbol name, `junction` or `box`) overrides
+  the drawing of its class on the PFD; an unknown name is `cheme.process-symbol` (warning).
+  `GeneratingFlow` and `TransportingFluids` steps are drawn as pumps, `SteeringFlow` as a
+  control valve, `Crystallizing` as a jacketed vessel, `SeparatingMechanically` as a
+  separator.
+
 ## 1.5.0 (2026-11-04)
 
 Minor release: electrochemical measurements, measured-performance cells, dynamic electrolysis
