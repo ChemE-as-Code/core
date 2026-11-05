@@ -33,9 +33,13 @@ connectors sit just above the title block's top, not at the border.
   down to the top of the title block. A connector is on an edge within 10 mm of it
   (`EDGE_TOLERANCE`), or within 35 mm (`EDGE_REACH`) when nothing but its own line and texts is
   drawn between it and that edge.
-- A connector whose id or own text says it is an open end (atm, atmosphere, sky, safe location,
-  vent, breather, hose, funnel, sewer, drain but not a closed drain: `LOCAL_END`) is not
-  checked, unless its text names a sheet (`P-nn`, sheet) or the battery limit (`B/L`, `BL`,
+- A connector whose id or own text says it is an open end is not checked (`LOCAL_END`, on
+  the text in lower case with spaces, hyphens and underscores read as one space): atm,
+  atmosphere, sky, safe location, breather, hose, funnel, sewer; or vent or drain with no
+  system noun (header, system, collection, network, main, line, drum, KO, knock-out, scrubber,
+  station, tank, vessel, sump, pit, pot, stack) right after it or one word later, and for a
+  drain not closed ("to vent header", "to drain header" and "to closed-drain header" are
+  checked). Its text must name no sheet (`P-nn`, sheet) or the battery limit (`B/L`, `BL`,
   battery limit: `SHEET_END`). The message names the criterion.
 - The hint gives the `cheme move ID --offset=DX,DY` onto the nearest edge and, when that is not
   the edge the connector's direction calls for, the offset onto the left (incoming) or right

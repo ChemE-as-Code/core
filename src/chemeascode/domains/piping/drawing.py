@@ -34,8 +34,8 @@ lines, symbols and texts exactly where the sheet puts them, after every ``ShapeU
     an off-page connector that does not sit on an edge of the drawing area (the inside of the
     border, down to the top of the title block): within ``EDGE_TOLERANCE`` of it, or within
     ``EDGE_REACH`` with nothing else drawn between it and the edge. An open end drawn where it
-    is (its id or text says to atmosphere, a vent, a drain, a hose connection, and its text names
-    no sheet or battery limit) may sit anywhere.
+    is (its id or text says to atmosphere, a vent, a drain, a hose connection, not a vent or drain
+    header or a closed drain, and its text names no sheet or battery limit) may sit anywhere.
 
 Text extents are estimated from the font size, the characters (Arial widths, the export's
 fallback font), ``text-anchor`` and ``dominant-baseline``. The sheet's border and title block are
@@ -1179,16 +1179,36 @@ EDGE_TOLERANCE = 10.0
 #: it and the edge (a header sheet's row of connectors, its texts outside it; the DEXPI
 #: reference P&ID's two connectors, 27 and 31 mm in).
 EDGE_REACH = 35.0
-#: An open end drawn where it is (to atmosphere, a drain, a hose connection), not a connection
-#: to another sheet: its id or its own text says so ("to atm.", "to drain"; a closed drain is a
-#: header elsewhere) ...
-LOCAL_END = re.compile(
-    r"\b(atm|atmosphere|sky|safe location|vent|breather|hose|funnel|sewer)\b|(?<!closed )\bdrain\b"
+#: A system a vent or drain goes into, named right after it ("to vent header", "to drain
+#: collection system", "to vent KO drum"): a connection elsewhere, not an open end.
+_SYSTEM_NOUN = (
+    r"(?:header|system|collection|network|main|line|drum|ko|knock ?out|scrubber|station|"
+    r"tank|vessel|sump|pit|pot|stack)"
 )
-#: ... unless its text names a sheet or the battery limit ("to vent header, P-07", "to flare
+#: An open end drawn where it is (to atmosphere, a drain, a hose connection), not a connection
+#: to another sheet: its id or its own text says so ("to atm.", "to drain", "open drain",
+#: "tanker hose", "breather"). A vent or drain counts only when no system noun follows it within
+#: a word, and a drain not when closed ("to closed-drain header") ...
+LOCAL_END = re.compile(
+    r"\b(?:atm|atmosphere|sky|safe location|breather|hose|funnel|sewer)\b"
+    rf"|(?<!closed )\b(?:vent|drain)\b(?! (?:\S+ )?{_SYSTEM_NOUN}\b)"
+)
+#: ... unless its text names a sheet or the battery limit ("to vent, P-07", "to flare
 #: (B/L)"): DEXPI 2.0 draws both with the same off-page connector classes, and the sheets carry
 #: no reference to the other sheet's connector, so the words are what tells them apart.
-SHEET_END = re.compile(r"\bp-\d+\b|\bsheet\b|\bb/?l\b|battery limit")
+SHEET_END = re.compile(r"\bp \d+\b|\bsheet\b|\bb/?l\b|battery limit")
+
+
+def _words(text: str) -> str:
+    """*text* lower case with runs of spaces, hyphens and underscores as one space."""
+    return re.sub(r"[\s_-]+", " ", text.lower()).strip()
+
+
+def is_open_end(connector: str, texts: list[str]) -> bool:
+    """Whether a connector with id *connector* and its own *texts* is an open end drawn where it
+    is (``LOCAL_END``), its texts naming no sheet or battery limit (``SHEET_END``)."""
+    said = _words(" ".join(texts))
+    return bool(LOCAL_END.search(f"{_words(connector)} {said}")) and not SHEET_END.search(said)
 
 
 @dataclass
@@ -1246,9 +1266,7 @@ def offpage_placements(drawing: Drawing, context: Context) -> list[Placement]:
         )
         kind = context.kinds.get(connector, "").rsplit(".", 1)[-1]
         direction = "in" if kind.startswith("FlowIn") else "out" if "FlowOut" in kind else ""
-        texts = " ".join(t.text for t in drawing.labels if connector in t.owners).lower()
-        words = f"{connector.replace('_', ' ').lower()} {texts}"
-        local = bool(LOCAL_END.search(words)) and not SHEET_END.search(texts)
+        local = is_open_end(connector, [t.text for t in drawing.labels if connector in t.owners])
         placements.append(Placement(connector, direction, box, edge, distance, on_edge, local))
     return placements
 
@@ -1304,7 +1322,8 @@ def _offpage_not_on_edge(drawing: Drawing, context: Context) -> list[DrawingFind
                 "connection to another sheet or the battery limit goes on the edge (within "
                 f"{EDGE_TOLERANCE:g} mm, or {EDGE_REACH:g} mm with nothing else drawn between "
                 "it and the edge); only an open end whose id or text says atm., vent, drain or "
-                "hose, naming no sheet or B/L, may stay by its valve",
+                "hose (no vent or drain header, no closed drain) and names no sheet or B/L may "
+                "stay by its valve",
                 [place.connector],
                 box,
                 place.connector,

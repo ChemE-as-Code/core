@@ -511,31 +511,47 @@ def test_a_header_row_set_in_from_the_edge_needs_a_clear_way_to_it():
     assert "24 mm inside the drawing area's top edge" in found.message
 
 
+OPEN_ENDS = ["to atm.", "to drain", "open drain", "tanker hose", "from casing (breather)"]
+#: Closed systems and connections elsewhere, whatever their words say about vents and drains.
+NOT_OPEN = [
+    "to vent header",
+    "to drain header",
+    "to closed-drain header",
+    "to closed_drain",
+    "to vent KO drum",
+    "to vent header, P-07",
+    "to flare (B/L)",
+]
+
+
 def test_open_ends_may_sit_by_their_valve():
     """A vent to atmosphere, a drain or a hose connection drawn with an off-page connector is no
-    connection to another sheet; one whose text names a sheet or the battery limit is."""
+    connection to another sheet; a vent or drain header, a closed drain and a connector whose
+    text names a sheet or the battery limit are, and are reported mid-sheet."""
+    exempt = [_connector(f"OUT{i}", 100 + 30 * i, 100, t) for i, t in enumerate(OPEN_ENDS)]
+    kinds = {f"OUT{i}": OUT_CONNECTOR for i in range(len(OPEN_ENDS))}
     assert (
-        _offpage(
-            _connector("OPC_PSV1_atm", 150, 100),
-            _connector("OUT2", 200, 100, "to drain"),
-            _connector("IN3", 250, 100, "tanker hose"),
-            _connector("OUT4", 300, 100, "to atmosphere (safe location)"),
-            OPC_PSV1_atm=OUT_CONNECTOR,
-            OUT2=OUT_CONNECTOR,
-            IN3=IN_CONNECTOR,
-            OUT4=OUT_CONNECTOR,
-        )
+        _offpage(*exempt, _connector("OPC_PSV1_atm", 100, 160), OPC_PSV1_atm=OUT_CONNECTOR, **kinds)
         == []
     )
-    found = _offpage(
-        _connector("OUT1", 150, 100, "to vent header, P-07"),
-        _connector("OUT2", 200, 100, "to closed drain"),
-        _connector("OUT3", 250, 100, "to flare (B/L)"),
-        OUT1=OUT_CONNECTOR,
-        OUT2=OUT_CONNECTOR,
-        OUT3=OUT_CONNECTOR,
-    )
-    assert sorted(f.ids[0] for f in found) == ["OUT1", "OUT2", "OUT3"]
+    fired = [_connector(f"OUT{i}", 100 + 30 * i, 160, t) for i, t in enumerate(NOT_OPEN)]
+    kinds = {f"OUT{i}": OUT_CONNECTOR for i in range(len(NOT_OPEN))}
+    found = _offpage(*fired, **kinds)
+    assert sorted(f.ids[0] for f in found) == sorted(kinds)
+
+
+@pytest.mark.parametrize("note", OPEN_ENDS)
+def test_open_end_words(note: str):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert is_open_end("OPC_1", [note])
+
+
+@pytest.mark.parametrize("note", NOT_OPEN)
+def test_closed_system_words(note: str):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert not is_open_end("OPC_1", [note])
 
 
 # -- label-far-from-owner ---------------------------------------------------------------------

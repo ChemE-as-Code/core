@@ -44,7 +44,8 @@
   inside of the border down to the title block's top): within 10 mm of it, or 35 mm with nothing
   else drawn between it and the edge (a header sheet's row of connectors under their notes).
   An open end drawn with the same DEXPI classes, whose id or note says atm., vent, drain or hose
-  and names no sheet or B/L, may stay by its valve. The hint gives the `cheme move ID
+  (not a vent or drain header, not a closed drain) and names no sheet or B/L, may stay by its
+  valve. The hint gives the `cheme move ID
   --offset=DX,DY` onto the nearest edge. On the process library's 26 asu-1, hda-1 and ammonia-1
   sheets it finds the five connectors still off the edges, all on asu-1 P-04.
 
