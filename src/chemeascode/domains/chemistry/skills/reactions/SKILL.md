@@ -137,23 +137,32 @@ each value taken from the evidence cites its observation in `source`.
    - A liquid `batch` or `semibatch` that gives off a gas (HCl from a chlorination or
      phosgenation, CO2, HBr from a bromination) takes `batch.vent: {stream, components: [ids],
      fraction: {id: share}}` (ADR 0054): the listed components leave the liquid as they form,
-     by the vent `stream`, an outlet of the step besides the liquid's (two outlets). They do not
-     accumulate in the liquid and count in neither its volume, its concentrations nor its heat
-     capacity, so they need no `liquid_molar_volume` or `liquid_heat_capacity`; a `fraction`
-     below 1 keeps the rest dissolved (then it needs them). Write the `heat_of_reaction` with
-     the gas formed as a gas at the vessel's temperature (as reaction calorimetry with off-gas
-     measures it): the vent carries the gas's own enthalpy and no heat of desorption is added.
-     A dosed gas (phosgene, Cl2, methyl nitrite) is a dose like any other: it dissolves on
-     entry, with its `liquid_molar_volume` and `liquid_heat_capacity`. When only part is taken
-     up, give the dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to
-     the vessel's temperature (its ideal-gas cp, else left out and noted). `process propagate`
-     writes both outlets (composition, flow, the liquid's temperature and pressure) and the
-     balance closes over them; `process reactors` gives the vent's kmol/h and its peak rate in
-     kmol/(s m3) of the final content, `cheme process recipe` the peak in kmol/s and m3/h per
-     batch and what one batch gives off: size the off-gas line and scrubber from these. Do not
-     list a reactant in `vent.components` (it would leave before reacting), and do not model
-     the gas as a dissolved liquid component plus a degassing split: that overstates the
-     volume and gives no off-gas profile.
+     by the vent `stream`, an outlet of the step besides the liquid's (two outlets). They do
+     not accumulate in the liquid and count in neither its volume, its concentrations nor its
+     heat capacity, so they need no `liquid_molar_volume` or `liquid_heat_capacity`; a
+     `fraction` below 1 keeps the rest dissolved (then it needs them). The share is of what
+     each reaction forms: a reaction that consumes a vented gas (benzyl alcohol + HCl, Ac2O +
+     HCl) takes it from the liquid (charged, dosed or the dissolved rest), never back from the
+     vent. Write the `heat_of_reaction` with the gas formed as a gas at the vessel's
+     temperature (as reaction calorimetry with off-gas measures it): the vent carries the gas's
+     own enthalpy and no heat of desorption is added. A dosed gas (phosgene, Cl2, methyl
+     nitrite) dissolves on entry like a liquid dose, with its `liquid_molar_volume` and
+     `liquid_heat_capacity`, but no heat of absorption or condensation is added (HCl into water
+     about -75 kJ/mol, phosgene about -24, Cl2 about -20): write the `heat_of_reaction` of the
+     reactions that consume it with the dosed gas as a gas (as calorimetry with gas dosing
+     measures it), so this heat is counted as the dose reacts. That keeps the MTSR
+     conservative, but the cooling duty during dosing leaves out the absorption of the gas not
+     yet reacted; on the dissolved basis both miss it. When only part is taken up, give the
+     dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to the vessel's
+     temperature (its ideal-gas cp, else left out and noted). `process propagate` writes both
+     outlets (composition, flow, the liquid's temperature and pressure) and the balance closes
+     over them; `process reactors` gives the vent's kmol/h and its peak rate in kmol/(s m3) of
+     the final content, `cheme process recipe` the peak in kmol/s and m3/h per batch and what
+     one batch gives off: size the off-gas line and scrubber from these. The vent stream's
+     template must hold the vent's components and what a passing dose carries. A reactant
+     listed in `vent.components` vents nothing of itself: only what the reactions form vents; a
+     dosed gas that escapes is `absorbed`. Do not model the gas as a dissolved liquid component
+     plus a degassing split: that overstates the volume and gives no off-gas profile.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A

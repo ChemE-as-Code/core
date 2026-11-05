@@ -194,6 +194,93 @@ def test_a_dosed_gas_partly_absorbed_passes_the_rest_to_the_vent():
         _vented(k, _batch(False), doses=dosed(300.0))
 
 
+def _side_reactions(k2):
+    """R1 forms G; R2 consumes it (G + S -> C, first order in c_G)."""
+
+    def law(k, order):
+        return {
+            "form": "power_law",
+            "basis": "volume",
+            "driving": "concentration",
+            "k": {"A": k},
+            "orders": {order: 1},
+            "provenance": "assumed",
+        }
+
+    return Reactions.model_validate(
+        {
+            "schema": "cheme/reactions/v1",
+            "kind": "reactions",
+            "reactions": [
+                {
+                    "id": "R1",
+                    "stoichiometry": {"A": -1, "B": 1, "G": 1},
+                    "phase": "liquid",
+                    "heat_of_reaction": {"value": HEAT, "provenance": "assumed"},
+                    "rate": law(1e-3, "A"),
+                },
+                {
+                    "id": "R2",
+                    "stoichiometry": {"G": -1, "S": -1, "C": 1},
+                    "phase": "liquid",
+                    "heat_of_reaction": {"value": -1e4, "provenance": "assumed"},
+                    "rate": law(k2, "G"),
+                },
+            ],
+        }
+    ).reactions
+
+
+@pytest.mark.parametrize("k2", [1e-3, 1e-2])
+def test_a_side_reaction_of_the_vented_gas_takes_it_from_the_liquid(k2):
+    """The vent takes its share of what R1 forms, not of the net formation: R2 consumes only
+    the dissolved rest, never gas that has already left."""
+    volumes = dict.fromkeys("ABSCG", 0.1)
+    cp = dict.fromkeys("ABSCG", 150.0)
+    batch = Batch.model_validate(
+        {
+            "time": 3600,
+            "vent": {"stream": "V", "components": ["G"], "fraction": {"G": 0.5}},
+            "provenance": "assumed",
+        }
+    )
+    charge = {"S": 5.0, "A": 1.0}
+    result = solve_batch(
+        _side_reactions(k2), charge, 300.0, 101.325, batch, {}, Liquid(volumes), cp
+    )
+    r1, r2 = result.extents["R1"], result.extents["R2"]
+    assert r1 == pytest.approx(1 - math.exp(-1e-3 * 3600), rel=1e-6)  # first order in c_A
+    assert result.vent["G"] == pytest.approx(0.5 * r1, rel=1e-6)
+    assert 0.0 < r2 <= 0.5 * r1 * (1 + 1e-9)
+    # closure over both outlets
+    nu = {"A": {"R1": -1}, "B": {"R1": 1}, "G": {"R1": 1, "R2": -1}, "S": {"R2": -1}}
+    nu["C"] = {"R2": 1}
+    extents = {"R1": r1, "R2": r2}
+    for name in "ABSCG":
+        made = sum(v * extents[j] for j, v in nu[name].items())
+        assert result.outlet[name] + result.vent.get(name, 0.0) == pytest.approx(
+            charge.get(name, 0.0) + made, rel=1e-9, abs=1e-9
+        ), name
+
+
+def test_a_charged_vent_component_is_drawn_down_by_its_consumer():
+    """G vented whole and also charged (a recycled liquor): all of what R1 forms leaves, and R2
+    consumes the charged pool, even while R1 forms more than R2 consumes."""
+    volumes = dict.fromkeys("ABSCG", 0.1)
+    cp = dict.fromkeys("ABSCG", 150.0)
+    batch = Batch.model_validate(
+        {"time": 3600, "vent": {"stream": "V", "components": ["G"]}, "provenance": "assumed"}
+    )
+    charge = {"S": 5.0, "A": 1.0, "G": 0.2}
+    result = solve_batch(
+        _side_reactions(1e-4), charge, 300.0, 101.325, batch, {}, Liquid(volumes), cp
+    )
+    r1, r2 = result.extents["R1"], result.extents["R2"]
+    assert r2 > 0.0
+    assert result.vent["G"] == pytest.approx(r1, rel=1e-6)
+    assert result.outlet["G"] == pytest.approx(0.2 - r2, rel=1e-6)
+
+
 def test_the_schema_of_vent_and_absorbed():
     vent = Vent.model_validate({"stream": "V", "components": ["G", "H"], "fraction": {"H": 0.3}})
     assert vent.shares() == {"G": 1.0, "H": 0.3}
@@ -340,6 +427,7 @@ def test_propagate_writes_the_liquid_and_the_vent_and_the_balance_closes(tmp_pat
     assert balance.status == "ok", balance.failing
     assert sorted(balance.streams_out) == ["S3", "S4"]
     assert not [f.format() for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+    assert not [f.format() for f in rules(process) if f.level == "error"]
     # the vent and the reactors report
     (row,) = reactor_report(ws.root).reactors
     vent = row["tank"]["vent"]
@@ -375,6 +463,38 @@ def test_vent_rules(tmp_path):
     passing = UNVENTED.replace("time: 3600}]", "time: 3600, absorbed: 0.5}]")
     ws = _unvented_plant(tmp_path / "e", passing)
     assert any("pass gas through" in m and "no batch.vent" in m for m in _messages(ws))
+    three = FLOWSHEET.replace(
+        "{id: gas, direction: out}]", "{id: gas, direction: out}, {id: gas2, direction: out}]"
+    ) + ("  - id: S5\n    from: R.gas2\n    to: OFFGAS.in\n    template: gas\n")
+    assert any("vent with 3 outlets" in m for m in _messages(_plant(tmp_path / "f", three)))
+    # a vented batch on gas-phase reactions: one error, said once
+    batch = FLOWSHEET.replace("reactor: semibatch", "reactor: batch").replace(
+        "batch: {dosing: [{stream: S2, time: 3600}], ", "batch: {time: 3600, "
+    )
+    ws = _plant(tmp_path / "g", batch)
+    path = ws.root / "process/reactions.yaml"
+    path.write_text(REACTIONS.replace("phase: liquid", "phase: vapor"))
+    phase = [m for m in _messages(ws, "error") if "not liquid-phase" in m or "is not" in m]
+    assert phase == ["block R: a vent takes liquid-phase reactions only: R1 is not"]
+    # a semi-batch says so by its own rule only
+    ws = _plant(tmp_path / "h")
+    (ws.root / "process/reactions.yaml").write_text(
+        REACTIONS.replace("phase: liquid", "phase: vapor")
+    )
+    phase = [m for m in _messages(ws, "error") if "liquid-phase" in m]
+    assert phase == ["block R: reactor semibatch with the reaction(s) R1 not liquid-phase"]
+    # the vent stream's template holds the vent's components and what a dose passes through
+    lacking = MATERIALS.replace("{id: gas, components: [G]}", "{id: gas, components: [A]}")
+    ws = _plant(tmp_path / "i")
+    (ws.root / "process/materials.yaml").write_text(lacking)
+    assert any("vent stream S4's template gas lacks G" in m for m in _messages(ws, "error")), (
+        _messages(ws)
+    )
+    ws = _plant(tmp_path / "j", FLOWSHEET.replace("time: 3600}]", "time: 3600, absorbed: 0.8}]"))
+    assert any(
+        "template gas lacks A" in m and "the dose S2 passes it through" in m
+        for m in _messages(ws, "error")
+    )
 
 
 def test_a_dosed_gas_dissolves_on_entry_like_any_dose(tmp_path):
@@ -400,9 +520,17 @@ def test_a_dosed_gas_dissolves_on_entry_like_any_dose(tmp_path):
 def test_a_partly_absorbed_gas_dose_in_a_plant(tmp_path):
     flowsheet = FLOWSHEET.replace("time: 3600}]", "time: 3600, absorbed: 0.8}]")
     ws = _plant(tmp_path, flowsheet)
+    # the vent carries the passing A: its template holds it
+    path = ws.root / "process/materials.yaml"
+    path.write_text(
+        MATERIALS.replace("{id: gas, components: [G]}", "{id: gas, components: [A, G]}")
+    )
     assert not _messages(ws)
     process, _ = load(ws.root)
     run(ws, process, "design", write=True)
+    process, found = load(ws.root)
+    errors = [f.format() for f in found + rules(process) if f.level == "error"]
+    assert not errors, errors
     gas = _states(ws)["S4"]
     left = 0.8 * (1 - math.exp(-0.01 * DOSING)) / (0.01 * DOSING)
     assert gas["flow"]["value"] == pytest.approx(0.2 * 44.05 + (0.8 - left) * 16.0, rel=1e-5)
@@ -478,3 +606,18 @@ def test_an_unvented_batch_fingerprints_as_before(tmp_path, kind):
     assert {
         name: outlet[name]["fingerprint"] for name in ("composition", "flow")
     } == FINGERPRINTS_1_7_0[kind]
+
+
+def test_process_simulate_refuses_a_vented_batch(tmp_path):
+    """Its reactors give one outlet: the vented batch's two are not coupled to DWSIM."""
+    import tests.test_process_simulate_kinetic as kinetic
+
+    batch = kinetic.TANK.replace("reactor: cstr", "reactor: batch").replace(
+        "tank: {volume: 2.0, catalyst_loading: 1000, heat: adiabatic, provenance: assumed,\n"
+        "           source: test fixture}",
+        "batch: {time: 5.0, catalyst_loading: 1000, vent: {stream: S2, components: [NH3]},\n"
+        "           provenance: assumed}",
+    )
+    assert "vent:" in batch
+    errors = kinetic._errors(kinetic._translate(kinetic._plant(tmp_path, batch)))
+    assert any("a vented batch's two outlets" in e for e in errors), errors

@@ -36,10 +36,13 @@ moment (Stoessel's MTSR of a semi-batch, the dosing stopped) and, isothermal, th
 remove (the reaction's heat and the doses' warming), per m3 of the final content.
 
 A liquid batch or semi-batch with a ``vent`` (ADR 0054) gives off the vent's components ``g``
-as they form, a share ``f_g`` (default 1) of their formation by the reactions::
+as they form, a share ``f_g`` (default 1) of their gross formation, reaction by reaction::
 
-    dn_g/dt = (1 - f_g) G_g + sum_d F_d,g          G_g = max(sum_j nu_gj M_j r_j, 0)
-    dv_g/dt = f_g G_g                              (what has left by the vent)
+    dn_g/dt = sum_j nu_gj M_j r_j - f_g G_g + sum_d F_d,g     G_g = sum_j max(nu_gj M_j r_j, 0)
+    dv_g/dt = f_g G_g                                        (what has left by the vent)
+
+so a reaction that consumes a vented component (or runs back) draws on the liquid's, charged,
+dosed or the dissolved share ``1 - f_g`` of what formed, never on the gas that has left.
 
 so a vented product does not accumulate in the liquid, nor count in its volume, concentrations
 or heat capacity. Its ``heat_of_reaction`` is taken as forming it as a gas at the vessel's
@@ -95,8 +98,13 @@ ASSUMPTIONS = {
     "vent": (
         "a vented component leaves the liquid as it forms (no mass-transfer limit, no "
         "saturation of the liquid), at the vessel's temperature and pressure",
+        "a share of what each reaction forms leaves; a reaction consuming it takes it from the "
+        "liquid",
         "its heat_of_reaction forms it as a gas: no heat of desorption or solution",
         "a dosed gas dissolves its absorbed share on entry; the rest passes straight through",
+        "a dissolving dose adds no heat of absorption or condensation: its reactions' "
+        "heat_of_reaction takes it as a gas, so that heat is released as it reacts (the cooling "
+        "duty during dosing leaves out the absorption of the gas not yet reacted)",
     ),
 }
 
@@ -727,7 +735,10 @@ def solve_batch(
             ]
             leaving = []  # kmol/s of each vented component leaving as it forms
             for i, f in zip(vented, vent_share, strict=True):
-                out = f * max(sum(nu[i][j] * extent[j] for j in range(m)), 0.0)
+                # a share of what the reactions form (each reaction's own), not of the net:
+                # what another reaction consumes it takes from the liquid, never back from
+                # the gas that has left
+                out = f * sum(max(nu[i][j] * extent[j], 0.0) for j in range(m))
                 dn[i] -= out
                 leaving.append(out)
             dt = 0.0
@@ -818,7 +829,7 @@ def solve_batch(
         rates = mix.rates(moles, t, pressure_of(moles, t))
         extent = [mult[j] * rates[j] for j in range(m)]
         formed = sum(
-            f * max(sum(nu[i][j] * extent[j] for j in range(m)), 0.0)
+            f * sum(max(nu[i][j] * extent[j], 0.0) for j in range(m))
             for i, f in zip(vented, vent_share, strict=True)
         )
         return formed + passing_now

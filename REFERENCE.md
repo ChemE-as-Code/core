@@ -1082,16 +1082,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (`stirred_tank.solve_batch` with doses; ADR 0050). `process simulate` does not couple it.
   A liquid batch or semi-batch that gives off gas takes `batch.vent: {stream, components,
   fraction}` (ADR 0054): the listed components leave the liquid as they form (a `fraction` of
-  what forms, default 1), by the vent `stream`, the step's second outlet; they count in neither
-  the liquid's volume, concentrations nor heat capacity, and their `heat_of_reaction` forms them
-  as gas at the vessel's temperature. A dose may give `absorbed: share`: that share dissolves,
-  the rest passes through to the vent. `process propagate` writes both outlets and the balance
+  what each reaction forms, default 1; a reaction consuming one takes it from the liquid), by
+  the vent `stream`, the step's second outlet; they count in neither the liquid's volume,
+  concentrations nor heat capacity, and their `heat_of_reaction` forms them as gas at the
+  vessel's temperature. A dose may give `absorbed: share`: that share dissolves, the rest passes
+  through to the vent. A dissolving dose adds no heat of absorption or condensation: write the
+  `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
   `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (a note gives its
   peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
-  an undeclared vent component, (warning) one formed by no reaction, a dose with `absorbed`
-  below 1 and no vent. `process simulate` does not couple a vented batch.
+  more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
+  a vent stream whose template lacks a vent component or a passing dose's component, (warning)
+  one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
+  does not couple a vented batch.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or

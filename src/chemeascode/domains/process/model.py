@@ -1250,8 +1250,6 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
     declared = process.components()
     if unknown := [n for n in vent.components if n not in declared]:
         problems.append("the vent component(s) " + ", ".join(unknown) + " not declared")
-    if gas := [r.id for r in reactions if r.phase != "liquid"]:
-        problems.append("a vent and the reaction(s) " + ", ".join(gas) + " not liquid-phase")
     for problem in problems:
         out.add(
             "error",
@@ -1261,6 +1259,19 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
             [item.id],
             hint=hint,
         )
+    # a semibatch's own rules already say its reactions are not liquid-phase
+    if item.reactor == "batch" and (gas := [r.id for r in reactions if r.phase != "liquid"]):
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: a vent takes liquid-phase reactions only: {', '.join(gas)} "
+            + ("is" if len(gas) == 1 else "are")
+            + " not",
+            [*at, "batch", "vent"],
+            [item.id],
+            hint=hint,
+        )
+    _vent_template_rule(out, item, at, vent, declared)
     unformed = [
         n
         for n in vent.components
@@ -1275,6 +1286,47 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
             [*at, "batch", "vent", "components"],
             [item.id, *unformed],
             hint="list the gases the reactions form; a dosed gas passes through by dosing.absorbed",
+        )
+
+
+def _vent_template_rule(out: _Out, item: Any, at: list[Any], vent: Any, declared: Any) -> None:
+    """The vent stream's template holds what propagate writes into it: the vent's components
+    and what a dose passing gas through (``absorbed`` below 1) carries (its stream's
+    composition where stated, else its template's components)."""
+    process = out.process
+    streams = {s.id: s for s in process.flowsheet.streams}
+    stream = streams.get(vent.stream)
+    templates = process.templates()
+    template = templates.get(stream.template or "") if stream is not None else None
+    if template is None:
+        return  # no such outlet, or no template: said by the stream rules
+    needed: dict[str, str] = {n: "a vent component" for n in vent.components if n in declared}
+    for dose in item.batch.dosing:
+        if dose.absorbed is None or dose.absorbed >= 1 or dose.stream not in streams:
+            continue
+        dosed = streams[dose.stream]
+        carried = {
+            n
+            for state in dosed.state.values()
+            if state.composition is not None
+            for n, y in state.composition.values.items()
+            if y > 0
+        }
+        if not carried and (t := templates.get(dosed.template or "")) is not None:
+            carried = set(t.components)
+        for n in sorted(carried):
+            needed.setdefault(n, f"the dose {dose.stream} passes it through")
+    lacking = [n for n in needed if n not in template.components]
+    if lacking:
+        why = "; ".join(f"{n}: {needed[n]}" for n in lacking)
+        out.add(
+            "error",
+            "reactor",
+            f"{at[0][:-1]} {item.id}: vent stream {vent.stream}'s template {template.id} lacks "
+            f"{', '.join(lacking)} ({why})",
+            [*at, "batch", "vent", "stream"],
+            [item.id, vent.stream],
+            hint="add them to the vent stream's template",
         )
 
 
