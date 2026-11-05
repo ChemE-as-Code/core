@@ -58,9 +58,6 @@ either: after every merge to `main` here, the `project-template` workflow regene
 `cheme init` and pushes it (secret `PROJECT_TEMPLATE_TOKEN`). If that workflow cannot run, for
 example while GitHub Actions is unavailable, the template falls behind until the next run.
 
-While this repository is private, people need read access to it, and a plant's CI needs the
-secret `PLANTCODE_READ_TOKEN` (see the plant's `.github/workflows/validate.yml`).
-
 ## Install
 
 ```sh
