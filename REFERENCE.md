@@ -169,7 +169,10 @@ item drawn) and model rules:
 | `cheme.text-outside-frame` | warning | a drawn text running more than 0.5 mm outside the inside of the sheet's border |
 | `cheme.title-text-overflow` | warning | a title block text more than 2 mm wider than its cell (e.g. a long sheet title from `plant.yaml`) |
 | `cheme.line-through-symbol` | warning | a pipe or signal line running through an instrument bubble, or the body of an equipment item, it does not end on (a line ending at a nozzle, or with an end inside the body at an internal or a tap, does not count) |
-| `cheme.drawing-not-checked` | info | the SVG export failed, so the four drawing rules did not run |
+| `cheme.line-through-valve` | warning | a signal or measuring line running through the body of a valve, a pipe of another segment running through a valve, or any line running through an actuator's head (a control valve's signal drawn up through the valve to an actuator on top, an actuator drawn up the pipe on a vertical valve); one finding per line and valve, the actuator's valve named (from its `ActuatingSystem`). The pipes of the segment the valve sits on, the actuator's stem, a line with an end inside the outline (a signal line into the actuator's centre) and a line meeting the outline within 1 mm of its end (a signal line ending on the actuator's top) do not count; the line must run 0.3 mm into the outline's box |
+| `cheme.line-on-pipe` | warning | a signal or measuring line drawn on top of a pipe: a horizontal or vertical stretch within 0.3 mm of a pipe's stretch, along it for more than 1 mm (a signal line run down the pipe to an actuator drawn on it); one finding per line and piping line |
+| `cheme.line-not-orthogonal` | info | a signal or measuring line with a slanted stretch, 2 mm or longer and more than 1 degree off horizontal and vertical (a measuring line drawn straight from its tap to the bubble); the short legs of a hop over another line do not count |
+| `cheme.drawing-not-checked` | info | the SVG export failed, so the drawing rules did not run |
 
 `cheme.segment-ends` reports what pyDEXPI's Mandatory rules `pydexpi_segment_connectivity`
 and `pydexpi_segment_reference_nodes_and_items_match` find, once per segment, on the line of the
@@ -190,7 +193,7 @@ them).
 
 #### Drawing geometry
 
-The four drawing rules check the sheet as `cheme render` draws it: pyDEXPI's SVG export,
+The drawing rules check the sheet as `cheme render` draws it: pyDEXPI's SVG export,
 with every shape's transform applied, so they see what a reader of the rendered sheet sees.
 Text boxes are estimated from the font size and the characters (Arial widths, the export's
 fallback font), placed by `text-anchor` and `dominant-baseline` (a `text-bottom` label stands
@@ -1544,12 +1547,14 @@ first finding's id:
 
 ```yaml
 - id: drawing-clean
-  title: No line through a label, crossing, overlapping or misplaced label left unaccepted
+  title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
+    misplaced label left unaccepted
   stage: basic
   kind: validate
-  fail_on: warning
+  fail_on: info          # cheme.line-not-orthogonal is an info finding
   rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
-          cheme.label-far-from-owner]
+          cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
+          cheme.line-not-orthogonal]
 ```
 
 `on-sheet` asks the loaded model, not the XML text: a tag is the one the P&ID prints

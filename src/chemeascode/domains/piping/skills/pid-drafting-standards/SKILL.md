@@ -8,11 +8,13 @@ description: Make a P&ID sheet look like a professional contractor drawing - lay
 ## Purpose and when to use
 
 A sheet can validate clean and still look amateurish: the drawing lint (`cheme validate`,
-`cheme render --findings`) catches overlaps and crossings, not a diagonal measuring line or a
-signal line drawn through a valve body. Use this skill as the visual pass after `pid-draft` or
-`pid-edit`, and for a drawing-only clean-up of existing sheets. It changes **geometry only**:
-symbol positions and scale, nozzle and node positions, line routes, actuator orientation, label
-and note positions. Never add, remove or reconnect an object, or change a tag or value, in this
+`cheme render --findings`) catches overlaps, crossings, lines through valves
+(`cheme.line-through-valve`), signal lines on pipes (`cheme.line-on-pipe`) and slanted lines
+(`cheme.line-not-orthogonal`), all failing the `drawing-clean` gate, but not a crammed layout,
+uneven spacing or a connector on the wrong edge. Use this skill as the visual pass after
+`pid-draft` or `pid-edit`, and for a drawing-only clean-up of existing sheets. It changes
+**geometry only**: symbol positions and scale, nozzle and node positions, line routes, actuator
+orientation, label and note positions. Never add, remove or reconnect an object, or change a tag or value, in this
 pass; an improvement that needs one is an engineering change for `pid-edit` and the reviewer.
 
 Read `dexpi-xml` and `pid-edit` first; a sheet with `generator:` in `plant.yaml` is changed in
@@ -63,8 +65,9 @@ its script and `cheme regen`, never in the XML (`scripts/README.md`).
   below); line number and DN beside their line, parallel to it, never ambiguous between two
   lines.
 - Off-page connectors: incoming on the left edge, outgoing on the right, at one x per edge,
-  evenly stacked, their texts clear of each other and of the border. Leave one where it is if
-  moving it adds crossings; say so in the commit.
+  evenly stacked, their texts clear of each other and of the border. Move one there even if
+  that adds a crossing or two: a connector mid-sheet or on the wrong edge is worse than a
+  clean right-angle crossing.
 - Notes left-aligned in the notes area, not in the drawing.
 
 ## Pitfalls

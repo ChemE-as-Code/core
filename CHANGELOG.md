@@ -24,6 +24,35 @@
   `GeneratingFlow` and `TransportingFluids` steps are drawn as pumps, `SteeringFlow` as a
   control valve, `Crystallizing` as a jacketed vessel, `SeparatingMechanically` as a
   separator.
+- Drawing lint: `cheme.line-through-valve` (warning), a signal or measuring line through the
+  body of a valve, a pipe of another segment through a valve, or any line through an actuator's
+  head: the most common defect left on the process library's ammonia-1 P&IDs (a control valve's
+  signal drawn up through the valve to its actuator, an actuator drawn up the pipe of a
+  vertical valve), which `line-through-symbol` never saw (it checks bubbles and equipment
+  bodies only). The valve's own pipes, a line ending on the valve or actuator and the actuator's
+  stem do not count; the finding names the valve an actuator operates (`Context.actuated`).
+  `cheme.line-on-pipe` (warning): a signal or measuring line drawn on top of a pipe.
+  `cheme.line-not-orthogonal` (info): a signal or measuring line with a slanted stretch (a hop's
+  short legs excepted). On the process library's 26 asu-1, hda-1 and ammonia-1 sheets before
+  their drawing clean-up: 56 line-through-valve, 14 line-on-pipe and 88 line-not-orthogonal;
+  after it 1, 0 and 0 (the one left, on asu-1 P-03, is real).
+- The fragment router (`cheme fragment instrument/signal --sheet`) keeps signal and measuring
+  lines off valve bodies, actuator heads and the top of pipes; the template's example generator
+  draws its measuring lines orthogonal.
+
+### Changed
+
+- The template's `drawing-clean` gate also fails on `cheme.line-through-valve`,
+  `cheme.line-on-pipe` and `cheme.line-not-orthogonal` (`fail_on: info` for the last). A plant
+  repository made with an earlier template keeps its own `checks/checks.yaml`: add the three
+  rules there to get the stricter gate.
+- The authoring API's `instrument` (`chemeascode.domains.piping.authoring`) draws the actuator
+  at right angles to the valve's line on the bubble's side (down when the bubble is below a
+  horizontal line, sideways on a vertical line; it was always up) and routes the signal line
+  out of the bubble's side into the actuator's stem, so it never crosses the valve body. The
+  measuring line leaves its line at right angles and stays orthogonal (it was a slanted straight
+  line); `sensing_points=[...]` gives its bends. Generator scripts that relied on the old drawing
+  draw differently when rerun (`cheme regen`).
 
 ## 1.5.0 (2026-11-04)
 

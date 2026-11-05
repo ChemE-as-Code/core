@@ -186,4 +186,5 @@ nav:
       - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
       - "0045 A design case's LCI dataset with its own identity": adr/0045-a-design-case-lci-dataset-with-its-own-identity.md
       - "0046 The PFD drawn as an engineering sheet": adr/0046-pfd-drawn-as-an-engineering-sheet.md
+      - "0047 Valve, pipe and slant drawing rules in the gate": adr/0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md
       - Template: adr/template.md

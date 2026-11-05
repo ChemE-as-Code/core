@@ -18,7 +18,18 @@ lines, symbols and texts exactly where the sheet puts them, after every ``ShapeU
 ``cheme.line-through-symbol``
     a pipe or signal line runs through an instrument bubble, or through the body of an equipment
     item, that it does not end on (a line ending at a nozzle, or inside the body at an internal
-    or a tap, is fine).
+    or a tap, is fine);
+``cheme.line-through-valve``
+    a signal or measuring line runs through the body of a valve, a pipe of another segment through
+    a valve, or any line through an actuator's head (a control valve's signal drawn up through
+    the valve to its actuator, an actuator drawn on the pipe); a line ending on the valve or the
+    actuator, and the pipes of the segment the valve sits on, are fine;
+``cheme.line-on-pipe``
+    a signal or measuring line drawn on top of a pipe, along it (a signal line run down the pipe
+    to an actuator drawn on it);
+``cheme.line-not-orthogonal`` (info)
+    a signal or measuring line with a slanted stretch, neither horizontal nor vertical (a short
+    hop over another line is fine).
 
 Text extents are estimated from the font size, the characters (Arial widths, the export's
 fallback font), ``text-anchor`` and ``dominant-baseline``. The sheet's border and title block are
@@ -51,6 +62,9 @@ RULES = (
     "cheme.text-outside-frame",
     "cheme.title-text-overflow",
     "cheme.line-through-symbol",
+    "cheme.line-through-valve",
+    "cheme.line-on-pipe",
+    "cheme.line-not-orthogonal",
 )
 
 #: How far a line must run inside a text box to go through it (mm): less is a graze, which the
@@ -701,6 +715,8 @@ class Context:
     parents: dict[str, str] = field(default_factory=dict)
     #: For a literal text naming tags: the ids of the objects it names, by (text, x, y).
     named: dict[tuple[str, float, float], list[str]] = field(default_factory=dict)
+    #: The valve each actuator operates (an actuating system's actuator -> its valve).
+    actuated: dict[str, str] = field(default_factory=dict)
 
     def name(self, object_id: str) -> str:
         name = self.names.get(object_id)
@@ -714,6 +730,10 @@ class Context:
         return self.category(object_id) == "equipment" and "Nozzle" not in self.kinds.get(
             object_id, ""
         )
+
+    def is_actuator(self, object_id: str) -> bool:
+        """Whether *object_id* is an actuator (drawn on its valve's stem)."""
+        return self.kinds.get(object_id, "").endswith("Actuator")
 
     def category(self, object_id: str) -> str:
         kind = self.kinds.get(object_id, "")
@@ -784,6 +804,9 @@ def lint_drawing(drawing: Drawing, context: Context) -> list[DrawingFinding]:
     findings += _outside_frame(drawing, context)
     findings += _title_overflow(drawing)
     findings += _through_symbols(lines, symbols, context)
+    findings += _through_valves(lines, symbols, context)
+    findings += _on_pipes(lines, context)
+    findings += _not_orthogonal(lines, context)
     return findings
 
 
@@ -929,6 +952,214 @@ def _through_symbols(
                     if body
                     else "move the instrument clear of the line, or route the line around it"
                 ),
+            )
+        )
+    return findings
+
+
+#: How far a line must run inside the box of a valve's or an actuator's outline to go through it
+#: (mm): the symbols are small (a globe valve 4 x 2 mm, an actuator 3.6 mm across).
+VALVE_DEPTH = 0.3
+
+
+def valve_parts(symbols: list[Stroke], context: Context) -> dict[str, list[tuple[Stroke, Box]]]:
+    """The outlines of each valve and actuator, with their boxes, by the valve's or actuator's id.
+
+    An outline is a symbol stroke of three points or more (the valve's body, a ball, an actuator's
+    head); a two-point stroke (an actuator's stem, a gate valve's bar) is no body to run through.
+    """
+    parts: dict[str, list[tuple[Stroke, Box]]] = {}
+    for stroke in symbols:
+        if stroke.kind != "symbol" or not stroke.owners or len(stroke.points) < 3:
+            continue
+        owner = stroke.owners[0]
+        if context.category(owner) != "valve" and not context.is_actuator(owner):
+            continue
+        box = _bounds(stroke.points)
+        if min(box[2] - box[0], box[3] - box[1]) <= 2 * VALVE_DEPTH:
+            continue
+        parts.setdefault(owner, []).append((stroke, box))
+    return parts
+
+
+def _through_valves(
+    lines: list[Stroke], symbols: list[Stroke], context: Context
+) -> list[DrawingFinding]:
+    """Lines running through the body of a valve or an actuator they do not end on.
+
+    A valve's own pipes (of the segment it sits on) may run into it; a signal or measuring line,
+    or another line's pipe, may not, and no line may run through an actuator (the pipe its valve
+    sits on included: an actuator drawn on the pipe). A line with an end inside the outline ends
+    on it (a signal line to the actuator's centre), and so does one meeting it within
+    ``ENDS_ON`` of its end (a signal line to the top of the actuator).
+    """
+    parts = valve_parts(symbols, context)
+    if not parts:
+        return []
+    owner_of = {id(stroke): owner for owner, found in parts.items() for stroke, _ in found}
+    box_of = {id(stroke): box for found in parts.values() for stroke, box in found}
+    segments, grid = _segment_grid([stroke for found in parts.values() for stroke, _ in found])
+    #: (line, valve) -> the line, the parts it runs through (valve body, actuator), the points.
+    found: dict[tuple[str, str], tuple[Stroke, dict[str, str], list[Point]]] = {}
+    for line in lines:
+        ends = (line.points[0], line.points[-1])
+        for a, b in line.segments():
+            for index in sorted(grid.near(_bounds((a, b)))):
+                c, d, outline = segments[index]
+                owner = owner_of[id(outline)]
+                if owner in line.owners:
+                    continue
+                actuator = context.is_actuator(owner)
+                if (
+                    line.kind == "process"
+                    and not actuator
+                    and set(line.owners) & set(outline.owners[1:])
+                ):
+                    continue  # the pipe the valve sits on
+                inner = _shrink(box_of[id(outline)], VALVE_DEPTH)
+                if any(_inside(e, inner) for e in ends):
+                    continue  # ends on the valve or the actuator
+                clipped = _clip(a, b, inner)
+                if clipped is None or math.dist(*clipped) <= VALVE_DEPTH:
+                    continue  # along or past the outline
+                point = _meets(a, b, c, d)
+                if point is None or any(math.dist(point, e) <= ENDS_ON for e in ends):
+                    continue
+                valve = context.actuated.get(owner, owner)
+                _, hit, points = found.setdefault((line.owner, valve), (line, {}, []))
+                hit["actuator" if actuator else "body"] = owner
+                if all(math.dist(point, p) > JOINT_TOLERANCE for p in points):
+                    points.append(point)
+    findings = []
+    for (line_id, valve), (line, hit, points) in found.items():
+        if "body" in hit and "actuator" in hit:
+            what = f"the body and the actuator of {context.name(valve)}"
+        elif "body" in hit:
+            what = f"the body of {context.name(valve)}"
+        elif valve != hit["actuator"]:
+            what = f"the actuator of {context.name(valve)}"
+        else:
+            what = f"the actuator {context.name(valve)}"
+        if line.kind == "process" and "actuator" in hit:
+            hint = (
+                "turn the actuator off the pipe: its stem at right angles to the pipe, the "
+                "signal line arriving at the actuator from the side away from the pipe"
+            )
+        elif line.kind == "process":
+            hint = "route the pipe around the valve, or end it at the valve's node"
+        elif "body" in hit:
+            hint = (
+                "route the line around the valve: a signal line arrives at the actuator from "
+                "the side away from the pipe, a measuring line taps the pipe clear of the valve"
+            )
+        else:
+            hint = "end the signal line on the side of the actuator it comes from"
+        findings.append(
+            DrawingFinding(
+                "cheme.line-through-valve",
+                "warning",
+                f"{_line_kind(line)} {context.name(line_id)} runs through {what}",
+                list(dict.fromkeys([line_id, valve, *hit.values()])),
+                _grow(_bounds(points), 1.0),
+                f"{line_id}+{valve}",
+                hint=hint,
+            )
+        )
+    return findings
+
+
+#: A signal line this close (mm) to a pipe, parallel to it, is drawn on it ...
+ON_PIPE_DISTANCE = 0.3
+#: ... when it runs along it this far (mm).
+ON_PIPE_LENGTH = 1.0
+
+
+def _on_pipes(lines: list[Stroke], context: Context) -> list[DrawingFinding]:
+    """Signal and measuring lines drawn on top of a pipe: a horizontal or vertical stretch of
+    the signal line on a pipe's stretch, longer than ``ON_PIPE_LENGTH``."""
+    pipes = [s for s in lines if s.kind == "process"]
+    if not pipes:
+        return []
+    segments, grid = _segment_grid(pipes)
+    found: dict[tuple[str, str], tuple[Stroke, Stroke, list[Point]]] = {}
+    for line in lines:
+        if line.kind != "signal":
+            continue
+        for a, b in line.segments():
+            for axis in (0, 1):
+                across = 1 - axis
+                if abs(a[across] - b[across]) > 0.05:
+                    continue
+                for index in sorted(grid.near(_grow(_bounds((a, b)), ON_PIPE_DISTANCE))):
+                    c, d, pipe = segments[index]
+                    if abs(c[across] - d[across]) > 0.05:
+                        continue
+                    if abs(a[across] - c[across]) > ON_PIPE_DISTANCE:
+                        continue
+                    low = max(min(a[axis], b[axis]), min(c[axis], d[axis]))
+                    high = min(max(a[axis], b[axis]), max(c[axis], d[axis]))
+                    if high - low <= ON_PIPE_LENGTH:
+                        continue
+                    ends = [(low, a[across]), (high, a[across])]
+                    if axis == 1:
+                        ends = [(a[across], low), (a[across], high)]
+                    system = context.parents.get(pipe.owner, pipe.owner)
+                    _, pipe_ids, points = found.setdefault((line.owner, system), (line, [], []))
+                    pipe_ids.append(pipe.owner)
+                    points += ends
+    findings = []
+    for (line_id, system), (line, pipe_ids, points) in found.items():
+        box = _bounds(points)
+        length = max(box[2] - box[0], box[3] - box[1])
+        pipe_ids = list(dict.fromkeys(pipe_ids))
+        findings.append(
+            DrawingFinding(
+                "cheme.line-on-pipe",
+                "warning",
+                f"{_line_kind(line)} {context.name(line_id)} runs along pipe "
+                f"{context.name(pipe_ids[0])}, on top of it, for {length:.1f} mm",
+                [line_id, *pipe_ids],
+                _grow(box, 1.0),
+                f"{line_id}+{system}",
+                hint="route the signal line clear of the pipe (it crosses a pipe at right angles); "
+                "turn an actuator drawn on the pipe off it",
+            )
+        )
+    return findings
+
+
+#: A signal line stretch at least this long (mm) ...
+SLANT_LENGTH = 2.0
+#: ... and more than this many degrees off horizontal and vertical is slanted.
+SLANT_ANGLE = 1.0
+
+
+def _not_orthogonal(lines: list[Stroke], context: Context) -> list[DrawingFinding]:
+    """Signal and measuring lines with a slanted stretch (one finding per line). Shorter
+    stretches are left out: a hop over a crossing line is drawn with short slanted legs."""
+    findings = []
+    for line in lines:
+        if line.kind != "signal":
+            continue
+        slanted = []
+        for a, b in line.segments():
+            dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
+            if math.hypot(dx, dy) < SLANT_LENGTH:
+                continue
+            if math.degrees(math.atan2(min(dx, dy), max(dx, dy))) > SLANT_ANGLE:
+                slanted.append((a, b))
+        if not slanted:
+            continue
+        where = ", ".join(f"({a[0]:.1f},{a[1]:.1f})-({b[0]:.1f},{b[1]:.1f})" for a, b in slanted)
+        findings.append(
+            DrawingFinding(
+                "cheme.line-not-orthogonal",
+                "info",
+                f"{_line_kind(line)} {context.name(line.owner)} runs slanted from {where}",
+                [line.owner],
+                _bounds(p for segment in slanted for p in segment),
+                f"{line.owner}",
+                hint="draw it in horizontal and vertical stretches (a corner point where it turns)",
             )
         )
     return findings
@@ -1299,6 +1530,17 @@ def context_from_xml(root: etree._Element) -> Context:
             if system:
                 parents[object_id] = system
     context = Context(kinds, names, parents)
+    for system in root.iter("Object"):
+        if not system.get("type", "").endswith("ActuatingSystem"):
+            continue
+        valves = [
+            r.get("objects", "").lstrip("#")
+            for r in system.iter("References")
+            if r.get("property") == "Valve"
+        ]
+        for actuator in system.iter("Object"):
+            if actuator.get("id") and actuator.get("type", "").endswith("Actuator") and valves:
+                context.actuated[actuator.get("id")] = valves[0]
     instruments = {
         name: object_id
         for object_id, name in names.items()
