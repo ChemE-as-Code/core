@@ -4,6 +4,16 @@
 
 ### Added
 
+- Batch vessels and jackets (ADR 0050, core#158 package 3): a unit procedure of
+  `process/recipe.yaml` on a batch or semi-batch step may give `vessel: {fill_fraction,
+  aspect_ratio, nominal, volume, jacket: {u, area, coolant_temperature, heating_temperature}}`.
+  `cheme process recipe` sizes it from the batch content (the model's content times batch size /
+  the flowsheet's rate), rounded up to the R10 preferred numbers, and checks the jacket against
+  the model's peak duty (`cheme.recipe-jacket`, `cheme.recipe-vessel`). A `heat` or `cool`
+  operation may give `temperatures: [start, end]` instead of a duration: its time from the
+  jacket's UA and medium temperature. `cheme datasheets fill` takes a batch reactor's volume and
+  peak duty from the recipe's vessel (input `recipe:<unit procedure>`).
+
 - Batch recipe (ADR 0049, core#158): `process/recipe.yaml` (`cheme/recipe/v1`) declares the
   batch size (kg, t or m3 of one stream), the operating hours and the unit procedures with their
   ordered operations (charge, heat, dose, react, cool, transfer, filter, dry, clean, hold,

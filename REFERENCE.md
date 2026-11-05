@@ -1067,7 +1067,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
   `-duration` and `-basis` (warning: the flowsheet's rate of that stream differs from batch size
   x batches / hours by more than 1 %). `estimate/tea.yaml` `operation.batch: {recipe: true}`
-  takes the cycle time and batches per year from it (`domains/process/recipe.py`).
+  takes the cycle time and batches per year from it (`domains/process/recipe.py`). A unit
+  procedure on a batch or semi-batch step may size its `vessel` (fill fraction, R10 preferred
+  sizes) and check its `jacket` (U, area or wetted shell, coolant and heating temperatures)
+  against the model's peak duty (`cheme.recipe-jacket`, `-vessel`); a `heat` or `cool`
+  operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
+  writes a batch reactor's volume and peak duty from it (ADR 0050).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or

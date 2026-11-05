@@ -1160,7 +1160,8 @@ def input_data(
     sheet's ``type_specific`` value, else the ``--param`` value, *given*, or the one a fill
     recorded in the sheet's ``sizing_basis``) or ``table:<table>/<row>`` (a row of a table
     cheme-as-code ships: ``overall-coefficients/<row>``, ``roughness/<row>``,
-    ``fittings/<row>``, ``pipe-sizes/<schedule>/DN<dn>``)."""
+    ``fittings/<row>``, ``pipe-sizes/<schedule>/DN<dn>``) or ``recipe:<unit procedure>`` (its
+    entry and the batch size in ``process/recipe.yaml``)."""
     kind, _, name = ref.partition(":")
     model = model or {}
     if kind == "condenser":
@@ -1175,6 +1176,19 @@ def input_data(
         return {"value": found.value, "assumed": found.assumed} if found is not None else None
     if kind == "table":
         return _table_row(name)
+    if kind == "recipe":
+        from chemeascode.domains.process.recipe import load_recipe
+
+        recipe = load_recipe(process.root)[0] if process is not None else None
+        procedures = [u for u in (recipe.unit_procedures if recipe else []) if u.id == name]
+        if not procedures:
+            return None
+        return _stripped(
+            {
+                "batch_size": recipe.batch_size.model_dump(mode="json"),
+                "unit_procedure": procedures[0].model_dump(mode="json", by_alias=True),
+            }
+        )
     if kind == "catalyst":
         catalysts = process.catalysts.by_id() if process is not None and process.catalysts else {}
         found = catalysts.get(name)
@@ -2866,6 +2880,17 @@ def _reactor(sheet: _Sheet, context: _Context) -> None:
         )
 
 
+def _recipe_vessel(process: Any, node_id: str, case: str) -> Any:
+    """The vessel process/recipe.yaml sizes for batch step *node_id*, or None."""
+    from chemeascode.domains.process.recipe import evaluate, load_recipe
+
+    recipe, doc, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    result = evaluate(process, recipe, doc, case)
+    return next((v for v in result.vessels if v.unit == node_id), None)
+
+
 def _stirred_reactor(
     sheet: _Sheet, process: Any, node: Any, node_id: str, inlets: list[Any], case: str
 ) -> None:
@@ -2885,8 +2910,31 @@ def _stirred_reactor(
             f"{node_id} is a {node.reactor}: its volume follows the batch size and cycle, and "
             "its duty varies over the batch (cheme process reactors gives the heat released)"
         )
-        sheet.tbd_value("volume_m3", "m3", why, add=True)
-        sheet.tbd_value("duty_kw", "kW", why, add=True)
+        vessel = _recipe_vessel(process, node_id, case)
+        if vessel is not None:
+            sheet.put(
+                "volume_m3",
+                vessel.volume,
+                "m3",
+                f"the vessel of {vessel.procedure} in process/recipe.yaml (cheme process "
+                f"recipe): {vessel.working_volume:.4g} m3 of batch, {vessel.fill:.0%} full",
+                True,
+                inputs=[f"recipe:{vessel.procedure}"],
+            )
+        else:
+            sheet.tbd_value("volume_m3", "m3", why, add=True)
+        if vessel is not None and vessel.peak_duty is not None:
+            sheet.put(
+                "duty_kw",
+                -vessel.peak_duty,
+                "kW",
+                f"the peak duty to remove from one batch of {vessel.procedure} "
+                "(process/recipe.yaml, cheme process recipe): negative is heat removed",
+                True,
+                inputs=[f"recipe:{vessel.procedure}"],
+            )
+        else:
+            sheet.tbd_value("duty_kw", "kW", why, add=True)
         return
     try:
         if len(inlets) != 1:
