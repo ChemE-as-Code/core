@@ -444,7 +444,7 @@
     "$defs": {
       "Batch": {
         "additionalProperties": false,
-        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).",
+        "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing).",
         "properties": {
           "time": {
             "anyOf": [
@@ -493,6 +493,14 @@
             "default": null,
             "description": "kg of catalyst per m3: rate laws per kg of catalyst.",
             "title": "Catalyst Loading"
+          },
+          "dosing": {
+            "description": "reactor: semibatch: the dosed feeds.",
+            "items": {
+              "$ref": "#/$defs/Dosing"
+            },
+            "title": "Dosing",
+            "type": "array"
           },
           "provenance": {
             "enum": [
@@ -790,7 +798,8 @@
                   "gibbs",
                   "pfr",
                   "cstr",
-                  "batch"
+                  "batch",
+                  "semibatch"
                 ],
                 "type": "string"
               },
@@ -799,7 +808,7 @@
               }
             ],
             "default": null,
-            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet) or batch (the rate laws over the batch time); none: conversion when every reaction has one.",
+            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet), batch (the rate laws over the batch time) or semibatch (a batch with feeds dosed into its charge: batch.dosing); none: conversion when every reaction has one.",
             "title": "Reactor"
           },
           "bed": {
@@ -860,7 +869,7 @@
               }
             ],
             "default": null,
-            "description": "reactor: batch: the batch."
+            "description": "reactor: batch or semibatch: the batch."
           },
           "catalyst": {
             "anyOf": [
@@ -1403,6 +1412,61 @@
           "provenance"
         ],
         "title": "CrystallizerEnergy",
+        "type": "object"
+      },
+      "Dosing": {
+        "additionalProperties": false,
+        "description": "A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,\nits flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over\n``time``, or in the ``profile``'s segments one after the other.",
+        "properties": {
+          "stream": {
+            "description": "The inlet stream dosed (the step's other inlets: the charge).",
+            "title": "Stream",
+            "type": "string"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "s of dosing at a constant rate",
+            "title": "Time"
+          },
+          "profile": {
+            "description": "(s, share of the feed) segments, each at a constant rate, one after the other; the shares add up to 1.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Profile",
+            "type": "array"
+          },
+          "start": {
+            "default": 0.0,
+            "description": "s after the charge the dosing starts",
+            "minimum": 0,
+            "title": "Start",
+            "type": "number"
+          }
+        },
+        "required": [
+          "stream"
+        ],
+        "title": "Dosing",
         "type": "object"
       },
       "EnthalpyReference": {
@@ -2281,7 +2345,8 @@
                   "gibbs",
                   "pfr",
                   "cstr",
-                  "batch"
+                  "batch",
+                  "semibatch"
                 ],
                 "type": "string"
               },
@@ -2290,7 +2355,7 @@
               }
             ],
             "default": null,
-            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet) or batch (the rate laws over the batch time); none: conversion when every reaction has one.",
+            "description": "How cheme process propagate solves the outlet: conversion (of each reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's temperature and pressure), gibbs (every reaction among the stream's components) or pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the rate laws at the outlet), batch (the rate laws over the batch time) or semibatch (a batch with feeds dosed into its charge: batch.dosing); none: conversion when every reaction has one.",
             "title": "Reactor"
           },
           "bed": {
@@ -2351,7 +2416,7 @@
               }
             ],
             "default": null,
-            "description": "reactor: batch: the batch."
+            "description": "reactor: batch or semibatch: the batch."
           },
           "catalyst": {
             "anyOf": [
