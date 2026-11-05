@@ -60,14 +60,14 @@ checks:
     kind: validate
   - id: drawing-clean
     title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
-      misplaced label left unaccepted
+      misplaced label, no off-page connector off the sheet's edge left unaccepted
     stage: basic
     kind: validate
     # info: cheme.line-not-orthogonal (a slanted line) is an info finding
     fail_on: info
     rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
             cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
-            cheme.line-not-orthogonal]
+            cheme.line-not-orthogonal, cheme.offpage-not-on-edge]
     # A sheet kept from the DEXPI reference P&ID (pyDEXPI's sample, e.g. as a worked example)
     # fails this gate by design: the reference has crossings and labels on its lines. Accept
     # its findings here, naming the sheet:
@@ -77,6 +77,10 @@ checks:
     # accept:
     #   - id: "pid/P-03.xml#line-crossing:Line_GOX3001_S1_P1+Line_LOX3001_S1_P1"
     #     reason: "D-023: no route around the GOX riser; J. Smith, design review 2026-10-20"
+    # A crossing a connector's move to the sheet's edge adds is accepted the same way (the
+    # connector goes on the edge even so), and so is a utility stub kept at its user:
+    #   - id: "pid/P-04.xml#offpage-not-on-edge:OPC_CW4001"
+    #     reason: "CW stub drawn at E-4102 by convention; plant owner, 2026-11-05"
   - id: pids-exist
     title: At least one P&ID sheet
     stage: basic

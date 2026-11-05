@@ -68,6 +68,9 @@ its script and `cheme regen`, never in the XML (`scripts/README.md`).
   evenly stacked, their texts clear of each other and of the border. Move one there even if
   that adds a crossing or two: a connector mid-sheet or on the wrong edge is worse than a
   clean right-angle crossing.
+  The lint checks the placement (`cheme.offpage-not-on-edge`, in the `drawing-clean` gate): a
+  connector to another sheet or the battery limit off the edges fails, a vent to atm., drain or
+  hose end may stay by its valve; it does not check which edge.
 - Notes left-aligned in the notes area, not in the drawing.
 
 ## Pitfalls

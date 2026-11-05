@@ -198,7 +198,7 @@ def _build_section(path: Path, signals: bool = True) -> Paster:
     made = p.make("valve", "LV4107", valve_class="GlobeValve", dn="80", at="170,140", tag="LV-4107")
     p.paste(made, **_segment_paste(p, "Line_LOX4102_S1"))
     made = p.make(
-        "offpage", "OPC_LOX4102", direction="out", at="210,140", dn="80", note="to P-05 V-5101"
+        "offpage", "OPC_LOX4102", direction="out", at="405,140", dn="80", note="to P-05 V-5101"
     )
     p.paste(made, **_segment_paste(p, "Line_LOX4102_S1"))
     for pipe, start, end, bends in (

@@ -20,7 +20,7 @@ public name ``chemeascode.domains.piping.authoring``::
     line(sheet, "80-W-101", dn=80, fluid="Water",
          route=[tank["N1"], (90, 150), valve("V101", "GateValve"), pump["N1"]])
     line(sheet, "50-W-102", dn=50, fluid="Water",
-         route=[pump["N2"], (160, 100), offpage("out", at=(240, 100), note="to P-02")])
+         route=[pump["N2"], (160, 100), offpage("out", at=(405, 100), note="to P-02")])
     instrument(sheet, "PI-101", at=(175, 125), sensing=pump["N2"])
     note(sheet, "Trip: LALL-101 stops P-101", at=(60, 180))
     sheet.save()                                        # writes and runs cheme fmt

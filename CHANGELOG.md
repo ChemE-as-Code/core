@@ -39,6 +39,14 @@
 - The fragment router (`cheme fragment instrument/signal --sheet`) keeps signal and measuring
   lines off valve bodies, actuator heads and the top of pipes; the template's example generator
   draws its measuring lines orthogonal.
+- Drawing lint: `cheme.offpage-not-on-edge` (warning, ADR 0049), an off-page connector to
+  another sheet or the battery limit that does not sit on an edge of the drawing area (the
+  inside of the border down to the title block's top): within 10 mm of it, or 35 mm with nothing
+  else drawn between it and the edge (a header sheet's row of connectors under their notes).
+  An open end drawn with the same DEXPI classes, whose id or note says atm., vent, drain or hose
+  and names no sheet or B/L, may stay by its valve. The hint gives the `cheme move ID
+  --offset=DX,DY` onto the nearest edge. On the process library's 26 asu-1, hda-1 and ammonia-1
+  sheets it finds the five connectors still off the edges, all on asu-1 P-04.
 
 ### Changed
 
@@ -46,6 +54,9 @@
   `cheme.line-on-pipe` and `cheme.line-not-orthogonal` (`fail_on: info` for the last). A plant
   repository made with an earlier template keeps its own `checks/checks.yaml`: add the three
   rules there to get the stricter gate.
+- The `drawing-clean` gate also fails on `cheme.offpage-not-on-edge`; add it to an existing
+  plant's `checks/checks.yaml` to get it. The template's example generator draws its off-page
+  connectors on the right edge.
 - The authoring API's `instrument` (`chemeascode.domains.piping.authoring`) draws the actuator
   at right angles to the valve's line on the bubble's side (down when the bubble is below a
   horizontal line, sideways on a vertical line; it was always up) and routes the signal line
