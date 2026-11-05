@@ -1422,6 +1422,13 @@ def build_model(process: Process, view: str, meta: dict[str, str]) -> tuple[Any,
     return engineering, placed
 
 
+#: Spaces per nesting level in a generated sheet's XML (``sheets.produce`` serializes): none. A
+#: generated sheet is not edited by hand (``cheme.generated-edited``), and pyDEXPI's default
+#: two-space indentation was half of its bytes. Every element still starts a line of its own, so
+#: sheets diff line by line, and the tree, the model and the drawing are unchanged (ADR 0048).
+XML_INDENT = 0
+
+
 #: A flow arrowhead: length and half width, mm.
 ARROW_L, ARROW_W = 2.6, 0.85
 

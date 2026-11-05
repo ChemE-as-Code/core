@@ -73,6 +73,56 @@ def test_rebuild_is_byte_identical(recycle):
     assert (recycle.root / "process/PFD.xml").read_bytes() == first
 
 
+def test_sheets_are_written_unindented_and_draw_the_same(recycle):
+    """A generated sheet is pyDEXPI's XML without indentation (ADR 0048): one element per line,
+    the same tree as the indented form, half the bytes, and the same SVG."""
+    from lxml import etree
+    from pydexpi.loaders.public import load_xml_with_report
+    from pydexpi.loaders.xml_serializer import DexpiXmlSerializer
+
+    from chemeascode.domains.piping.render import render_svg
+
+    build(recycle, force=True)
+    written = (recycle.root / "process/PFD.xml").read_bytes()
+    lines = written.decode("utf-8").splitlines()
+    assert not [line for line in lines if line[:1].isspace()]
+    assert sum(1 for line in lines if line.startswith("<Object ")) > 200
+
+    model = load_xml_with_report(written).model
+    indented = DexpiXmlSerializer().export_to_bytes(model)
+    unindented = DexpiXmlSerializer(indent=0).export_to_bytes(model)
+
+    def tree(content: bytes) -> bytes:
+        parser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
+        return etree.tostring(etree.fromstring(content, parser), method="c14n")
+
+    assert tree(written) == tree(indented) == tree(unindented)
+    assert len(unindented) < 0.6 * len(indented)
+    assert render_svg(model) == render_svg(load_xml_with_report(indented).model)
+
+
+def test_generator_fingerprint_covers_what_build_imports():
+    """Every process module ``build.py`` imports (the sheet, the symbols, ...) is part of the
+    generator fingerprint, so editing it marks the sheets ``cheme.generated-version``."""
+    import ast
+
+    from chemeascode.domains.process import provenance
+
+    source = (Path(provenance.__file__).parent / "build.py").read_text(encoding="utf-8")
+    imported = {
+        node.module.rsplit(".", 1)[-1] + ".py"
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.ImportFrom)
+        and node.module
+        and node.module.startswith("chemeascode.domains.process.")
+    }
+    assert imported <= set(provenance.GENERATOR_MODULES), imported - set(
+        provenance.GENERATOR_MODULES
+    )
+    here = Path(provenance.__file__).parent
+    assert all((here / name).is_file() for name in provenance.GENERATOR_MODULES)
+
+
 def test_values_round_trip_with_provenance_and_case(recycle):
     from pydexpi.loaders.public import load_xml_with_report
 

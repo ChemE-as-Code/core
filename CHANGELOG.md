@@ -4,6 +4,11 @@
 
 ### Changed
 
+- `cheme process build` writes the BFD and PFD without indentation (ADR 0048; generator 7:
+  every BFD/PFD needs `cheme process build`): the same tree, model and rendering, 44 to 48 %
+  fewer bytes (process library methanol-1 PFD 1.72 to 0.90 MB, ammonia-1 7.53 to 3.92 MB).
+  The generator fingerprint now also covers `pfd_sheet.py`, `symbols.py` and the ISO shapes,
+  so editing the stream table or a symbol marks the sheets outdated.
 - The PFD is drawn as an engineering sheet (ADR 0046; generator 6: every BFD/PFD needs
   `cheme process build`): the smallest ISO 216 or ISO 5457 elongated sheet that holds it, with
   frame, zone markers and a title block; a stream table (phase, °C, bar, mass flow, the
