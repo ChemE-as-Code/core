@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 (2026-11-05)
+
+Minor release: batch and semi-batch processes (#158). `reactor: semibatch` doses feeds into a
+charge and gives the thermal screening the accumulation of the dosed reactant and the MTSR at
+the worst moment (ADR 0050); `process/recipe.yaml` and `cheme process recipe` derive the cycle
+time, the batches per year and a Gantt chart, and the TEA takes them (ADR 0051); the recipe
+sizes batch vessels and checks their jackets (ADR 0052); LCA consumables may be given
+`per_batch` (ADR 0053). Every BFD/PFD needs `cheme process build` once (the process
+generator's code changed).
 
 ### Added
 
