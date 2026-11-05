@@ -357,11 +357,9 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     inlets = [
         s for s in process.flowsheet.streams if (e := process.ends(s)[1]) and e.node == up.unit
     ]
-    solved, _ = solve_node(process, node, tank_inlet(node, inlets), case)
-    if model == "semibatch":
-        charge, _ = split_inlets(node, inlets)
-    else:
-        charge = inlets[0]
+    inlet = tank_inlet(node, inlets)
+    solved, _ = solve_node(process, node, inlet, case)
+    charge = split_inlets(node, inlets)[0] if model == "semibatch" else inlet
     comps = process.components()
 
     def capacity(moles: dict[str, float]) -> float | None:
