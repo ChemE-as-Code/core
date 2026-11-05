@@ -270,11 +270,30 @@ def test_propagate_fills_the_dryer_and_the_report_closes_the_balance(tmp_path):
     assert energy["vessel_kJ_h"] == pytest.approx(2000 * 55.0 / HOURS, rel=1e-5)
     assert energy["duty_kW"] == pytest.approx(DUTY, rel=1e-5)
     assert sol["per_batch"]["evaporated_kg"] == pytest.approx(VAPOUR * HOURS, rel=1e-5)
-    # the heating stream Q1 says 100 kW, the model gives 111.2 kW
-    (differ,) = unit["differences"]
+    # the heating stream Q1 says 100 kW, the model gives 111.2 kW: a duty finding of its own,
+    # not an outlet's (propagate writes the outlets, never the energy stream)
+    assert unit["differences"] == []
+    (differ,) = unit["duty_differences"]
     assert differ.startswith("Q1 duty: 100 kW written")
-    assert any(f.rule == "cheme.process-crystallizer-outlet" for f in report.findings)
+    assert not any(f.rule == "cheme.process-crystallizer-outlet" for f in report.findings)
+    (duty,) = [f for f in report.findings if f.rule == "cheme.process-dryer-duty"]
+    assert duty.level == "warning" and "Q1 duty" in duty.message
+    assert "write the model's duty on the heating stream" in duty.hint
+    assert "dryer.energy" in duty.hint and "propagate" not in duty.hint
+    # the product's moisture is the dryer's: the dissolved salt and product are dry solid
+    product = unit["outlets"]["product"]
+    assert product["moisture_mass_fraction"] == pytest.approx(
+        sol["moisture_mass_fraction"], rel=1e-9
+    )
+    assert product["dry_solid_kg_h"] == pytest.approx(SOLID, rel=1e-5)
+    assert product["liquid_kg_h"] == pytest.approx(KEPT, rel=1e-5)
+    vapour = unit["outlets"]["vapour"]
+    assert vapour["dry_solid_kg_h"] == 0 and vapour["liquid_kg_h"] == pytest.approx(
+        VAPOUR, rel=1e-5
+    )
     text = report_text(report)
+    (line,) = [x for x in text.splitlines() if x.startswith("  product: ")]
+    assert line.endswith("moisture 0.002")
     assert "dryer D1: basis residual-moisture" in text and "latent heat of H2O: 2358" in text
     (unit,) = [u for u in model_bases(process) if u.id == "D1"]
     assert (unit.basis, unit.predictive, unit.sourced) == ("residual-moisture", False, False)
@@ -310,8 +329,10 @@ def test_latent_heat_from_the_critical_constants_and_what_is_missing(tmp_path):
 
 
 def test_dryer_rules(tmp_path):
-    flowsheet = FLOWSHEET.replace("volatiles: [H2O]", "volatiles: [H2O, X_s, MEOH]").replace(
-        "port: heat\n", "port: product\n"
+    flowsheet = (
+        FLOWSHEET.replace("volatiles: [H2O]", "volatiles: [H2O, X_s, MEOH]")
+        .replace("port: heat\n", "port: product\n")
+        .replace("latent_heat: {H2O: 2358.0}", "latent_heat: {H2O: 2358.0, WATER: 2358.0}")
     )
     ws = _plant(tmp_path, flowsheet, propagate=False)
     process, found = load(ws.root)
@@ -320,6 +341,16 @@ def test_dryer_rules(tmp_path):
     assert any("'MEOH' is not a component" in m for m in messages)
     assert any("X_s is a solid component" in m for m in messages)
     assert any("energy.port product is no energy inlet port" in m for m in messages)
+    # a latent heat keyed by a component that is not a volatile (a typo) is an error
+    (typo,) = [
+        f for f in rules(process) if f.rule == "cheme.process-dryer" and "'WATER'" in f.message
+    ]
+    assert typo.level == "error" and "not one of its volatiles" in typo.message
+    assert typo.line is not None and "volatiles' component ids" in typo.hint
+    # the declared volatiles' latent heats raise nothing
+    ws = _plant(tmp_path / "b", propagate=False)
+    process, _ = load(ws.root)
+    assert not [f for f in rules(process) if "latent_heat" in f.message]
     with pytest.raises(ValueError, match="product and vapour"):
         Dryer.model_validate(
             {
@@ -380,6 +411,80 @@ def test_drying_and_filtration_times_and_one_vessel_for_several_steps(tmp_path):
     assert result.cycle_time == pytest.approx(total, rel=1e-9)
     assert {s.basis for s in result.steps if s.kind in ("dry", "filter")} == {"calculated"}
     assert "heated area" in recipe_text(result)
+
+
+def test_the_vessel_holds_the_slurry_and_the_wash_not_only_the_cake(tmp_path):
+    """A filter-dryer's vessel takes the slurry its filter takes in (5 h of 1000 kg/h at
+    1000 kg/m3: 5 m3), larger than the dried cake's 2 m3: the slurry sizes it and fills a given
+    vessel; the heated area stays the cake's wetted area."""
+    ws = _plant(tmp_path)
+    materials = (ws.root / "process/materials.yaml").read_text()
+    # every component 1000 kg/m3 as a liquid: V = M / 1000 m3/kmol
+    for name, molar_mass in (("X_s", "177.98"), ("X", "177.98"), ("NaBr", "102.89")):
+        tag = f"{{id: {name}, "
+        line = next(x for x in materials.splitlines() if tag in x)
+        volume = float(molar_mass) / 1000
+        materials = materials.replace(
+            line,
+            line.replace(
+                f"molar_mass: {molar_mass}",
+                f"molar_mass: {molar_mass}, liquid_molar_volume: {volume:g}",
+            ),
+        )
+    (ws.root / "process/materials.yaml").write_text(materials)
+    result = recipe_report(ws.root)
+    (vessel,) = result.vessels
+    assert vessel.working_volume == pytest.approx(5.0, rel=1e-6)
+    assert vessel.volume == pytest.approx(10.0) and vessel.rounded
+    assert vessel.fill == pytest.approx(0.5, rel=1e-6)
+    d = (40 / math.pi) ** (1 / 3)
+    assert vessel.diameter == pytest.approx(d, rel=1e-9)
+    # the cake (2 m3 at its cake_density) sets the heated area, not the slurry
+    assert vessel.jacket_area == pytest.approx(wetted_area(2.0, d), rel=1e-6)
+    dry = next(s for s in result.steps if s.operation == "dry")
+    assert dry.end - dry.start == pytest.approx(
+        VAPOUR * HOURS / (5.0 * wetted_area(2.0, d)), rel=1e-5
+    )
+    # a given vessel that holds the cake (4 m3: half full) but not the slurry
+    recipe = yaml.safe_load((ws.root / "process/recipe.yaml").read_text())
+    recipe["unit_procedures"][0]["vessel"] |= {"volume": 4.0, "heated_area": 8.0}
+    (ws.root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    result = recipe_report(ws.root)
+    (over,) = [f for f in result.findings if f.rule == "cheme.recipe-vessel"]
+    assert over.level == "warning" and "5 m3 of batch in the 4 m3 vessel" in over.message
+    assert "125% full" in over.message
+
+
+def test_a_given_volume_without_cake_density_says_what_is_missing(tmp_path):
+    flowsheet = FLOWSHEET.replace("      cake_density: {value: 1250, provenance: assumed}\n", "")
+    recipe = copy.deepcopy(RECIPE)
+    recipe["unit_procedures"][0]["vessel"] |= {"volume": 4.0}
+    result = recipe_report(_plant(tmp_path, flowsheet, recipe).root)
+    (failure,) = [f for f in result.findings if f.rule == "cheme.recipe-duration"]
+    assert "no heated area: give vessel.heated_area (or jacket.area)" in failure.message
+    assert "cake_density so the cake's wetted area can be calculated" in failure.message
+    assert "or a volume" not in failure.message
+    text = recipe_text(result)
+    assert "batch volume not known, 4 m3, fill not known, D" in text and "0% full" not in text
+
+
+def test_the_gantt_label_column_fits_a_units_list(tmp_path):
+    from chemeascode.domains.process.recipe import gantt_svg
+
+    recipe = copy.deepcopy(RECIPE)
+    recipe["unit_procedures"][0]["id"] = "ISOLATE_AND_DRY_THE_CRYSTALS"
+    result = recipe_report(_plant(tmp_path, recipe=recipe).root)
+    svg = gantt_svg(result)
+    name = "ISOLATE_AND_DRY_THE_CRYSTALS (F1+D1)"
+    x = float(svg.split(f">{name}</text>")[0].rsplit('x="', 1)[1].split('"')[0])
+    # right-aligned at x: 11 px semibold capitals and digits are about 7 px a character
+    assert x - 7 * len(name) >= 0
+    # the bars and the axis keep their width
+    (view,) = [part for part in svg.split('"') if part.startswith("0 0 ")]
+    assert float(view.split()[2]) >= 760 + (x + 8 - 170) - 1
+    # a short label keeps the old column
+    short = gantt_svg(recipe_report(_plant(tmp_path / "b").root))
+    assert 'x="162"' in short
 
 
 def test_ruth_closed_form():

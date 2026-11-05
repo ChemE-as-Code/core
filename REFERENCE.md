@@ -1119,19 +1119,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     (T - T_in) + sum W lambda + C_v (T - T_in) / h_batch) / eta`. A latent heat that is not
     declared comes from the component's `critical` constants (Pitzer, Poling et al. 2001, eq.
     7-9.4). The vessel's heat is per batch of `process/recipe.yaml`. The duty is compared with
-    the energy stream at `port`.
+    the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
+    everything but the volatiles, so its moisture is the residual moisture.
   - A recipe `dry` operation with `from:` the dryer takes one batch's vapour over
     `drying_rate` (kg/(m2 h)) times the heated area of the unit procedure's vessel
     (`vessel.heated_area`, the jacket's area, or the shell and bottom the cake wets), or the
-    dryer's `drying_time`. The vessel is sized from the wet cake over `cake_density` when it
-    gives no `volume`.
+    dryer's `drying_time`. The vessel is sized, when it gives no `volume`, from the largest
+    content of one batch: the wet cake over `cake_density`, or what a step of the unit
+    procedure takes in (the slurry, a reslurry wash) from the liquid molar volumes. A given
+    `volume` is checked against the same content (`cheme.recipe-vessel`).
   - A `solid_separation:` with `filtration: {specific_cake_resistance, medium_resistance,
     pressure_difference, viscosity, filtrate_density, area}` gives a `filter` `from:` its
     Ruth time `mu (alpha M V / (2 A^2) + R_m V / A) / dP`, with the area defaulting to the
     vessel's bottom.
   - A unit procedure may name `units: [F101, W101, F102, D101]` instead of `unit:`: the steps of
     one vessel, whose occupancy is counted once. A step in two vessels is
-    `cheme.recipe-reference`. Rules: `cheme.process-dryer`.
+    `cheme.recipe-reference`. Rules: `cheme.process-dryer` (also a `latent_heat` keyed by a
+    component that is not a volatile), `cheme.process-dryer-duty`.
   - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
     `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,

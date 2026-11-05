@@ -11,7 +11,8 @@
   the vapour. `cheme process crystallizers` reports the duty: the cake's sensible heat, the
   latent heat (declared, else Pitzer's correlation from the critical constants) and the
   vessel's heat per batch, over an efficiency. It compares the duty with the heating stream at
-  `energy.port`. Model basis `residual-moisture`; rules `cheme.process-dryer`. A
+  `energy.port` (`cheme.process-dryer-duty`). Model basis `residual-moisture`; rules
+  `cheme.process-dryer`. A
   `solid_separation:` may give `filtration:` (specific cake resistance and more) for Ruth's
   filtration time.
 - Recipe (ADR 0057): a `dry` operation takes `from:` a dryer (one batch's vapour over the
@@ -19,7 +20,8 @@
   takes `from:` a filter with `filtration:`. A unit procedure may give `units: [steps]` that
   share one vessel (a filter-dryer: filter, wash, re-filter, dry), its occupancy counted once
   (NBS lesson L-3). `vessel.heated_area` is new, and a filter-dryer's vessel is sized from the
-  dryer's wet cake over its `cake_density`. Every BFD/PFD needs `cheme process build` once
+  largest content of one batch: the dryer's wet cake over its `cake_density`, or the slurry or
+  reslurry wash a step of the vessel takes in. Every BFD/PFD needs `cheme process build` once
   (the process generator's code changed).
 
 ## 1.7.0 (2026-11-05)

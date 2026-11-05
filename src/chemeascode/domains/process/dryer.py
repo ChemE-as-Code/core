@@ -296,7 +296,8 @@ def dryer_entry(
 ) -> tuple[dict[str, dict[str, float]], dict[str, Any], list[str]]:
     """Dryer *node* for ``cheme process crystallizers``: outlet port -> kg/h by component, its
     solution (with the recipe's batch, when there is one) and where the flowsheet's heating
-    stream (``energy.port``) differs from the model's duty."""
+    stream (``energy.port``) differs from the model's duty (``cheme.process-dryer-duty``: not an
+    outlet, propagate does not write it)."""
     result, _ = solve_node(process, node, inlet, case, _recipe_hours(process, case))
     differ = []
     energy = node.dryer.energy
@@ -354,8 +355,8 @@ def drying_hours(spec: Any, evaporated_kg: float, area: float | None) -> float:
         raise DryerError("the dryer gives no drying_rate (kg/(m2 h)) and no drying_time")
     if not area:
         raise DryerError(
-            "no heated area: give the unit procedure a vessel with heated_area or "
-            "jacket.area, or a volume (or the dryer's cake_density)"
+            "no heated area: give vessel.heated_area (or jacket.area), or the dryer's "
+            "cake_density so the cake's wetted area can be calculated"
         )
     return evaporated_kg / (spec.drying_rate.value * area)
 
@@ -462,6 +463,14 @@ def rules(process: Any) -> list[Finding]:
                 "mix the feeds in a Mixing step before it",
             )
         energy = spec.energy
+        for n in energy.latent_heat if energy is not None else {}:
+            if n not in spec.volatiles:
+                add(
+                    "error",
+                    f"dryer energy.latent_heat names {n!r}, which is not one of its volatiles",
+                    [*loc, "energy", "latent_heat"],
+                    "key latent_heat by the volatiles' component ids",
+                )
         if energy is not None and energy.port is not None:
             port = next((p for p in node.ports if p.id == energy.port), None)
             if port is None or port.kind != "energy" or port.direction != "in":

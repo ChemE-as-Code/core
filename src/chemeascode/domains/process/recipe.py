@@ -536,25 +536,61 @@ def _one_inlet(process: Any, node: Any) -> Any:
     return inlets[0]
 
 
+def _step_contents(
+    process: Any, recipe: Recipe, up: UnitProcedure, case: str, skip: str | None = None
+) -> float | None:
+    """m3: the largest material that one batch brings into a step of *up* (the slurry a
+    filter-dryer takes, the reslurry wash), each member's material inlets per batch from their
+    components' liquid molar volumes; None when none can be calculated. *skip*: a step whose
+    content is known otherwise (the dryer with a cake_density)."""
+    from chemeascode.domains.process.model import stream_flows
+
+    try:
+        hours = batch_hours(process, recipe, case)
+    except ValueError:
+        return None
+    found = None
+    for node in _nodes(process, up):
+        if node.id == skip:
+            continue
+        flow = 0.0
+        known = False
+        for stream in _inlets(process, node.id):
+            if stream.kind != "material":
+                continue
+            volume = _volume_flow(process, stream_flows(process, stream, case).components)
+            if volume is not None:
+                flow += volume
+                known = True
+        if known:
+            found = max(found or 0.0, flow * hours)
+    return found
+
+
 def _cake_vessel(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> VesselResult:
-    """The vessel of a filter-dryer or dryer procedure *up*: the wet cake of one batch (the
-    dryer's inlet over its cake_density) over the fill fraction, rounded up, or the given
-    volume; its heated area given, the jacket's, or the shell and bottom the cake wets (in
-    ``jacket_area``). Raises ValueError."""
+    """The vessel of a filter-dryer or dryer procedure *up*: its largest content of one batch
+    over the fill fraction, rounded up, or the given volume. The content is the largest of the
+    wet cake (the dryer's inlet over its cake_density) and what each of its steps takes in (the
+    slurry, the reslurry wash: :func:`_step_contents`). Its heated area is given, the jacket's,
+    or the shell and bottom the cake wets (in ``jacket_area``). Raises ValueError."""
     from chemeascode.domains.process.model import stream_flows
 
     vessel = up.vessel
     dryer, _ = _solids(process, up)
-    working = None
+    cake = None
     temperature = 0.0
+    measured = None
     if dryer is not None:
         temperature = dryer.dryer.temperature
         density = dryer.dryer.cake_density
         if density is not None:
+            measured = dryer.id
             wet = stream_flows(process, _one_inlet(process, dryer), case).total
             if wet is None:
                 raise ValueError(f"no flow of {dryer.id}'s wet cake")
-            working = wet * batch_hours(process, recipe, case) / density.value
+            cake = wet * batch_hours(process, recipe, case) / density.value
+    contents = _step_contents(process, recipe, up, case, skip=measured)
+    working = max(cake or 0.0, contents or 0.0) or None
     if vessel.volume is not None:
         volume, rounded = vessel.volume, False
     elif working:
@@ -564,12 +600,13 @@ def _cake_vessel(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> 
             volume = preferred(volume)
     else:
         raise ValueError(
-            "no vessel volume: give vessel.volume, or the dryer's cake_density to size it"
+            "no vessel volume: give vessel.volume, or the dryer's cake_density (or the "
+            "liquid_molar_volume of what the steps take in) to size it"
         )
     diameter = _diameter(volume, vessel.aspect_ratio)
     heated = vessel.heated_area or (vessel.jacket.area if vessel.jacket else None)
-    if heated is None and working:
-        heated = wetted_area(working, diameter)
+    if heated is None and cake:
+        heated = wetted_area(cake, diameter)
     return VesselResult(
         up.id,
         up.label,
@@ -1101,9 +1138,10 @@ def recipe_text(result: RecipeResult) -> str:
             if v.working_volume
             else "batch volume not known, "
         )
+        fill = f"{v.fill:.0%} full" if v.working_volume else "fill not known"
         lines.append(
             f"  vessel of {v.unit} ({v.procedure}): {held}"
-            f"{v.volume:.4g} m3{' (preferred size)' if v.rounded else ''}, {v.fill:.0%} full, "
+            f"{v.volume:.4g} m3{' (preferred size)' if v.rounded else ''}, {fill}, "
             f"D {v.diameter:.3g} m"
             + (
                 f"; peak duty {v.peak_duty:.4g} kW, jacket removes {v.removable:.4g} kW "
@@ -1150,8 +1188,14 @@ def gantt_svg(result: RecipeResult) -> str:
     (prefers-color-scheme)."""
     from html import escape
 
-    left, top, row, right = 170, 46, 30, 30
-    width = 760
+    def label(u: UnitCycle) -> str:
+        return f"{u.procedure} ({u.unit})" + (f" x{u.parallel}" if u.parallel > 1 else "")
+
+    # the label column fits the longest name (11 px semibold, capitals and digits about 7 px
+    # each; a units: list joined with +)
+    longest = max((len(label(u)) for u in result.units), default=0)
+    left, top, row, right = max(170, 12 + 7 * longest), 46, 30, 30
+    width = 760 + left - 170
     span = max((s.end for s in result.steps), default=1.0) or 1.0
     scale = (width - left - right) / span
 
@@ -1205,7 +1249,7 @@ def gantt_svg(result: RecipeResult) -> str:
     )
     for i, u in enumerate(result.units):
         y = top + row * i
-        name = f"{u.procedure} ({u.unit})" + (f" x{u.parallel}" if u.parallel > 1 else "")
+        name = label(u)
         css = "label neck" if u.procedure == result.bottleneck else "label"
         body.append(
             f'<text class="{css}" x="{left - 8}" y="{y + row / 2 + 4:.0f}" '

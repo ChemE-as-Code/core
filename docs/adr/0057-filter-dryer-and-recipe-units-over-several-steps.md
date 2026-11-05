@@ -51,17 +51,24 @@ Options considered:
   - Without either the duty is missing, and the report says why; no number is given.
 - **`cheme process crystallizers`** reports dryers too: the evaporated flow, the moisture, the
   mass residual, the duty and its terms, each latent heat with its basis, and the amounts of
-  one batch. With `energy.port` it compares the heating stream's duty with the model's, beyond
-  the flowsheet's relative tolerance (`cheme.process-crystallizer-outlet`). The schema and
-  port rules are `cheme.process-dryer`.
+  one batch. A dryer's outlets are divided by its own split: the volatiles are the liquid and
+  everything else the dry solid, so the product's moisture is the dryer's residual moisture.
+  With `energy.port` it compares the heating stream's duty with the model's, beyond the
+  flowsheet's relative tolerance (`cheme.process-dryer-duty`, apart from the outlets'
+  `cheme.process-crystallizer-outlet`: propagate writes the outlets, never the energy stream).
+  The schema and port rules are `cheme.process-dryer`; a `latent_heat` keyed by a component
+  that is not a volatile is one of them.
 - **Drying time.** A recipe `dry` operation may take `from:` a dryer step. The time is one
   batch's vapour over `drying_rate` (kg/(m2 h), a constant mean rate, given or ASSUMED) times
   the heated area of the unit procedure's vessel, or the dryer's given `drying_time`.
   - The heated area is `vessel.heated_area`, else `vessel.jacket.area`, else the shell and
     bottom the wet cake wets.
-  - The wet cake's volume is the dryer's inlet for one batch over its `cake_density`. That
-    volume over the fill fraction, rounded up to R10 (ADR 0052), sizes the vessel when no
-    `volume` is given.
+  - The wet cake's volume is the dryer's inlet for one batch over its `cake_density`. The
+    vessel's working volume is the largest of that and what each step of the unit procedure
+    takes in for one batch (the slurry, a reslurry wash), from the components' liquid molar
+    volumes where they are known. That volume over the fill fraction, rounded up to R10 (ADR
+    0052), sizes the vessel when no `volume` is given, and a given volume is checked against
+    it (`cheme.recipe-vessel`). The heated area stays the cake's.
 - **Filtration time.** A `filter` operation may take `from:` a `solid_separation:` that gives
   `filtration:` (specific cake resistance, medium resistance, pressure difference, viscosity,
   optional filtrate density and area). Its time is Ruth's constant-pressure equation, `t = mu
