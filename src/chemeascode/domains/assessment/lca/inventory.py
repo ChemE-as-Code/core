@@ -572,7 +572,7 @@ def inventory(
     cutoff: list[CutoffFlow] = []
     if scope.construction:
         cutoff += _construction_cutoff(scope, takeoff, equipment, result.totals["construction"])
-    exchanges += _supplies(scope, exchanges, problem, cutoff, process)
+    exchanges += _supplies(scope, exchanges, problem, cutoff, process, case)
     cutoff += _study_cutoff(scope)
     cutoff += _excluded_emissions(scope)
     _system_model_findings(scope, problem)
@@ -1466,32 +1466,43 @@ def _disposed(
     return _treated(exchange, disposal.treatment(), model, problem)
 
 
-def _batches(process: Process | None, problem) -> tuple[float, float, str] | None:
-    """(batches per year, hours, a note) of the plant's recipe (process/recipe.yaml), or None
-    with an error when it gives no cycle."""
+def _batches(process: Process | None, problem, case: str) -> tuple[float, float, str] | None:
+    """(batches per year, hours, a note) of the plant's recipe (process/recipe.yaml) in *case*,
+    or None with an error when it gives no cycle."""
     from chemeascode.domains.process.recipe import RECIPE_FILE, evaluate, load_recipe
 
-    recipe, doc, _ = load_recipe(process.root) if process is not None else (None, None, [])
-    result = evaluate(process, recipe, doc) if recipe is not None else None
+    recipe, doc, found = load_recipe(process.root) if process is not None else (None, None, [])
+    result = evaluate(process, recipe, doc, case) if recipe is not None else None
     if result is None or not result.batches_per_year:
+        if recipe is not None:
+            errors = [f.message for f in result.findings if f.level == "error"]
+            why = "gives no cycle" + (f": {'; '.join(errors)}" if errors else "")
+        elif found:
+            why = "does not load: " + "; ".join(f.message for f in found)
+        else:
+            why = "does not exist"
         problem(
             "error",
             "cheme.lca-per-batch",
-            f"a consumable per_batch needs the batches per year of {RECIPE_FILE}, which "
-            + ("gives no cycle" if recipe is not None else "does not exist"),
+            f"a consumable per_batch needs the batches per year of {RECIPE_FILE}, which {why}",
             "per_batch",
             f"write {RECIPE_FILE} (cheme process recipe), or give per_year",
         )
         return None
     note = (
         f"{result.batches_per_year:.6g} batches in {result.hours_per_year:g} h "
-        f"({RECIPE_FILE}, bottleneck {result.bottleneck})"
+        f"({RECIPE_FILE}, case {case}, bottleneck {result.bottleneck})"
     )
     return result.batches_per_year, result.hours_per_year, note
 
 
 def _supplies(
-    scope, exchanges: list[DatasetExchange], problem, cutoff: list[CutoffFlow], process=None
+    scope,
+    exchanges: list[DatasetExchange],
+    problem,
+    cutoff: list[CutoffFlow],
+    process=None,
+    case: str | None = None,
 ) -> list[DatasetExchange]:
     """Consumables, maintenance, transport and end of life: exchanges per hour of operation,
     the last three derived from *exchanges* (construction and the flows already counted), and
@@ -1503,7 +1514,7 @@ def _supplies(
     model = scope.model
     batches: tuple[float, float, str] | None = None
     if any(c.per_batch is not None for c in scope.consumables):
-        batches = _batches(process, problem)
+        batches = _batches(process, problem, case or process.flowsheet.default_case())
     for item in scope.consumables:
         kind, per = FACTOR_UNITS[item.unit]
         source = item.source

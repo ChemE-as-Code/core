@@ -280,6 +280,11 @@ def test_a_consumable_per_batch_follows_the_recipe(plant: Path) -> None:
     dataset = LciDataset.model_validate(yaml.safe_load(dataset_yaml(report)))
     (exchange,) = [e for e in dataset.exchanges if e.key == "consumable:rinse"]
     assert "500 kg per batch x 1000 batches in 8000 h" in exchange.source
+    # a recipe that does not load is said to, not called missing
+    (plant / "process" / "recipe.yaml").write_text("schema: cheme/recipe/v1\nkind: recipe\n")
+    report = lca_report(plant)
+    (finding,) = [f for f in report.findings if f.rule == "cheme.lca-per-batch"]
+    assert "does not load" in finding.message
     # without the recipe: an error, not a silent zero
     (plant / "process" / "recipe.yaml").unlink()
     report = lca_report(plant)
