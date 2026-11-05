@@ -388,6 +388,14 @@ class Dosing(Strict):
         exclude_if=lambda value: not value,
     )
     start: float = Field(default=0.0, ge=0, description="s after the charge the dosing starts")
+    absorbed: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="A dosed gas: the share of the dose the liquid takes up (it dissolves on "
+        "entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+        exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
+    )
 
     @model_validator(mode="after")
     def _form(self) -> Dosing:
@@ -408,6 +416,37 @@ class Dosing(Strict):
         return found
 
 
+class Vent(Strict):
+    """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
+    liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
+    do not accumulate in the liquid and count in neither its volume nor its concentrations; a
+    ``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved."""
+
+    stream: str = Field(description="The outlet stream of the step the gas leaves by.")
+    components: list[str] = Field(
+        min_length=1, description="The components that leave the liquid as they form."
+    )
+    fraction: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> the share of what forms that leaves (default 1).",
+        exclude_if=lambda value: not value,
+    )
+
+    @model_validator(mode="after")
+    def _shares(self) -> Vent:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.components: each component once")
+        if stray := sorted(set(self.fraction) - set(self.components)):
+            raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
+        if any(not 0 < f <= 1 for f in self.fraction.values()):
+            raise ValueError("vent.fraction: a share above 0, at most 1")
+        return self
+
+    def shares(self) -> dict[str, float]:
+        """Component -> the share of what forms that leaves."""
+        return {n: self.fraction.get(n, 1.0) for n in self.components}
+
+
 class Batch(Strict):
     """A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge
     (its flow the charge per hour), the outlet its composition when the batch ends, after
@@ -416,7 +455,8 @@ class Batch(Strict):
 
     A semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its
     ``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the
-    dosing)."""
+    dosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as
+    they form, by a second outlet."""
 
     time: float | None = Field(default=None, gt=0, description="s of reaction")
     target: BatchTarget | None = None
@@ -428,6 +468,12 @@ class Batch(Strict):
         default_factory=list,
         description="reactor: semibatch: the dosed feeds.",
         exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
+    )
+    vent: Vent | None = Field(
+        default=None,
+        description="A liquid batch or semi-batch that gives off gas: {stream, components, "
+        "fraction} (ADR 0054).",
+        exclude_if=lambda value: value is None,  # an unvented batch's fingerprint stays
     )
     provenance: Provenance
     source: str = ""
