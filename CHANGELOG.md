@@ -9,6 +9,9 @@
   fewer bytes (process library methanol-1 PFD 1.72 to 0.90 MB, ammonia-1 7.53 to 3.92 MB).
   The generator fingerprint now also covers `pfd_sheet.py`, `symbols.py` and the ISO shapes,
   so editing the stream table or a symbol marks the sheets outdated.
+  `cheme fmt` (also with paths, `--check` and `cheme run --fmt`) leaves such a generated sheet
+  as built and says "generated, not formatted (cheme process build)", so formatting a freshly
+  built BFD/PFD is no edit (`cheme.generated-edited`).
 - The PFD is drawn as an engineering sheet (ADR 0046; generator 6: every BFD/PFD needs
   `cheme process build`): the smallest ISO 216 or ISO 5457 elongated sheet that holds it, with
   frame, zone markers and a title block; a stream table (phase, °C, bar, mass flow, the

@@ -50,15 +50,21 @@ out; a test keeps every process module `build.py` imports in it.
   diffs stay line by line with the same line count.
 - Negative: the nesting is no longer visible when the XML is read as text. Every sheet is
   outdated (`cheme.generated-version`) and is rebuilt with `cheme process build` once, a
-  whole-file diff. `cheme fmt PATH` run on a generated sheet by hand re-indents it, which is an
-  edit (`cheme.generated-edited`); `cheme fmt` without paths does not touch process sheets.
+  whole-file diff.
+- `cheme fmt` (with or without paths, `--check`, and `cheme run --fmt`) leaves a generated
+  process sheet untouched, recognised by its `<!-- cheme-process {...} -->` comment, and reports
+  it as "generated, not formatted (cheme process build)": re-indenting it would be an edit
+  (`cheme.generated-edited`), so the agents' "`cheme fmt <sheet>`, then `cheme validate`" still
+  passes on a freshly built sheet.
 - Git compresses the indentation well (the methanol-1 PFD is 46 kB gzipped either way), so the
   saving is in checkouts, downloads of single files and tools reading them, not in pack size.
 
 ## Evidence
 
 - `src/chemeascode/domains/process/build.py` (`XML_INDENT`),
+  `src/chemeascode/domains/piping/fmt.py` (`is_process_sheet`, `format_file`),
   `src/chemeascode/domains/process/sheets.py` (`produce`),
   `src/chemeascode/domains/process/provenance.py` (`GENERATOR_MODULES`).
 - Tests: `tests/test_process.py` (`test_sheets_are_written_unindented_and_draw_the_same`,
-  `test_generator_fingerprint_covers_what_build_imports`).
+  `test_generator_fingerprint_covers_what_build_imports`), `tests/test_fmt.py`
+  (`test_fmt_leaves_generated_process_sheets_as_built`).

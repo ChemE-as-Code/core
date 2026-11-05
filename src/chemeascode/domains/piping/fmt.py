@@ -22,6 +22,11 @@ is written back at the top of the document (after an XML declaration, before pyD
 and the root element), one per line in document order, so formatting twice gives the same
 bytes. Nothing else should start a comment with ``cheme-``; other comments are dropped and
 reported as before.
+
+A BFD or PFD that ``cheme process build`` wrote (its ``<!-- cheme-process {...} -->`` comment)
+is not formatted at all: it is written as built, without indentation (ADR 0048), and any rewrite
+would be an edit (``cheme.generated-edited``). :func:`format_file` leaves it untouched and says
+so (:attr:`FormatResult.generated`).
 """
 
 from __future__ import annotations
@@ -49,6 +54,11 @@ class FormatResult:
     ids_assigned: int
     #: ``line N: <!-- ... -->`` for every comment or processing instruction the rewrite dropped.
     dropped: list[str] = field(default_factory=list)
+    #: A generated process sheet (BFD/PFD), left as ``cheme process build`` wrote it.
+    generated: bool = False
+
+    #: What to say about a generated process sheet.
+    GENERATED_NOTE = "generated, not formatted (cheme process build)"
 
 
 def _parse(content: bytes) -> etree._Element:
@@ -228,9 +238,24 @@ def _reinsert(content: bytes, comments: list[str]) -> bytes:
     return block + content
 
 
+#: The provenance comment of a sheet ``cheme process build`` generated, before the root element.
+_PROCESS_SHEET = re.compile(rb"<!--\s*cheme-process\s+\{")
+
+
+def is_process_sheet(content: bytes) -> bool:
+    """Whether *content* is a BFD or PFD written by ``cheme process build``: its provenance
+    comment sits before the root element (the stamp puts it after the XML declaration)."""
+    head = content[:4096]
+    root = re.search(rb"<(?![?!])", head)
+    return bool(_PROCESS_SHEET.search(head[: root.start()] if root else head))
+
+
 def format_file(path: Path, *, check: bool = False) -> FormatResult:
-    """Format *path* in place, or with *check* only report whether it would change."""
+    """Format *path* in place, or with *check* only report whether it would change. A generated
+    process sheet (:func:`is_process_sheet`) is left untouched: ``generated``, not changed."""
     content = path.read_bytes()
+    if is_process_sheet(content):
+        return FormatResult(path, False, 0, generated=True)
     formatted, assigned, dropped = format_reporting(content)
     changed = formatted != content
     if changed and not check:

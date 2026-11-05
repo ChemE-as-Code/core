@@ -30,7 +30,8 @@ This repository is a process plant design. The files are the design; there is no
   `assumed`, `calculated` by `cheme process propagate --fill`, `cheme process simulate
   --fill` or `cheme process props --fill` only); `DESIGN.md` keeps the
   decisions, not a second copy of the numbers. P&IDs start from the PFD (skill `pid-draft`).
-- After every change: `cheme fmt <sheet>`, then `cheme validate`. Fix every `error`. Do not
+- After every change: `cheme fmt <sheet>` (it formats P&IDs; generated BFD/PFD sheets are left as
+  built), then `cheme validate`. Fix every `error`. Do not
   commit with errors; the pre-commit hook and CI refuse it anyway. Never bypass the hook
   (`git commit --no-verify`, `-c core.hooksPath=...`): fix what it reports, or stop and say so.
 - One logical change per commit. Say what changed on which sheet and why. Append the change to
@@ -81,7 +82,7 @@ This repository is a process plant design. The files are the design; there is no
 | `cheme validate [files] [--json] [--ignore RULE[,RULE]] [--only RULE] [--skip-generators]` | all P&IDs and lists, and lists vs P&IDs (equipment, lines and DN, instruments), drawing geometry (lines through labels, crossings, overlapping and misplaced labels, each with a `[crop ...]`) and tags named in texts; a `drawing <sheet>:` count line per sheet; the last line says what was compared; rules may be globs (`cheme.*-not-on-pid`); generated sheets are rebuilt in a scratch copy and compared unless `--skip-generators` |
 | `cheme sheet new <ID> [--title T] [--file F]` | a new sheet from the template with its title block filled from `plant.yaml` (project block), added to `sheets:` (a planned one becomes drafted) |
 | `cheme sheet meta <ID> [Key=Value ...]` | show or set title-block values (`Revision=B`, `Title=...`, `Status=...`, any MetaData property, `ModelName`, `DiagramName`): MetaData and the title-block texts together |
-| `cheme fmt [files] [--check]` | canonical XML, readable id on every object |
+| `cheme fmt [files] [--check]` | canonical XML, readable id on every object (P&IDs; a generated BFD/PFD is left as built) |
 | `cheme show <id or tag> [--sheet F] [--layout]` | `file:start-end` of an object and its drawing, owner chain, references in and out; `instrumentation:` the loop, actuating and signal chains it is part of; for equipment the lines, segments and branches at each nozzle; for a line number its segments, items and nodes with DN; `--layout` the measured plot-plan distances around a placed item |
 | `cheme render [files] [--png] [--crop X0,Y0,X1,Y1 \| --tiles CxR] [--findings] [--scale S] [--rev R]` | `build/<sheet>.svg` (`.png` with `--png`, `<sheet>@<rev>` with `--rev`, `<sheet>_crop-X0-Y0-X1-Y1` with `--crop`, so a crop never overwrites the full sheet); `--crop` in sheet mm, Y down; `--tiles 4x3` (or `auto`) overlapping tiles `<sheet>_tile-B3` covering the sheet, each with its `--crop`; `--findings` marks the drawing findings |
 | `cheme diff <old> [new] [--list [--verbose \| --flat] \| --json]` | HTML report in `build/diff.html`; `--list` one line per changed plant item with its added/removed/modified counts, `--verbose` each change under it, `--flat` one line per changed object with the drawing that shows it; `--json` the data |
