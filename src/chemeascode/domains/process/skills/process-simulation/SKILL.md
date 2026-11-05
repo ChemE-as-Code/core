@@ -14,8 +14,10 @@ downstream of the feeds are needed or assumed: outlet states of compressors, pum
 heaters and coolers, valves, mixers and splitters, flash drums, two-stream heat exchangers,
 shortcut and rigorous columns, and recycle loops. `cheme process propagate` covers
 pass-through, mixer, splitter and reactor balances and its own batch and solids models, with
-recycles torn at `tears:` (skill `process-design`); simulate covers the energy balance and
-separations.
+the model duties of batch and semi-batch steps, `still:`, `crystallizer:` with `energy:` and
+conversion steps on their energy streams (ADR 0059: `--fill` writes and checks them, so do not
+type them by hand) and recycles torn at `tears:` (skill `process-design`); simulate covers
+the other energy balances and the separations.
 
 ## Required inputs and missing inputs
 

@@ -51,6 +51,10 @@ Q_MIN, Q_MAX = -5.0, 0.0
 #: The fractions of an ``initial:`` guess sum to 1 within this (as a stream's composition,
 #: ``cheme.process-composition-sum``).
 COMPOSITION_SUM = 1e-3
+#: What a node declares that no sweep reads, left out of the tear fingerprint
+#: (:func:`loop_inputs`): names and links, the drawing symbol, the thermal screening (ADR 0058)
+#: and the energy stream a model duty goes on (ADR 0059, written after the loop converged).
+NOT_SWEPT = frozenset({"title", "links", "symbol", "hazard", "energy_port"})
 
 
 @dataclass
@@ -261,8 +265,8 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
     """The fingerprint of the tear values in *case*: what the loops depend on, never their
     iterates. The given and assumed flow, composition, temperature, pressure and phase of every
     material stream upstream of a tear's source (the loop and what feeds it), those nodes as
-    declared, their reactions, the components, the catalysts, the tears and the convergence
-    settings with the tolerance."""
+    declared but for what no sweep reads (:data:`NOT_SWEPT`), their reactions, the components,
+    the catalysts, the tears and the convergence settings with the tolerance."""
     from chemeascode.domains.process.propagate import ours
 
     fs = process.flowsheet
@@ -307,7 +311,7 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
         "tolerance": fs.tolerance.model_dump(mode="json"),
         "streams": values,
         "nodes": {
-            n: nodes[n].model_dump(mode="json", by_alias=True, exclude={"title", "links"})
+            n: nodes[n].model_dump(mode="json", by_alias=True, exclude=set(NOT_SWEPT))
             for n in sorted(seen)
         },
         "reactions": reactions,

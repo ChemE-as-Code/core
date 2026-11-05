@@ -182,3 +182,46 @@ def test_a_cstr_series_is_screened_at_its_first_tank(tmp_path):
     (entry,) = screen(_plant(tmp_path, flowsheet)).entries
     first = 0.002 * 1000 / (1 + 0.002 * 1000)  # the first tank converts 2/3
     assert entry.accumulation == pytest.approx(1 - first, rel=1e-6)
+
+
+ENERGY_IN = (
+    FLOWSHEET.replace(
+        "  - {id: F, ports: [{id: out, direction: out}]}\n",
+        "  - {id: F, ports: [{id: out, direction: out}]}\n"
+        "  - {id: POWER, ports: [{id: q, direction: out, kind: energy}]}\n",
+    )
+    .replace(
+        "    ports: [{id: in, direction: in}, {id: out, direction: out}]\n",
+        "    ports: [{id: in, direction: in}, {id: out, direction: out},\n"
+        "            {id: power, direction: in, kind: energy}]\n",
+    )
+    .replace("  - id: S2\n", "  - {id: P1, kind: energy, from: POWER.q, to: R.power}\n  - id: S2\n")
+)
+
+
+@pytest.mark.parametrize("model", ["batch", "conversion"])
+def test_an_energy_stream_into_the_reactor_is_no_inlet(tmp_path, model):
+    # agitator power into a batch, or the heat a conversion step takes up: the reactor is still
+    # screened from its one material inlet, as the tank and reactor models count it
+    flowsheet = ENERGY_IN
+    reactions = None
+    if model == "conversion":
+        flowsheet = flowsheet.replace("    reactor: batch\n", "    reactor: conversion\n").replace(
+            "    batch: {time: 600, provenance: assumed}\n", ""
+        )
+        reactions = REACTIONS.replace(
+            "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.002},\n"
+            "            orders: {A: 1}, provenance: assumed}}\n",
+            "     conversion: {key: A, value: 0.5, provenance: assumed}}\n",
+        )
+    root = _plant(tmp_path, flowsheet)
+    if reactions is not None:
+        (root / "process/reactions.yaml").write_text(reactions)
+    report = screen(root)
+    (entry,) = report.entries
+    assert "one inlet stream" not in entry.missing
+    rise = 80000.0 * 1.0 / (160.0 + 4 * 100.0)
+    assert entry.adiabatic_rise == pytest.approx(rise)
+    assert entry.mtsr == pytest.approx(330.0 + rise)  # above the MTT of 373 K
+    assert entry.criticality == 4
+    assert [f.rule for f in report.findings] == ["cheme.reactor-hazard-class"]

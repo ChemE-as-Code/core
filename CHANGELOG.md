@@ -40,7 +40,12 @@
   substitution are available. The iterating sweeps round nothing, so a loop converges to its
   tolerance; the written values come from one rounded sweep at the converged guess. The tear
   values are `calculated`, fingerprinted on the loop's
-  inputs rather than on the iterate, so a converged plant is not stale on `--check`. A given or
+  inputs rather than on the iterate, so a converged plant is not stale on `--check`; what no
+  sweep reads (a node's `hazard`, `energy_port`, `symbol`, title and links) stays out of that
+  fingerprint, so a screening or energy-port edit to a node in the loop leaves the tear
+  current (tear values filled with a pre-release build get new fingerprints once). A
+  temperature or pressure the node a tear leaves derives for it reaches the node it enters, so
+  a duty downstream of the tear does not depend on where the loop is torn. A given or
   assumed flow or composition of a tear stays fixed. `cheme.process-recycle` reports a
   converged loop (info, with the iterations and the worst residual) and a loop that does not
   converge or close (warning, with the residual; nothing that depends on it is written).
@@ -52,8 +57,10 @@
   `examples/process-purge-loop`: a loop reactor with a recycle split, checked against its
   closed form in `tests/test_recycle.py`. On a scratch copy of the library's `sodium-azide-1`,
   both recycles (mother liquor and methanol) converge in 20 iterations to within 0.02 % of the
-  hand-converged streams. Plants without `tears:` solve, report and fingerprint as in 1.8.0.
-  Every BFD/PFD needs `cheme process build` once, because the process generator's code changed.
+  hand-converged streams. The tear fields are left out of a dump when not given: a plant
+  without `tears:` solves and fingerprints as in 1.8.0 apart from the model duties below (ADR
+  0059). Every BFD/PFD needs `cheme process build` once, because the process generator's code
+  changed.
 - Batch and conversion models write and check their energy streams (ADR 0059, #180). `cheme
   process propagate --fill` writes the year-average duty (kW per hour of the flowsheet's
   flows, `calculated` with a fingerprint) of an isothermal `reactor: batch` or `semibatch` (the
@@ -76,12 +83,13 @@
   the ideal-gas duty was `?`, and adds `model_duty` to `--json` where the model knows a duty or
   a stream wants one; `cheme process stills` shows the year-average duty.
   **Behaviour change**: `propagate --check` can newly exit 1, and `validate` newly warns, where
-  a hand-typed duty differs from the model. In the process library seven entries do (scratch
-  copies, 1.8.0 exit 0): benzyl-chloroformate-1 R101 Q2 and sodium-azide-1 R102 Q2 (batch),
-  ethylene-1 H102 Q102, formic-acid-1 R201 Q10, hydrogen-bromide-1 R101 Q2,
-  hydrogen-chloride-1 R101 Q1 and phosphorus-oxychloride-1 R201 Q3 (continuous conversion
-  steps). `process reactors` text and JSON change for 44 of its 73 entries (the model's duty
-  line). Plants without heat streams or given duties on these steps solve and fingerprint as in
+  a hand-typed duty differs from the model. In the process library (b8043f4c, 53 entries with
+  a flowsheet; scratch copies, 1.8.0 exit 0) nine entries do: benzyl-chloroformate-1 R101 Q2
+  and sodium-azide-1 R102 Q2 (batch), p-toluenesulfonyl-chloride-1 Q101 Q5 (semi-batch),
+  benzoyl-chloride-1 ST101 Q4 (still), ethylene-1 H102 Q102, formic-acid-1 R201 Q10,
+  hydrogen-bromide-1 R101 Q2, hydrogen-chloride-1 R101 Q1, phosphorus-oxychloride-1 R201 Q3
+  and p-toluenesulfonyl-chloride-1 R102 Q3 (conversion steps). `process reactors` text and
+  JSON change for 47 of the 53 (the model's duty line). Plants without heat streams or given duties on these steps solve and fingerprint as in
   1.8.0. Every BFD/PFD needs `cheme process build` once (the process generator's code changed).
 
 ### Changed
@@ -98,21 +106,43 @@
   Without one, a note says the MTT is lower. These are fixes: the MTT changes only where a
   vent component, a dosed gas or a minor dissolved component boiling below `T_p` set it, or
   outside 90 to 110 kPa(a); the MTT, MTSR and class of the core examples and of the process
-  library's 73 entries are those of 1.8.0.
+  library's 53 flowsheets (b8043f4c) are those of 1.8.0, except where the fix below screens a
+  reactor for the first time.
 - New output for plants that use none of the new fields:
   - every reactor with more than one reaction gets `counted_reactions`, `counted_basis` and
-    `per_reaction` in the JSON and a `reactions (...)` text line (methanol-1, ammonia-1,
-    formaldehyde-1);
+    `per_reaction` in the JSON and a `reactions (...)` text line (16 library entries:
+    acetic-anhydride-1, acetylene-1, ammonia-1, aniline-1, benzyl-chloroformate-1,
+    carbon-tetrabromide-1, chloromethane-1, ethanol-1, formaldehyde-1, methanol-1,
+    methylamines-1, methylmagnesium-bromide-1, p-toluenesulfonyl-chloride-1, sodium-azide-1,
+    sodium-cyanide-1, thionyl-chloride-1; with the fix below also ethylene-1, hydrogen-1 and
+    isobutene-1);
   - every semi-batch gets `mtsr_profile` and an `MTSR over the batch` text line;
   - every vented batch or semi-batch gets `gas_release`, a text line and a
     `cheme.reactor-hazard-vent` warning until it states `hazard.vent_capacity`, so `cheme
-    process reactor-hazards` exits 1 for it (sodium-azide-1, methylmagnesium-bromide-1). The
+    process reactor-hazards` exits 1 for it (sodium-azide-1, methylmagnesium-bromide-1,
+    benzoyl-chloride-1, p-toluenesulfonyl-chloride-1; benzyl-chloroformate-1 already exits 1
+    and gains the warning). The
     vent note no longer says the blocked vent is "not screened here": it points to the gas
-    release.
+    release;
+  - every reactor above 110 kPa(a) or below 90 kPa(a) whose MTT components lack
+    `heat_of_vaporization` gets a note naming them (urea-1 R101, ethylene-glycol-1 R401; with
+    the fix below also formic-acid-1 R201, potassium-permanganate-1 EL401 and urea-1 E302,
+    R401).
 
-  A reactor with one reaction, no dosing and no vent reports as in 1.8.0. The new
+  A reactor with one reaction, no dosing and no vent, at 90 to 110 kPa(a) and with no heat or
+  power stream into it, reports as in 1.8.0. The new
   `ReactionHazard` fields stay out of a reactor's dump. Every BFD/PFD needs `cheme process
   build` once, because the process schema changed.
+
+### Fixed
+
+- `cheme process reactor-hazards` screens a batch, CSTR, PFR or conversion step with an
+  energy stream into it (agitator power, or the heat stream ADR 0059 asks for a heated batch):
+  until now that stream counted as a second inlet, and the reactor was left unscreened ("no
+  full screening without one inlet stream"); only a semi-batch counted its material inlets
+  alone, as the tank and reactor models do. In the process library 19 reactors of 15 entries
+  are now screened (7 get an MTSR, e.g. acetic-anhydride-1 T301 984.8 K, phosgene-1 R101); no
+  entry gets a new warning or exit code.
 
 ## 1.8.0 (2026-11-05)
 

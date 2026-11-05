@@ -99,7 +99,15 @@ Stoessel's classes, the accumulation and the semi-batch model are unchanged. The
 were. The JSON gives the new keys only when they hold something: `per_reaction` and
 `counted_*` for every reactor with more than one reaction, `mtsr_profile` for every
 semi-batch, `gas_release` for every vented batch. A reactor with one reaction, no dosing and
-no vent reports as in 1.8.0.
+no vent, at 90 to 110 kPa(a), with no heat or power stream into it, reports as in 1.8.0.
+Outside that pressure band a reactor whose MTT components lack `heat_of_vaporization` gets a
+note naming them (urea-1, ethylene-glycol-1).
+
+Energy streams into a reactor are no inlets of its screening, for every model, as in the tank
+and reactor models (`stirred_tank.tank_inlet`). Until this release only a semi-batch left them
+out: a batch, CSTR, PFR or conversion step with agitator power or a heat stream into it (the
+setup ADR 0059 asks for a heated batch) had two inlets and was not screened ("one inlet
+stream").
 
 ## Consequences
 
@@ -119,7 +127,9 @@ no vent reports as in 1.8.0.
   Every vented batch gets the new `-vent` warning until it states a vent capacity, so
   `cheme process reactor-hazards` exits 1 for it. Every reactor with more than one reaction,
   every semi-batch and every vented batch gets new JSON keys and text lines. The MTT, MTSR
-  and class of the core examples and the process library's entries are those of 1.8.0.
+  and class of the core examples and the process library's entries are those of 1.8.0, except
+  for the reactors with an energy stream into them, which are now screened (19 reactors of 15
+  library entries; 7 of them get an MTSR, none a new warning).
 - Negative: the dissolved-gas rule follows the declared boiling points and a share
   threshold, not a phase equilibrium. A minor gas held in solution well above its boiling
   point (a solvate, a complex) is still left out, a dissolved gas does not lower the liquor's

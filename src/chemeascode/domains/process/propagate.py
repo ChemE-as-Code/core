@@ -340,6 +340,13 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         s.state.setdefault(case, State())
         setattr(s.state[case], name, value)
         found.values[(s.id, name)] = value
+        if name not in FIELDS and shadows.get(s.id) is s:
+            # a tear's temperature or pressure, derived by the node it leaves, reaches the node
+            # it enters (only its flow and composition are iterated): where the loop is torn
+            # does not change what the models downstream of the tear see
+            real = streams[s.id].state.setdefault(case, State())
+            if getattr(real, name) is None:
+                setattr(real, name, value)
         return True
 
     def kg_h(value: float) -> Quantity:

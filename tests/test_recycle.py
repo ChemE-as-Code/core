@@ -590,3 +590,168 @@ def test_the_result_depends_on_neither_the_tear_nor_a_tighter_tolerance(plant):
     assert {k: v for k, v in other.items() if k[1] == "flow"} == {
         k: v for k, v in example.items() if k[1] == "flow"
     }
+
+
+# -- a tear's temperature and pressure reach the node it enters ---------------------------------
+
+
+def _two_reactors(root: Path) -> None:
+    """The purge loop with a batch reactor R1 (its duty on Q, to cooling water) whose effluent S3
+    feeds a conversion step R2 (its duty on Q2): R1 derives S3's temperature, R2's duty needs it."""
+    materials = root / "process/materials.yaml"
+    data = yaml.safe_load(materials.read_text())
+    for c in data["components"]:
+        c.update(liquid_molar_volume=0.1, liquid_heat_capacity=100 if c["id"] == "C3" else 140)
+    materials.write_text(yaml.safe_dump(data, sort_keys=False))
+    reactions = root / "process/reactions.yaml"
+    data = yaml.safe_load(reactions.read_text())
+    heat = {"value": -8000, "provenance": "assumed", "source": "ASSUMED"}
+    isom = data["reactions"][0]
+    del isom["conversion"]
+    isom["heat_of_reaction"] = heat
+    isom["rate"] = {
+        "form": "power_law",
+        "basis": "volume",
+        "driving": "concentration",
+        "k": {"A": 0.001},
+        "orders": {"NC4": 1},
+        "provenance": "assumed",
+    }
+    data["reactions"].append(
+        {
+            "id": "ISOM2",
+            "stoichiometry": {"NC4": -1, "IC4": 1},
+            "phase": "liquid",
+            "heat_of_reaction": heat,
+            "conversion": {"key": "NC4", "value": 0.1, "provenance": "assumed", "source": "x"},
+        }
+    )
+    reactions.write_text(yaml.safe_dump(data, sort_keys=False))
+
+    def change(d):
+        _unfilled(d)
+        given = {"provenance": "assumed", "source": "ASSUMED"}
+        d["products"][:0] = [
+            {
+                "id": cw,
+                "category": "utility",
+                "utility": {"kind": "cooling_water"},
+                "ports": [{"id": "r", "direction": "in", "kind": "energy"}],
+            }
+            for cw in ("CW", "CW2")
+        ]
+        d["blocks"][0]["ports"] += [
+            {"id": q, "direction": "out", "kind": "energy"} for q in ("q", "q2")
+        ]
+        r1 = next(n for n in d["steps"] if n["id"] == "R1")
+        r1.update(
+            reactor="batch",
+            batch={"target": {"key": "NC4", "conversion": 0.4}, "provenance": "assumed"},
+        )
+        r1["ports"].append({"id": "q", "direction": "out", "kind": "energy", "delegates": "q"})
+        d["steps"].insert(
+            2,
+            {
+                "id": "R2",
+                "block": "RXN",
+                "title": "Finishing reactor",
+                "class": "ReactingChemicals",
+                "reactions": ["ISOM2"],
+                "reactor": "conversion",
+                "ports": [
+                    {"id": "in", "direction": "in"},
+                    {"id": "out", "direction": "out"},
+                    {"id": "q", "direction": "out", "kind": "energy", "delegates": "q2"},
+                ],
+            },
+        )
+        _stream(d, "S2")["state"] = {
+            "design": {"temperature": {"value": 320, **given}, "pressure": {"value": 1500, **given}}
+        }
+        s3 = _stream(d, "S3")
+        s3["to"] = "R2.in"
+        s3["state"] = {"design": {"pressure": {"value": 1500, **given}}}  # no temperature
+        at = d["streams"].index(s3) + 1
+        d["streams"].insert(
+            at,
+            {
+                "id": "S6",
+                "title": "Finished effluent",
+                "from": "R2.out",
+                "to": "X1.in",
+                "template": "butanes",
+                "state": {"design": {"temperature": {"value": 320, **given}}},
+            },
+        )
+        for sid in ("S4", "S5"):
+            _stream(d, sid)["state"] = {"design": {"pressure": {"value": 1500, **given}}}
+        d["streams"] += [
+            {"id": "Q", "kind": "energy", "from": "R1.q", "to": "CW.r"},
+            {"id": "Q2", "kind": "energy", "from": "R2.q", "to": "CW2.r"},
+        ]
+
+    _edit(root, change)
+
+
+def _duty(root: Path, sid: str):
+    process, _ = load(root)
+    stream = next(s for s in process.flowsheet.streams if s.id == sid)
+    state = stream.state.get("design")
+    return state.duty if state is not None else None
+
+
+def test_a_duty_after_a_tear_does_not_depend_on_where_the_loop_is_torn(tmp_path, monkeypatch):
+    # torn at the batch reactor's outlet S3, R1's temperature of S3 reaches R2 (the node S3
+    # enters), whose conversion duty on Q2 needs it: the same duty as torn at the recycle S5
+    duties = {}
+    for tear in ("S5", "S3"):
+        root = tmp_path / tear
+        shutil.copytree(EXAMPLE, root, ignore=shutil.ignore_patterns("build"))
+        monkeypatch.chdir(root)
+        _two_reactors(root)
+        _edit(root, lambda d, tear=tear: d.update(tears=[{"stream": tear}]))
+        done = _cli("process", "propagate", "--fill")
+        assert done.exit_code == 0, done.stdout
+        assert "no duty for Q2" not in done.stdout, done.stdout
+        q2 = _duty(root, "Q2")
+        assert q2 is not None and q2.provenance == "calculated", (tear, done.stdout)
+        duties[tear] = (q2.value, q2.fingerprint)
+        again = _cli("process", "propagate", "--check")
+        assert again.exit_code == 0 and "process-duty" not in again.stdout, again.stdout
+    assert duties["S3"] == duties["S5"]
+
+
+# -- what no sweep reads stays out of the tear fingerprint ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    "node, field, value",
+    [
+        ("R1", "hazard", {"td24": 450, "mtt": 400, "provenance": "assumed", "source": "ASSUMED"}),
+        ("R1", "hazard", {"reactions": ["ISOM"], "provenance": "assumed"}),
+        ("R1", "energy_port", "q"),
+        ("M1", "symbol", "box"),
+    ],
+)
+def test_a_screening_energy_port_or_drawing_edit_leaves_the_tears_current(
+    plant, node, field, value
+):
+    # the thermal screening (ADR 0058), the energy stream a model duty goes on (ADR 0059) and
+    # the drawing symbol change nothing a sweep derives: the converged tear S5 stays current
+    def port(d):
+        r1 = next(n for n in d["steps"] if n["id"] == "R1")
+        r1["ports"].append({"id": "q", "direction": "out", "kind": "energy"})
+
+    def change(d):
+        next(n for n in d["steps"] if n["id"] == node)[field] = value
+
+    if field == "energy_port":  # the port it names is there before (and the loop refilled)
+        _edit(plant, port)
+        assert _cli("process", "propagate", "--fill").exit_code == 0
+    process, _ = load(plant)
+    before = loop_inputs(process, "design", ["S5"])
+    _edit(plant, change)
+    process, _ = load(plant)
+    assert loop_inputs(process, "design", ["S5"]) == before
+    done = _cli("process", "propagate", "--check")
+    assert "calculated-stale" not in done.stdout, done.stdout

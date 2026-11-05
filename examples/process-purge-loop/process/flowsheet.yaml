@@ -115,5 +115,5 @@ streams:
     template: butanes
     state:
       design:
-        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
-        flow: {value: 3000.0, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: 4587c96d2fcdce9e}
+        flow: {value: 3000.0, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: 4587c96d2fcdce9e}

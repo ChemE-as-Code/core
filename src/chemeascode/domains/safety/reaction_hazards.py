@@ -349,9 +349,14 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
             "phase changes screened for their declared heat of reaction (it counts in dT_ad): "
             + ", ".join(heated)
         )
-    inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
-    if model == "semibatch":  # its charge and doses: the material inlets
-        inlets = [s for s in inlets if s.kind == "material"]
+    # the material inlets (a semi-batch's charge and doses): a heat or power stream into the
+    # reactor is no feed, as the tank and reactor models count it (stirred_tank.tank_inlet)
+    inlets = [
+        s
+        for s in fs.streams
+        if s.kind == "material" and (e := process.ends(s)[1]) is not None and e.node == node
+    ]
+    if model == "semibatch":
         # the semi-batch model's potential holds its phase changes too
         counted = _counted(item, entry, every, [r.id for r in reactions])
         return _uncounted(_screen_semibatch(process, item, entry, reactions, inlets, case, counted))

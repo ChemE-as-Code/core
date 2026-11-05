@@ -43,11 +43,14 @@ Options considered:
   the guess is an empty stream. `convergence: {method, max_iterations, damping, tolerance}` is
   optional, with defaults `wegstein`, 100, 1 and the flowsheet's tolerance. Both fields are left
   out of a model dump when they are not given, so a flowsheet without them dumps, solves and
-  fingerprints as in 1.8.0.
+  fingerprints as in 1.8.0, apart from the model duties of ADR 0059.
 - **Iteration** (`domains/process/recycle.py`). Each tear stream holds its guess for the node
   it enters. The node it leaves writes into a copy of the stream, so one sweep
   (`propagate._sweep`) is one evaluation `g(x)` of every loop. The variables are the component
-  mass flows (kg/h) of the tears. Successive substitution is `x + d (g - x)` with the damping d.
+  mass flows (kg/h) of the tears. A temperature or pressure the node it leaves derives for the
+  tear (not given on it) also reaches the node it enters, within the same sweep, so the models
+  downstream of the tear (a conversion step's duty, a batch's moles) see the same stream
+  wherever the loop is torn. Successive substitution is `x + d (g - x)` with the damping d.
   Wegstein (1958) works per component with `q = s/(s - 1)` bounded to [-5, 0] (acceleration
   only, as in Aspen Plus's defaults), and its first step is a substitution. Flows are clipped
   at 0. Neither the iterates nor the sweeps that evaluate `g` are rounded
@@ -66,8 +69,11 @@ Options considered:
 - **Provenance** (ADR 0011): a tear value is `calculated`, with source `cheme process
   propagate: recycle <node> from <inlets> (tear, <method>)`. Its fingerprint is
   `recycle.loop_inputs`: the given and assumed values of every stream upstream of the tear's
-  source (the loop and what feeds it), those nodes as declared, their reactions, the components,
-  the catalysts, the tears and the convergence settings. It is not the iterate. The iterations
+  source (the loop and what feeds it), those nodes as declared (but for what no sweep reads:
+  their title, links, drawing symbol, `hazard` (ADR 0058) and `energy_port` (ADR 0059),
+  `recycle.NOT_SWEPT`), their reactions, the components, the catalysts, the tears and the
+  convergence settings. It is not the iterate. A screening, energy-port or drawing edit to a
+  node in the loop therefore leaves the tear current, as it leaves the other propagated streams. The iterations
   always start from the declared guess and never from values written earlier, so a converged
   plant derives the same values again and `--check` finds nothing stale. Changing a feed makes
   the loop stale.
