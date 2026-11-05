@@ -13,16 +13,20 @@ component in kg/h, and repeats with a new guess:
   the first step is a substitution). For a linear loop with a constant gain per component (a
   purge loop with conversion), it reaches the fixed point in its second step.
 
-The loop is converged when every component of every tear is within the tolerance
-(``convergence.tolerance``, else the flowsheet's: ``|g - x| <= abs + rel max(g, x)``). The
-values are those of the last sweep, with the tear streams at the guess it started from, so the
-flowsheet as written is one evaluation of the loop. The tear values are ``calculated`` and
-fingerprinted on the loop's inputs (:func:`loop_inputs`), not on the iterates; the iterations
-always start from the declared guess, never from values written earlier, so a converged plant
-derives the same values again and is not stale. A loop that does not converge writes nothing
-that depends on it: the values are those of a sweep without the tears, as propagate derived
-them before. A given or assumed flow or composition of a tear stream stays fixed (a design
-specification), and only the other is iterated.
+The iterating sweeps round nothing (``rounded=False``): with the six digits propagate writes,
+g(x) would be a staircase, and the iterations would stop up to 1e-6/(1 - gain) from the fixed
+point whatever the tolerance. The loop is converged when every component of every tear is
+within the tolerance (``convergence.tolerance``, else the flowsheet's:
+``|g - x| <= abs + rel max(g, x)``). The values written are those of one more sweep, rounded,
+from the converged guess rounded to six digits, so the flowsheet as written is one evaluation
+of the loop. The tear values are ``calculated`` and fingerprinted on the loop's inputs
+(:func:`loop_inputs`), not on the iterates; the iterations always start from the declared
+guess, never from values written earlier, so a converged plant derives the same values again
+and is not stale. A loop that does not converge or close writes nothing that depends on it:
+the values are those of a sweep without the tears, as propagate derived them before. A tear
+whose loop gives nothing back (open) never moves its guess: the iterations stop once the other
+tears are converged or no guess moves any more. A given or assumed flow or composition of a
+tear stream stays fixed (a design specification), and only the other is iterated.
 """
 
 from __future__ import annotations
@@ -44,6 +48,9 @@ from chemeascode.foundation.provenance import NOT_INPUTS, value_fingerprint
 #: Wegstein's q is bounded to [Q_MIN, Q_MAX]: acceleration only, never damping (Aspen Plus's
 #: defaults).
 Q_MIN, Q_MAX = -5.0, 0.0
+#: The fractions of an ``initial:`` guess sum to 1 within this (as a stream's composition,
+#: ``cheme.process-composition-sum``).
+COMPOSITION_SUM = 1e-3
 
 
 @dataclass
@@ -62,6 +69,8 @@ class Recycle:
     where: tuple[str, str] | None = None
     #: What the tolerance allows there (kg/h).
     allowed: float | None = None
+    #: Tear stream id -> its converged guess (kg/h by component, not rounded).
+    solution: dict[str, dict[str, float]] = field(default_factory=dict)
     #: (index in tears, stream id, message): why the iterations stopped short.
     problems: list[tuple[int | None, str, str]] = field(default_factory=list)
     #: (index in tears, level, stream id, message): tears left out (:func:`tear_problems`).
@@ -82,8 +91,9 @@ def _given(value: Any) -> bool:
 def tear_problems(process: Process, case: str | None = None) -> list[tuple[int, str, str]]:
     """(index in tears, level, message) for every tear that cannot be iterated: an unknown or
     energy stream, one that does not run between two nodes propagate solves, one named twice, a
-    guess with an unknown component or flow unit; in *case* (else every case), a stream whose
-    flow and composition are both given or assumed (nothing to converge)."""
+    guess with an unknown component or flow unit, or fractions that do not sum to 1 (a mass
+    flow is multiplied by its mass fractions as they are); in *case* (else every case), a
+    stream whose flow and composition are both given or assumed (nothing to converge)."""
     fs = process.flowsheet
     streams = {s.id: s for s in fs.streams}
     nodes = _nodes(process)
@@ -123,6 +133,18 @@ def tear_problems(process: Process, case: str | None = None) -> list[tuple[int, 
                 out.append(
                     (i, "error", f"tear {s.id}: initial unit {guess.unit!r} is not a flow unit")
                 )
+            total = sum(guess.composition.values())
+            if guess.composition and abs(total - 1.0) > COMPOSITION_SUM:
+                out.append(
+                    (
+                        i,
+                        "error",
+                        f"tear {s.id}: initial {guess.basis} sum {total:.6g}, not 1 (the "
+                        f"guess would start at {total:.6g} of its flow)",
+                    )
+                )
+            if any(v < 0 for v in guess.composition.values()):
+                out.append((i, "error", f"tear {s.id}: initial has a negative fraction"))
         for c in cases:
             state = s.state.get(c)
             if state is not None and _given(state.flow) and _given(state.composition):
@@ -328,8 +350,7 @@ def _step(
 def converge(process: Process, case: str) -> Any:
     """:func:`.propagate.derive` of a flowsheet with ``tears:``: the loops converged, the tear
     values written as calculated (or, unconverged, the sweep without the tears)."""
-    from chemeascode.domains.process.fill import _sig
-    from chemeascode.domains.process.propagate import SOURCE, _sweep
+    from chemeascode.domains.process.propagate import _sweep
 
     fs = process.flowsheet
     settings = fs.convergence or Convergence()
@@ -357,10 +378,26 @@ def converge(process: Process, case: str) -> Any:
         except ValueError as failure:
             recycle.problems.append((index[sid], sid, str(failure)))
             return plain()
+
+    def not_closing(open_: list[str]) -> Any:
+        for sid in open_:
+            a, _ = process.ends(streams[sid])
+            node = a.node if a is not None else streams[sid].from_
+            recycle.problems.append(
+                (
+                    index[sid],
+                    sid,
+                    f"the loop torn at {sid} does not close: {node} derives no flow and "
+                    f"composition for {sid} (see the not-solved findings)",
+                )
+            )
+        return plain()
+
     last: dict[str, tuple[dict[str, float], dict[str, float]]] = {}
     for k in range(settings.max_iterations):
         guesses = {sid: _guess(process, streams[sid], case, x[sid]) for sid in tears}
-        found = _sweep(process, case, guesses)
+        # unrounded: g(x) is smooth, and the loop converges to the tolerance asked for
+        found = _sweep(process, case, guesses, rounded=False)
         recycle.iterations = k + 1
         given: dict[str, dict[str, float]] = {}
         back: dict[str, dict[str, float]] = {}
@@ -373,18 +410,7 @@ def converge(process: Process, case: str) -> Any:
                 g = given[sid]
             back[sid] = g
         if len(open_) == len(tears) or (open_ and k + 1 == settings.max_iterations):
-            for sid in open_:
-                a, _ = process.ends(streams[sid])
-                node = a.node if a is not None else streams[sid].from_
-                recycle.problems.append(
-                    (
-                        index[sid],
-                        sid,
-                        f"the loop torn at {sid} does not close: {node} derives no flow and "
-                        f"composition for {sid} (see the not-solved findings)",
-                    )
-                )
-            return plain()
+            return not_closing(open_)
         # the worst residual: the largest share of its tolerance (abs 0 and rel 0 allowed)
         worst: tuple[float, float, float, str, str] | None = None
         for sid in tears:
@@ -400,43 +426,79 @@ def converge(process: Process, case: str) -> Any:
         assert worst is not None
         recycle.residual, recycle.allowed = worst[1], worst[2]
         recycle.where = (worst[3], worst[4])
-        if worst[0] <= 1.0 and not open_:
+        if worst[0] <= 1.0:
+            if open_:
+                # the closed loops are converged and an open tear's guess never moves (its
+                # loop gives nothing back): it will not close in further iterations
+                return not_closing(open_)
             recycle.converged = True
-            inputs = loop_inputs(process, case, list(tears))
-            for sid in tears:
-                a, _ = process.ends(streams[sid])
-                node = a.node if a is not None else "?"
-                into = sorted(
-                    s.id
-                    for s in fs.streams
-                    if s.kind == "material"
-                    and (b := process.ends(s)[1]) is not None
-                    and b.node == node
-                )
-                for name in ("flow", "composition"):
-                    value = getattr(guesses[sid], name)
-                    if value is None:
-                        continue
-                    # written to six digits, as every propagated value
-                    if name == "flow":
-                        rounded = {"value": _sig(value.value)}
-                    else:
-                        rounded = {"values": {n: _sig(v) for n, v in value.values.items()}}
-                    found.values[(sid, name)] = value.model_copy(
-                        update={
-                            **rounded,
-                            "provenance": "calculated",
-                            "source": f"{SOURCE}: recycle {node} from {' '.join(into)} "
-                            f"(tear, {settings.method})",
-                            "fingerprint": inputs,
-                        }
-                    )
-            found.recycle = recycle
-            return found
+            recycle.solution = {sid: dict(given[sid]) for sid in tears}
+            return _written(process, case, recycle, tears, guesses)
         nxt = {
             sid: _step(settings.method, settings.damping, given[sid], back[sid], last.get(sid))
             for sid in tears
         }
+        if open_ and not any(_moved(given[sid], nxt[sid]) for sid in tears):
+            return not_closing(open_)  # stalled: no guess changes any more
         last = {sid: (given[sid], back[sid]) for sid in tears}
         x = nxt
     return plain()
+
+
+def _moved(old: dict[str, float], new: dict[str, float]) -> bool:
+    return any(
+        abs(new.get(n, 0.0) - old.get(n, 0.0)) > 1e-12 * max(1.0, abs(old.get(n, 0.0)))
+        for n in dict.fromkeys([*old, *new])
+    )
+
+
+def _written(
+    process: Process,
+    case: str,
+    recycle: Recycle,
+    tears: dict[str, Any],
+    guesses: dict[str, State],
+) -> Any:
+    """The derivation of a converged loop: the tear values of the converged guess *guesses*
+    rounded to the six digits propagate writes, and one rounded sweep from them (so that the
+    flowsheet as written is one evaluation of the loop), the tears calculated and
+    fingerprinted on the loop's inputs."""
+    from chemeascode.domains.process.fill import _sig
+    from chemeascode.domains.process.propagate import SOURCE, _sweep
+
+    fs = process.flowsheet
+    settings = fs.convergence or Convergence()
+    streams = {s.id: s for s in fs.streams}
+    rounded: dict[str, State] = {}
+    for sid, guess in guesses.items():
+        state = State()
+        if guess.flow is not None:
+            state.flow = guess.flow.model_copy(update={"value": _sig(guess.flow.value)})
+        if guess.composition is not None:
+            values = {n: _sig(v) for n, v in guess.composition.values.items()}
+            state.composition = guess.composition.model_copy(update={"values": values})
+        rounded[sid] = state
+    found = _sweep(process, case, rounded)
+    inputs = loop_inputs(process, case, list(tears))
+    for sid in tears:
+        a, _ = process.ends(streams[sid])
+        node = a.node if a is not None else "?"
+        into = sorted(
+            s.id
+            for s in fs.streams
+            if s.kind == "material" and (b := process.ends(s)[1]) is not None and b.node == node
+        )
+        for name in ("flow", "composition"):
+            value = getattr(rounded[sid], name)
+            if value is None:
+                continue
+            found.values[(sid, name)] = value.model_copy(
+                update={
+                    "provenance": "calculated",
+                    "source": f"{SOURCE}: recycle {node} from {' '.join(into)} "
+                    f"(tear, {settings.method})",
+                    "fingerprint": inputs,
+                }
+            )
+    found.recycle = recycle
+    return found

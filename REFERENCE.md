@@ -1365,7 +1365,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     ```yaml
     tears:
       - stream: S11
-        initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.3, NAOH: 0.3}}
+        initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.6, NAOH: 0.4}}
     convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
     ```
 
@@ -1374,7 +1374,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     (`method: substitution`, optional `damping` below 1) or Wegstein's method (the default; q
     per component bounded to [-5, 0]) until every component and the total are within
     `convergence.tolerance` (default: the flowsheet's), at most `max_iterations` times (default
-    100). The values written are those of the last sweep, with the tears at its guess. A tear
+    100). The iterations round nothing; the values written come from one more sweep from the
+    converged guess, rounded to six digits as every propagated value. A tear
     value is `calculated`, with source `recycle <node> from <inlets> (tear, <method>)`, and is
     fingerprinted on the loop's inputs, not on the iterate. The iterations always start from
     `initial`, so a converged plant derives the same values again and is not stale. A given or
@@ -1382,12 +1383,18 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     other is iterated. `cheme.process-recycle` is info for a converged loop (iterations, worst
     residual against its tolerance). It is a warning for a loop that does not converge (with
     its residual), or that does not close because the guess leaves the tear's source without
-    values (give a closer `initial`). Nothing that depends on an unconverged loop is written.
-    `cheme validate` reports a tear that cannot be iterated as `cheme.process-tear`: an
-    unknown, energy, feed or product stream, one named twice, or a guess in undeclared
-    components or flow units are errors; a tear whose flow and composition are both given is a
-    warning. The tolerance applies to the residual: a loop whose gain is near 1 stops further
-    from its fixed point, so tighten it there. Tears are declared, never chosen.
+    values: an empty guess can leave a splitter remainder negative, or a still, reactor or
+    filter with nothing to work on (give a closer `initial`). An open tear never moves, so the
+    iterations stop as soon as the other tears converge. Nothing that depends on an unconverged
+    loop is written, and `--json` is then `not-converged`; a tear left out of the iterations
+    (below) does not change the status. `cheme validate` reports a tear that cannot be iterated
+    as `cheme.process-tear`: an unknown, energy, feed or product stream, one named twice, or a
+    guess in undeclared components or flow units or whose fractions do not sum to 1 (within
+    0.001) are errors; a tear whose flow and composition are both given is a warning. The
+    tolerance applies to the residual: a loop whose gain is near 1 stops up to
+    tolerance / (1 - gain) from its fixed point, so tighten it there. Tear each loop once: two
+    tears in one loop converge, but only as fast as plain substitution (each tear's slope is 0
+    for Wegstein). Tears are declared, never chosen.
     `examples/process-purge-loop` is a loop reactor with a recycle split whose steady state is
     analytic (`tests/test_recycle.py`).
 - **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,

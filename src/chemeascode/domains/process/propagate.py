@@ -43,6 +43,7 @@ edited in place: only the ``composition:`` and ``flow:`` entries of a state chan
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,7 +58,8 @@ from chemeascode.domains.chemistry.reactions import convert
 from chemeascode.domains.chemistry.thermochemistry import independent_reactions, missing, outside
 from chemeascode.domains.chemistry.thermochemistry import ln_k as ln_k_of_stoichiometry
 from chemeascode.domains.process import FLOWSHEET_FILE
-from chemeascode.domains.process.fill import PropsResult, _child, _dump, _flow, _last_line, _sig
+from chemeascode.domains.process.fill import PropsResult, _child, _dump, _flow, _last_line
+from chemeascode.domains.process.fill import _sig as _six
 from chemeascode.domains.process.model import Process, stream_flows
 from chemeascode.domains.process.reactors import equilibrium_conditions
 from chemeascode.domains.process.schema import (
@@ -72,6 +74,18 @@ from chemeascode.foundation.provenance import NOT_INPUTS, value_fingerprint, wri
 from chemeascode.foundation.schemas.run import AdapterResult, Solver, finding_dict
 from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 from chemeascode.foundation.yamlsource import _yaml_line
+
+#: True while :func:`.recycle.converge` iterates: a sweep then rounds nothing, so that what a
+#: loop gives back is a smooth function of its guess (six-digit values would make it a
+#: staircase, and the iterations would stop up to 1e-6/(1 - gain) from the fixed point,
+#: whatever the tolerance). The written values come from one rounded sweep after convergence.
+_EXACT: ContextVar[bool] = ContextVar("exact", default=False)
+
+
+def _sig(value: float) -> float:
+    """*value* to the six significant digits propagate writes (unrounded in an exact sweep)."""
+    return value if _EXACT.get() else _six(value)
+
 
 SOURCE = "cheme process propagate"
 FIELDS = ("composition", "flow")
@@ -227,11 +241,26 @@ def derive(process: Process, case: str) -> Derivation:
     return converge(process, case)
 
 
-def _sweep(process: Process, case: str, guesses: dict[str, State] | None = None) -> Derivation:
+def _sweep(
+    process: Process,
+    case: str,
+    guesses: dict[str, State] | None = None,
+    *,
+    rounded: bool = True,
+) -> Derivation:
     """:func:`derive` without recycles: sweeps through the nodes until nothing more can be
     derived. With *guesses* (tear stream id -> its iterated flow and composition), each tear
     stream holds its guess for the node it enters, and the node it leaves writes a copy of it
-    (:attr:`Derivation.torn`), so that one call evaluates the loops once."""
+    (:attr:`Derivation.torn`), so that one call evaluates the loops once. Not *rounded*, the
+    derived values keep every digit (the iterations of :func:`.recycle.converge`)."""
+    token = _EXACT.set(not rounded)
+    try:
+        return _swept(process, case, guesses)
+    finally:
+        _EXACT.reset(token)
+
+
+def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Derivation:
     fs = process.flowsheet.model_copy(deep=True)
     work = Process(process.root, process.materials, fs, reactions=process.reactions)
     work.catalysts = process.catalysts
@@ -929,15 +958,18 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
     return result
 
 
-def recycle_findings(found: Derivation, case: str) -> list[tuple[str, str, list, list, str]]:
+def recycle_findings(
+    found: Derivation, case: str, *, declared: bool = True
+) -> list[tuple[str, str, list, list, str]]:
     """(level, message, location, ids, hint) of the ``cheme.process-recycle`` findings of
-    *found*: a tear that cannot be iterated, a loop that does not close or does not converge
-    (warnings, with the residual), and a converged loop (info, with the iterations)."""
+    *found*: a tear that cannot be iterated (unless not *declared*: those say nothing about
+    whether the loops converged), a loop that does not close or does not converge (warnings,
+    with the residual), and a converged loop (info, with the iterations)."""
     recycle = found.recycle
     if recycle is None:
         return []
     out = []
-    for i, level, sid, message in recycle.declared:
+    for i, level, sid, message in recycle.declared if declared else []:
         out.append(
             (
                 "warning",
@@ -956,9 +988,10 @@ def recycle_findings(found: Derivation, case: str) -> list[tuple[str, str, list,
                 f"{message} ({case}); the loop is not converged",
                 ["tears", i] if i is not None else ["tears"],
                 [sid],
-                "give the tear an initial: guess of the right order (an empty recycle can "
-                "leave a splitter remainder negative or a still empty), and see the not-solved "
-                "findings; nothing that depends on the loop is written",
+                "give the tear an initial: guess of the right order (an empty first guess "
+                "can leave a splitter remainder negative, or a still, a reactor or a filter "
+                "with nothing to work on, so that a node of the loop derives nothing), and see "
+                "the not-solved findings; nothing that depends on the loop is written",
             )
         )
     if not recycle.tears or recycle.problems:
@@ -1061,7 +1094,9 @@ def _adapter_result(
     for node, message in found.stills:
         messages.append(f"{node} (still): not solved: {message}")
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
-    for level, message, *_ in recycle_findings(found, case):
+    # a tear declaration left out (or a fully specified one kept as given) is a validate
+    # finding, not a loop that failed to converge
+    for level, message, *_ in recycle_findings(found, case, declared=False):
         if level == "warning":
             messages.append(message)
     recycle = found.recycle

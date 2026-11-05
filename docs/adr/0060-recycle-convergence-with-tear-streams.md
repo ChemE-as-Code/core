@@ -50,12 +50,19 @@ Options considered:
   mass flows (kg/h) of the tears. Successive substitution is `x + d (g - x)` with the damping d.
   Wegstein (1958) works per component with `q = s/(s - 1)` bounded to [-5, 0] (acceleration
   only, as in Aspen Plus's defaults), and its first step is a substitution. Flows are clipped
-  at 0. The iterates are not rounded; the written values are rounded to six digits, as every
-  propagated value.
+  at 0. Neither the iterates nor the sweeps that evaluate `g` are rounded
+  (`_sweep(..., rounded=False)`): with the six digits propagate writes, `g` would be a
+  staircase, and the iterations would land on a point where `g(x) == x` up to
+  1e-6/(1 - gain) from the fixed point, whatever the tolerance.
 - **Convergence**: every component and the total of every tear must satisfy
-  `|g - x| <= abs + rel * max(g, x)`. The values written are those of the last sweep, with the
-  tears at the guess that sweep started from, so the flowsheet as written is one consistent
-  evaluation. The tear's source node balances within the tolerance; the rest balance exactly.
+  `|g - x| <= abs + rel * max(g, x)`, so the loop is within tolerance / (1 - gain) of its fixed
+  point. The values written come from one more sweep, rounded to six digits as every
+  propagated value, from the converged guess rounded to the six digits written, so the
+  flowsheet as written is one consistent evaluation. The tear's source node balances within the
+  tolerance (and the six digits); the rest balance exactly. A tear whose loop gives nothing back
+  (open) keeps its guess, so the iterations stop as soon as the other tears converge or no
+  guess moves; a stream with no flow has zero component flows, whatever its fractions, so an
+  empty guess passes through a reactor.
 - **Provenance** (ADR 0011): a tear value is `calculated`, with source `cheme process
   propagate: recycle <node> from <inlets> (tear, <method>)`. Its fingerprint is
   `recycle.loop_inputs`: the given and assumed values of every stream upstream of the tear's
@@ -74,9 +81,10 @@ Options considered:
   depends on the loop is written: the values are those of a sweep without the tears, as before.
   `cheme.process-tear` (validate) is an error for a tear that cannot be iterated (an unknown or
   energy stream, a feed or product stream, a stream named twice, a guess in undeclared
-  components or flow units). It is a warning for a tear whose flow and composition are both
-  given or assumed. The adapter result (`--json`) is `not-converged` when a loop is, and its
-  `iterations` count the loop's iterations.
+  components or flow units or whose fractions do not sum to 1). It is a warning for a tear whose
+  flow and composition are both given or assumed. The adapter result (`--json`) is
+  `not-converged` when a loop does not converge or close (a tear left out is validate's
+  finding and changes no status), and its `iterations` count the loop's iterations.
 
 ## Consequences
 
@@ -87,8 +95,9 @@ Options considered:
 - Negative: each iteration is a full propagate run, so a plant with semi-batches and stills
   takes seconds (NaN3: about 10 s for propagate, and the same again in `validate`'s staleness
   check). The tolerance applies to the residual, not to the error: a slowly contracting loop
-  (gain near 1) stops further from its fixed point than its tolerance. A tight
-  `convergence.tolerance` is the remedy.
+  (gain near 1) stops up to tolerance / (1 - gain) from its fixed point. A tight
+  `convergence.tolerance` is the remedy. Two tears in one loop converge only as fast as
+  substitution (each tear's own slope is 0), so a loop is torn once.
 - Limitations: tears are declared, never chosen. Feeds sized for a product rate (a design
   spec, core#181 part 2) and component separators solved from recoveries (part 3) are not part
   of this ADR: NaN3's hydrazine top-up and the other fresh feeds that follow charge ratios stay
@@ -106,10 +115,13 @@ Options considered:
 - `src/chemeascode/domains/process/recycle.py`, `propagate.py` (`_sweep`, `recycle_findings`),
   `schema.py` (`Tear`, `TearGuess`, `Convergence`), `model.py` (`_tear_rules`).
 - `tests/test_recycle.py`: the loop reactor with a recycle split of `examples/process-purge-loop`
-  against its closed form (reactor feed `F/(1 - r)`, n-butane `F_A/(1 - r(1 - X))`), Wegstein's
-  step on a linear map (the fixed point in its second step), substitution and damping, a loop
-  that does not converge, a fixed recycle flow, the declaration findings, staleness after a
-  changed feed, and model dumps without the new fields.
+  against its closed form within the declared tolerance (reactor feed `F/(1 - r)`, n-butane
+  `F_A/(1 - r(1 - X))`), torn at each of its streams from an empty guess and from an
+  `initial:`, with two tears, beside a second loop that closes and one that stays open, in two
+  cases, and at the flowsheet's tolerance; Wegstein's step on a linear map (the fixed point in
+  its second step), substitution and damping, a loop that does not converge, a fixed recycle
+  flow, the declaration findings and the adapter status, staleness after a changed feed, and
+  model dumps without the new fields.
 - Wegstein, J. H. (1958), Accelerating convergence of iterative processes, Commun. ACM 1(6),
   9-13. Westerberg, A. W., Hutchison, H. P., Motard, R. L., Winter, P. (1979), *Process
   Flowsheeting*, Cambridge University Press.

@@ -88,8 +88,8 @@ streams:
     template: butanes
     state:
       design:
-        composition: {basis: mole_fraction, values: {NC4: 0.425059, IC4: 0.510069, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: 12954a388ae706f6}
-        flow: {value: 3999.99, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: 0032de6f3216f356}
+        composition: {basis: mole_fraction, values: {NC4: 0.425058, IC4: 0.51007, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: d3c29a49d4a1ecd5}
+        flow: {value: 4000.0, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: d8328479fb116dda}
   - id: S3
     title: Reactor effluent
     from: R1.out
@@ -97,8 +97,8 @@ streams:
     template: butanes
     state:
       design:
-        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680092, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: d742eea5e88b581c}
-        flow: {value: 3999.99, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 8ac8e788f5688295}
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: fba9ed1f7fbe4a7e}
+        flow: {value: 4000.0, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 0a93847adeeabd74}
   - id: S4
     title: Isomerate
     from: X1.product
@@ -106,8 +106,8 @@ streams:
     template: butanes
     state:
       design:
-        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680092, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3', fingerprint: 818284f9950684ed}
-        flow: {value: 1000.0, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3 S5', fingerprint: 7125857e265aa8ff}
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3', fingerprint: cf443fe00d687ac9}
+        flow: {value: 1000.0, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3 S5', fingerprint: 616cedb596e519f5}
   - id: S5
     title: Recycle
     from: X1.recycle
@@ -115,5 +115,5 @@ streams:
     template: butanes
     state:
       design:
-        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648723}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
-        flow: {value: 2999.99, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
+        flow: {value: 3000.0, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: e804563ed7920c7e}
