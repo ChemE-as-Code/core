@@ -374,11 +374,49 @@ class BatchTarget(Strict):
     conversion: float = Field(gt=0, lt=1)
 
 
+class Dosing(Strict):
+    """A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,
+    its flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over
+    ``time``, or in the ``profile``'s segments one after the other."""
+
+    stream: str = Field(description="The inlet stream dosed (the step's other inlets: the charge).")
+    time: float | None = Field(default=None, gt=0, description="s of dosing at a constant rate")
+    profile: list[tuple[float, float]] = Field(
+        default_factory=list,
+        description="(s, share of the feed) segments, each at a constant rate, one after the "
+        "other; the shares add up to 1.",
+        exclude_if=lambda value: not value,
+    )
+    start: float = Field(default=0.0, ge=0, description="s after the charge the dosing starts")
+
+    @model_validator(mode="after")
+    def _form(self) -> Dosing:
+        if (self.time is None) == (not self.profile):
+            raise ValueError("give time or profile, one of them")
+        if any(d <= 0 or s < 0 for d, s in self.profile):
+            raise ValueError("profile: durations positive, shares not negative")
+        if self.profile and abs(sum(s for _, s in self.profile) - 1.0) > 1e-6:
+            raise ValueError("profile: the shares add up to 1")
+        return self
+
+    def segments(self) -> list[tuple[float, float, float]]:
+        """(start s, end s, share of the feed) of each segment."""
+        found, clock = [], self.start
+        for duration, share in self.profile or [(self.time or 0.0, 1.0)]:
+            found.append((clock, clock + duration, share))
+            clock += duration
+        return found
+
+
 class Batch(Strict):
     """A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge
     (its flow the charge per hour), the outlet its composition when the batch ends, after
     ``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its
-    composition's volume (ideal mixing), a gas batch its volume (the pressure changes)."""
+    composition's volume (ideal mixing), a gas batch its volume (the pressure changes).
+
+    A semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its
+    ``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the
+    dosing)."""
 
     time: float | None = Field(default=None, gt=0, description="s of reaction")
     target: BatchTarget | None = None
@@ -386,14 +424,28 @@ class Batch(Strict):
     catalyst_loading: float | None = Field(
         default=None, gt=0, description="kg of catalyst per m3: rate laws per kg of catalyst."
     )
+    dosing: list[Dosing] = Field(
+        default_factory=list,
+        description="reactor: semibatch: the dosed feeds.",
+        exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
     @model_validator(mode="after")
     def _end(self) -> Batch:
-        if (self.time is None) == (self.target is None):
+        if self.time is not None and self.target is not None:
             raise ValueError("give time or target, one of them")
+        if not self.dosing and self.time is None and self.target is None:
+            raise ValueError("give time or target, one of them")
+        streams = [d.stream for d in self.dosing]
+        if len(set(streams)) != len(streams):
+            raise ValueError("dosing: each stream once")
         return self
+
+    def dosing_end(self) -> float:
+        """s: when the last dose ends (0 without dosing)."""
+        return max((b for d in self.dosing for _, b, _ in d.segments()), default=0.0)
 
 
 class SelectivityUncertainty(Strict):
@@ -472,14 +524,17 @@ class Reacting(Strict):
         description="Reaction id -> conversion of its key component here, instead of the "
         "reaction's own conversion (cheme process propagate).",
     )
-    reactor: Literal["conversion", "equilibrium", "gibbs", "pfr", "cstr", "batch"] | None = Field(
+    reactor: (
+        Literal["conversion", "equilibrium", "gibbs", "pfr", "cstr", "batch", "semibatch"] | None
+    ) = Field(
         default=None,
         description="How cheme process propagate solves the outlet: conversion (of each "
         "reaction's key component), equilibrium (of the reactions, ideal gas, at the outlet's "
         "temperature and pressure), gibbs (every reaction among the stream's components) or "
         "pfr (a fixed bed: the reactions' rate laws along its bed), cstr (stirred tanks: the "
-        "rate laws at the outlet) or batch (the rate laws over the batch time); none: "
-        "conversion when every reaction has one.",
+        "rate laws at the outlet), batch (the rate laws over the batch time) or semibatch (a "
+        "batch with feeds dosed into its charge: batch.dosing); none: conversion when every "
+        "reaction has one.",
     )
     bed: Bed | None = Field(default=None, description="reactor: pfr: the catalyst bed.")
     tank: Tank | None = Field(default=None, description="reactor: cstr: the tank(s).")
@@ -491,7 +546,7 @@ class Reacting(Strict):
         description="A conversion reactor by the key's conversion and the selectivities to its "
         "products (instead of a conversion per reaction).",
     )
-    batch: Batch | None = Field(default=None, description="reactor: batch: the batch.")
+    batch: Batch | None = Field(default=None, description="reactor: batch or semibatch: the batch.")
     catalyst: str | None = Field(
         default=None, description="The catalyst its bed holds: an id of process/catalysts.yaml."
     )
@@ -734,6 +789,15 @@ class Step(Node, Reacting, Solids):
         default_factory=dict,
         description="Splitters (SplittingMaterial): outlet port -> fraction of the inlet flow, "
         "for cheme process propagate.",
+    )
+    symbol: str | None = Field(
+        default=None,
+        description="PFD drawing only: the ISO 10628-2 symbol to draw the step with (a symbol "
+        "name as `cheme fragment shape` takes it, e.g. TANK_CONE_ROOF_SHAPE, MIXER_SHAPE), "
+        "`junction` (a mixing or splitting tee) or `box`; default: its class's symbol.",
+        exclude_if=lambda value: (
+            value is None
+        ),  # fingerprints of steps without one stay as they were
     )
 
 

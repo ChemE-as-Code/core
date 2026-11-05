@@ -386,6 +386,8 @@ class Builder:
                 "hours_per_year",
             )
         batch = None
+        if own.batch is not None and own.batch.recipe and own.batch.cycle_time is None:
+            own.batch = self._recipe_batch(own)
         if own.batch is not None:
             b = own.batch
             batch = model.Batch(
@@ -446,6 +448,48 @@ class Builder:
         from chemeascode.foundation.workspace import LIST_FILES
 
         return LIST_FILES["lca"]
+
+    def _recipe_batch(self, own: Any) -> Any:
+        """``operation.batch`` with ``recipe: true`` resolved from process/recipe.yaml: its
+        cycle time and batches per year, the flowsheet's rates its year averages (one batch
+        per hours / batches). None, with an error, when the recipe gives no cycle."""
+        from chemeascode.domains.assessment.tea.schemas import Positive
+        from chemeascode.domains.process.recipe import RECIPE_FILE, recipe_report
+
+        result = recipe_report(self.root)
+        if result is None or result.cycle_time is None or not result.batches_per_year:
+            why = (
+                "; ".join(f.message for f in result.findings if f.level == "error")
+                if result is not None
+                else "no such file"
+            )
+            self.problem(
+                "error",
+                "cheme.tea-batch-recipe",
+                f"operation.batch.recipe: no cycle from {RECIPE_FILE}"
+                + (f": {why}" if why else ""),
+                f"write {RECIPE_FILE} and check it with cheme process recipe",
+                "recipe:",
+            )
+            return None
+        if abs(result.hours_per_year - own.hours_per_year) > 1e-9 * own.hours_per_year:
+            self.problem(
+                "warning",
+                "cheme.tea-batch-recipe",
+                f"the recipe's batches fit in {result.hours_per_year:g} h/a, "
+                f"operation.hours_per_year is {own.hours_per_year:g}",
+                "state one operating basis for the plant",
+                "hours_per_year",
+            )
+        source = f"{RECIPE_FILE} (cheme process recipe; bottleneck {result.bottleneck})"
+        return own.batch.model_copy(
+            update={
+                "cycle_time": Positive(value=result.cycle_time, source=source),
+                "batches_per_year": Positive(value=result.batches_per_year, source=source),
+                "basis_hours": result.hours_per_year / result.batches_per_year,
+                "trains": 1,
+            }
+        )
 
     def flows(self, tea: TeaFile) -> dict[str, Merged] | None:
         """The flowsheet's feeds and products, share-weighted over the cases."""

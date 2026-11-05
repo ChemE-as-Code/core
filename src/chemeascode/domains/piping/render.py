@@ -129,7 +129,29 @@ def svg_element(model: Any) -> etree._Element:
     if not model.diagram:
         raise NothingToDraw("the model has no diagram")
     diagram = model.diagram[0] if isinstance(model.diagram, list) else model.diagram
-    return name_sheet_drawings(DrawDiagram(diagram).draw_svg(return_element=True), diagram)
+    svg = name_sheet_drawings(DrawDiagram(diagram).draw_svg(return_element=True), diagram)
+    return sheet_background(svg, diagram)
+
+
+def sheet_background(svg: etree._Element, diagram: Any) -> etree._Element:
+    """Paint the backdrop in the sheet's own ``BackgroundColor`` (white paper) instead of
+    pyDEXPI's neutral viewer grey, unless a filled shape on the sheet has that colour and would
+    vanish against it (pyDEXPI's reason for the grey); then the grey stays."""
+    color = getattr(diagram, "backgroundColor", None)
+    backdrop = next((e for e in svg if isinstance(e.tag, str) and _local(e.tag) == "rect"), None)
+    if color is None or backdrop is None or backdrop.get("fill") != "#f0f0f0":
+        return svg
+    paper = f"rgb({color.r},{color.g},{color.b})"
+    fills = {e.get("fill", "").replace(" ", "") for e in svg.iter() if isinstance(e.tag, str)}
+    hexed = f"#{color.r:02x}{color.g:02x}{color.b:02x}"
+    if paper in fills or hexed in fills or (hexed == "#ffffff" and {"white", "#fff"} & fills):
+        return svg
+    backdrop.set("fill", hexed)
+    return svg
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
 
 
 #: How much :func:`emphasise_inline` enlarges inline symbols and actuators, and thickens their

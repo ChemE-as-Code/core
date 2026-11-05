@@ -1,0 +1,240 @@
+# Electrolysis duties: schedules, the anolyte reservoir and dosing
+
+`process/duties.yaml` (schema `cheme/electrolysis-duties/v1`) states how a cell of
+`process/cells.yaml` is operated over time against the reservoir its anolyte circulates
+through. `cheme process duty` integrates each duty and reports the pH, inventory, product,
+charge, energy, dosing and bleed over time, the time to the stated pH threshold, and the time
+spent outside the measured conditions. The code is
+`chemeascode.domains.process.electrolysis_duty` (model `electrolysis-duty` v1) with the anolyte
+models of `chemeascode.domains.chemistry.anolyte`; the decision is
+[ADR 0043](../adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md). It builds on the
+[measured cell performance](electrochemical-measurements.md) and the
+[membrane block](electrochemical-cells.md) of ADR 0041.
+
+## The file
+
+```yaml
+schema: cheme/electrolysis-duties/v1
+kind: electrolysis_duties
+duties:
+  - id: D-150
+    title: 150 mA/cm2 on 1 L of 1 M KOH
+    cell: BPM-1                      # an id of process/cells.yaml
+    cells_in_series: 1               # default: the cell's
+    stacks: 1                        # stacks in parallel on the one reservoir
+    # stack: STK-1                   # or: run at the arrangement that stack is sized at
+    schedule: {kind: constant_current, current_density: {value: 150, unit: mA/cm2}}
+    reservoir:
+      volume: {value: 1, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}   # also carbonate, bicarbonate, co2
+      cation: K+
+      model: well-mixed-carbonate    # an anolyte model id; there is no default
+      degassing:                     # optional; without it CO2 degassing is off (info)
+        kla: {value: 2, unit: 1/h, source: "..."}
+        co2_partial_pressure: {value: 0.0004, unit: atm, source: "air"}
+      # size: to_horizon             # optional: the volume that reaches the horizon
+      # time_margin: {value: 0.1}    # with size: a fraction of the horizon, or {value, unit: h}
+    dosing:
+      kind: on_threshold             # none | on_threshold | continuous
+      trigger_ph: 12.5
+      stop_ph: 13.0
+      concentration: {value: 5, unit: mol/L}
+      rate: {value: 10, unit: mL/h}
+      density: {value: 1.22, unit: kg/L, source: "..."}   # optional: the solution's mass
+    bleed: {rate: {value: 2, unit: mL/h}}
+    makeup_water: {rate: {value: 2, unit: mL/h}}
+    threshold: {ph: 12, source: "the stated design criterion"}
+    horizon: {value: 2000, unit: h}
+    minimum_inventory: {volume: {value: 0.5, unit: L}}   # or cation: {value, unit: mol}
+    tolerance: 1.0e-8                # relative, optional
+    operating_map: {wde: [0.5, 0.995], volume: [0.1, 10], volume_unit: L, resolution: [16, 10]}
+```
+
+Schedules:
+
+| kind | gives | notes |
+| --- | --- | --- |
+| `constant_current` | `current` (A per cell) or `current_density` | |
+| `piecewise` | `points: [[t, I], ...]` in `time_unit` and `unit` (A or A/m2, mA/cm2) | `interpolation: step` (held) or `linear`; the first point at 0, the last value holds |
+| `power` | `points: [[t, P], ...]`, P of all the duty's cells (W, kW) | `P = N U(j) j A` solved for j inside the measured range; outside it there is no current |
+| `on_off` | `period`, `duty_fraction`, `current` when on | `start: on` or `off` |
+
+`N` is the cells in series times the stacks, all on the one reservoir. A duty a stack of
+`process/cells.yaml` names under `equipment.duty` runs at the arrangement that stack is sized
+at, in `cheme process duty` as in `cheme process stack` (`cheme.duty-arrangement`, info): its
+own `cells_in_series` and `stacks` are then not used ([electrolyser stacks](electrolyser-stacks.md)).
+A duty no stack's equipment names, such as a comparison duty on a skid's hardware, gets that
+arrangement by naming the stack (`stack: STK-1`); it may not state other `cells_in_series` or
+`stacks` (`cheme.duty-arrangement`, error: the duty is refused), and a duty naming a stack
+that is not in `process/cells.yaml`, is of another cell, or whose arrangement is not given
+(the stack refused; the duty run without the stack sizing) is refused too.
+
+## What is computed
+
+At each instant the cell's voltage `U(j)`, the Faradaic efficiency of its product `FE(j)`, the
+water dissociation efficiency `WDE(j)` and the carbon share `C_x(j)` of the co-ion current come
+from `MeasuredPerformance.at(j)` for a measured cell (interpolated between the measured points,
+never extrapolated) or from a specified cell's constants (`voltage`, `faradaic_efficiency`,
+`membrane.water_dissociation_efficiency`, `membrane.co_ion_crossover`) within its
+`operating_range`. Per cell, with the current `I`:
+
+- OH- into the anolyte from the bipolar membrane: `WDE I / F`;
+- OH- consumed at the anode (oxygen evolution): `I / F`;
+- the co-ion current `(1 - WDE) I / F`: the cation leaving the anolyte (share `1 - C_x`) and
+  carbon entering it as HCO3- (share `C_x`), or the ions and shares of the membrane block;
+- the product formed: `FE I nu / (n F)`; the power `U I`.
+
+These, times `N`, with the dosing (cation and OH- of the solution, its volume), the make-up
+water and the bleed (at the reservoir's composition), are the fluxes the anolyte model
+integrates. The cumulative hydroxide deficit is `(1 - WDE) Q / F`, the charge `Q` over all
+cells.
+
+The integration is the adaptive Dormand-Prince 5(4) method of `foundation/ode.py` with events:
+
+- the stated pH threshold (ends the duty; reported as the **time to the specified pH
+  threshold**, a design criterion, not a corrosion onset);
+- the minimum inventory (volume or cation), or an empty reservoir;
+- dosing on at `trigger_ph` and off at `stop_ph`;
+- the product target of a comparison.
+
+The schedule's breakpoints and the times the current density crosses the measured range split
+the integration. **The transient stops at the first exit from the measured range** (current
+density or temperature): the state after it is not computed. The scheduled operating time
+outside the range is summed (to the horizon when the transient stopped at an exit). Time with
+the anolyte outside the model's validity (pH, ionic strength, temperature) is summed too.
+
+The totals are also split by route, so that the cation and the carbon balance of the
+reservoir close on their own (the LCI's reconciliation needs no closing by difference):
+
+| total | what |
+| --- | --- |
+| `initial_cation_mol`, `initial_carbon_mol`, `initial_volume_l` | the reservoir at the start |
+| `dosing_cation_mol` | the cation dosed (one per hydroxide: `dosing_mol`) |
+| `membrane_cation_mol` | the cation leaving the anolyte through the membrane, `(1 - C_x)(1 - WDE) Q / F` at constant performance |
+| `membrane_carbon_mol` | the carbon entering through the membrane (one per HCO3- or CO3-2), `C_x (1 - WDE) Q / F` |
+| `bleed_cation_mol`, `bleed_carbon_mol` | the cation and carbon leaving with the bleed, at the reservoir's composition |
+
+`initial + dosed - bled - membrane = final` for the cation and `initial + membrane - bled -
+degassed = final` for the carbon, to rounding (a test holds both to 1e-9 relative). They are
+integrated as quadratures on the integration's own steps, outside its error control, so every
+other value is as without them.
+
+A duty is **feasible** when it runs to its horizon (or reaches a comparison's target) without
+reaching the threshold or the minimum inventory, entirely inside the measured range and the
+model's validity, and the integration converged.
+
+## The reservoir volume that reaches the horizon
+
+`reservoir.size: to_horizon` asks for the reservoir volume that reaches the duty's horizon
+(plus `time_margin`: a fraction of the horizon, or a time in h or d) at the stated pH threshold.
+Without dosing, bleed, make-up water and degassing, and with the cell on at one operating point
+(one WDE and co-ion split whenever it is on: constant current, on/off, or steps of a specified
+cell), the reservoir's state moves along the charge `Q` passed, and the threshold falls at a
+fixed charge per volume `Q* / V0`. The volume is then exact:
+
+`V = V0 Q(target) / Q*`
+
+with `V0` the stated volume, `Q(target)` the schedule's charge up to the target and `Q*` the
+charge at the threshold: from the run when it reaches the threshold, otherwise by following the
+run's straight path in the charge (the model's speciation) to the threshold. At constant current
+it is `V0 H / t_threshold`. The threshold is not the only limit: on the same path the
+concentrations at `V` after the charge `Q` are those at `V0` after `Q V0 / V`, and the
+inventories are `V/V0 n0 - Q dn/dQ`. So the volume is raised, exactly, where the duty would
+otherwise end first or leave the model's claim before the target: to keep a stated
+`minimum_inventory` (absolute, in mol or L, so it does not scale with the volume:
+`V >= (m + Q(target) dn/dQ) V0 / n0`), and to keep the anolyte inside the anolyte model's
+validity (pH, ionic strength) up to the target. `limited_by` names the limit that sets it
+(the pH threshold, the stated minimum, the model's validity). The run itself is at `V0`, as
+without `size`; the volume is in `required_volume` of the JSON (`volume_l`, `limited_by`,
+`target_h`, `probe_volume_l`, the charges and the basis) and a `cheme.duty-size` info finding.
+A run at `V0` that ends at the stated minimum inventory gives the volume too; a stated volume
+already below the minimum at the start ends the duty at 0 h (not feasible) and gives none. `cheme process stack --write` writes it into
+`reservoir.volume` for a duty a stack's equipment names
+([electrolyser stacks](electrolyser-stacks.md)), rounded up to 4 significant figures so that
+the duty at the written volume reaches the target. With dosing, a bleed, make-up water or
+degassing the volume does not scale exactly and `size: to_horizon` is refused
+(`cheme.duty-size`, error), as for a schedule at more than one operating point, one leaving the
+measured range before the target, or a run ended otherwise than by the threshold, the
+horizon or the stated minimum inventory (an exhausted inventory); the duty itself still runs.
+
+## The anolyte model `well-mixed-carbonate` v1
+
+An independent, concentration-basis implementation of the anolyte balance of Prats Vergel et
+al. (Nat. Chem. Eng. 2025), on conserved quantities with instantaneous equilibrium speciation
+instead of the authors' finite-rate kinetics:
+
+- state: moles of the cation and of total inorganic carbon `C_T`, and the volume;
+- `[H+]` from the charge balance `[M+] + [H+] = [OH-] + [HCO3-] + 2 [CO3-2]` with
+  Kw = 1e-14, pK1 = 6.37, pK2 = 10.32 at 25 °C, solved on `log10 [H+]` (bracketed Newton);
+- CO2 degassing `k_L a V ([CO2] - 0.034 p_CO2)` above saturation only, when `k_L a` is given.
+
+Its validity: ionic strength 0-1.5 mol/L, pH 2-14.5, 293.15-303.15 K. Its limitations: an
+ideal solution (concentrations, not activities: at 1 mol/L ionic strength the pH is a
+concentration-basis pH, not an activity pH), constants at 25 °C, no other ions or solids,
+supersaturated CO2 stays in solution without degassing.
+
+Because the pH is on concentrations, the time to a threshold scales exactly with the reservoir
+volume at fixed fluxes. The authors' published script stops on `-log10` of the H+ *amount*,
+which is the pH only at 1 L (process-library#329 D1: at 10 L it stops at pH 13). Against the
+#329 reproduction (200 mA/cm2, 5 cm2, 1 M KOH, C_x 0.66, WDE 0.95) this model gives 322.30 h to
+pH 12 at 1 L and 3223.0 h at 10 L, as the authors' model on a concentration basis
+(`tests/test_electrolysis_duty.py`). Apart from that reproduction, the validation condition of
+#329 V1 (20 mL of 0.1 M KOH, 100 mA/cm2) gives 1.54 h, inside the envelope 1.31-1.87 h around
+the measured 1.47 h.
+
+The NaCl electrolyte route (`cheme process electrolyte`, `electrolytes.yml`) does not compute
+KOH or carbonate solutions and refuses them; the anolyte model is the only place they are
+handled.
+
+## Comparing duties
+
+`cheme process duty --compare A,B --co 0.5` (`compare_duties`) integrates each duty until its
+cumulative product equals 0.5 kg. A duty reaches the target when it delivers it to within the
+relative tolerance (`--tolerance`, default 1e-3 of the target); a duty whose horizon,
+threshold, inventory or measured range ends it first is reported as not reaching it
+(`cheme.duty-target-not-reached`). Per duty: the elapsed time, charge, energy, time outside
+the measured range, final pH, dosing used and the cumulative hydroxide deficit. The duties
+are named in `--compare`, not as positional ids (both is an error); `--plot DIR` draws the
+compared transients, each up to the target.
+
+## Plots
+
+`--plot DIR` writes per duty:
+
+- `duty-<id>.svg`: aligned time plots, one quantity per panel on one time axis: current,
+  voltage, pH with the stated threshold, product delivered, hydroxide dosed; events dotted,
+  the time after a range exit shaded "not simulated". Lines are simulated.
+- `map-<id>.svg`: the operating map, time to the threshold over WDE (constant) and reservoir
+  volume (log), with the duty's schedule and dosing; the measured WDE points of the
+  measurement file as markers labelled "measured", the duty's own point, and the WDE outside
+  the measured points shaded. Axis ranges come from `operating_map:` in the duty.
+
+## Findings
+
+| rule | level | when |
+| --- | --- | --- |
+| `cheme.duty-schema` | error | the file does not follow the schema, a unit or a value out of range, a dosing trigger not above the threshold, an on/off schedule of more than 100 000 periods over the horizon |
+| `cheme.duty-cell-missing` | error | the cell is not in `process/cells.yaml` or lacks what the duty needs (voltage, FE, a bipolar membrane with WDE and co-ion split from the membrane block or the measurement's titration, area, product), its membrane block is invalid (co-ion shares not in 0..1 or not adding up to 1, WDE outside 0..1), or its measurement has errors |
+| `cheme.duty-model-unknown` | error | no anolyte model of that id |
+| `cheme.duty-model-species` | error | a co-ion or anode reaction the model does not carry, or a model whose state names no `cation` (mol) and `volume` (L) |
+| `cheme.duty-out-of-range` | warning | operation outside the measured range, or the anolyte outside the model's validity (info: a specified cell without a current density range) |
+| `cheme.duty-threshold-reached` | info | the time to the stated threshold |
+| `cheme.duty-horizon-reached` | info | the threshold is not reached within the horizon |
+| `cheme.duty-inventory-low` | warning | the minimum inventory is reached, the reservoir empties, or a conserved inventory (cation, carbon) is exhausted: the transient stops there |
+| `cheme.duty-dosing-saturated` | warning | the threshold is reached while dosing, or dosing never reaches its stop pH |
+| `cheme.duty-dosing-chatter` | warning | threshold dosing switched on and off more than 20 000 times (a band `stop_ph - trigger_ph` too narrow for the dosing rate); the transient stops there |
+| `cheme.duty-not-converged` | error | the integration failed |
+| `cheme.duty-degassing` | info | no CO2 degassing stated |
+| `cheme.duty-compare` | error | compared duties form different products |
+| `cheme.duty-target-not-reached` | warning | a compared duty ends before the target |
+| `cheme.duty-arrangement` | info / error | the duty runs at the arrangement a stack of `process/cells.yaml` is sized at, not its own; error (refused): it names a stack (`stack:`) not in the file, of another cell, whose arrangement is not given, that another stack's equipment runs, or states `cells_in_series` or `stacks` other than the stack's |
+| `cheme.duty-size` | info / error / warning | `reservoir.size: to_horizon`: the volume that reaches the horizon, keeping the stated minimum inventory and the model's validity; error: no exact volume (dosing, bleed, make-up, degassing, more than one operating point, the measured range left, a time margin not a fraction or time); warning: a time margin without `size` |
+
+`cheme validate` reports the schema, cell and model findings without integrating: every error
+`cheme process duty` refuses a duty on before it integrates (units, ranges, the cell and its
+membrane, the anolyte model and its species, a `stack:` not in `process/cells.yaml` or of
+another cell, `size: to_horizon` with dosing, bleed, make-up or degassing). `--json` records the model ids and versions (the
+duty's and the anolyte model's), their assumptions and limitations, the range each duty is
+checked against (`measured_range`: current density, temperature, the power of all cells for a
+power schedule, the measured WDE), and the source revision with the sha256 of every input, the
+measurement file included.

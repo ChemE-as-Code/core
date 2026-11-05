@@ -8,7 +8,19 @@ cells in series, the Faradaic (current) efficiency, the cell voltage, where form
 cross over or are purged, its thermal boundary and the operating range its data hold for.
 The performance is **specified**: the voltage and the efficiencies are inputs (measured,
 vendor or literature figures); no polarisation curve, Nernst or Butler-Volmer model predicts
-them, and a cell asking for ``performance: predictive`` is refused.
+them, and a cell asking for ``performance: predictive`` is refused. A cell with
+``performance: measured`` takes them from a measured series
+(``experiments/electrochemistry/<id>.yaml``, :mod:`chemeascode.domains.experiments.
+electrochemistry`) at its current density ``I / A``, interpolated between the measured points
+and refused outside the series' validity range (never extrapolated); the Faradaic efficiencies
+of the measurement's side products become the current fractions of the side reactions they
+name. An optional ``membrane:`` block reports the membrane's water dissociation efficiency
+(given, or measured), the co-ion fluxes ``f_i (1 - WDE) N I / (|z_i| F)`` and the anolyte
+hydroxide deficit ``(1 - WDE) N I / F``, apart from the Faradaic efficiency, which it never
+changes. An optional ``stacks:`` section sizes stacks of a cell for a product duty, with the
+skid equipment a duty of ``process/duties.yaml`` gives (:class:`Stack`); the Faraday balance
+does not read it, ``cheme process stack``
+(:mod:`chemeascode.domains.equipment.electrolyser_stack`) does.
 
 :func:`cell_report` evaluates every cell (model :data:`MODEL`):
 
@@ -52,6 +64,20 @@ Rules (``cheme.cell-*``), each finding naming the file, line, rule and a hint:
 - ``cell-unsourced`` (info): the voltage or an efficiency is assumed or has no source;
 - ``cell-temperature`` (info): the heat of reaction is taken at another temperature than the
   cell's (sensible heat and the temperature dependence of dH are left out);
+- ``cell-measurement`` (error, refused): a measured cell's measurement file is missing, has
+  error findings, or lacks the product named; the product is formed by another reaction than
+  the cell's (or, with no ``reaction:`` in the measurement, is no product of it); a side
+  product forms at the other electrode than the product; a side product's measured Faradaic
+  efficiency is outside [0, 1]; ``measurements:`` on a cell that is not
+  ``performance: measured``; (info) a side product that forms none of the cell's side
+  reactions (its current is unassigned); (info) measured Faradaic efficiencies that add up to
+  more than 1 (within the measurement's tolerance) are scaled to add up to 1;
+  ``cell-measured-conflict`` (warning): a voltage, efficiency or water dissociation efficiency
+  stated in the cell differs from the measured one by more than the replicates' standard
+  deviation (the measured value is used); a measured cell outside the measurement's current
+  density or temperature range is refused with ``cell-operating-range`` (error);
+- ``cell-membrane``: co-ion shares that do not add up to 1, an unreadable ion or a water
+  dissociation efficiency outside [0, 1] (error); no water dissociation efficiency (info);
 - ``cell-flowsheet``: the linked step or stream does not exist or does not touch the step;
   ``cell-flowsheet-duty`` (warning): a linked stream's duty differs from ``P`` or ``Q``;
   ``cell-double-count``: one stream named as electricity and heat (error), or another energy
@@ -76,6 +102,7 @@ from chemeascode.domains.chemistry.reactions import (
     element_change,
     element_flows,
 )
+from chemeascode.domains.experiments.electrochemistry import FARADAY as _FARADAY
 from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
 from chemeascode.domains.process.schema import DUTY_UNITS, Materials, Quantity
 from chemeascode.foundation.findings import Finding
@@ -85,8 +112,9 @@ from chemeascode.foundation.yamlsource import _compose, _yaml_line
 
 SCHEMA = "cheme/electrochemical-cells/v1"
 CELLS_FILE = "process/cells.yaml"
-#: C/mol, CODATA 2018 (exact since the 2019 SI redefinition: N_A e).
-FARADAY = 96485.33212
+#: C/mol, CODATA 2018 (exact since the 2019 SI redefinition: N_A e); one constant with the
+#: measurement processing.
+FARADAY = _FARADAY
 #: The model this module evaluates, as recorded with every result.
 MODEL = {"id": "faraday-balance", "version": 1, "schema": SCHEMA}
 
@@ -172,7 +200,11 @@ class SideReaction(Strict):
 
     reaction: str
     electrons: float = Field(gt=0, description="Electrons per extent of the reaction.")
-    current_fraction: Quantity = Field(description="Of the current, 0..1 (or %).")
+    current_fraction: Quantity | None = Field(
+        default=None,
+        description="Of the current, 0..1 (or %); a measured cell takes it from the "
+        "measurement's side product that names this reaction.",
+    )
 
 
 class ThermalBoundary(Strict):
@@ -215,13 +247,45 @@ class FlowsheetLink(Strict):
     )
 
 
+class MeasurementLink(Strict):
+    """The measured series a cell's voltage and efficiencies are looked up in."""
+
+    file: str = Field(description="experiments/electrochemistry/<id>.yaml, from the root.")
+    product: str = Field(description="The measurement's product the overall reaction forms.")
+    side_products: list[str] = Field(
+        default_factory=list,
+        description="Products whose Faradaic efficiency becomes the current fraction of the "
+        "side reaction their measurement entry names (reaction:).",
+    )
+
+
+class CellMembrane(Strict):
+    """The membrane between the electrodes and the ions it carries: what is not water
+    dissociation (bipolar membrane) is carried by co-ions."""
+
+    kind: Literal["bipolar", "cation_exchange", "anion_exchange", "diaphragm", "none"]
+    bias: Literal["forward", "reverse"] | None = None
+    water_dissociation_efficiency: Quantity | None = Field(
+        default=None,
+        description="Share of the current carried by water dissociation, 0..1 (a measured "
+        "cell takes it from the measurement).",
+    )
+    co_ion_crossover: dict[str, float] = Field(
+        default_factory=dict,
+        description="Ion (K+, HCO3-, CO3-2) -> its share of the current not carried by water "
+        "dissociation; the shares add up to 1.",
+    )
+    source: str = ""
+
+
 class Cell(Strict):
     id: str
     title: str = ""
-    performance: Literal["specified", "predictive"] = Field(
+    performance: Literal["specified", "predictive", "measured"] = Field(
         default="specified",
-        description="specified: voltage and efficiencies are given; predictive (a polarisation "
-        "model) is not supported and refused.",
+        description="specified: voltage and efficiencies are given; measured: they are looked "
+        "up in a measured series (measurements:) at the cell's current density, never "
+        "extrapolated; predictive (a polarisation model) is not supported and refused.",
     )
     reaction: str = Field(description="The overall reaction: an id of process/reactions.yaml.")
     electrons: float = Field(gt=0, description="Electrons per extent of the overall reaction.")
@@ -258,6 +322,177 @@ class Cell(Strict):
         default="", description="The electrolyte (free text); its properties are not modelled."
     )
     flowsheet: FlowsheetLink | None = None
+    measurements: MeasurementLink | None = None
+    membrane: CellMembrane | None = None
+    sources: list[str] = Field(default_factory=list)
+
+
+class StackProduct(Strict):
+    """The product duty of the stacks at the skid boundary."""
+
+    component: str = Field(description="The main product: a product of the cell's reaction.")
+    rate: Quantity = Field(description="kg/h, kg/d, t/d, g/h, mol/s or kmol/h.")
+    recovery: Quantity | None = Field(
+        default=None,
+        description="The share of the product formed that is delivered at the skid boundary "
+        "(gas conditioning, purification), 0 < r <= 1 (or %), default 1: the stacks are sized "
+        "for rate / recovery formed.",
+    )
+    purity: Quantity | None = Field(default=None, description="Declared, reported only.")
+    pressure: Quantity | None = Field(default=None, description="Declared, reported only.")
+
+
+class StackElectrical(Strict):
+    """The electrical limits the arrangement is chosen within: cells in series in a stack,
+    stacks in parallel on the DC bus."""
+
+    max_stack_voltage: Quantity = Field(
+        description="V: the DC bus voltage (or the stack's insulation limit); cells per stack "
+        "= floor(U_max / U_cell)."
+    )
+    max_stack_current: Quantity | None = Field(
+        default=None, description="A or kA: the current one stack may carry (its cells')."
+    )
+    rectifier_efficiency: Quantity | None = Field(
+        default=None, description="AC to DC, 0..1: the AC power (optional)."
+    )
+    rectifier_max_current: Quantity | None = Field(
+        default=None, description="A or kA per rectifier: the number of rectifiers (optional)."
+    )
+
+
+class StackEnvelope(Strict):
+    """The stack's outline per cell, ASSUMED (with its source) until the vendor's: missing
+    values leave the stack's dimensions TBD."""
+
+    cell_pitch: Quantity | None = Field(
+        default=None,
+        description="mm (or m) per cell along the stack axis (bipolar plate, "
+        "frames, gaskets, membrane).",
+    )
+    end_plates: Quantity | None = Field(
+        default=None,
+        description="mm (or m): both end plate assemblies (current collectors, "
+        "insulation, compression) together, along the axis.",
+    )
+    frame_margin: Quantity | None = Field(
+        default=None,
+        description="mm (or m): the frame and manifolds beyond the (square) "
+        "active area on each side.",
+    )
+
+
+class StackAccess(Strict):
+    """Clearances around each stack for maintenance and stack replacement (ASSUMED until
+    the layout review)."""
+
+    end: Quantity | None = Field(default=None, description="m at each end of the stack axis.")
+    side: Quantity | None = Field(default=None, description="m along each side.")
+
+
+class StackReplacement(Strict):
+    """The membrane and electrode life (ASSUMED until the vendor's warranty)."""
+
+    interval: Quantity = Field(description="h of operation between cell replacements.")
+    operating_hours: Quantity | None = Field(
+        default=None, description="h of operation per year: replacements per year."
+    )
+
+
+class SkidTank(Strict):
+    """A tank whose working volume follows from the duty (reservoir, dosing or bleed tank)."""
+
+    tag: str = Field(description="Its tag in the equipment list (a vertical cylinder).")
+    margin: Quantity | None = Field(
+        default=None,
+        description="The freeboard or margin over the working volume, as a fraction (0.2) or %.",
+    )
+    aspect_ratio: Quantity | None = Field(
+        default=None, description="Height over diameter of the cylinder (ASSUMED)."
+    )
+
+
+class DosingTank(SkidTank):
+    """The dosing tank: what is dosed over the campaign, or over the refill interval."""
+
+    refill_interval: Quantity | None = Field(
+        default=None,
+        description="h (d): the tank is refilled this often; it holds the most dosed in any "
+        "such interval of the campaign (default: the whole campaign).",
+    )
+
+
+class BleedTank(SkidTank):
+    """The bleed tank: what is bled over the campaign, or over the emptying interval."""
+
+    empty_interval: Quantity | None = Field(
+        default=None,
+        description="h (d): the tank is emptied this often; it holds the most bled in any "
+        "such interval of the campaign (default: the whole campaign).",
+    )
+
+
+class RecirculationPump(Strict):
+    """The anolyte recirculation pump: its flow from the flow per cell and the cells."""
+
+    tag: str
+    flow_per_area: Quantity | None = Field(
+        default=None, description="Anolyte flow per active area: mL/(min cm2), L/(h m2)."
+    )
+    flow_per_cell: Quantity | None = Field(
+        default=None, description="Anolyte flow per cell: mL/min, L/min, L/h, m3/h."
+    )
+    density: Quantity | None = Field(default=None, description="Of the anolyte: kg/m3, kg/L.")
+    viscosity: Quantity | None = Field(default=None, description="Of the anolyte: mPa s.")
+    reservoir_pressure: Quantity | None = Field(
+        default=None, description="kPa(a), bar(a): over the reservoir (the suction)."
+    )
+    stack_pressure_drop: Quantity | None = Field(
+        default=None, description="kPa, bar: across a stack (inlet to return)."
+    )
+
+    @model_validator(mode="after")
+    def _one(self) -> RecirculationPump:
+        if self.flow_per_area is not None and self.flow_per_cell is not None:
+            raise ValueError("give flow_per_area or flow_per_cell, not both")
+        return self
+
+
+class DosingPump(Strict):
+    tag: str
+    margin: Quantity | None = Field(
+        default=None, description="Over the duty's largest dosing rate, as a fraction or %."
+    )
+
+
+class SkidEquipment(Strict):
+    """The skid equipment whose inputs follow from a duty of ``process/duties.yaml``, run at
+    the sized arrangement."""
+
+    duty: str = Field(description="A duty id of process/duties.yaml: the campaign is its horizon.")
+    reservoir: SkidTank | None = None
+    recirculation_pump: RecirculationPump | None = None
+    dosing_pump: DosingPump | None = None
+    dosing_tank: DosingTank | None = None
+    bleed_tank: BleedTank | None = None
+
+
+class Stack(Strict):
+    """Stacks of one cell of this file sized for a product duty (``cheme process stack``)."""
+
+    id: str
+    title: str = ""
+    cell: str = Field(description="A cell id of this file: area, current, FE and voltage.")
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Equipment-list tags of the stacks, one per stack: each gets the envelope.",
+    )
+    product: StackProduct
+    electrical: StackElectrical
+    envelope: StackEnvelope | None = None
+    access: StackAccess | None = None
+    replacement: StackReplacement | None = None
+    equipment: SkidEquipment | None = None
     sources: list[str] = Field(default_factory=list)
 
 
@@ -267,6 +502,11 @@ class Cells(Strict):
     schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
     kind: Literal["electrochemical_cells"]
     cells: list[Cell] = Field(default_factory=list)
+    stacks: list[Stack] = Field(
+        default_factory=list,
+        description="Stacks sized from a cell for a product duty, and the skid equipment "
+        "inputs from a duty (cheme process stack); not part of the Faraday balance.",
+    )
 
     @model_validator(mode="after")
     def _version(self) -> Cells:
@@ -317,9 +557,20 @@ class CellResult:
     sources: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
     step: str | None = None
+    #: specified or measured; a measured cell's lookup (file, current density, bracket, sd)
+    performance: str = "specified"
+    measurement: dict[str, Any] | None = None
+    #: the membrane's water dissociation efficiency, co-ion fluxes and hydroxide deficit
+    membrane: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return dict(self.__dict__)
+        data = dict(self.__dict__)
+        # a specified cell without a membrane is reported as before these fields existed
+        defaults = (("performance", "specified"), ("measurement", None), ("membrane", None))
+        for name, default in defaults:
+            if data[name] == default:
+                del data[name]
+        return data
 
 
 @dataclass
@@ -575,6 +826,465 @@ def _check_electrodes(cell: Cell, reaction: Reaction, formulas: dict, out: _Out,
         )
 
 
+# -- measured performance and the membrane -----------------------------------------------------
+
+
+@dataclass
+class _Lookup:
+    """What a measured cell takes from its measurement at its current density."""
+
+    file: str
+    citation: str
+    point: Any  # experiments.electrochemistry.PerformancePoint
+    validity: dict[str, Any]
+    voltage: float | None
+    efficiency: float | None
+    #: side reaction id -> its current fraction (the Faradaic efficiency of its side product)
+    fractions: dict[str, float] = field(default_factory=dict)
+
+
+def _conflict(
+    quantity: Quantity | None,
+    units: dict[Any, float],
+    measured: float,
+    sd: float | None,
+    what: str,
+    at: list[Any],
+    cid: str,
+    out: _Out,
+) -> None:
+    """A cell value stated beside the measured one: a warning unless it lies within the
+    replicates' standard deviation (one replicate: equal to 1e-9)."""
+    if quantity is None:
+        return
+    given = _value(quantity, units, what, out, at, cid)
+    if given is None:
+        return
+    tolerance = sd if sd else 1e-9 * max(abs(measured), 1.0)
+    if abs(given - measured) > tolerance * (1 + 1e-9):
+        spread = f" +- {sd:.3g}" if sd else " (one replicate)"
+        out.add(
+            "warning",
+            "measured-conflict",
+            f"cell {cid}: {what} {given:.6g} differs from the measured {measured:.6g}{spread}: "
+            "the measured value is used",
+            at,
+            [cid],
+            f"remove {what} from the cell (the measurement gives it), or check the measurement",
+        )
+
+
+def _lookup(
+    cell: Cell,
+    reaction: Reaction | None,
+    loc: list[Any],
+    root: Path | None,
+    cache: dict[str, Any] | None,
+    current: float | None,
+    area: float | None,
+    result: CellResult,
+    out: _Out,
+    refuse,
+) -> _Lookup | None:
+    """The voltage and efficiencies of a measured cell at its current density (refused
+    outside the measurement's validity range: never extrapolated)."""
+    from chemeascode.domains.experiments.electrochemistry import (
+        MeasuredPerformance,
+        measurement_report,
+    )
+
+    cid = cell.id
+    link = cell.measurements
+    if cell.performance != "measured":
+        refuse(
+            "measurement",
+            f"measurements: given, but performance is {cell.performance}",
+            [*loc, "measurements"],
+            "set performance: measured (voltage and efficiencies then come from the "
+            "measurement), or remove measurements:",
+        )
+        return None
+    if link is None:
+        refuse(
+            "input-missing",
+            "performance: measured without measurements:",
+            [*loc, "performance"],
+            "give measurements: {file: experiments/electrochemistry/<id>.yaml, product: <id>}",
+        )
+        return None
+    where = [*loc, "measurements", "file"]
+    if root is None or not (Path(root) / link.file).is_file():
+        refuse(
+            "measurement",
+            f"measurement file {link.file} does not exist",
+            where,
+            "give the path from the repository root (experiments/electrochemistry/<id>.yaml)",
+        )
+        return None
+    cache = {} if cache is None else cache
+    if link.file not in cache:
+        cache[link.file] = measurement_report(Path(root), link.file)
+    report = cache[link.file]
+    if report.errors:
+        refuse(
+            "measurement",
+            f"measurement file {link.file} has {len(report.errors)} error finding(s)",
+            where,
+            f"run `cheme experiments electrochem {link.file}` and fix them",
+        )
+        return None
+    if report.voltage_basis == "electrode_vs_reference":
+        refuse(
+            "input-missing",
+            f"{link.file} gives electrode potentials against a reference, not a cell voltage",
+            where,
+            "measure the cell voltage at the terminals (voltage_basis: cell)",
+        )
+        return None
+    unknown = [p for p in [link.product, *link.side_products] if p not in report.products]
+    if unknown:
+        refuse(
+            "measurement",
+            f"{', '.join(unknown)} not a product of {link.file}",
+            [*loc, "measurements"],
+            f"name products of the measurement: {', '.join(report.products) or 'none'}",
+        )
+        return None
+    # the product's Faradaic efficiency becomes the current efficiency of the cell's reaction
+    named = report.reactions.get(link.product)
+    if named is not None and named != cell.reaction:
+        refuse(
+            "measurement",
+            f"{link.file} forms {link.product} by reaction {named}, not by the cell's reaction "
+            f"{cell.reaction}",
+            [*loc, "measurements", "product"],
+            f"name the product of {cell.reaction} as measurements.product ({link.product} may "
+            "be a side product), or correct the product's reaction: in the measurement",
+        )
+        return None
+    if named is None and reaction is not None and reaction.stoichiometry.get(link.product, 0) <= 0:
+        refuse(
+            "measurement",
+            f"{link.product} is no product of the cell's reaction {cell.reaction}",
+            [*loc, "measurements", "product"],
+            f"name a product of {cell.reaction} as measurements.product, or give it "
+            f"reaction: {cell.reaction} in the measurement",
+        )
+        return None
+    # the current fractions of the cell are of one electrode: the full current passes each
+    electrode = report.electrodes.get(link.product)
+    elsewhere = [p for p in link.side_products if report.electrodes.get(p, electrode) != electrode]
+    if elsewhere:
+        refuse(
+            "measurement",
+            f"side product {', '.join(elsewhere)} forms at the other electrode than "
+            f"{link.product} ({electrode}) in {link.file}: their current fractions do not add up",
+            [*loc, "measurements", "side_products"],
+            f"name side products formed at the {electrode} only",
+        )
+        return None
+    if current is None:
+        return None  # refused as missing below
+    if not area:
+        refuse(
+            "input-missing",
+            "no active_area: the current density the measurement is looked up at",
+            loc,
+            "give active_area: (cm2 or m2) of one cell",
+        )
+        return None
+    j = current / area
+    point = MeasuredPerformance(report).at(j)
+    if not point.available:
+        lo, hi = point.bounds or (0.0, 0.0)
+        refuse(
+            "operating-range",
+            f"current density {j:.6g} A/m2: {point.reason}; a measured cell is never extrapolated",
+            [*loc, "current"],
+            f"operate within the measured {lo:g}-{hi:g} A/m2, or measure the point",
+        )
+        return None
+    lookup = _Lookup(link.file, report.citation, point, dict(report.validity), None, None)
+    result.measurement = {
+        "file": link.file,
+        "current_density_a_m2": j,
+        "bracket": list(point.bracket or ()),
+        "voltage_basis": point.voltage_basis,
+        "voltage_sd_v": point.voltage_sd_v,
+        "faradaic_efficiency": dict(point.faradaic_efficiency),
+        "faradaic_efficiency_sd": dict(point.faradaic_efficiency_sd),
+        "validity": dict(report.validity),
+    }
+    if point.voltage_basis == "cell_ir_corrected":
+        result.limitations.append(
+            f"the measured voltage ({link.file}) is iR-corrected: the power and heat leave out "
+            "the ohmic loss"
+        )
+    lookup.voltage = point.voltage_v
+    lookup.efficiency = point.faradaic_efficiency.get(link.product)
+    for name, value in (("voltage", lookup.voltage), (link.product, lookup.efficiency)):
+        if value is None:
+            refuse(
+                "input-missing",
+                f"{link.file} gives no "
+                + ("voltage" if name == "voltage" else f"Faradaic efficiency of {name}")
+                + f" at {j:.6g} A/m2",
+                [*loc, "measurements"],
+                "measure it at the bracketing points",
+            )
+    if lookup.voltage is not None:
+        _conflict(
+            cell.voltage,
+            _VOLTAGE,
+            lookup.voltage,
+            point.voltage_sd_v,
+            "voltage",
+            [*loc, "voltage"],
+            cid,
+            out,
+        )
+    if lookup.efficiency is not None:
+        _conflict(
+            cell.faradaic_efficiency,
+            _FRACTION,
+            lookup.efficiency,
+            point.faradaic_efficiency_sd.get(link.product),
+            "faradaic_efficiency",
+            [*loc, "faradaic_efficiency"],
+            cid,
+            out,
+        )
+    sides = {s.reaction: (j_, s) for j_, s in enumerate(cell.side_reactions)}
+    for product in link.side_products:
+        fe = point.faradaic_efficiency.get(product)
+        reaction = report.reactions.get(product)
+        if fe is None:
+            refuse(
+                "input-missing",
+                f"{link.file} gives no Faradaic efficiency of {product} at {j:.6g} A/m2",
+                [*loc, "measurements", "side_products"],
+                "measure it at the bracketing points, or remove it from side_products",
+            )
+            continue
+        if reaction is None or reaction not in sides:
+            text = (
+                f"side product {product} (FE {fe:.4g}) forms no side reaction of the cell: its "
+                "current is counted as unassigned (heat)"
+            )
+            result.limitations.append(text)
+            out.add(
+                "info",
+                "measurement",
+                f"cell {cid}: {text}",
+                [*loc, "measurements", "side_products"],
+                [cid, product],
+                "give the product's reaction: in the measurement and list it under side_reactions",
+            )
+            continue
+        k, side = sides[reaction]
+        if not 0 <= fe <= 1:
+            refuse(
+                "measurement",
+                f"{link.file} gives side product {product} a Faradaic efficiency of {fe:.4g} at "
+                f"{j:.6g} A/m2 (points {' and '.join(dict.fromkeys(point.bracket or ()))}), "
+                "not in [0, 1]",
+                [*loc, "measurements", "side_products"],
+                f"check the measurement of {product}: run `cheme experiments electrochem "
+                f"{link.file}`",
+            )
+            return None
+        lookup.fractions[reaction] = fe
+        _conflict(
+            side.current_fraction,
+            _FRACTION,
+            fe,
+            point.faradaic_efficiency_sd.get(product),
+            f"side_reactions.{reaction}.current_fraction",
+            [*loc, "side_reactions", k, "current_fraction"],
+            cid,
+            out,
+        )
+    _normalise(lookup, result, out, loc, cid, j)
+    return lookup
+
+
+def _normalise(
+    lookup: _Lookup, result: CellResult, out: _Out, loc: list[Any], cid: str, j: float
+) -> None:
+    """Measured Faradaic efficiencies that add up to more than 1 (within the measurement's
+    own ``fe-sum-high`` tolerance, since a file with errors refuses the cell): scaled to add up
+    to 1, as the current cannot carry more charge than it has."""
+    if lookup.efficiency is None:
+        return
+    total = lookup.efficiency + sum(lookup.fractions.values())
+    if total <= 1 + 1e-9:
+        return
+    lookup.efficiency /= total
+    lookup.fractions = {r: f / total for r, f in lookup.fractions.items()}
+    if result.measurement is not None:
+        result.measurement["normalised_from"] = total
+    bracket = " and ".join(dict.fromkeys(lookup.point.bracket or ()))
+    text = (
+        f"the measured Faradaic efficiencies of {lookup.file} add up to {total:.6g} at "
+        f"{j:.6g} A/m2 (points {bracket}): scaled to add up to 1"
+    )
+    result.limitations.append(text)
+    out.add(
+        "info",
+        "measurement",
+        f"cell {cid}: {text}",
+        [*loc, "measurements"],
+        [cid],
+        "within the measurement's tolerance (calibration of the GC and the flow meter); "
+        f"check the flow and fractions of {lookup.file} if it is more than expected",
+    )
+
+
+#: K: a measurement's temperature counts as the cell's within this (a thermostatted bench cell)
+_TEMPERATURE_SLACK = 0.5
+
+
+def _measured_temperature(cell: Cell, lookup: _Lookup, result: CellResult, loc, refuse) -> None:
+    bounds = lookup.validity.get("temperature_k")
+    t = result.temperature_k
+    if bounds is None:
+        result.limitations.append(
+            f"{lookup.file} states no temperature: the cell's is not checked against it"
+        )
+        return
+    if t is not None and not bounds[0] - _TEMPERATURE_SLACK <= t <= bounds[1] + _TEMPERATURE_SLACK:
+        refuse(
+            "operating-range",
+            f"temperature {t:.6g} K outside the measured {bounds[0]:g}-{bounds[1]:g} K of "
+            f"{lookup.file}; a measured cell is never extrapolated",
+            [*loc, "thermal", "temperature"],
+            "operate at the measured temperature, or measure at this one",
+        )
+
+
+def _membrane(
+    cell: Cell,
+    result: CellResult,
+    lookup: _Lookup | None,
+    formulas: dict[str, str],
+    out: _Out,
+    loc: list[Any],
+) -> None:
+    """The membrane's water dissociation efficiency (given, or measured), the co-ion fluxes
+    ``f_i (1 - WDE) N I / (|z_i| F)`` and the anolyte hydroxide deficit ``(1 - WDE) N I / F``.
+    Reported apart from the Faradaic efficiency, which it never changes."""
+    membrane = cell.membrane
+    assert membrane is not None
+    cid = cell.id
+    at = [*loc, "membrane"]
+    row: dict[str, Any] = {
+        "kind": membrane.kind,
+        "bias": membrane.bias,
+        "water_dissociation_efficiency": None,
+        "water_dissociation_efficiency_sd": None,
+        "basis": None,
+        "co_ion_current_fraction": None,
+        "co_ion_flux_mol_s": {},
+        "co_ion_flux_kmol_h": {},
+        "hydroxide_deficit_mol_s": None,
+        "hydroxide_deficit_kmol_h": None,
+        "measured_co_ion_carbon_fraction": None,
+        "source": membrane.source,
+    }
+    result.membrane = row
+    if membrane.kind == "none":
+        return
+    charges: dict[str, int] = {}
+    for ion in membrane.co_ion_crossover:
+        _, z = species_atoms(ion, formulas)
+        if not z:
+            out.add(
+                "error",
+                "membrane",
+                f"cell {cid}: co-ion {ion} is no ion (formula and charge, e.g. K+, HCO3-)",
+                [*at, "co_ion_crossover", ion],
+                [cid, ion],
+                "write the ion with its charge",
+            )
+            continue
+        charges[ion] = abs(z)
+    shares = membrane.co_ion_crossover
+    if shares and (
+        abs(sum(shares.values()) - 1) > 1e-6 or any(not 0 <= v <= 1 for v in shares.values())
+    ):
+        out.add(
+            "error",
+            "membrane",
+            f"cell {cid}: the co-ion shares add up to {sum(shares.values()):.6g}, not 1",
+            [*at, "co_ion_crossover"],
+            [cid],
+            "give each ion's share (0..1) of the current not carried by water dissociation",
+        )
+        charges = {}
+    wde = _value(
+        membrane.water_dissociation_efficiency,
+        _FRACTION,
+        "water_dissociation_efficiency",
+        out,
+        [*at, "water_dissociation_efficiency"],
+        cid,
+    )
+    measured = lookup.point.water_dissociation_efficiency if lookup is not None else None
+    if measured is not None:
+        sd = lookup.point.water_dissociation_efficiency_sd  # type: ignore[union-attr]
+        _conflict(
+            membrane.water_dissociation_efficiency,
+            _FRACTION,
+            measured,
+            sd,
+            "water_dissociation_efficiency",
+            [*at, "water_dissociation_efficiency"],
+            cid,
+            out,
+        )
+        wde = measured
+        row.update(water_dissociation_efficiency_sd=sd, basis="measured")
+        row["measured_co_ion_carbon_fraction"] = lookup.point.co_ion_carbon_fraction  # type: ignore[union-attr]
+    elif wde is not None:
+        row["basis"] = "given"
+    if wde is None:
+        if lookup is None and (cell.performance == "measured" or cell.measurements is not None):
+            return  # the measurement was refused (cell-measurement): it is not read
+        out.add(
+            "info",
+            "membrane",
+            f"cell {cid}: {membrane.kind} membrane without a water dissociation efficiency: no "
+            "co-ion fluxes or hydroxide deficit",
+            at,
+            [cid],
+            "give membrane.water_dissociation_efficiency, or measure it (titration of the "
+            "anolyte) in the cell's measurement",
+        )
+        return
+    if not 0 <= wde <= 1:
+        out.add(
+            "error",
+            "membrane",
+            f"cell {cid}: water dissociation efficiency {wde:g} not in [0, 1]",
+            [*at, "water_dissociation_efficiency"],
+            [cid],
+            "a fraction of the current",
+        )
+        return
+    row["water_dissociation_efficiency"] = wde
+    row["co_ion_current_fraction"] = 1 - wde
+    if result.refused or result.current_a is None:
+        return
+    stack = result.cells * result.current_a  # A
+    deficit = (1 - wde) * stack / FARADAY  # mol/s
+    row["hydroxide_deficit_mol_s"] = deficit
+    row["hydroxide_deficit_kmol_h"] = deficit * 3.6
+    for ion, z in charges.items():
+        flux = shares[ion] * (1 - wde) * stack / (z * FARADAY)
+        row["co_ion_flux_mol_s"][ion] = flux
+        row["co_ion_flux_kmol_h"][ion] = flux * 3.6
+
+
 def _evaluate(
     cell: Cell,
     index: int,
@@ -582,12 +1292,33 @@ def _evaluate(
     formulas: dict[str, str],
     masses: dict[str, float],
     out: _Out,
+    root: Path | None = None,
+    measured: dict[str, Any] | None = None,
 ) -> CellResult:
+    """One cell's Faraday balance and, with a ``membrane:``, its membrane transport;
+    *measured* caches the measurement reports by file (read from *root*)."""
+    result, lookup = _faraday(cell, index, reactions, formulas, masses, out, root, measured)
+    if cell.membrane is not None:
+        _membrane(cell, result, lookup, formulas, out, ["cells", index])
+    return result
+
+
+def _faraday(
+    cell: Cell,
+    index: int,
+    reactions: dict[str, Reaction],
+    formulas: dict[str, str],
+    masses: dict[str, float],
+    out: _Out,
+    root: Path | None,
+    measured: dict[str, Any] | None,
+) -> tuple[CellResult, _Lookup | None]:
     loc = ["cells", index]
     cid = cell.id
     result = CellResult(cid, cell.reaction, line=_yaml_line(out.doc, loc), cells=cell.cells)
     result.step = cell.flowsheet.step if cell.flowsheet is not None else None
     result.sources = list(cell.sources)
+    result.performance = cell.performance
 
     def refuse(rule: str, reason: str, at: list[Any], hint: str) -> None:
         result.refused = True
@@ -684,20 +1415,29 @@ def _evaluate(
         )
 
     current = _value(cell.current, _CURRENT, "current", out, [*loc, "current"], cid)
-    efficiency = _value(
-        cell.faradaic_efficiency,
-        _FRACTION,
-        "faradaic_efficiency",
-        out,
-        [*loc, "faradaic_efficiency"],
-        cid,
-    )
-    voltage = _value(cell.voltage, _VOLTAGE, "voltage", out, [*loc, "voltage"], cid)
-    missing = {
-        "current": (current, "the current through each cell (A or kA)"),
-        "faradaic_efficiency": (efficiency, "the Faradaic (current) efficiency, 0..1"),
-        "voltage": (voltage, "the cell voltage at the terminals (V)"),
-    }
+    lookup: _Lookup | None = None
+    area: float | None = None
+    if cell.performance == "measured" or cell.measurements is not None:
+        area = _value(cell.active_area, _AREA, "active_area", out, [*loc, "active_area"], cid)
+        lookup = _lookup(cell, reaction, loc, root, measured, current, area, result, out, refuse)
+        efficiency = lookup.efficiency if lookup is not None else None
+        voltage = lookup.voltage if lookup is not None else None
+        missing = {"current": (current, "the current through each cell (A or kA)")}
+    else:
+        efficiency = _value(
+            cell.faradaic_efficiency,
+            _FRACTION,
+            "faradaic_efficiency",
+            out,
+            [*loc, "faradaic_efficiency"],
+            cid,
+        )
+        voltage = _value(cell.voltage, _VOLTAGE, "voltage", out, [*loc, "voltage"], cid)
+        missing = {
+            "current": (current, "the current through each cell (A or kA)"),
+            "faradaic_efficiency": (efficiency, "the Faradaic (current) efficiency, 0..1"),
+            "voltage": (voltage, "the cell voltage at the terminals (V)"),
+        }
     for name, (value, what) in missing.items():
         if value is None and getattr(cell, name) is None:
             refuse(
@@ -722,15 +1462,35 @@ def _evaluate(
         refuse("input-missing", "the voltage is not positive", [*loc, "voltage"], "give U > 0")
     fractions: list[float] = []
     for s, _, j in side:
-        f = _value(
-            s.current_fraction,
-            _FRACTION,
-            "current_fraction",
-            out,
-            [*loc, "side_reactions", j, "current_fraction"],
-            cid,
-        )
+        if lookup is not None and s.reaction in lookup.fractions:
+            f: float | None = lookup.fractions[s.reaction]
+        elif s.current_fraction is None:
+            fractions.append(0.0)
+            if lookup is not None or cell.performance != "measured":
+                refuse(
+                    "input-missing",
+                    f"side reaction {s.reaction}: no current fraction",
+                    [*loc, "side_reactions", j],
+                    "give current_fraction (0..1, with its source)"
+                    + (
+                        ", or name a side product of the measurement that forms it"
+                        if lookup is not None
+                        else ""
+                    ),
+                )
+            continue
+        else:
+            f = _value(
+                s.current_fraction,
+                _FRACTION,
+                "current_fraction",
+                out,
+                [*loc, "side_reactions", j, "current_fraction"],
+                cid,
+            )
         fractions.append(f if f is not None else 0.0)
+        if lookup is not None and s.reaction in lookup.fractions:
+            continue  # measured: in [0, 1] (_lookup); a product below detection forms nothing
         if f is None or not 0 < f <= 1:
             refuse(
                 "charge",
@@ -744,7 +1504,12 @@ def _evaluate(
             "charge",
             f"the current fractions add up to {1 - unassigned:.6g} > 1",
             loc,
-            "faradaic_efficiency plus the side reactions' fractions is at most 1",
+            (
+                f"the Faradaic efficiencies measured in {lookup.file} plus the current_fraction "
+                "stated for the other side reactions is at most 1: lower the stated fractions"
+            )
+            if lookup is not None
+            else "faradaic_efficiency plus the side reactions' fractions is at most 1",
         )
 
     thermal = cell.thermal
@@ -773,13 +1538,27 @@ def _evaluate(
                 "K or °C",
             )
 
-    area = _value(cell.active_area, _AREA, "active_area", out, [*loc, "active_area"], cid)
+    if lookup is None and cell.performance != "measured" and cell.measurements is None:
+        area = _value(cell.active_area, _AREA, "active_area", out, [*loc, "active_area"], cid)
     if current is not None and area:
         result.current_density_a_m2 = current / area
+    # a measured cell's voltage and efficiencies come from its measurement, not these entries
+    stated = (
+        []
+        if cell.performance == "measured"
+        else [
+            ("voltage", cell.voltage),
+            ("faradaic_efficiency", cell.faradaic_efficiency),
+        ]
+    )
+    taken = lookup.fractions if lookup is not None else {}
     for name, quantity in (
-        ("voltage", cell.voltage),
-        ("faradaic_efficiency", cell.faradaic_efficiency),
-        *((f"side_reactions.{s.reaction}", s.current_fraction) for s, _, _ in side),
+        *stated,
+        *(
+            (f"side_reactions.{s.reaction}", s.current_fraction)
+            for s, _, _ in side
+            if s.reaction not in taken
+        ),
     ):
         if quantity is not None and not _sourced(quantity):
             out.add(
@@ -791,18 +1570,36 @@ def _evaluate(
                 [cid],
                 "give provenance: given with the source (measured, vendor or literature data)",
             )
-    result.sourced = all(
-        _sourced(q)
-        for q in (cell.voltage, cell.faradaic_efficiency, *(s.current_fraction for s, _, _ in side))
-    )
+    if cell.performance == "measured":
+        result.sourced = (
+            lookup is not None
+            and bool(lookup.citation.strip())
+            and all(_sourced(s.current_fraction) for s, _, _ in side if s.reaction not in taken)
+        )
+        if lookup is not None:
+            cited = f"{lookup.file}: {lookup.citation}" if lookup.citation else lookup.file
+            result.sources.append(cited)
+        quantities: tuple[Quantity | None, ...] = (cell.current,)
+    else:
+        result.sourced = all(
+            _sourced(q)
+            for q in (
+                cell.voltage,
+                cell.faradaic_efficiency,
+                *(s.current_fraction for s, _, _ in side),
+            )
+        )
+        quantities = (cell.voltage, cell.faradaic_efficiency, cell.current)
     result.sources += [
         q.source
-        for q in (cell.voltage, cell.faradaic_efficiency, cell.current)
+        for q in quantities
         if q is not None and q.source.strip() and q.source not in result.sources
     ]
-    _operating_range(cell, result, out, loc)
+    _operating_range(cell, result, out, loc, lookup)
+    if lookup is not None and result.temperature_k is not None:
+        _measured_temperature(cell, lookup, result, loc, refuse)
     if result.refused or reaction is None:
-        return result
+        return result, lookup
 
     assert current is not None and efficiency is not None and voltage is not None
     charge_rate = cell.cells * current  # C/s through the stack
@@ -930,12 +1727,16 @@ def _evaluate(
             "formed": result.power_kw / kg if kg else None,
             "delivered": result.power_kw / outlet if outlet else None,
         }
-    return result
+    return result, lookup
 
 
-def _operating_range(cell: Cell, result: CellResult, out: _Out, loc: list[Any]) -> None:
+def _operating_range(
+    cell: Cell, result: CellResult, out: _Out, loc: list[Any], lookup: _Lookup | None = None
+) -> None:
     span = cell.operating_range
     cid = cell.id
+    if span is None and cell.performance == "measured":
+        return  # the measurement's validity range is the operating range (_lookup)
     if span is None:
         result.limitations.append("no operating range declared for the specified performance")
         out.add(
@@ -1161,6 +1962,44 @@ def has_cells(root: Path) -> bool:
     return (Path(root) / CELLS_FILE).is_file()
 
 
+def load_cells(root: Path) -> tuple[Cells | None, Any, list[Finding]]:
+    """``process/cells.yaml`` under *root*: the model (None when it is missing or invalid), its
+    composed YAML document (for line numbers) and the schema findings."""
+    cells, doc, findings = _load(Path(root), CELLS_FILE, Cells, "cheme.cell-schema")
+    if doc is None and (Path(root) / CELLS_FILE).is_file():
+        doc = _compose(Path(root) / CELLS_FILE)
+    return cells, doc, findings
+
+
+@dataclass(frozen=True)
+class CellProduct:
+    """A product of a cell's overall reaction: the electrons and the product's coefficient per
+    extent, and its molar mass (kg/kmol; None when materials.yaml gives none)."""
+
+    reaction: str
+    electrons: float
+    coefficient: float
+    molar_mass: float | None
+
+
+def cell_product(root: Path, cell: Cell, product: str) -> CellProduct | None:
+    """*product* of *cell*'s overall reaction in ``process/reactions.yaml`` under *root*, with
+    its molar mass from ``process/materials.yaml``; None when the reaction is not declared or
+    does not form *product*."""
+    root = Path(root)
+    reactions, _, _ = _load(root, REACTIONS_FILE, Reactions, "cheme.cell-schema")
+    materials, _, _ = _load(root, MATERIALS_FILE, Materials, "cheme.cell-schema")
+    reaction = reactions.by_id().get(cell.reaction) if reactions is not None else None
+    if reaction is None or reaction.stoichiometry.get(product, 0.0) <= 0:
+        return None
+    return CellProduct(
+        reaction.id,
+        cell.electrons,
+        reaction.stoichiometry[product],
+        _molar_masses(materials).get(product),
+    )
+
+
 def cell_report(root: Path) -> CellReport:
     """Every cell of ``process/cells.yaml`` under *root* (see the module docstring). Read-only.
     A missing or invalid materials or reactions file refuses the cells that need it; a missing
@@ -1170,6 +2009,8 @@ def cell_report(root: Path) -> CellReport:
     root = Path(root)
     inputs = [CELLS_FILE, MATERIALS_FILE, REACTIONS_FILE, FLOWSHEET_FILE]
     cells, doc, findings = _load(root, CELLS_FILE, Cells, "cheme.cell-schema")
+    if cells is not None:
+        inputs += [c.measurements.file for c in cells.cells if c.measurements is not None]
     source = source_revision(root, inputs)
     if cells is None:
         return CellReport([], findings, source)
@@ -1182,6 +2023,7 @@ def cell_report(root: Path) -> CellReport:
     out.findings += findings
     seen: set[str] = set()
     results = []
+    measured: dict[str, Any] = {}
     for index, cell in enumerate(cells.cells):
         if cell.id in seen:
             out.add(
@@ -1193,7 +2035,7 @@ def cell_report(root: Path) -> CellReport:
                 "give each cell its own id",
             )
         seen.add(cell.id)
-        results.append(_evaluate(cell, index, known, formulas, masses, out))
+        results.append(_evaluate(cell, index, known, formulas, masses, out, root, measured))
     _flowsheet_checks(root, cells, results, out)
     return CellReport(results, out.findings, source)
 
@@ -1211,7 +2053,11 @@ def cell_bases(report: CellReport) -> dict[str, Any]:
             continue
         problems = list(cell.reasons)
         if not cell.sourced:
-            problems.append("voltage or current efficiency assumed or without a source")
+            problems.append(
+                "the measurement has no source"
+                if cell.performance == "measured"
+                else "voltage or current efficiency assumed or without a source"
+            )
         if cell.step in bases and (not bases[cell.step].sourced or not problems):
             continue  # the step keeps the basis of its first unsourced (or first) cell
         bases[cell.step] = UnitBasis(
@@ -1222,21 +2068,41 @@ def cell_bases(report: CellReport) -> dict[str, Any]:
             not problems,
             file=CELLS_FILE,
             line=cell.line,
-            detail=f"specified electrochemical cell {cell.id} (voltage, current efficiency): "
+            detail=f"{_performance_text(cell)}: "
             f"Faraday balance {MODEL['id']} v{MODEL['version']}"
             + (": " + "; ".join(problems) if problems else ""),
             sources=list(cell.sources),
             assumptions=list(ASSUMPTIONS),
             limitations=[
-                "specified cell performance: voltage and current efficiency are not predicted",
+                "measured cell performance: voltage and current efficiency interpolated "
+                "between measured points, not predicted"
+                if cell.performance == "measured"
+                else "specified cell performance: voltage and current efficiency are not predicted",
                 *cell.limitations,
             ],
         )
     return bases
 
 
+def _performance_text(cell: CellResult) -> str:
+    if cell.performance != "measured":
+        return f"specified electrochemical cell {cell.id} (voltage, current efficiency)"
+    at = cell.measurement or {}
+    j = at.get("current_density_a_m2")
+    return (
+        f"measured electrochemical cell {cell.id} (voltage, current efficiency from "
+        f"{at.get('file', 'its measurement')}"
+        + (f" at {j:.6g} A/m2" if j is not None else "")
+        + ")"
+    )
+
+
 def _g(value: float | None) -> str:
     return "-" if value is None else f"{value:.4g}"
+
+
+def _sd(value: float | None) -> str:
+    return "" if not value else f" +- {value:.2g}"
 
 
 def report_text(report: CellReport) -> str:
@@ -1261,7 +2127,39 @@ def report_text(report: CellReport) -> str:
                 f"{_g(specific['formed'])} kWh/kg formed, {_g(specific['delivered'])} kWh/kg "
                 "delivered (all the cell's electricity, not allocated)"
             )
+        if c.measurement is not None:
+            m = c.measurement
+            fe = ", ".join(
+                f"{n} {v:.4g}{_sd(m['faradaic_efficiency_sd'].get(n))}"
+                for n, v in m["faradaic_efficiency"].items()
+            )
+            lines.append(
+                f"  measured: {m['file']} at {m['current_density_a_m2']:.6g} A/m2 (between "
+                f"{' and '.join(m['bracket'])}): voltage {c.voltage_v:.4g}"
+                f"{_sd(m['voltage_sd_v'])} V ({m['voltage_basis']}), FE {fe}"
+            )
+        if c.membrane is not None:
+            lines.append(_membrane_text(c.membrane))
         for text in c.limitations:
             lines.append(f"  limitation: {text}")
     lines += [f.format() for f in report.findings]
     return "\n".join(lines)
+
+
+def _membrane_text(row: dict[str, Any]) -> str:
+    kind = row["kind"].replace("_", "-") + (f", {row['bias']} bias" if row["bias"] else "")
+    wde = row["water_dissociation_efficiency"]
+    if wde is None:
+        return f"  membrane ({kind}): no water dissociation efficiency"
+    text = (
+        f"  membrane ({kind}): water dissociation efficiency {wde:.4g}"
+        f"{_sd(row['water_dissociation_efficiency_sd'])} ({row['basis']}; apart from the "
+        "Faradaic efficiency)"
+    )
+    if row["hydroxide_deficit_kmol_h"] is not None:
+        fluxes = ", ".join(f"{n} {v:.4g}" for n, v in row["co_ion_flux_kmol_h"].items())
+        text += (
+            f"; co-ions {fluxes or 'not split'} kmol/h; anolyte hydroxide deficit "
+            f"{row['hydroxide_deficit_kmol_h']:.4g} kmol/h"
+        )
+    return text

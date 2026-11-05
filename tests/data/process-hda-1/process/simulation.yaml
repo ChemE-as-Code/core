@@ -1,0 +1,88 @@
+# The DWSIM model of hda-1 (`cheme process simulate`; schema `cheme schema process-simulation`).
+# Decision D-014 in DESIGN.md. Every spec repeats a design choice of DESIGN.md (source given)
+# or is ASSUMED with its reason. The property package is not qualified by core for aromatics
+# with hydrogen and methane (core methods.yml benchmarks; core#315): the results are a
+# cross-check of scripts/hda_balance.py on a second implementation of Peng-Robinson, not a
+# validated model.
+schema: cheme/simulation/v1
+kind: simulation
+simulator: dwsim
+property_package: Peng-Robinson (PR)
+method_selection:
+  facts:
+    pressure_value: 37                # the highest pressure of the flowsheet: make-up hydrogen S4, 3700 kPa(a) (D-003)
+    pressure_unit: bar(a)
+    is_polar: false                   # H2, CH4, toluene, benzene, biphenyl: nonpolar
+    is_electrolyte: false             # no ions
+    has_pseudocomponents: false       # five pure compounds with CAS numbers (materials.yaml)
+    interaction_parameters_available: false  # not checked which pairs DWSIM's PR set covers (H2 and CH4 with the aromatics); uncertain, so the conservative answer
+    liquid_liquid_expected: false     # no water; the aromatics are fully miscible
+    vapor_association_expected: false # no carboxylic acids or HF
+specs:
+  # ---- RXN (D-004, D-007, D-010)
+  P101:
+    unit: pump        # Pumping (D-016); kept explicit
+    outlet_pressure: {value: 3600, provenance: assumed, source: D-004}
+    efficiency: {value: 0.65, provenance: assumed, source: "D-010: pump efficiency"}
+  E101:
+    cold_outlet_temperature: {value: 840.0, provenance: assumed, source: "D-004: FEHE cold outlet"}
+    cold_pressure_drop: {value: 80, unit: kPa, provenance: assumed, source: "D-004: S5 3600 to S6 3520 kPa(a)"}
+    hot_pressure_drop: {value: 70, unit: kPa, provenance: assumed, source: "D-004: 70 kPa per exchanger side"}
+  H101:
+    unit: heater
+    outlet_temperature: {value: 895.15, provenance: assumed, source: "D-004: reactor inlet"}
+    pressure_drop: {value: 70, unit: kPa, provenance: assumed, source: "D-004: 70 kPa per heater side"}
+  R101:
+    mode: adiabatic
+    pressure_drop: {value: 70, unit: kPa, provenance: assumed, source: "D-004: inlet 3450, outlet 3380 kPa(a)"}
+  E102:
+    outlet_temperature: {value: 313.15, provenance: assumed, source: "D-004: trim cooler outlet"}
+    pressure_drop: {value: 60, unit: kPa, provenance: assumed, source: "D-004: 60 kPa per cooler"}
+  V101:
+    temperature: {value: 313.15, provenance: assumed, source: "D-004: HP separator"}
+    pressure: {value: 3250, provenance: assumed, source: "D-004: HP separator"}
+    outlets: {vap: vapor, liq: liquid}
+  K101:
+    outlet_pressure: {value: 3600, provenance: assumed, source: "D-004: recycle compressor discharge"}
+    efficiency: {value: 0.75, provenance: assumed, source: "D-010: compressor isentropic efficiency"}
+  # ---- SEP (D-008): Fenske-Underwood-Gilliland shortcut columns. The key specs are the design
+  # targets of D-002 and D-008; where the script puts none of a key in a product, a small value
+  # is ASSUMED (the shortcut method needs a nonzero one).
+  C201:
+    unit: shortcut_column
+    light_key: CH4
+    heavy_key: BZ
+    light_key_in_bottoms: 0.00001     # ASSUMED: D-008 sends all H2 and CH4 overhead
+    heavy_key_in_distillate: 0.0269   # D-008: benzene in the off-gas in equilibrium with the reflux (scripts/hda_balance.py S19, 0.02691)
+    reflux_ratio: 1.0                 # D-008: L/D 1
+    condenser: partial
+    condenser_pressure: {value: 800, provenance: assumed, source: D-008}
+    reboiler_pressure: {value: 800, provenance: assumed, source: "D-008 (column pressure drop not stated)"}
+    outlets: {top: distillate, bot: bottoms}
+  C202:
+    unit: shortcut_column
+    light_key: BZ
+    heavy_key: TOL
+    light_key_in_bottoms: 0.0142627   # D-008: 99.5 % benzene recovery (scripts/hda_balance.py S22)
+    heavy_key_in_distillate: 0.001    # D-002: 99.9 mol% benzene, toluene the only impurity
+    reflux_ratio: 2.18                # D-008 rule 1.3 x Underwood minimum, on the minimum DWSIM finds at the arriving (partly flashed) feed, 1.674 (D-014)
+    condenser: total
+    condenser_pressure: {value: 150, provenance: assumed, source: D-008}
+    reboiler_pressure: {value: 170, provenance: assumed, source: D-008}
+    outlets: {top: distillate, bot: bottoms}
+  # C203 rigorous (D-014): DWSIM's shortcut gave biphenyl bottoms whose mole fractions add up to
+  # 1.004 (the light-key spec set directly, the rest by balance), so the column is solved stage
+  # by stage. Stage count ASSUMED from DWSIM's own shortcut estimate (5.97 theoretical stages at
+  # R 0.5, Underwood minimum 0.022) with margin.
+  C203:
+    stages: 10                        # ASSUMED: condenser and reboiler included
+    feed_stage: 5                     # ASSUMED: mid-column
+    condenser: total
+    condenser_pressure: {value: 30, provenance: assumed, source: D-008}
+    reboiler_pressure: {value: 45, provenance: assumed, source: D-008}
+    condenser_spec: {reflux_ratio: 0.5}                # D-008: at least 0.5 (Underwood minimum 0.02)
+    # D-008's 2 mol% toluene in the bottoms as a flow: the biphenyl make of the converged reactor
+    # (HDABP 5.1391 kmol/h -> 2.5696 kmol/h BIPH) / 0.98 = 2.6220 kmol/h, 401.05 kg/h (a
+    # mole-fraction spec did not converge in DWSIM; the result's toluene fraction is the check)
+    reboiler_spec: {flow: {value: 401.05, unit: kg/h, provenance: assumed, source: "D-008, D-014: 2 mol% toluene at the simulated biphenyl make"}}
+    outlets: {top: distillate, bot: bottoms}

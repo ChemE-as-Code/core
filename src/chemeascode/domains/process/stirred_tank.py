@@ -1,5 +1,6 @@
-"""Stirred tanks: the continuous stirred tank (``reactor: cstr``) and the batch
-(``reactor: batch``), from the reactions' rate laws (:mod:`.chemistry.rates`).
+"""Stirred tanks: the continuous stirred tank (``reactor: cstr``), the batch (``reactor:
+batch``) and the semi-batch (``reactor: semibatch``), from the reactions' rate laws
+(:mod:`.chemistry.rates`).
 
 A CSTR is well mixed: the outlet is the tank's content. Per tank of ``count`` equal tanks in
 series, the extents ``xi_j`` (kmol/s) solve::
@@ -21,6 +22,18 @@ A batch integrates the moles of a charge over time::
 
 to ``time`` or to the ``target`` conversion of its key component (Dormand-Prince 5(4), as the
 fixed bed). Its result is intensive: the composition does not depend on the batch size.
+
+A semi-batch (``reactor: semibatch``, liquid) is that batch with the dosed feeds as sources,
+``F_d,i`` kmol/s while dose ``d`` runs (piecewise constant), and their sensible heat::
+
+    dn_i/dt = sum_j nu_ij M_j r_j + sum_d F_d,i
+    adiabatic:  dT/dt = [sum_j (-dHr_j) M_j r_j + sum_d C_d (T_d - T)] / C
+
+integrated segment by segment, then over the post-reaction (``time`` or ``target``). It reports
+the accumulation of the dosed reactant, ``X(t) = n_reagent(t) / (charged + dosed)``, its
+maximum, the cooling-failure temperature ``T + max_j (-dHr_j) xi_j,max(n) / C(n)`` at its worst
+moment (Stoessel's MTSR of a semi-batch, the dosing stopped) and, isothermal, the peak duty to
+remove (the reaction's heat and the doses' warming), per m3 of the final content.
 
 Phases: every reaction of a tank is gas-phase or every one liquid-phase (:mod:`.chemistry.liquid`
 gives a liquid's mole fractions, activities or concentrations). A gas's enthalpies are the
@@ -56,6 +69,15 @@ ASSUMPTIONS = {
         "volume as an ideal gas (the pressure changes)",
         "no charging, heating-up or emptying time",
     ),
+    "semibatch": (
+        "ideally mixed: one composition and temperature in the vessel at each time",
+        "rate laws taken as the effective rates in the vessel (no mass transfer between phases)",
+        "liquid, ideal-mixing volumes: the volume grows with what is dosed",
+        "each dose mixes in at once, at its stream's temperature",
+        "a cooling failure stops the dosing (feed interlocked with the cooling): the "
+        "cooling-failure temperature is the content's, reacting to completion adiabatically",
+        "no charging, heating-up or emptying time",
+    ),
 }
 
 #: Points of a batch's profile (beside the integrator's own).
@@ -85,14 +107,29 @@ class TankResult:
     tanks: list[dict[str, Any]] = field(default_factory=list)
     #: batch: (time s, temperature K, pressure kPa(a), conversion of the key or first reactant)
     profile: list[tuple[float, float, float, float]] = field(default_factory=list)
-    #: batch: kJ released per kmol of charge (positive: exothermic), and the largest rate of
-    #: heat release per m3 of the batch (kW/m3)
+    #: batch: kJ released per kmol of charge, a semi-batch's charge and doses together
+    #: (positive: exothermic), and the largest rate of heat release per m3 of the batch (kW/m3)
     heat_released: float | None = None
     peak_heat_rate: float | None = None
     notes: list[str] = field(default_factory=list)
     #: kmol/h of extent of each reaction over the whole tank series or batch (per hour of
     #: charge): what a conversion reactor needs to give the same outlet
     extents: dict[str, float] = field(default_factory=dict)
+    #: semi-batch: s when the last dose ends; m3 of the charge (``volume``: of the content at
+    #: the end, both per hour of charge)
+    dosing_time: float | None = None
+    charge_volume: float | None = None
+    #: semi-batch: (time s, unreacted dosed reactant over all of it charged and dosed), its
+    #: largest value and when
+    accumulation: list[tuple[float, float]] = field(default_factory=list)
+    max_accumulation: float | None = None
+    max_accumulation_time: float | None = None
+    #: semi-batch: the worst moment for a cooling failure, the dosing stopped: (time s,
+    #: temperature K, the temperature the content then reaches adiabatically K)
+    cooling_failure: tuple[float, float, float] | None = None
+    #: semi-batch, isothermal: the largest duty to remove, kW per m3 of the content at the end
+    #: (the reaction's heat and the doses' warming to the batch's temperature)
+    peak_cooling_duty: float | None = None
 
 
 @dataclass
@@ -420,6 +457,24 @@ def solve_cstr(
     return result
 
 
+@dataclass
+class Dose:
+    """A feed dosed into a semi-batch: kmol (on the charge's basis) by component, its
+    temperature, and its segments (start s, end s, share of the feed) at constant rates."""
+
+    moles: Mapping[str, float]
+    temperature: float  # K
+    segments: list[tuple[float, float, float]]
+
+    def rate(self, t: float) -> float:
+        """The share of the feed per second at time *t* s."""
+        return sum(s / (b - a) for a, b, s in self.segments if a <= t < b)
+
+    def fed(self, t: float) -> float:
+        """The share of the feed dosed by time *t* s."""
+        return sum(s * min(max((t - a) / (b - a), 0.0), 1.0) for a, b, s in self.segments)
+
+
 def solve_batch(
     reactions: list[Any],
     charge: Mapping[str, float],
@@ -430,12 +485,27 @@ def solve_batch(
     liquid: Any = None,
     heat_capacity: Mapping[str, float | None] | None = None,
     isothermal_at: float | None = None,
+    doses: Sequence[Dose] = (),
 ) -> TankResult:
     """The composition of the *charge* (kmol, or kmol/h of charge) at *temperature* K and
     *pressure* kPa after *batch* (a :class:`~.schema.Batch`): its ``time``, or its ``target``
     conversion. Raises TankError, also when the target is not reached (the batch stops
-    converting first, at equilibrium or when a reactant is used up)."""
-    names = list(dict.fromkeys([*charge, *(n for r in reactions for n in r.stoichiometry)]))
+    converting first, at equilibrium or when a reactant is used up).
+
+    With *doses* it is a semi-batch (liquid): the doses enter at their rates, and the batch's
+    ``time`` or ``target`` is the post-reaction after the last dose. The result then has the
+    accumulation of the dosed reactant over time, the worst cooling failure and the peak
+    cooling duty."""
+    doses = list(doses)
+    names = list(
+        dict.fromkeys(
+            [
+                *charge,
+                *(n for d in doses for n in d.moles),
+                *(n for r in reactions for n in r.stoichiometry),
+            ]
+        )
+    )
     mix = _mixture(reactions, names, data, liquid, heat_capacity or {}, batch.catalyst_loading)
     nu = mix.nu()
     m = len(reactions)
@@ -443,16 +513,24 @@ def solve_batch(
     total0 = sum(n0)
     if total0 <= 0:
         raise TankError("the charge is empty")
+    if not doses and batch.time is None and batch.target is None:
+        raise TankError("a batch needs its time or target (batch.dosing makes a semibatch)")
+    if doses and mix.liquid is None:
+        raise TankError("a semi-batch holds liquid-phase reactions (phase: liquid)")
+    dose_moles = [[max(d.moles.get(n, 0.0), 0.0) for n in names] for d in doses]
+    dosed = [sum(d[i] for d in dose_moles) for i in range(len(names))]
     charged = [n for n in names if charge.get(n, 0.0) > 0]
+    is_reactant = {n for r in reactions for n, v in r.stoichiometry.items() if v < 0}
+    # the dosed reactant whose accumulation the semi-batch reports
+    reagent = next((n for i, n in enumerate(names) if dosed[i] > 0 and n in is_reactant), None)
     if batch.target is not None:
         key = batch.target.key
-        if key not in names or charge.get(key, 0.0) <= 0:
+        if key not in names or (charge.get(key, 0.0) <= 0 and dosed[names.index(key)] <= 0):
             raise TankError(f"the target's key component {key} is not charged")
+    elif reagent is not None:
+        key = reagent
     else:  # the profile's conversion: of the first charged reactant, else of a charged one
-        key = next(
-            (n for n in charged if any(r.stoichiometry.get(n, 0) < 0 for r in reactions)),
-            charged[0],
-        )
+        key = next((n for n in charged if n in is_reactant), charged[0])
     ki = names.index(key)
     if batch.heat == "isothermal" and isothermal_at:
         temperature = isothermal_at  # the batch is held at its given temperature
@@ -470,6 +548,15 @@ def solve_batch(
 
     if adiabatic:
         energies(temperature)  # a TankError names what is missing before the run
+    # kJ/K of each whole dose (None: no liquid_heat_capacity): its sensible heat on entering
+    dose_capacity: list[float | None] = []
+    for d in doses:
+        try:
+            dose_capacity.append(mix.capacity(d.moles, d.temperature))
+        except TankError:
+            if adiabatic:
+                raise
+            dose_capacity.append(None)
 
     def volume_of(moles: Sequence[float], t: float) -> float:
         if gas_volume is not None:
@@ -481,94 +568,200 @@ def solve_batch(
             return pressure
         return sum(moles) * R * t / gas_volume
 
-    def derivatives(state: list[float]) -> list[float]:
-        moles, t = state[:-2], state[-2]
-        v = volume_of(moles, t)
-        mult = mix.multipliers(v)
-        rates = mix.rates(moles, t, pressure_of(moles, t))
-        extent = [mult[j] * rates[j] for j in range(m)]
-        dn = [sum(nu[i][j] * extent[j] for j in range(m)) for i in range(len(names))]
-        dt = 0.0
-        if adiabatic:
-            cap = mix.capacity(dict(zip(names, moles, strict=True)), t)
-            heats = energies(t)
-            dt = sum(-h * e for h, e in zip(heats, extent, strict=True)) / cap
-        return [*dn, dt, 0.0]
+    def feeding(t: float) -> tuple[list[float], list[tuple[float, float]]]:
+        """kmol/s by component dosed at time *t*, and (kW/K, K) of each dose then: its heat
+        capacity flow and temperature."""
+        found = [0.0] * len(names)
+        sensible = []
+        for d, amounts, cap in zip(doses, dose_moles, dose_capacity, strict=True):
+            if (share := d.rate(t)) > 0:
+                found = [a + share * v for a, v in zip(found, amounts, strict=True)]
+                if cap is not None:
+                    sensible.append((share * cap, d.temperature))
+        return found, sensible
 
-    def conversion(state: list[float]) -> float:
-        return 1.0 - state[ki] / n0[ki]
+    def fed(t: float) -> list[float]:
+        """kmol by component dosed by time *t*."""
+        found = [0.0] * len(names)
+        for d, amounts in zip(doses, dose_moles, strict=True):
+            share = d.fed(t)
+            found = [a + share * v for a, v in zip(found, amounts, strict=True)]
+        return found
 
-    state = [*n0, temperature, pressure]
-    t_end = batch.time
-    target = batch.target.conversion if batch.target else None
-    clock, h = 0.0, (t_end or 1.0) / 1000.0
-    result = TankResult({}, temperature, pressure, "batch")
-    result.profile.append((0.0, temperature, pressure, 0.0))
-    heat = 0.0
-    peak = 0.0
+    def conversion(state: list[float], clock: float) -> float:
+        given = n0[ki] + (fed(clock)[ki] if doses else 0.0)
+        return 1.0 - state[ki] / given if given > 0 else 0.0
+
+    def potential(moles: Sequence[float], t: float) -> float:
+        """K: the rise if cooling fails now and the dosing stops: the largest heat of one
+        reaction run to completion of what is in the vessel, over its heat capacity."""
+        heats = energies(t)
+        best = 0.0
+        for j in range(m):
+            if heats[j] < 0:
+                extent = min(moles[i] / -nu[i][j] for i in range(len(names)) if nu[i][j] < 0)
+                best = max(best, -heats[j] * extent)
+        return best / mix.capacity(dict(zip(names, moles, strict=True)), t)
+
     try:
         energies(temperature)
         known = True
     except TankError:
         known = False
+    worst_known = bool(doses) and known
+    missing_cooling = ""
+    if worst_known:
+        # every component that can be in the vessel: charged, dosed or formed
+        present = {
+            n: 1.0
+            for i, n in enumerate(names)
+            if n0[i] > 0 or dosed[i] > 0 or any(nu[i][j] > 0 for j in range(m))
+        }
+        try:
+            mix.capacity(present, temperature)
+        except TankError as failure:
+            worst_known = False
+            missing_cooling = str(failure)
+
+    def run(
+        state: list[float],
+        clock: float,
+        t_end: float | None,
+        target: float | None,
+        source: list[float],
+        sensible: list[tuple[float, float]],
+        post: bool,
+    ) -> tuple[list[float], float]:
+        """From *state* at *clock* s to *t_end* s or the *target* conversion, *source* kmol/s
+        dosed meanwhile; the accepted steps go into the result."""
+        nonlocal heat, peak, cooling, stalled
+
+        def derivatives(state: list[float]) -> list[float]:
+            moles, t = state[:-2], state[-2]
+            v = volume_of(moles, t)
+            mult = mix.multipliers(v)
+            rates = mix.rates(moles, t, pressure_of(moles, t))
+            extent = [mult[j] * rates[j] for j in range(m)]
+            dn = [
+                sum(nu[i][j] * extent[j] for j in range(m)) + source[i] for i in range(len(names))
+            ]
+            dt = 0.0
+            if adiabatic:
+                cap = mix.capacity(dict(zip(names, moles, strict=True)), t)
+                heats = energies(t)
+                gain = sum(-h * e for h, e in zip(heats, extent, strict=True))
+                gain += sum(c * (t_dose - t) for c, t_dose in sensible)
+                dt = gain / cap
+            return [*dn, dt, 0.0]
+
+        h = ((t_end - clock) if t_end is not None else 1.0) / 1000.0
+        while True:
+            if t_end is not None:
+                h = min(h, t_end - clock)
+            new, error = _dopri_step(derivatives, state, h)
+            scale = [
+                max(abs(a), abs(b), 1e-9 * total0)
+                for a, b in zip(state[:-2], new[:-2], strict=True)
+            ] + [max(abs(state[-2]), 1.0), 1.0]
+            err = max(abs(e) / s for e, s in zip(error, scale, strict=True))
+            if err > 1e-7 and h > 1e-12:
+                h *= max(0.2, 0.9 * (1e-7 / err) ** 0.2)
+                continue
+            if target is not None and conversion(new, clock + h) >= target:
+                # the target lies inside this step: bisect the step size
+                lo, hi = 0.0, h
+                for _ in range(60):
+                    mid = (lo + hi) / 2
+                    trial, _ = _dopri_step(derivatives, state, mid)
+                    if conversion(trial, clock + mid) >= target:
+                        hi = mid
+                    else:
+                        lo = mid
+                new, _ = _dopri_step(derivatives, state, hi)
+                h = hi
+            new[:-2] = [max(v, 0.0) for v in new[:-2]]
+            # what reacted in this step: the change of moles less what was dosed
+            d_moles = [b - a - s * h for a, b, s in zip(state[:-2], new[:-2], source, strict=True)]
+            if known:
+                # the extents of this step from its change of moles, at the step's temperature
+                released = _released(mix, nu, d_moles, energies(state[-2]))
+                heat += released
+                v = volume_of(new[:-2], new[-2])
+                if h > 0 and v > 0:
+                    peak = max(peak, released / h / v)
+                if doses and h > 0 and not adiabatic:
+                    # kW to remove: the reaction's heat and the doses' warming to the batch
+                    warming = sum(c * (t_dose - new[-2]) for c, t_dose in sensible)
+                    cooling = max(cooling, released / h + warming)
+            previous = conversion(state, clock)
+            clock += h
+            progress = abs(conversion(new, clock) - previous)
+            state = new
+            record(state, clock)
+            if t_end is not None and clock >= t_end * (1 - 1e-12):
+                return state, clock
+            if target is not None and conversion(state, clock) >= target - 1e-12:
+                return state, clock
+            if not post:
+                h = min(h * 2, max(clock, h) * 10)
+                continue
+            stalled = stalled + 1 if progress < 1e-12 else 0
+            if target is None and stalled > 50:
+                result.notes.append(
+                    f"converts no further after {clock:.4g} s (equilibrium, or a reactant used up)"
+                )
+                return state, t_end  # type: ignore[return-value]
+            if stalled > 50 or clock > 1e9:
+                raise TankError(
+                    f"the target conversion {target:g} of {key} is not reached: the batch stops "
+                    f"at {conversion(state, clock):.4g} (equilibrium, or a reactant used up)"
+                )
+            h = min(h * 2, max(clock, h) * 10)
+
+    reagent_total = (n0[names.index(reagent)] + dosed[names.index(reagent)]) if reagent else 0.0
+    worst: list[float] = []  # time s, temperature K, temperature after a cooling failure K
+
+    def record(state: list[float], clock: float) -> None:
+        moles, t = state[:-2], state[-2]
+        result.profile.append((clock, t, pressure_of(moles, t), conversion(state, clock)))
+        if not doses:
+            return
+        if reagent is not None and reagent_total > 0:
+            result.accumulation.append((clock, moles[names.index(reagent)] / reagent_total))
+        if worst_known:
+            try:
+                reached = t + potential(moles, t)
+            except TankError:
+                return  # no heat capacity of what is there: no value at this step
+            if not worst or reached > worst[2]:
+                worst[:] = [clock, t, reached]
+
+    state = [*n0, temperature, pressure]
+    result = TankResult({}, temperature, pressure, "semibatch" if doses else "batch")
+    heat = 0.0
+    peak = 0.0
+    cooling = 0.0
     stalled = 0
-    while True:
-        if t_end is not None:
-            h = min(h, t_end - clock)
-        new, error = _dopri_step(derivatives, state, h)
-        scale = [
-            max(abs(a), abs(b), 1e-9 * total0) for a, b in zip(state[:-2], new[:-2], strict=True)
-        ] + [max(abs(state[-2]), 1.0), 1.0]
-        err = max(abs(e) / s for e, s in zip(error, scale, strict=True))
-        if err > 1e-7 and h > 1e-12:
-            h *= max(0.2, 0.9 * (1e-7 / err) ** 0.2)
-            continue
-        if target is not None and conversion(new) >= target:
-            # the target lies inside this step: bisect the step size
-            lo, hi = 0.0, h
-            for _ in range(60):
-                mid = (lo + hi) / 2
-                trial, _ = _dopri_step(derivatives, state, mid)
-                if conversion(trial) >= target:
-                    hi = mid
-                else:
-                    lo = mid
-            new, _ = _dopri_step(derivatives, state, hi)
-            h = hi
-        new[:-2] = [max(v, 0.0) for v in new[:-2]]
-        d_moles = [b - a for a, b in zip(state[:-2], new[:-2], strict=True)]
-        if known:
-            # the extents of this step from its change of moles, at the step's temperature
-            released = _released(mix, nu, d_moles, energies(state[-2]))
-            heat += released
-            v = volume_of(new[:-2], new[-2])
-            if h > 0 and v > 0:
-                peak = max(peak, released / h / v)
-        clock += h
-        progress = abs(conversion(new) - conversion(state))
-        state = new
-        result.profile.append(
-            (clock, state[-2], pressure_of(state[:-2], state[-2]), conversion(state))
+    clock = 0.0
+    record(state, clock)
+    breaks = sorted({0.0, *(x for d in doses for a, b, _ in d.segments for x in (a, b))})
+    zero = [0.0] * len(names)
+    for a, b in zip(breaks, breaks[1:], strict=False):
+        source, sensible = feeding((a + b) / 2)
+        state, clock = run(state, clock, b, None, source, sensible, post=False)
+    dosing_end = clock
+    target = batch.target.conversion if batch.target else None
+    if not doses:
+        state, clock = run(state, clock, batch.time, target, zero, [], post=True)
+    elif target is not None and conversion(state, clock) >= target:
+        result.notes.append(
+            f"the target conversion {target:g} of {key} is reached when the dosing ends"
         )
-        if t_end is not None and clock >= t_end * (1 - 1e-12):
-            break
-        if target is not None and conversion(state) >= target - 1e-12:
-            break
-        stalled = stalled + 1 if progress < 1e-12 else 0
-        if target is None and stalled > 50:
-            result.notes.append(
-                f"converts no further after {clock:.4g} s (equilibrium, or a reactant used up)"
-            )
-            clock = t_end  # type: ignore[assignment]
-            break
-        if stalled > 50 or clock > 1e9:
-            raise TankError(
-                f"the target conversion {target:g} of {key} is not reached: the batch stops at "
-                f"{conversion(state):.4g} (equilibrium, or a reactant used up)"
-            )
-        h = min(h * 2, max(clock, h) * 10)
+    elif batch.time is not None or target is not None:
+        t_end = clock + batch.time if batch.time is not None else None
+        state, clock = run(state, clock, t_end, target, zero, [], post=True)
     result.outlet = dict(zip(names, state[:-2], strict=True))
-    change = [b - a for a, b in zip(n0, state[:-2], strict=True)]
+    change = [b - a - d for a, b, d in zip(n0, state[:-2], dosed, strict=True)]
     gram = [
         [sum(nu[i][j] * nu[i][k] for i in range(len(names))) for k in range(m)] for j in range(m)
     ]
@@ -577,7 +770,7 @@ def solve_batch(
     # the outlet the extents give: the integrator clips a reactant at zero now and then, and a
     # conversion reactor (the DWSIM coupling) must reproduce the outlet from the extents
     result.outlet = {
-        n: max(n0[i] + sum(nu[i][j] * fitted[j] for j in range(m)), 0.0)
+        n: max(n0[i] + dosed[i] + sum(nu[i][j] * fitted[j] for j in range(m)), 0.0)
         for i, n in enumerate(names)
     }
     result.temperature = state[-2]
@@ -585,16 +778,37 @@ def solve_batch(
     result.time = clock
     result.volume = volume_of(n0, temperature)
     if known:
-        result.heat_released = heat / total0
+        result.heat_released = heat / (total0 + sum(dosed))
         result.peak_heat_rate = peak
+    if doses:
+        result.dosing_time = dosing_end
+        result.volume = volume_of(state[:-2], state[-2])
+        result.charge_volume = volume_of(n0, temperature)
+        if result.accumulation:
+            result.max_accumulation_time, result.max_accumulation = max(
+                result.accumulation, key=lambda p: p[1]
+            )
+        if worst:
+            result.cooling_failure = (worst[0], worst[1], worst[2])
+        elif known:
+            result.notes.append(f"no cooling-failure temperature: {missing_cooling}")
+        if known and not adiabatic and result.volume:
+            result.peak_cooling_duty = cooling / result.volume
+        if reagent is None:
+            result.notes.append("no dosed reactant: no accumulation")
     for r in reactions:
         hottest = max(p[1] for p in result.profile)
         if not r.rate.covers(hottest) or not r.rate.covers(temperature):
             result.notes.append(f"the batch leaves the rate's temperature range of {r.id}")
     if len(result.profile) > PROFILE_POINTS:
         step = len(result.profile) / PROFILE_POINTS
-        kept = [result.profile[int(k * step)] for k in range(PROFILE_POINTS)]
-        result.profile = [*kept, result.profile[-1]]
+        picked = [int(k * step) for k in range(PROFILE_POINTS)]
+        result.profile = [*(result.profile[k] for k in picked), result.profile[-1]]
+        if result.accumulation:
+            result.accumulation = [
+                *(result.accumulation[k] for k in picked),
+                result.accumulation[-1],
+            ]
     return result
 
 
@@ -610,6 +824,36 @@ def _released(
     return -sum(x * h for x, h in zip(extents, heats, strict=True))
 
 
+def tank_inlet(node: Any, inlets: Sequence[Any]) -> Any:
+    """What :func:`solve_node` takes of tank or batch *node*'s inlet streams: the one inlet, or
+    a semi-batch's every inlet (its charge and its doses). Energy and information streams (an
+    agitator's power) are no inlet of the content. Raises TankError."""
+    inlets = [s for s in inlets if getattr(s, "kind", "material") == "material"]
+    if node.reactor == "semibatch":
+        return inlets
+    if len(inlets) != 1:
+        raise TankError(f"a {node.reactor} takes one inlet stream (mix the feeds before it)")
+    return inlets[0]
+
+
+def split_inlets(node: Any, inlets: Sequence[Any]) -> tuple[Any, list[tuple[Any, Any]]]:
+    """A semi-batch's charge stream and its (dosing, stream) pairs among *inlets*. Raises
+    TankError when a dosed stream is no inlet, or the charge is not one stream. Energy and
+    information streams are left out."""
+    inlets = [s for s in inlets if getattr(s, "kind", "material") == "material"]
+    by_id = {s.id: s for s in inlets}
+    dosing = node.batch.dosing if node.batch is not None else []
+    if lacking := [d.stream for d in dosing if d.stream not in by_id]:
+        raise TankError(f"the dosed stream(s) {', '.join(lacking)} are no inlet of {node.id}")
+    dosed = {d.stream for d in dosing}
+    charges = [s for s in inlets if s.id not in dosed]
+    if len(charges) != 1:
+        raise TankError(
+            f"a semibatch takes one charge stream besides its doses ({len(charges)} given)"
+        )
+    return charges[0], [(d, by_id[d.stream]) for d in dosing]
+
+
 def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TankResult, dict[str, Any]]:
     """:func:`_solve_node`, every problem a :class:`TankError` (a rate law, a liquid measure or
     an activity model may raise a plain ValueError), so that callers report it."""
@@ -621,32 +865,46 @@ def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TankResu
         raise TankError(str(failure)) from failure
 
 
-def _solve_node(
-    process: Any, node: Any, inlet: Any, case: str
-) -> tuple[TankResult, dict[str, Any]]:
-    """The tank (``reactor: cstr``) or batch (``reactor: batch``) *node* fed by stream *inlet*
-    in *case*, and what it was solved from (the inputs of the outlet's fingerprint). Raises
-    :class:`TankError` naming what is missing. One function for ``cheme process propagate`` and
-    ``process reactors``."""
+def stream_moles(process: Any, stream: Any, case: str) -> tuple[dict[str, float], float, float]:
+    """kmol/h by component, K and kPa(a) of *stream* in *case*. Raises TankError."""
     from chemeascode.domains.process.model import stream_flows
     from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 
     fs = process.flowsheet
-    state = inlet.state.get(case)
+    state = stream.state.get(case)
     t = getattr(state, "temperature", None)
     p = getattr(state, "pressure", None)
     kelvin = to_kelvin(t.value, t.unit or fs.units.temperature) if t is not None else None
     kpa = to_kpa_abs(p.value, p.unit or fs.units.pressure) if p is not None else None
     if kelvin is None or kpa is None:
-        raise TankError(f"no inlet temperature and absolute pressure ({inlet.id})")
-    flows = stream_flows(process, inlet, case)
+        raise TankError(f"no inlet temperature and absolute pressure ({stream.id})")
+    flows = stream_flows(process, stream, case)
     if flows.components is None:
-        raise TankError(f"no composition and flow of {inlet.id}: " + ", ".join(flows.missing))
+        raise TankError(f"no composition and flow of {stream.id}: " + ", ".join(flows.missing))
     comps = process.components()
     lacking = sorted(n for n in flows.components if not getattr(comps.get(n), "molar_mass", None))
     if lacking:
         raise TankError("no molar_mass for " + ", ".join(lacking))
-    moles = {n: kg / comps[n].molar_mass for n, kg in flows.components.items()}
+    return {n: kg / comps[n].molar_mass for n, kg in flows.components.items()}, kelvin, kpa
+
+
+def _solve_node(
+    process: Any, node: Any, inlet: Any, case: str
+) -> tuple[TankResult, dict[str, Any]]:
+    """The tank (``reactor: cstr``), batch (``reactor: batch``) or semi-batch (``reactor:
+    semibatch``, *inlet* its inlet streams) *node* fed by stream *inlet* in *case*, and what it
+    was solved from (the inputs of the outlet's fingerprint). Raises :class:`TankError` naming
+    what is missing. One function for ``cheme process propagate`` and ``process reactors``."""
+    from chemeascode.foundation.units import to_kelvin
+
+    fs = process.flowsheet
+    doses: list[Dose] = []
+    if node.reactor == "semibatch":
+        inlet, pairs = split_inlets(node, inlet if isinstance(inlet, list) else [inlet])
+        for dosing, stream in pairs:
+            moles, kelvin, _ = stream_moles(process, stream, case)
+            doses.append(Dose(moles, kelvin, dosing.segments()))
+    moles, kelvin, kpa = stream_moles(process, inlet, case)
     outlet_t = None
     for stream in fs.streams:
         ends = process.ends(stream)
@@ -655,7 +913,7 @@ def _solve_node(
             given = getattr(q, "temperature", None)
             if given is not None and given.provenance != "calculated":
                 outlet_t = to_kelvin(given.value, given.unit or fs.units.temperature)
-    return solve_moles(process, node, moles, kelvin, kpa, outlet_t)
+    return solve_moles(process, node, moles, kelvin, kpa, outlet_t, doses)
 
 
 def _deactivation(process: Any, node: Any) -> Any:
@@ -679,7 +937,7 @@ def tank_inputs(process: Any, node: Any, reactions: list[Any], names: list[str])
     comps = process.components()
     data = process.ideal_gas()
     found: dict[str, Any] = {
-        kind: spec.model_dump(mode="json"),
+        "batch" if kind == "semibatch" else kind: spec.model_dump(mode="json"),
         "reactions": [r.inputs_dump() for r in reactions],
         "ideal_gas": {n: data[n].model_dump(mode="json") if data.get(n) else None for n in names},
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
@@ -705,24 +963,38 @@ def solve_moles(
     kelvin: float,
     kpa: float,
     outlet_t: float | None = None,
+    doses: Sequence[Dose] = (),
 ) -> tuple[TankResult, dict[str, Any]]:
     """The tank or batch *node* fed with *moles* (kmol/h) at *kelvin* K and *kpa* kPa(a), an
-    isothermal one held at *outlet_t* where given, and what it was solved from (its inputs
-    besides the inlet). For ``cheme process propagate`` (through :func:`solve_node`) and the
-    coupling to the DWSIM solve, which brings its own inlet. Raises ValueError (TankError)."""
+    isothermal one held at *outlet_t* where given, a semi-batch dosed with *doses*, and what it
+    was solved from (its inputs besides the inlet). For ``cheme process propagate`` (through
+    :func:`solve_node`) and the coupling to the DWSIM solve, which brings its own inlet. Raises
+    ValueError (TankError)."""
     from chemeascode.domains.process.liquid_phase import liquid_of
 
     kind = node.reactor
     spec = node.tank if kind == "cstr" else node.batch
     if spec is None:
         raise TankError(f"reactor {kind} without {'tank' if kind == 'cstr' else 'batch'}:")
+    if kind == "semibatch" and not doses:
+        raise TankError("a semibatch without doses (batch.dosing: and their inlet streams)")
+    if kind == "batch" and spec.dosing:
+        raise TankError("a batch with dosing: set reactor: semibatch, or remove batch.dosing")
     reactions, unknown = process.reactions_of(node.id)
     if unknown:
         raise TankError("undeclared reactions " + ", ".join(unknown))
     if not reactions:
         raise TankError("no reactions")
     comps = process.components()
-    names = list(dict.fromkeys([*moles, *(n for r in reactions for n in r.stoichiometry)]))
+    names = list(
+        dict.fromkeys(
+            [
+                *moles,
+                *(n for d in doses for n in d.moles),
+                *(n for r in reactions for n in r.stoichiometry),
+            ]
+        )
+    )
     mw = {n: getattr(comps.get(n), "molar_mass", None) for n in names}
     if lack := [n for n in names if not mw[n]]:
         raise TankError("no molar_mass for " + ", ".join(lack))
@@ -732,6 +1004,10 @@ def solve_moles(
     capacity = {n: getattr(comps.get(n), "liquid_heat_capacity", None) for n in names}
     inputs = {"T_in": kelvin, "P_in": kpa, **tank_inputs(process, node, reactions, names)}
     inputs["T_out_given"] = outlet_t
+    if doses:
+        inputs["doses"] = [
+            {"moles": dict(d.moles), "T": d.temperature, "segments": d.segments} for d in doses
+        ]
     if kind == "cstr":
         activity = 1.0
         if spec.time_on_stream:
@@ -744,5 +1020,7 @@ def solve_moles(
                 f"catalyst activity {activity:.4g} after {spec.time_on_stream:g} h on stream"
             )
     else:
-        result = solve_batch(reactions, moles, kelvin, kpa, spec, data, liquid, capacity, outlet_t)
+        result = solve_batch(
+            reactions, moles, kelvin, kpa, spec, data, liquid, capacity, outlet_t, doses
+        )
     return result, inputs

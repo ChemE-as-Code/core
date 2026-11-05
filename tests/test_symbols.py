@@ -25,7 +25,14 @@ from chemeascode.domains.piping.authoring.shapes import (
     template_sheet_path,
 )
 from chemeascode.domains.process.sheets import build
-from chemeascode.domains.process.symbols import STEP_SYMBOLS, step_symbol, symbols
+from chemeascode.domains.process.symbols import (
+    BOX,
+    JUNCTION,
+    STEP_SYMBOLS,
+    step_drawing,
+    step_symbol,
+    symbols,
+)
 from chemeascode.foundation.workspace import Workspace
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
@@ -119,10 +126,16 @@ def test_inline_library_symbols_end_where_the_valve_fragment_puts_the_pipe():
 
 
 def test_step_symbols_follow_the_step_class_and_its_bases():
-    assert all(name is None or name in symbols() for name in STEP_SYMBOLS.values())
+    assert all(name in (None, JUNCTION) or name in symbols() for name in STEP_SYMBOLS.values())
     assert all(getattr(C, cls, None) is not None for cls in STEP_SYMBOLS)
     assert step_symbol("Pumping").name == "PUMP_CENTRIFUGAL_SHAPE"
     assert step_symbol("StrippingDistilling").name == "COLUMN_TRAYS_SHAPE"
+    # junctions (mixing and splitting tees) have no equipment symbol; a step's symbol: wins
+    assert step_drawing("Mixing") == step_drawing("SplittingMaterial") == JUNCTION
+    assert step_symbol("Mixing") is None
+    assert step_drawing("Mixing", "TANK_CONE_ROOF_SHAPE").name == "TANK_CONE_ROOF_SHAPE"
+    assert step_drawing("Cooling", BOX) is None
+    assert step_drawing("Cooling", "NO_SUCH_SHAPE").name == "HEAT_EXCHANGER_SHAPE"
     assert step_symbol("Cooling").name == "HEAT_EXCHANGER_SHAPE"
     assert step_symbol("MixingSimple") is None
     assert step_symbol("ProcessStep") is None

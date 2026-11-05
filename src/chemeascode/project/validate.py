@@ -1523,6 +1523,31 @@ def validate_workspace(
     if cells_path.is_file() and (targets is None or cells_path.resolve() in targets):
         report.findings += cell_report(workspace.root).findings
         report.files.append(CELLS_FILE)
+        # Stacks sized from the cells: the sizing and the equipment list's stack dimensions;
+        # `cheme process stack` runs the duties for the skid equipment.
+        from chemeascode.domains.equipment.electrolyser_stack import stack_findings
+
+        report.findings += stack_findings(workspace.root)
+
+    # Measured electrochemical series: schema, units, Faradaic and charge balances.
+    from chemeascode.domains.experiments.electrochemistry import (
+        measurement_files,
+        measurement_report,
+    )
+
+    for name in measurement_files(workspace.root):
+        if targets is None or (workspace.root / name).resolve() in targets:
+            report.findings += measurement_report(workspace.root, name).findings
+            report.files.append(name)
+
+    # Electrolysis duties: the schema, the cells and the anolyte models only;
+    # `cheme process duty` integrates them.
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE, duty_findings
+
+    duties_path = workspace.root / DUTIES_FILE
+    if duties_path.is_file() and (targets is None or duties_path.resolve() in targets):
+        report.findings += duty_findings(workspace.root)
+        report.files.append(DUTIES_FILE)
 
     # Liquid-liquid extractors: the schema only; `cheme process extract` solves them.
     from chemeascode.domains.process.separations import extraction

@@ -49,6 +49,7 @@ from chemeascode.domains.assessment.lca.backgrounds import resolve
 from chemeascode.domains.assessment.lca.balance import dataset_balance
 from chemeascode.domains.assessment.lca.carbon import ccu_findings, pcf, pcf_findings
 from chemeascode.domains.assessment.lca.carbon import findings as carbon_findings
+from chemeascode.domains.assessment.lca.case_dataset import UnknownCase, with_case
 from chemeascode.domains.assessment.lca.comparability import NOT_COMPARABLE, effective_scope
 from chemeascode.domains.assessment.lca.comparability import verdict as scenario_verdict
 from chemeascode.domains.assessment.lca.construction import read_takeoff
@@ -231,6 +232,10 @@ class LcaReport:
     credits: list[Impact] = field(default_factory=list)
     #: Only the foreground inventory was computed (no factors or Brightway needed).
     inventory_only: bool = False
+    #: The flowsheet case asked for in place of the one ``lca/lca.yaml`` studies
+    #: (``lca_report(case=...)``, :mod:`.case_dataset`): the dataset then has an id, title and
+    #: uuid naming it. None for the study's own case.
+    variant_case: str | None = None
     #: The inventory each scenario characterised, by id, when it differs from the baseline's:
     #: its own flowsheet case (``case:``), or its ``missing:`` and ``proxy:`` declarations.
     scenario_inventories: dict[str, Inventory] = field(default_factory=dict)
@@ -452,15 +457,21 @@ def maturity(root: Path) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def lca_report(root: Path, inventory_only: bool = False) -> LcaReport:
+def lca_report(root: Path, inventory_only: bool = False, case: str | None = None) -> LcaReport:
     """The LCA of the plant repository at *root*, independent of the working directory.
 
     With *inventory_only*, only the foreground inventory and the unallocated dataset: no
     factors, Brightway project or licensed data needed.
 
+    With *case*, the foreground of that flowsheet case instead of the one ``lca/lca.yaml``
+    studies (*inventory_only* implied: the results, scenarios and manifest are the study's).
+    A case other than the study's is ``variant_case``, and its dataset's id, title and uuid
+    name it (:func:`.case_dataset.with_case`). Raises :class:`.case_dataset.UnknownCase` for a
+    case the flowsheet does not declare.
+
     Raises :class:`NotAPlantRepository` when *root* holds no ``plant.yaml``. Inputs that do not
     load are findings, and ``loaded`` is then False (classification ``unavailable``)."""
-    report = _lca_report(Path(root), inventory_only)
+    report = _lca_report(Path(root), inventory_only or case is not None, case)
     if report.inventory is not None:
         report.findings += report.inventory.notes
         report.data_quality = _data_quality(report)
@@ -479,7 +490,7 @@ def lca_report(root: Path, inventory_only: bool = False) -> LcaReport:
     return report
 
 
-def _lca_report(root: Path, inventory_only: bool) -> LcaReport:
+def _lca_report(root: Path, inventory_only: bool, case: str | None = None) -> LcaReport:
     from chemeascode.domains.process.model import load
 
     if not (root / PLANT_FILE).is_file():
@@ -537,6 +548,13 @@ def _lca_report(root: Path, inventory_only: bool) -> LcaReport:
         return report
     if any(f.level == "error" for f in report.findings):
         return report
+    if case is not None:
+        declared = [c.id for c in process.flowsheet.cases]
+        if case not in declared:
+            raise UnknownCase(case, declared)
+        if case != (scope.case or process.flowsheet.default_case()):
+            scope = scope.model_copy(update={"case": case})
+            report.variant_case = case
     # provider profiles map what flows: leaves unmapped
     added, report.mapping_files, found = profile_flows(root, scope, process, LCA_FILE, lca_text)
     report.findings += found
@@ -563,6 +581,8 @@ def _lca_report(root: Path, inventory_only: bool) -> LcaReport:
         report.maturity,
         load=lambda path: load_dataset(root, path),
     )
+    if report.variant_case is not None and report.inventory.dataset is not None:
+        report.inventory.dataset = with_case(report.inventory.dataset, report.variant_case)
     if report.inventory.dataset is not None:
         # the balance gates: mass, elements, carbon by origin, energy
         report.balance = dataset_balance(
@@ -1856,7 +1876,9 @@ def outputs(report: LcaReport) -> dict[str, str]:
 
 
 def dataset_yaml(report: LcaReport) -> str:
-    """The plant's unallocated LCI dataset as ``lca/dataset.yaml`` (empty without one)."""
+    """The plant's unallocated LCI dataset as ``lca/dataset.yaml`` (empty without one); for a
+    report of another case (``variant_case``), that case's dataset as
+    ``lca/datasets/<id>.yaml`` (:mod:`.case_dataset`)."""
     dataset = report.inventory.dataset if report.inventory else None
     if dataset is None:
         return ""
@@ -1891,6 +1913,14 @@ def dataset_yaml(report: LcaReport) -> str:
         "# lca --write from the flowsheet and lca/lca.yaml; do not edit. Other studies reference\n"
         "# it as a background (dataset: {path, product, allocation}).\n"
     )
+    if report.variant_case is not None:
+        case = report.variant_case
+        header = (
+            f"# The unallocated LCI dataset of design case {case} (kind lci_dataset): generated\n"
+            f"# by cheme assess lca --write --case {case} from the flowsheet and lca/lca.yaml; do\n"
+            f"# not edit (cheme assess lca --check --case {case} finds it stale). Its id, title\n"
+            "# and uuid name the case (ADR 0045); the study's own case is lca/dataset.yaml.\n"
+        )
     return header + yaml.dump(
         data, Dumper=_DatasetDumper, sort_keys=False, allow_unicode=True, width=100
     )

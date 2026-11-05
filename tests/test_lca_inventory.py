@@ -241,3 +241,57 @@ def test_monte_carlo_keeps_supplies_with_their_sources(plant: Path) -> None:
         v for v in mc.varied if v.split(":")[1] in ("maintenance", "transport", "end-of-life")
     ]
     assert {b for k, b in mc.bases.items() if k != "amount:construction:steel"} == {"pedigree"}
+
+
+def test_a_consumable_per_batch_follows_the_recipe(plant: Path) -> None:
+    """core#158 package 5: 500 kg of rinse water per batch, 1000 batches of 8 h in 8000 h
+    (process/recipe.yaml): 62.5 kg/h of the flowsheet's year averages, 2.5 h per t of PROD."""
+    hours = {"provenance": "assumed"}
+    recipe = {
+        "schema": "cheme/recipe/v1",
+        "kind": "recipe",
+        "batch_size": {"value": 3200, "unit": "kg", "stream": "S3", **hours},
+        "hours_per_year": {"value": 8000, **hours},
+        "unit_procedures": [
+            {
+                "id": "SEPARATE",
+                "unit": "SEP",
+                "operations": [{"id": "run", "kind": "other", "duration": {"value": 8, **hours}}],
+            }
+        ],
+    }
+    (plant / "process" / "recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    scope = {**SCOPE, "consumables": [*SCOPE["consumables"]]}
+    scope["consumables"].append(
+        {
+            "id": "rinse",
+            "title": "Rinse water",
+            "unit": "kg",
+            "per_batch": 500,
+            "factor": "sieve",
+            "source": "rinse of the vessel (ASSUMED)",
+        }
+    )
+    _write(plant, scope)
+    report = lca_report(plant)
+    assert report.loaded, [f.format() for f in report.findings]
+    rinse = {r.key: r for r in report.inventory.rows}["consumable:rinse"]
+    assert rinse.quantity == pytest.approx(62.5 * 2.5)
+    dataset = LciDataset.model_validate(yaml.safe_load(dataset_yaml(report)))
+    (exchange,) = [e for e in dataset.exchanges if e.key == "consumable:rinse"]
+    assert "500 kg per batch x 1000 batches in 8000 h" in exchange.source
+    # a recipe that does not load is said to, not called missing
+    (plant / "process" / "recipe.yaml").write_text("schema: cheme/recipe/v1\nkind: recipe\n")
+    report = lca_report(plant)
+    (finding,) = [f for f in report.findings if f.rule == "cheme.lca-per-batch"]
+    assert "does not load" in finding.message
+    # without the recipe: an error, not a silent zero
+    (plant / "process" / "recipe.yaml").unlink()
+    report = lca_report(plant)
+    assert any(f.rule == "cheme.lca-per-batch" for f in report.findings)
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="per_batch"):
+        LcaFile.model_validate(
+            {**scope, "consumables": [{**scope["consumables"][-1], "per_year": 1}]}
+        )

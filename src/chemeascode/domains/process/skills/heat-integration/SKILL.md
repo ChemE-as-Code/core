@@ -38,8 +38,18 @@ operating cases.
 
 Engineering guidance only, with one partial exception.
 
-- Core has no stream-data extraction, no utility-level placement and no network design.
-- Core has no `cheme` command for pinch analysis. It has a Python function,
+- Core has no utility-level placement and no network design.
+- `cheme process pinch --dt-min X [--case C] [--include-constrained] [--json|--md] [--write]`
+  takes whole-plant targets from the case's recorded, current simulation run
+  (`process/simulation-run.json`; it never runs the simulator). It extracts one stream per
+  thermal duty with its class (utility, recovery, constrained, excluded) and quality (today
+  always `linearised` or `insufficient`: the simulator reports no H-T profile), reconciles them
+  against the run's duties, and prints the current utility demand, the theoretical minimum
+  utility demand at dTmin and the theoretical energy-saving potential (never "savings"), the
+  pinch, utility-use pinch violations and cross-pinch transfer in existing exchangers.
+  `--write` records it in `process/pinch-run.json` and refuses while the reconciliation has a
+  finding. dTmin is yours to give, with `--dt-min-source` (default ASSUMED).
+- It rests on the Python function,
   `chemeascode.domains.process.heat_integration.pinch.pinch_analysis(streams, dt_min)`, that runs
   the problem table algorithm on streams you give it (K, kW/K or piecewise segments) and returns
   minimum hot and cold utility, the pinch temperatures and the grand composite curve. Its result

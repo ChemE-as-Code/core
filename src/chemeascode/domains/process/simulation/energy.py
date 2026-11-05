@@ -97,11 +97,18 @@ from typing import Any
 
 from chemeascode.domains.process import MATERIALS_FILE
 from chemeascode.domains.process.energy import ENERGY_TOLERANCE, tolerance
-from chemeascode.domains.process.heat_integration.pinch import (
-    PinchStream,
-    Segment,
-    minimum_approach,
+from chemeascode.domains.process.heat_integration.pinch import minimum_approach
+from chemeascode.domains.process.heat_integration.streams import (
+    HEATED,
+    REACTORS,
+    SMALL_DT,
+    SMALL_VF,
+    _ends,
+    _is_utility,
+    _terminals,
+    process_duties,
 )
+from chemeascode.domains.process.heat_integration.streams import side as _side
 from chemeascode.domains.process.simulation import SIMULATION_FILE
 from chemeascode.domains.process.simulation.backends import DWSIM, IDAES, IDAES_PACKAGES
 from chemeascode.foundation.findings import Finding
@@ -177,13 +184,9 @@ DATA_TOLERANCE = {"rel_reaction_heat": 0.01, "abs_kW": 0.1}
 #: A reacting component's molar flow change below this fraction of the flows through the unit
 #: (or the plant) is none.
 SMALL_DN = 1e-9
-#: Temperature differences below this are taken as no change (K); vapour fractions below
-#: this as no phase change.
-SMALL_DT = 1e-6
-SMALL_VF = 1e-4
-#: Reacting units (a kinetic_pfr is solved by cheme-as-code and seen by DWSIM as a conversion
-#: reactor: it reacts all the same).
-REACTORS = ("conversion_reactor", "equilibrium_reactor", "gibbs_reactor", "kinetic_pfr")
+#: SMALL_DT, SMALL_VF (no temperature or phase change), REACTORS and HEATED (units with one
+#: duty on one process stream) are shared with the thermal-stream extraction
+#: (:mod:`chemeascode.domains.process.heat_integration.streams`), imported above.
 #: Specified splits whose energy imbalance is stated, not judged (ADR 0038): the recoveries
 #: are given, so nothing in the split conserves energy; the imbalance is the streams' enthalpy
 #: out minus in (:data:`STATED_SIGN`) and enters the plant closure as a stated residual.
@@ -193,8 +196,6 @@ STATED_SIGN = (
     "enthalpy out minus enthalpy in (kW): the heat the unit would have to take in for its "
     "balance to close; positive: its outlets carry more enthalpy than its inlets"
 )
-#: Units whose single duty heats or cools one process stream (inlet 0 to outlet 0).
-HEATED = ("heater", "cooler", "flash", *REACTORS)
 
 
 def _finding(level: str, rule: str, message: str, line: int | None, ids: list[str], hint: str):
@@ -222,38 +223,10 @@ def _phase_changes(out: dict[str, Any], a: str, b: str) -> bool:
     return two_phase or abs(va - vb) > SMALL_VF
 
 
-def _side(t_in: float, t_out: float, duty: float, name: str, side: str | None = None):
-    """A pinch stream for one exchanger side: constant heat capacity flow, or an isothermal
-    load (temperatures equal) on *side*."""
-    if abs(t_in - t_out) <= SMALL_DT:
-        return PinchStream.piecewise([Segment.latent(t_in, duty)], name, side=side)  # type: ignore[arg-type]
-    return PinchStream(t_in, t_out, duty / abs(t_in - t_out), name)
-
-
 def _delta_k(q: Any) -> float | None:
     if q is None:
         return None
     return q.value if (q.unit or "K") in ("K", "°C") else None
-
-
-def _ends(process: Any) -> dict[str, str]:
-    """Stream id -> the terminal at its other end (feed or product id)."""
-    fs = process.flowsheet
-    feeds = {t.id for t in fs.feeds}
-    products = {t.id for t in fs.products}
-    found = {}
-    for s in fs.streams:
-        a, b = s.from_.split(".")[0], s.to.split(".")[0]
-        if a in feeds:
-            found[s.id] = a
-        elif b in products:
-            found[s.id] = b
-    return found
-
-
-def _terminals(process: Any) -> dict[str, Any]:
-    fs = process.flowsheet
-    return {t.id: t for t in [*fs.feeds, *fs.products]}
 
 
 def audit(
@@ -472,11 +445,6 @@ def _exchangers(process, sim, model, out, units, ends, terminals, line) -> dict[
     return {"findings": findings, "rows": rows}
 
 
-def _is_utility(stream: str, ends: dict[str, str], terminals: dict[str, Any]) -> bool:
-    terminal = terminals.get(ends.get(stream, ""))
-    return getattr(terminal, "category", None) == "utility"
-
-
 # -- utility levels -----------------------------------------------------------------------------
 
 
@@ -490,27 +458,11 @@ def _utility_levels(model, out, units, ends, terminals, temps, line):
     findings: list[Finding] = []
     rows = []
     for u in model["units"]:
-        uid, kind = u["id"], u["type"]
+        uid = u["id"]
         got = units.get(uid) or {}
-        duties = []  # (role, process side as a pinch stream, utility is hot)
-        if kind in HEATED and u["inlets"] and u["outlets"]:
-            q = got.get("duty_kW")
-            t_in = _flow(out, u["inlets"][0]).get("temperature_K")
-            t_out = _flow(out, u["outlets"][0]).get("temperature_K")
-            if q and t_in is not None and t_out is not None:
-                heated = q > 0
-                process = _side(t_in, t_out, abs(q), uid, "cold" if heated else "hot")
-                duties.append(("energy", process, heated))
-        elif kind == "distillation_column":
-            top, bottom = got.get("top_temperature_K"), got.get("bottom_temperature_K")
-            if got.get("condenser_kW") and top is not None:
-                duties.append(
-                    ("condenser", _side(top, top, got["condenser_kW"], uid, "hot"), False)
-                )
-            if got.get("reboiler_kW") and bottom is not None:
-                duties.append(
-                    ("reboiler", _side(bottom, bottom, got["reboiler_kW"], uid, "cold"), True)
-                )
+        # (role, process side as a pinch stream, utility is hot); a shortcut column reports no
+        # stage temperatures, so its utility levels are not checked
+        duties = [(d.role, d.stream, d.heated) for d in process_duties(u, got, out, shortcut=False)]
         for role, process, heated in duties:
             terminal, stream = _energy_terminal(u, role, ends, terminals)
             level = getattr(terminal, "utility", None)

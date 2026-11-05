@@ -1,0 +1,143 @@
+{
+  "model": {
+    "id": "faraday-balance",
+    "version": 1,
+    "schema": "cheme/electrochemical-cells/v1"
+  },
+  "core_version": "<version>",
+  "assumptions": [
+    "steady state; Faraday's law: extent = current efficiency x N x I / (n F), F = 96485.33212 C/mol (CODATA 2018)",
+    "specified performance: cell voltage and current efficiencies are inputs; no polarisation curve, Nernst or Butler-Volmer model (no predictive electrochemistry)",
+    "current not assigned to a reaction (1 - FE - side fractions) causes no net chemical change (recombination of crossed-over products, shunt currents): its electricity becomes heat",
+    "isothermal boundary: feeds and products at the temperature of the heats of reaction; Q = P - sum(extent x dH); electricity counted once, as the DC power at the cell terminals (rectifier, transformer and busbar losses are outside the cell)",
+    "crossover and purge divide the formed products between outlets; they do not change the extents (no further reaction of a crossed-over product)"
+  ],
+  "limitations": [
+    "electrolyte properties (activities, heats of dilution, conductivity) are not modelled: the heats of reaction are those of process/reactions.yaml, on their own standard states (a linked dependency on electrolyte thermodynamics)",
+    "no adiabatic boundary, temperature rise or stream enthalpies (v1)",
+    "one current efficiency for the overall reaction: below 1 it reduces every product alike, and the current lost is heat, not chemistry; in a chlor-alkali cell the cathode forms H2 at about 100 % while hydroxide back-migration forms hypochlorite, chlorate and O2 (EU BREF 2014, 1.4.2: 1.070-1.128 t NaOH/t Cl2), so H2 and NaOH below a current efficiency of 1 are approximate (the electricity per t Cl2 is not affected); declare side reactions with their current fractions to include them",
+    "no polarisation curve: a voltage or efficiency outside the declared operating range is flagged, never extrapolated",
+    "not a unit of the DWSIM simulation (process/simulation.yaml): a linked flowsheet step is balanced with the cell's specified values"
+  ],
+  "qualified": [
+    {
+      "case": "water electrolysis, H2O(l) -> H2 + 1/2 O2, n = 2 (PEM half-reactions)",
+      "test": "tests/test_electrochemical_cell.py::test_water_electrolysis_reference",
+      "checks": "thermoneutral voltage from CODATA dfH(H2O, l); electricity per kg H2 against the US DOE PEM stack targets at 1.9, 1.8 and 1.6 V (rounded to 1 kWh/kg); at U_tn the electricity per kg equals the HHV of H2 and Q = 0",
+      "range": "1.6-1.9 V per cell, current efficiency 0.975-1, enthalpy basis 298.15 K"
+    },
+    {
+      "case": "chlor-alkali membrane cell, 2 NaCl + 2 H2O -> Cl2 + H2 + 2 NaOH, n = 2",
+      "test": "tests/test_electrochemical_cell.py::test_chlor_alkali_reference",
+      "checks": "thermoneutral voltage from CODATA ion enthalpies (infinite dilution); products per t Cl2 against the EU BREF's electrochemical unit (1.128 t NaOH, 28 kg H2); electricity per t Cl2 at 3.0 V and 95 % against the BREF's bipolar membrane range",
+      "range": "3.0 V at 6 kA/m2, current efficiency 0.95, enthalpy basis 298.15 K"
+    }
+  ],
+  "cells": [
+    {
+      "id": "PEM-1",
+      "reaction": "WS",
+      "line": 11,
+      "refused": false,
+      "reasons": [],
+      "current_a": 20000.0,
+      "cells": 1,
+      "current_density_a_m2": 20000.0,
+      "temperature_k": 298.15,
+      "voltage_v": 1.9,
+      "faradaic_efficiency": 1.0,
+      "unassigned_current_fraction": 0.0,
+      "extents": {
+        "WS": 0.37311370763823826
+      },
+      "formed_kmol_h": {
+        "H2O": -0.37311370763823826,
+        "H2": 0.37311370763823826,
+        "O2": 0.18655685381911913
+      },
+      "formed_kg_h": {
+        "H2O": -6.721643443102862,
+        "H2": 0.7521972345986884,
+        "O2": 5.969446208504174
+      },
+      "products": {
+        "H2": {
+          "home": "cathode",
+          "formed_kg_h": 0.7521972345986884,
+          "outlet_kg_h": 0.7521972345986884,
+          "crossover_kg_h": 0.0,
+          "purge_kg_h": 0.0
+        },
+        "O2": {
+          "home": "anode",
+          "formed_kg_h": 5.969446208504174,
+          "outlet_kg_h": 5.969446208504174,
+          "crossover_kg_h": 0.0,
+          "purge_kg_h": 0.0
+        }
+      },
+      "charge": {
+        "stack_current_a": 20000.0,
+        "carried_by_reactions_a": 20000.0,
+        "unassigned_a": 0.0,
+        "residual_a": 0.0
+      },
+      "elements_residual_kmol_h": {
+        "H": 0.0,
+        "O": 0.0
+      },
+      "thermoneutral_voltage_v": 1.4812095979755227,
+      "reversible_voltage_v": 1.229,
+      "power_kw": 38.0,
+      "reaction_enthalpy_kw": 29.624191959510455,
+      "heat_duty_kw": 8.375808040489545,
+      "energy_residual_kw": 0.0,
+      "electricity_kwh_per_kg": {
+        "H2": {
+          "formed": 50.518664855599646,
+          "delivered": 50.518664855599646
+        },
+        "O2": {
+          "formed": 6.365749631157502,
+          "delivered": 6.365749631157502
+        }
+      },
+      "voltage_efficiency": {
+        "thermoneutral": 0.7795839989344856,
+        "reversible": 0.646842105263158
+      },
+      "sourced": false,
+      "sources": [
+        "https://www.energy.gov/eere/fuelcells/technical-targets-proton-exchange-membrane-electrolysis",
+        "DOE PEM stack 2022 status: 1.9 V per cell",
+        "ideal current efficiency; reproduces the DOE PEM stack kWh/kg, whose footnote e nevertheless states a 2.5 % H2 crossover loss",
+        "DOE PEM stack 2022 status: 2.0 A/cm2"
+      ],
+      "limitations": [],
+      "step": null
+    }
+  ],
+  "findings": [
+    {
+      "file": "process/cells.yaml",
+      "line": 21,
+      "level": "info",
+      "rule": "cheme.cell-unsourced",
+      "message": "cell PEM-1: faradaic_efficiency is assumed",
+      "ids": [
+        "PEM-1"
+      ],
+      "hint": "give provenance: given with the source (measured, vendor or literature data)",
+      "id": "process/cells.yaml#cell-unsourced:PEM-1"
+    }
+  ],
+  "source": {
+    "commit": "<commit>",
+    "dirty": [],
+    "fingerprints": {
+      "process/cells.yaml": "<sha256>",
+      "process/materials.yaml": "<sha256>",
+      "process/reactions.yaml": "<sha256>"
+    }
+  }
+}

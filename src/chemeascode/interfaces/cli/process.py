@@ -204,6 +204,32 @@ def reactor_hazards(
         raise typer.Exit(1)
 
 
+@process_app.command("recipe")
+def recipe(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    svg: Annotated[
+        Path | None, typer.Option("--svg", help="Write the Gantt chart of one batch here.")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """The batch cycle of process/recipe.yaml: each unit's occupancy per batch, the cycle time
+    (the bottleneck), the batches per year, one batch's timeline and the batch-size stream's
+    rate against the flowsheet's (domains/process/recipe.py). --svg writes the Gantt chart of
+    one batch. Exit 1 on a warning or error, 2 without a recipe."""
+    from chemeascode.domains.process.recipe import gantt_svg, recipe_report, recipe_text
+
+    workspace = _workspace()
+    result = recipe_report(workspace.root, case)
+    if result is None:
+        typer.echo("no process/recipe.yaml", err=True)
+        raise typer.Exit(2)
+    if svg is not None and result.steps:
+        svg.write_text(gantt_svg(result))
+    typer.echo(json.dumps(result.as_dict(), indent=2) if as_json else recipe_text(result))
+    if any(f.level in ("warning", "error") for f in result.findings):
+        raise typer.Exit(1)
+
+
 @process_app.command("reactor-choice")
 def reactor_choice(
     node: Annotated[str, typer.Argument(help="The reactor block or step.")],
@@ -330,6 +356,184 @@ def cell(
         raise typer.Exit(1)
 
 
+@process_app.command("duty")
+def duty(
+    ids: Annotated[list[str] | None, typer.Argument(help="Duty ids (default: every duty).")] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    plot: Annotated[
+        Path | None,
+        typer.Option(help="Write the time plots and operating maps (SVG) into this directory."),
+    ] = None,
+    compare: Annotated[
+        str | None,
+        typer.Option(help="ID,ID: compare these duties at equal delivered product (--co)."),
+    ] = None,
+    co: Annotated[
+        float | None, typer.Option(help="With --compare: the delivered product, kg.")
+    ] = None,
+    tolerance: Annotated[
+        float,
+        typer.Option(help="With --compare: relative tolerance on the delivered product."),
+    ] = 1e-3,
+) -> None:
+    """The dynamic duties of process/duties.yaml: each cell's current or power schedule
+    against the anolyte reservoir (voltage, efficiencies and WDE from the measured series or
+    the specified cell, never extrapolated), the pH, inventory, product, charge, energy,
+    dosing and bleed over time, the time to the stated pH threshold and the time outside the
+    measured range. A duty a stack of process/cells.yaml names (equipment.duty) runs at the
+    arrangement that stack is sized at, as in cheme process stack (cheme.duty-arrangement).
+    --compare ID,ID --co KG compares duties at equal delivered product (the duties are named
+    there, not as IDS; --plot then draws the compared transients). Writes nothing but the
+    plots. Exit 1 on an error finding, 2 without process/duties.yaml, for an unknown duty id or
+    for IDS given with --compare."""
+    from chemeascode.domains.equipment.electrolyser_stack import stack_arrangements
+    from chemeascode.domains.process.electrolysis_duty import (
+        DUTIES_FILE,
+        DutyReport,
+        compare_duties,
+        comparison_text,
+        duty_report,
+        has_duties,
+        report_text,
+    )
+
+    workspace = _workspace()
+    if not has_duties(workspace.root):
+        typer.echo(f"{DUTIES_FILE} does not exist", err=True)
+        raise typer.Exit(2)
+    arrangements = stack_arrangements(workspace.root)  # one design basis with the stacks
+    if compare is not None:
+        if co is None:
+            typer.echo("--compare needs --co KG (the delivered product)", err=True)
+            raise typer.Exit(2)
+        if ids:
+            typer.echo(
+                f"--compare names the duties to compare (ID,ID); drop {' '.join(ids)} or add "
+                "them to --compare",
+                err=True,
+            )
+            raise typer.Exit(2)
+        names = [n.strip() for n in compare.split(",") if n.strip()]
+        try:
+            comparison = compare_duties(workspace.root, names, co, tolerance, arrangements)
+        except (KeyError, ValueError) as failure:
+            typer.echo(str(failure).strip("'\""), err=True)
+            raise typer.Exit(2) from failure
+        typer.echo(comparison.to_json() if as_json else comparison_text(comparison))
+        if plot is not None:  # the compared transients, each to the target
+            _duty_plots(DutyReport(comparison.duties, comparison.findings), plot, as_json)
+        if any(f.level == "error" for f in comparison.findings):
+            raise typer.Exit(1)
+        return
+    try:
+        report = duty_report(workspace.root, ids or None, arrangements)
+    except KeyError as failure:
+        typer.echo(str(failure).strip("'\""), err=True)
+        raise typer.Exit(2) from failure
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if plot is not None:
+        _duty_plots(report, plot, as_json)
+    if report.errors:
+        raise typer.Exit(1)
+
+
+@process_app.command("stack")
+def stack(
+    ids: Annotated[
+        list[str] | None, typer.Argument(help="Stack ids (default: every stack).")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write",
+            help="Write the calculated stack and tank dimensions into the equipment list, "
+            "the pumps' inputs into their datasheets (never over a value written by hand) and "
+            "a reservoir volume the duty asks for (reservoir.size: to_horizon) into "
+            "process/duties.yaml.",
+        ),
+    ] = False,
+) -> None:
+    """The stacks of the stacks: section of process/cells.yaml sized for their product duty
+    at the cell's operating point (never outside its measured or declared range): active area,
+    cells, cells per stack from the voltage limit, stacks, stack voltage and current, DC power,
+    output and its margin, kWh per kg, the stack envelope; and the skid equipment inputs from
+    the duty named, run at the sized arrangement over its horizon: reservoir and tank
+    dimensions (a dosing or bleed tank over its refill or emptying interval), the recirculation
+    and dosing pumps' flows, and with the duty's reservoir.size: to_horizon the reservoir volume
+    that reaches its horizon. Without --write it writes nothing and reports what differs from
+    the equipment list, the datasheets and process/duties.yaml (cheme.stack-outdated); --write
+    writes them (a reservoir volume first, then the tanks from the duty at it); with --write
+    --json the report (as the files are then) carries `written`, each file written with its
+    tags (or duty ids).
+    Exit 1 on an error finding (process/cells.yaml not following its schema among them: its
+    findings are printed), 2 without process/cells.yaml or stacks, or for an unknown id."""
+    from chemeascode.domains.equipment.electrolyser_stack import (
+        has_stacks,
+        report_text,
+        stack_report,
+        write_stack_inputs,
+    )
+    from chemeascode.domains.process.electrochemical_cell import CELLS_FILE, has_cells
+    from chemeascode.domains.process.electrolysis_duty import DUTIES_FILE
+
+    workspace = _workspace()
+    if not has_cells(workspace.root):
+        typer.echo(f"{CELLS_FILE} does not exist", err=True)
+        raise typer.Exit(2)
+    if not has_stacks(workspace.root):
+        loaded = stack_report(workspace.root)  # a file that does not load: its findings
+        if loaded.errors:
+            typer.echo(loaded.to_json() if as_json else report_text(loaded))
+            raise typer.Exit(1)
+        typer.echo(f"{CELLS_FILE} has no stacks: section", err=True)
+        raise typer.Exit(2)
+    try:
+        report = stack_report(workspace.root, ids or None)
+    except KeyError as failure:
+        typer.echo(str(failure).strip("'\""), err=True)
+        raise typer.Exit(2) from failure
+    if write:
+        try:
+            written = write_stack_inputs(workspace.root, report)
+            if DUTIES_FILE in written.written:
+                # a reservoir volume written (reservoir.size: to_horizon): the tanks follow
+                # from the duty at that volume, in a second pass
+                again = write_stack_inputs(
+                    workspace.root, stack_report(workspace.root, ids or None)
+                )
+                for name, tags in again.written.items():
+                    written.written[name] = sorted({*written.written.get(name, []), *tags})
+        except ValueError as failure:
+            typer.echo(str(failure), err=True)
+            raise typer.Exit(1) from failure
+        report = stack_report(workspace.root, ids or None)  # as the files are now
+        if as_json:
+            # the report as the files are now, and what this run wrote (file -> tags)
+            payload = {**report.as_dict(), "written": written.written}
+            typer.echo(json.dumps(payload, indent=2))
+            if report.errors:
+                raise typer.Exit(1)
+            return
+        for name, tags in written.written.items():
+            typer.echo(f"wrote {name}: {', '.join(tags)}")
+        if not written.written:
+            typer.echo("nothing to write")
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if report.errors:
+        raise typer.Exit(1)
+
+
+def _duty_plots(report, directory: Path, as_json: bool) -> None:
+    from chemeascode.domains.process.electrolysis_plots import duty_plots
+
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, svg in duty_plots(report).items():
+        (directory / name).write_text(svg, encoding="utf-8")
+        if not as_json:
+            typer.echo(f"wrote {directory / name}")
+
+
 @process_app.command("energy")
 def energy(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
@@ -363,6 +567,93 @@ def energy(
         for finding in findings:
             typer.echo(finding.format())
     if any(f.level in ("warning", "error") for f in findings):
+        raise typer.Exit(1)
+
+
+@process_app.command("pinch")
+def pinch(
+    dt_min: Annotated[
+        float,
+        typer.Option(
+            "--dt-min", help="The global minimum approach temperature dTmin, K (required)."
+        ),
+    ],
+    dt_min_source: Annotated[
+        str,
+        typer.Option(
+            "--dt-min-source", help="Where dTmin comes from (recorded; default: ASSUMED)."
+        ),
+    ] = "ASSUMED",
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    include_constrained: Annotated[
+        bool,
+        typer.Option(
+            "--include-constrained",
+            help="Include the constrained duties (reactors) in the targets, as a sensitivity.",
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+    md: Annotated[bool, typer.Option("--md", help="As Markdown.")] = False,
+    write: Annotated[
+        bool, typer.Option("--write", help="Record the targets in process/pinch-run.json.")
+    ] = False,
+) -> None:
+    """Whole-plant pinch targets of the case's recorded simulation run
+    (process/simulation-run.json, from cheme process simulate --fill; the simulator is not run).
+
+    Prints the current utility demand, the theoretical minimum utility demand at dTmin and the
+    theoretical energy-saving potential (their difference: not a saving), the hot-side,
+    cold-side and shifted pinch (or a threshold problem), the utility-use pinch violations
+    apart from cross-pinch transfer in existing exchangers, the thermal streams with class and
+    quality, and the reconciliation against the run's duties. --write records the result in
+    process/pinch-run.json. Exit 1 on an error (no current converged run, too few streams) or a
+    reconciliation finding; 2 on invalid input; 3 when --write is refused (a reconciliation
+    finding), nothing written."""
+    from chemeascode.domains.process.heat_integration.report import (
+        PINCH_FILE,
+        UnknownCase,
+        pinch_markdown,
+        pinch_report,
+        pinch_text,
+    )
+    from chemeascode.domains.process.heat_integration.report import write as record
+
+    if as_json and md:
+        typer.echo("give --json or --md, not both", err=True)
+        raise typer.Exit(2)
+    workspace = _workspace()
+    process = _process(workspace)
+    try:
+        report = pinch_report(
+            workspace.root,
+            process,
+            case,
+            dt_min,
+            dt_min_source=dt_min_source,
+            include_constrained=include_constrained,
+        )
+    except (UnknownCase, ValueError) as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    if as_json:
+        typer.echo(report.to_json())
+    elif md:
+        typer.echo(pinch_markdown(report))
+    else:
+        typer.echo(pinch_text(report))
+    if report.failed:
+        raise typer.Exit(1)
+    if write:
+        if report.unreconciled:
+            typer.echo(
+                f"refused: {PINCH_FILE} not written, the reconciliation has a finding (heat of "
+                "the run the extracted streams do not give back)",
+                err=True,
+            )
+            raise typer.Exit(3)
+        record(workspace.root, report)
+        typer.echo(f"{PINCH_FILE}: targets of case {report.case} recorded", err=as_json)
+    if any(f.level in ("warning", "error") for f in report.findings):
         raise typer.Exit(1)
 
 

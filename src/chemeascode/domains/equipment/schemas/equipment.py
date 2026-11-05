@@ -58,6 +58,17 @@ class Dimensions(Strict):
         "(pumps), integrally_geared, blower or machine (compressors), compander, expander or "
         "machine (turbines); default by the DEXPI class.",
     )
+    source: str = Field(
+        default="",
+        description="Where the sizes come from, when a tool calculated them (cheme process "
+        "stack: ...); the datasheets carry it with each main dimension.",
+    )
+    assumed: bool = Field(
+        default=False, description="The sizes rest on an assumption (marked ASSUMED)."
+    )
+    fingerprint: str | None = Field(
+        default=None, description="Of the inputs a tool calculated the sizes from."
+    )
 
     @model_validator(mode="after")
     def _check(self) -> "Dimensions":

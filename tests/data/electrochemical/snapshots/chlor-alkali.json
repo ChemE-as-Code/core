@@ -1,0 +1,162 @@
+{
+  "model": {
+    "id": "faraday-balance",
+    "version": 1,
+    "schema": "cheme/electrochemical-cells/v1"
+  },
+  "core_version": "<version>",
+  "assumptions": [
+    "steady state; Faraday's law: extent = current efficiency x N x I / (n F), F = 96485.33212 C/mol (CODATA 2018)",
+    "specified performance: cell voltage and current efficiencies are inputs; no polarisation curve, Nernst or Butler-Volmer model (no predictive electrochemistry)",
+    "current not assigned to a reaction (1 - FE - side fractions) causes no net chemical change (recombination of crossed-over products, shunt currents): its electricity becomes heat",
+    "isothermal boundary: feeds and products at the temperature of the heats of reaction; Q = P - sum(extent x dH); electricity counted once, as the DC power at the cell terminals (rectifier, transformer and busbar losses are outside the cell)",
+    "crossover and purge divide the formed products between outlets; they do not change the extents (no further reaction of a crossed-over product)"
+  ],
+  "limitations": [
+    "electrolyte properties (activities, heats of dilution, conductivity) are not modelled: the heats of reaction are those of process/reactions.yaml, on their own standard states (a linked dependency on electrolyte thermodynamics)",
+    "no adiabatic boundary, temperature rise or stream enthalpies (v1)",
+    "one current efficiency for the overall reaction: below 1 it reduces every product alike, and the current lost is heat, not chemistry; in a chlor-alkali cell the cathode forms H2 at about 100 % while hydroxide back-migration forms hypochlorite, chlorate and O2 (EU BREF 2014, 1.4.2: 1.070-1.128 t NaOH/t Cl2), so H2 and NaOH below a current efficiency of 1 are approximate (the electricity per t Cl2 is not affected); declare side reactions with their current fractions to include them",
+    "no polarisation curve: a voltage or efficiency outside the declared operating range is flagged, never extrapolated",
+    "not a unit of the DWSIM simulation (process/simulation.yaml): a linked flowsheet step is balanced with the cell's specified values"
+  ],
+  "qualified": [
+    {
+      "case": "water electrolysis, H2O(l) -> H2 + 1/2 O2, n = 2 (PEM half-reactions)",
+      "test": "tests/test_electrochemical_cell.py::test_water_electrolysis_reference",
+      "checks": "thermoneutral voltage from CODATA dfH(H2O, l); electricity per kg H2 against the US DOE PEM stack targets at 1.9, 1.8 and 1.6 V (rounded to 1 kWh/kg); at U_tn the electricity per kg equals the HHV of H2 and Q = 0",
+      "range": "1.6-1.9 V per cell, current efficiency 0.975-1, enthalpy basis 298.15 K"
+    },
+    {
+      "case": "chlor-alkali membrane cell, 2 NaCl + 2 H2O -> Cl2 + H2 + 2 NaOH, n = 2",
+      "test": "tests/test_electrochemical_cell.py::test_chlor_alkali_reference",
+      "checks": "thermoneutral voltage from CODATA ion enthalpies (infinite dilution); products per t Cl2 against the EU BREF's electrochemical unit (1.128 t NaOH, 28 kg H2); electricity per t Cl2 at 3.0 V and 95 % against the BREF's bipolar membrane range",
+      "range": "3.0 V at 6 kA/m2, current efficiency 0.95, enthalpy basis 298.15 K"
+    }
+  ],
+  "cells": [
+    {
+      "id": "MEM-1",
+      "reaction": "CA",
+      "line": 9,
+      "refused": false,
+      "reasons": [],
+      "current_a": 6000.0,
+      "cells": 1,
+      "current_density_a_m2": 6000.0,
+      "temperature_k": 363.15,
+      "voltage_v": 3.0,
+      "faradaic_efficiency": 0.95,
+      "unassigned_current_fraction": 0.050000000000000044,
+      "extents": {
+        "CA": 0.10633740667689791
+      },
+      "formed_kmol_h": {
+        "NaCl": -0.21267481335379582,
+        "H2O": -0.21267481335379582,
+        "Cl2": 0.10633740667689791,
+        "H2": 0.10633740667689791,
+        "NaOH": 0.21267481335379582
+      },
+      "formed_kg_h": {
+        "NaCl": -12.428716092395828,
+        "H2O": -3.8313367625686316,
+        "Cl2": 7.539322133392062,
+        "H2": 0.2143762118606262,
+        "NaOH": 8.506354509711771
+      },
+      "products": {
+        "Cl2": {
+          "home": "anode",
+          "formed_kg_h": 7.539322133392062,
+          "outlet_kg_h": 7.539322133392062,
+          "crossover_kg_h": 0.0,
+          "purge_kg_h": 0.0
+        },
+        "H2": {
+          "home": "cathode",
+          "formed_kg_h": 0.2143762118606262,
+          "outlet_kg_h": 0.2143762118606262,
+          "crossover_kg_h": 0.0,
+          "purge_kg_h": 0.0
+        },
+        "NaOH": {
+          "home": "cathode",
+          "formed_kg_h": 8.506354509711771,
+          "outlet_kg_h": 8.506354509711771,
+          "crossover_kg_h": 0.0,
+          "purge_kg_h": 0.0
+        }
+      },
+      "charge": {
+        "stack_current_a": 6000.0,
+        "carried_by_reactions_a": 5700.0,
+        "unassigned_a": 300.0000000000003,
+        "residual_a": -2.8421709430404007e-13
+      },
+      "elements_residual_kmol_h": {
+        "Cl": 0.0,
+        "H": 0.0,
+        "Na": 0.0,
+        "O": 0.0
+      },
+      "thermoneutral_voltage_v": 2.310143885111809,
+      "reversible_voltage_v": null,
+      "power_kw": 18.0,
+      "reaction_enthalpy_kw": 13.16782014513731,
+      "heat_duty_kw": 4.83217985486269,
+      "energy_residual_kw": 8.881784197001252e-16,
+      "electricity_kwh_per_kg": {
+        "Cl2": {
+          "formed": 2.3874825457154873,
+          "delivered": 2.3874825457154873
+        },
+        "H2": {
+          "formed": 83.9645399262044,
+          "delivered": 83.9645399262044
+        },
+        "NaOH": {
+          "formed": 2.1160651110236777,
+          "delivered": 2.1160651110236777
+        }
+      },
+      "voltage_efficiency": {
+        "thermoneutral": 0.7700479617039363
+      },
+      "sourced": true,
+      "sources": [
+        "Brinkmann et al., BAT Reference Document for the Production of Chlor-alkali, EUR 26844 EN (2014), doi:10.2791/13138",
+        "BREF chlor-alkali 2014, 4.3.2.3.2: about 3.0 V at 6.0 kA/m2",
+        "BREF chlor-alkali 2014, 4.3.2.3.2: current efficiency > 95 %",
+        "BREF chlor-alkali 2014, 4.3.2.3.2: 6.0 kA/m2"
+      ],
+      "limitations": [
+        "heat of reaction CA at 298.15 K, the cell at 363.15 K: the sensible heat of feeds and products and the temperature dependence of dH are not included"
+      ],
+      "step": null
+    }
+  ],
+  "findings": [
+    {
+      "file": "process/cells.yaml",
+      "line": 26,
+      "level": "info",
+      "rule": "cheme.cell-temperature",
+      "message": "cell MEM-1: heat of reaction CA at 298.15 K, the cell at 363.15 K: the sensible heat of feeds and products and the temperature dependence of dH are not included",
+      "ids": [
+        "MEM-1",
+        "CA"
+      ],
+      "hint": "give heat_of_reaction at the cell temperature to include them",
+      "id": "process/cells.yaml#cell-temperature:MEM-1+CA"
+    }
+  ],
+  "source": {
+    "commit": "<commit>",
+    "dirty": [],
+    "fingerprints": {
+      "process/cells.yaml": "<sha256>",
+      "process/materials.yaml": "<sha256>",
+      "process/reactions.yaml": "<sha256>"
+    }
+  }
+}

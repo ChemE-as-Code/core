@@ -1,0 +1,36 @@
+# A 5 cm2 reverse-bias bipolar-membrane CO2 electrolysis cell at 150 mA/cm2, its voltage and
+# Faradaic efficiencies looked up in a SYNTHETIC measured series (tests only; the numbers are
+# made up to exercise the code, not taken from any publication). The electrode reactions are
+# written in their alkaline form; in the cell the bipolar membrane supplies the protons and
+# hydroxide by dissociating water, with the efficiency the measurement gives. The co-ion split
+# is an illustrative value.
+schema: cheme/electrochemical-cells/v1
+kind: electrochemical_cells
+cells:
+  - id: BPM-1
+    title: Reverse-bias bipolar-membrane cell (synthetic data)
+    performance: measured
+    reaction: CO2R
+    electrons: 2
+    electrodes:
+      anode: {equation: "2 OH- -> 1/2 O2 + H2O + 2 e-", species: {OH-: -2, O2: 0.5, H2O: 1, e-: 2}}
+      cathode: {equation: "CO2 + H2O + 2 e- -> CO + 2 OH-", species: {CO2: -1, H2O: -1, e-: -2, CO: 1, OH-: 2}}
+    cells: 1
+    current: {value: 0.75, unit: A, provenance: given, source: "test: 150 mA/cm2 on 5 cm2"}
+    active_area: {value: 5, unit: cm2, provenance: given, source: "test: the bench cell"}
+    side_reactions:
+      - {reaction: WS, electrons: 2}
+    measurements:
+      file: experiments/electrochemistry/synthetic-bpm.yaml
+      product: CO
+      side_products: [H2]
+    membrane:
+      kind: bipolar
+      bias: reverse
+      co_ion_crossover: {K+: 0.34, HCO3-: 0.66}
+      source: "test: illustrative co-ion split"
+    thermal:
+      kind: isothermal
+      temperature: {value: 25, unit: °C, provenance: given, source: "test: the bench cell"}
+    electrolyte: "1 M KOH anolyte"
+    sources: ["synthetic test data"]

@@ -147,7 +147,11 @@ gate `lca` fails.
    unless its terms and a reviewed `publication:` decision of a person allow more; never
    commit or publish them by default, and never write that decision yourself.
 9. **Foreground only.** `cheme assess lca --dataset` exports the unallocated foreground with
-   no factors, Brightway or credentials: what a process library publishes.
+   no factors, Brightway or credentials: what a process library publishes. A second computed
+   design (another flowsheet case) gets its own dataset: `cheme assess lca --write --case <id>`
+   writes `lca/datasets/<dataset id>-<case>.yaml`, whose id, title and uuid name the case.
+   Never edit it; keep it current with `cheme assess lca --check --case <id>` (a
+   `kind: command` gate). Do not copy the project or change `case:` in `lca/lca.yaml` for it.
 10. **Document the dataset** before it is published (`cheme/lci_dataset/v2`). Give what cheme
    cannot derive under `dataset:` of `lca/lca.yaml`: `version`, `methodology_version`,
    `geography.description` (what the location code represents; the site apart), `system_model`,
@@ -158,6 +162,11 @@ gate `lca` fails.
    `cheme.lca-dataset-undocumented`; the gate requirement `lci-documented` checks the
    publication minimum. A v1 dataset (`schema: cheme/lca/v1`) still loads with a warning:
    `cheme migrate --write` rewrites a hand-written one.
+
+   A batch plant (with `process/recipe.yaml`) gives what it uses per batch and the flowsheet
+   does not carry (cleaning solvent, rinse water, nitrogen purges, off-spec make-up) as
+   `consumables:` with `per_batch:` instead of `per_year`; the batches per year come from the
+   recipe.
 
 11. **Wastes and end of life**. What goes in also comes out: give every replaced or
    charged consumable (adsorbent, catalyst) and the construction materials a `disposal:`

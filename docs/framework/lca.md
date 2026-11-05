@@ -63,6 +63,10 @@ scenarios.
   - `consumables:` supplies of the operation, such as an adsorbent or catalyst replaced every few
     years, or a lubricant. Each gives `per_year`, or `per_replacement` with `every_years`, in
     its `unit` (plus an `initial_charge` spread over the plant's life), and has a background.
+    A batch plant's per-batch use (cleaning solvent, rinse water, a nitrogen purge, the
+    make-up of an off-spec share) gives `per_batch`: times the batches per year over the hours
+    of `process/recipe.yaml`, the basis of the flowsheet's year averages (ADR 0053); without a
+    recipe it is the error `cheme.lca-per-batch`.
     A catalyst says `catalyst: true` and its `metals: {Pt: 0.003}` (mass fractions).
     `disposal:` says what leaves the plant of it (see [Wastes, by-products and end of
     life](#wastes-by-products-and-end-of-life)).
@@ -634,7 +638,10 @@ limitation, not assumed absent.
 **Foreground without a background.** `cheme assess lca --dataset` (or `--inventory`) alone
 derives the unallocated foreground without `lca/factors.yaml`, a Brightway project or
 credentials: what a public library publishes. `cheme validate` checks `lci_dataset` files the
-same way.
+same way. `--case <id>` (with `--dataset`, `--write` or `--check`) gives the dataset of another
+computed flowsheet case. Its id, title and uuid name the case, and `--write` writes it to
+`lca/datasets/<dataset id>-<case>.yaml`
+([design case datasets](lci-scenarios.md#a-design-cases-own-dataset), ADR 0045).
 
 ## Publication and the run manifest
 

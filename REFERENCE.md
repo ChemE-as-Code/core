@@ -120,6 +120,7 @@ cheme process propagate --fill                # compositions/flows through compr
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
+cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
 cheme chemistry thermo ammonia                # ideal-gas formation data for materials.yaml (extra props)
 cheme process props --fill                    # phase, density, enthalpy (extra props), in range only
@@ -133,6 +134,8 @@ cheme layout lifting [--write]                # lifting study: radius, load mome
 cheme assess mto | estimate [--write]         # material take-off of the model, factor estimate
 cheme assess equipment [--write]              # equipment costs from published correlations (Turton)
 cheme assess tea [--write] [--compare REV]    # TEA: capex build-up, cash flow, NPV/IRR/LCOP, drivers
+cheme assess lca [--write | --check]          # LCA per functional unit; lca/dataset.yaml, results
+cheme assess lca --write --case B             # case B's own LCI dataset: lca/datasets/<id>-b.yaml
 cheme datasheets draft [--tag T]              # draft datasheets for items without one (sources, TBD)
 cheme datasheets fill [--tag T] [--param k=v] # calculated sizes with their basis into the drafts
 cheme schema [equipment]                      # JSON Schema of a YAML file kind (none: list them)
@@ -163,7 +166,10 @@ item drawn) and model rules:
 | `cheme.text-outside-frame` | warning | a drawn text running more than 0.5 mm outside the inside of the sheet's border |
 | `cheme.title-text-overflow` | warning | a title block text more than 2 mm wider than its cell (e.g. a long sheet title from `plant.yaml`) |
 | `cheme.line-through-symbol` | warning | a pipe or signal line running through an instrument bubble, or the body of an equipment item, it does not end on (a line ending at a nozzle, or with an end inside the body at an internal or a tap, does not count) |
-| `cheme.drawing-not-checked` | info | the SVG export failed, so the four drawing rules did not run |
+| `cheme.line-through-valve` | warning | a signal or measuring line running through the body of a valve, a pipe of another segment running through a valve, or any line running through an actuator's head (a control valve's signal drawn up through the valve to an actuator on top, an actuator drawn up the pipe on a vertical valve); one finding per line and valve, the actuator's valve named (from its `ActuatingSystem`). The pipes of the segment the valve sits on, the actuator's stem, a line with an end inside the outline (a signal line into the actuator's centre) and a line meeting the outline within 1 mm of its end (a signal line ending on the actuator's top) do not count; the line must run 0.3 mm into the outline's box |
+| `cheme.line-on-pipe` | warning | a signal or measuring line drawn on top of a pipe: a horizontal or vertical stretch within 0.3 mm of a pipe's stretch, along it for more than 1 mm (a signal line run down the pipe to an actuator drawn on it); one finding per line and piping line |
+| `cheme.line-not-orthogonal` | info | a signal or measuring line with a slanted stretch, 2 mm or longer and more than 1 degree off horizontal and vertical (a measuring line drawn straight from its tap to the bubble); the short legs of a hop over another line do not count |
+| `cheme.drawing-not-checked` | info | the SVG export failed, so the drawing rules did not run |
 
 `cheme.segment-ends` reports what pyDEXPI's Mandatory rules `pydexpi_segment_connectivity`
 and `pydexpi_segment_reference_nodes_and_items_match` find, once per segment, on the line of the
@@ -184,7 +190,7 @@ them).
 
 #### Drawing geometry
 
-The four drawing rules check the sheet as `cheme render` draws it: pyDEXPI's SVG export,
+The drawing rules check the sheet as `cheme render` draws it: pyDEXPI's SVG export,
 with every shape's transform applied, so they see what a reader of the rendered sheet sees.
 Text boxes are estimated from the font size and the characters (Arial widths, the export's
 fallback font), placed by `text-anchor` and `dominant-baseline` (a `text-bottom` label stands
@@ -241,7 +247,9 @@ can be accepted.
 
 YAML lists are checked against their schemas, then compared with the P&IDs: equipment tags and
 classes (`cheme.equipment-*`), the optional `dimensions` of an equipment item (overall
-`diameter`, `height` or `length`, `width`, `head`, `support`, `weight`) against the sizes its
+`diameter`, `height` or `length`, `width`, `head`, `support`, `weight`; `source`, `assumed`
+and `fingerprint` of sizes a tool calculated, such as `cheme process stack`, of which the
+datasheets carry `source` and `assumed`) against the sizes its
 P&ID states where it states them (`NominalCapacityVolume`, `CylinderLength`, `TubeLength`, a
 chamber's `InsideDiameter` or `NominalDiameter`, `PlateHeight`/`PlateWidth`:
 `cheme.equipment-dimension-mismatch`, warning), line numbers against `PipingNetworkSystem` LineNumbers and
@@ -409,6 +417,17 @@ the table of every row), escalated by the CEPCI value the project gives with its
 source in `estimate/cost-basis.yaml`; an item outside a correlation's range or without its size
 or factors is a finding, never extrapolated, and the report states its AACE 18R-97 class.
 Rows, rules and `GET /api/mto`: [docs/framework/mto.md](docs/framework/mto.md).
+
+**A design case's LCI dataset.** `cheme assess lca --dataset|--write|--check --case <id>`
+derives the unallocated LCI dataset of another computed flowsheet case. It uses the study's
+scope, reference product and functional unit, and an id (`<dataset id>-<case>`), title
+(`<title>, case <case>`) and uuid (`uuid5(<base uuid>, "case:<case>")`) that name the case.
+`--write` writes it to `lca/datasets/<dataset id>-<case>.yaml` (generated: a header comment
+and `provenance`; never over a file it did not generate, `cheme.lca-dataset-not-generated`).
+`--check` exits 1 with `cheme.lca-dataset-stale` when that file is missing or differs. An
+undeclared case exits 2 and lists the declared ones. The study's own case is
+`lca/dataset.yaml`, unchanged. Details:
+[docs/framework/lci-scenarios.md](docs/framework/lci-scenarios.md), ADR 0045.
 
 **Techno-economic analysis.** `cheme assess tea` evaluates the economics against the decision
 `estimate/tea.yaml` states (npv, irr, lcop or cash cost and a threshold). It works for continuous
@@ -916,6 +935,19 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   provenance and case. The layout is layered left to right with recycles routed back, labels
   placed clear of lines and nodes, and the `layout.<view>` pins applied. A rebuild is
   byte-identical; a title rename moves nothing.
+- **The PFD drawing** (ADR 0046). The sheet is the smallest that holds the drawing and the stream
+  table: ISO 216 A3 to A0 or an ISO 5457 elongated one (A3x3 to A0x3), landscape, with the
+  frame, zone markers and a title block (title, project, drawing number, case, sheet). A layout
+  wider than an A0 wraps into rows, read like text. Steps are drawn with the ISO symbol of
+  their class (a step's optional `symbol:` overrides it: a symbol name, `junction` or `box`;
+  an unknown name is `cheme.process-symbol`, warning); mixing and splitting steps are junction
+  tees. A utility terminal (`category: utility`, a `utility:` given, or only energy ports) is
+  not a box with a line to every user: each of its streams is a short stub on top of the step
+  it serves, with the utility's id. Process lines are drawn heavier than equipment, with flow
+  arrowheads; blocks holding steps are light dash-dot process areas. Below the drawing the
+  stream table lists each material stream's phase, temperature (°C), pressure (bar), mass flow
+  and the flows of the largest components, and each energy stream's duty, for the default case
+  (assumed values marked `*`, stale ones blank). The BFD gets the same frame and title block.
 - **Calculated values and phase in the sheets.** Each material stream's `MaterialState` (its
   `MaterialStateType`) carries the `state.calculated` values DEXPI 2.0.1 has a property for:
   `density` (kg/m3) and `specificEnthalpy`, one `QualifiedValue` per case with the YAML
@@ -999,7 +1031,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **Reactive hazard screening**: **`cheme process reactor-hazards [--json]`** gives each
   reactor's adiabatic rise, MTSR, MTT and, with a TD24 from calorimetry (`hazard:` on the
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
-  (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`).
+  (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
+  accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
+  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1019,11 +1053,33 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   conversion, products: {id: S}}` (kmol formed per kmol of the key converted); `process
   propagate` solves the extents of its parallel and series reactions
   (`chemistry.reactions.selectivity_extents`), refusing selectivities the reactions cannot give.
+- **Batch recipe**: **`cheme process recipe [--case C] [--svg FILE] [--json]`** reads
+  `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0051): the `batch_size` (kg, t or m3 of one
+  stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
+  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
+  dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
+  semi-batch step's model). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
+  its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
+  Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
+  `-duration` and `-basis` (warning: the flowsheet's rate of that stream differs from batch size
+  x batches / hours by more than 1 %). `estimate/tea.yaml` `operation.batch: {recipe: true}`
+  takes the cycle time and batches per year from it (`domains/process/recipe.py`). A unit
+  procedure on a batch or semi-batch step may size its `vessel` (fill fraction, R10 preferred
+  sizes) and check its `jacket` (U, area or wetted shell, coolant and heating temperatures)
+  against the model's peak duty (`cheme.recipe-jacket`, `-vessel`); a `heat` or `cool`
+  operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
+  writes a batch reactor's volume and peak duty from it (ADR 0052).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
   liquid; `process propagate --fill` writes the outlet and `process reactors` reports the tanks'
-  conversions and duty, or the batch's profile and heat release.
+  conversions and duty, or the batch's profile and heat release. `reactor: semibatch` (liquid)
+  is a batch with `batch.dosing: [{stream, time | profile, start}]` dosed into its charge: the
+  dosed streams are inlets of the step, the other inlet the charge, `time`/`target` the
+  post-reaction. `process reactors` adds the accumulation of the dosed reactant over time and
+  its maximum, the worst cooling-failure temperature and the peak cooling duty per m3
+  (`stirred_tank.solve_batch` with doses; ADR 0050). `process simulate` does not couple it.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
@@ -1089,6 +1145,70 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   parameter with its 95 % interval; **`cheme experiments sample-mechanism`** makes such data
   from a mechanism, to lump it into a rate law for a fixed bed. Mechanism steps may give DFT
   `energies:` (transition state theory) instead of rate constants.
+- **Electrochemical cells and measurements**: **`cheme process cell [--json]`** evaluates the
+  cells of `process/cells.yaml` (schema `cheme/electrochemical-cells/v1`): the Faraday
+  balance, power, heat duty and kWh per kg, from specified values or, with
+  `performance: measured`, from a measured series looked up at the cell's current density
+  (refused outside its range, never extrapolated), and an optional membrane block (water
+  dissociation efficiency, co-ion fluxes, anolyte hydroxide deficit;
+  `docs/framework/electrochemical-cells.md`). `experiments/electrochemistry/*.yaml` (schema
+  `cheme/electrochemical-measurements/v1`) holds a measured series with replicates;
+  **`cheme experiments electrochem FILE [--json] [--plot DIR]`** computes per replicate and
+  point (mean, sd, n) the Faradaic efficiency of each product from the outlet flow and mole
+  fractions (standard conditions required), partial current densities, the water dissociation
+  efficiency from the anolyte titration, power, heat and the charge and carbon balances, and
+  writes polarisation, efficiency, partial-current and water-dissociation plots only for the
+  inputs that support them (`docs/framework/electrochemical-measurements.md`).
+- **Electrolysis duties**: `process/duties.yaml` (schema `cheme/electrolysis-duties/v1`)
+  states dynamic duties of a cell of `process/cells.yaml` against its anolyte reservoir: a
+  current, power or on/off schedule, the reservoir (volume, composition, anolyte model by id,
+  optional CO2 degassing), dosing on a pH trigger or continuous, bleed, make-up water, the
+  stated pH threshold (a design criterion) and the horizon.
+  **`cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]`** integrates
+  them (Dormand-Prince 5(4) with events): the voltage, Faradaic efficiency and water
+  dissociation efficiency at each instant from the measured series (never extrapolated: the
+  transient stops at the first exit from the measured range and the time outside is summed)
+  or the specified cell; pH, inventory, product, charge, energy, dosing and bleed over time;
+  the time to the specified pH threshold; `--compare` compares duties at equal delivered
+  product; `--plot` writes aligned time plots and an operating map (WDE x reservoir volume)
+  with the measured WDE points apart from the simulated values. The first anolyte model is
+  `well-mixed-carbonate` v1 (equilibrium carbonate speciation on a concentration basis;
+  `docs/framework/electrolysis-duties.md`). A duty a stack of `process/cells.yaml` names runs
+  at the arrangement that stack is sized at (`cheme.duty-arrangement`), as in
+  `cheme process stack`, and so does a duty that names the stack itself (`stack: STK-1`, a
+  comparison duty on the skid's hardware; another `cells_in_series` or `stacks` on it is an
+  error). The totals are split by route (the cation and carbon dosed, bled and through the
+  membrane, the initial inventories), so both balances close on their own.
+  `reservoir.size: to_horizon` (optional `time_margin`) reports the exact volume that reaches
+  the horizon, `V0 Q(target) / Q*`, for a duty without dosing, bleed, make-up or degassing at
+  one operating point, raised to keep a stated minimum inventory and the anolyte model's
+  validity to the target (`required_volume`, `limited_by`; otherwise `cheme.duty-size`,
+  error).
+- **Electrolyser stacks**: the optional `stacks:` section of `process/cells.yaml` (same schema,
+  optional fields only) names per stack design a cell, the product duty, the electrical
+  limits, the assumed envelope per cell, clearances, the replacement interval and the skid
+  equipment a duty sizes. **`cheme process stack [IDS] [--json] [--write]`** sizes it at the
+  cell's operating point (refused outside its measured or declared range, never
+  extrapolated): `A = n F Ndot / (nu FE j)`, `ceil(A / A_cell)` cells, at most
+  `floor(U_max / U)` in series per stack, the stacks, the reconciled voltage, current, DC
+  power, output and margin, kWh per kg, the envelope and footprint; and the reservoir, dosing
+  and bleed tanks and the recirculation and dosing pumps' inputs from the named duty, run at
+  that arrangement (a duty at another current density or of another cell, or not feasible,
+  gives none: `cheme.stack-duty`); a dosing tank's `refill_interval` and a bleed tank's
+  `empty_interval` size it for the most dosed or bled in any such interval, with the fills or
+  emptyings per campaign; `product.recovery` (default 1) sizes the stacks for the product
+  formed, rate / recovery, and reports formed and delivered output; a duty with
+  `reservoir.size: to_horizon` gets its reservoir volume written into `process/duties.yaml` by
+  `--write`. Without `--write` it writes nothing and reports what
+  differs (`cheme.stack-outdated`); `--write` edits the equipment-list `dimensions` in place and
+  the pumps' datasheet `type_specific` (the recirculation pump's with its end points
+  `suction_from` and `discharge_to`), never over a value written by hand
+  (`cheme.stack-kept`), from which `cheme layout build` and `cheme datasheets draft`/`fill`
+  take them; a value it wrote that is no longer given is cleared, a tag two stacks name is
+  written by neither, and `--write --json` adds `written` (file -> tags). The LCA does not read
+  the stacks: their power and dosing go into the flowsheet streams by hand. Exit 1 on an error finding (a `process/cells.yaml` that does not follow its
+  schema among them, its findings printed), 2 without the file or stacks or for an unknown id
+  (`docs/framework/electrolyser-stacks.md`, ADR 0044, skill `skid-design`).
 - **`cheme chemistry kinetics -r ID=NAME ... [-p ID=NAME ...] [--rmg-endpoint URL]`** reduces
   the NIST (and RMG) records of an elementary gas-phase reaction to one Arrhenius record and
   prints it as a `rate:` entry (network). An entry that is a formula and also another
@@ -1303,6 +1423,36 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   terminals without `category` (`raw_material`, `product`, `by_product`, `utility`,
   `wastewater`, `off_gas`, `solid_waste`, `emission`; `cheme.boundary-unclassified`) and utility
   terminals without levels. Exit 1 on a warning.
+- **`cheme process pinch --dt-min X [--dt-min-source S] [--case C] [--include-constrained]
+  [--json|--md] [--write]`** takes whole-plant pinch targets (problem table,
+  `heat_integration/pinch.py`) from the case's recorded simulation run
+  (`process/simulation-run.json`; it never runs the simulator: a missing, stale or unconverged
+  run is an error, `cheme.process-pinch-run-missing`, `-run-stale`, `-run-not-converged`).
+  dTmin is required, its source recorded (default `ASSUMED`). `heat_integration/streams.py`
+  extracts one stream per thermal duty and side, each in one class: `utility` (heaters, coolers,
+  flashes, condensers, reboilers, the process side of an exchanger against a utility terminal's
+  stream such as a waste-heat boiler, whose steam is the utility and no second stream),
+  `recovery` (both sides of a process/process exchanger, counted once; every side of a
+  multi-stream exchanger; a condenser heating another column's reboiler), `constrained`
+  (reactors, with the reason; out of the targets unless `--include-constrained`) or `excluded`
+  (with the reason). Quality: the simulators report end temperatures only, so a stream is
+  `linearised` (one constant-CP or isothermal segment; a phase change is not split at dew or
+  bubble points, `cheme.process-pinch-stream-linearised`) or `insufficient` (excluded,
+  `cheme.process-pinch-stream-excluded`). The reconciliation lists every thermal duty of the
+  run from the units' results and checks the streams give each back within 0.1 kW + 1 %;
+  heat left over is `cheme.process-pinch-reconciliation` (warning). It prints the **current
+  utility demand** (of the targeted streams; recovered heat is not utility), the **theoretical
+  minimum utility demand at dTmin** and the **theoretical energy-saving potential** (their
+  difference; it ignores pressure, distance, fouling, control, safety and cost and is not a
+  saving), the hot-side, cold-side and shifted pinch or a threshold problem, utility-use pinch
+  violations (a utility heater below, a cooler above the pinch) apart from cross-pinch
+  process-to-process transfer of the existing exchangers whose sides are all known (with their
+  least approach), the stream table and the reconciliation. `--write` records settings, core
+  version, the simulation run (model and content fingerprints), the inputs and the results in
+  `process/pinch-run.json` (schema `cheme/pinch-run/v1`, one entry per case, generated) and
+  refuses with exit 3 while the reconciliation has a finding. Exit 1 on an error or a warning,
+  2 on invalid input (no or a negative `--dt-min`, an unknown case, `--json` with `--md`).
+  Python: `heat_integration.report`; ADR 0040.
 - **`cheme process furnace [ID] [--json]`** gives the energy basis of a solid-reaction furnace
   declared in `process/furnaces.yaml` (schema `cheme/furnaces/v1`; today limestone calcination
   only): the element balance, the product and off-gas composition (calcination and fuel CO2
@@ -1418,12 +1568,14 @@ first finding's id:
 
 ```yaml
 - id: drawing-clean
-  title: No line through a label, crossing, overlapping or misplaced label left unaccepted
+  title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
+    misplaced label left unaccepted
   stage: basic
   kind: validate
-  fail_on: warning
+  fail_on: info          # cheme.line-not-orthogonal is an info finding
   rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
-          cheme.label-far-from-owner]
+          cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
+          cheme.line-not-orthogonal]
 ```
 
 `on-sheet` asks the loaded model, not the XML text: a tag is the one the P&ID prints
@@ -1637,6 +1789,10 @@ skills in `.claude/skills/`:
 | `reaction-evidence-search` | the evidence behind a reaction model in `process/reaction-evidence.yaml`: searches with the agent's own tools (logged with dates), sources with DOI or patent number, access reached and reuse terms, one observation per experiment or patent example at its exact location (conversion, selectivity and yield kept apart; kinetics with units, basis and range), conflicts and gaps, never a value a source does not give |
 | `route-selection` | comparing the routes (`cheme chemistry evidence`), selecting one with its rationale, the `model_basis` (reactions, evidence, assumptions, validation plan) and the handoff to `reactions.yaml` with each value citing its observation |
 | `reactions` | `process/reactions.yaml` (stoichiometry, conversion, heat of reaction, catalyst, sources), reactions on reactor steps, element and extent balances, conversion reactors in `process propagate` |
+| `electrochemical-cell-modelling` | `process/cells.yaml`: reactions and electrons, half-reactions, specified or measured performance (`performance: measured`, never extrapolated), the membrane block with FE and WDE kept apart, `cheme process cell` and the flowsheet link |
+| `electrolysis-duty-assessment` | `process/duties.yaml`: current, power or on/off schedules against the anolyte reservoir, the stated pH threshold, dosing, bleed, `cheme process duty`, comparison at equal delivered product, the measured range never left unflagged, measured points kept apart from simulated transients |
+| `skid-design` | an electrolyser skid from one design basis: the cell, the `stacks:` section of `process/cells.yaml` and a duty, `cheme process cell`, `duty` and `stack --write`, the control P&ID and `control report`, `datasheets draft/fill`, `layout build/render`, `assess lca`; the vendor envelope, clearances, hazardous area and H2/CO handling left to a human |
+| `experiment-reproduction` | reproducing a published measured series: the data set pinned by DOI and checksum, tolerances frozen before comparing, reproduction kept apart from validation and design use, no third-party content copied, `cheme experiments electrochem` |
 | `process-simulation` | `process/simulation.yaml` (property package, step specs), `process simulate --check` and `--fill` with DWSIM, deviations from assumed values, shortcut before rigorous columns, recycles |
 | `pid-edit` | changing a sheet: edit, fmt, validate, render, diff, commit |
 | `pid-draft` | a new sheet (`cheme sheet new`) started from the PFD, drafted with fragments or with a generator script on `chemeascode.domains.piping.authoring` (`cheme run`), and whether it stays generated |

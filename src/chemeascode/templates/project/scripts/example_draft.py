@@ -83,13 +83,13 @@ line(
 )
 
 # Instruments: tag, bubble position, what they sense, and the valve they act on.
-instrument(sheet, "PI-101", at=(175, 125), sensing=pump["N2"])
+instrument(sheet, "PI-101", at=(175, 142.5), sensing=pump["N2"])
 instrument(
     sheet,
     "FIC-101",
-    at=(130, 130),
+    at=(128, 128),
     sensing="Line_80W101_S2",
-    sensing_at=(135, 150),
+    sensing_at=(128, 150),
     signal_to="FV101",
 )
 note(sheet, "Trip: LALL-101 stops P-101", at=(60, 180))

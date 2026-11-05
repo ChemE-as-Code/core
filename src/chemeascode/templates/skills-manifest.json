@@ -185,6 +185,23 @@
     "a400128f9b309ed12f7e426d00f43582a7b75137630666371e92d96930c43b00"
    ]
   },
+  "electrochemical-cell-modelling": {
+   "SKILL.md": [
+    "620b3a0f3d02f8361b9f2f1b07c677880794d4cd6791b5cb51495fbd81823f38"
+   ]
+  },
+  "electrolysis-duty-assessment": {
+   "SKILL.md": [
+    "c483bf2bd6979c0b488205f928ea5e1b1c5cca35b8fa28ee1e755b380aece48e",
+    "2c03b435ef3f3fc7ec291d2c6edfaa0c12ecb5139fb4ee84c8002bed04a38e15"
+   ]
+  },
+  "experiment-reproduction": {
+   "SKILL.md": [
+    "a072007f138482ba230e537ce51d65e9e10a17829dfc4e4029f86fb746c0075e",
+    "26dfe1e54c36f5930d074daea091b8a55d9ef851dd7f034b8070bcf08aa39502"
+   ]
+  },
   "flowsheet-development": {
    "SKILL.md": [
     "447ff127d56405bedfed9a0b2e6f83752da4dcc098a442dca8d607c4d125810c"
@@ -234,6 +251,7 @@
   },
   "heat-integration": {
    "SKILL.md": [
+    "b4501bae6311d50624d78a093c72fd7a3e12a53a14b405070dc458c2c58f1afc",
     "eea3ab65d00323ba7500b36ab4a627f44ba7b591e9bc37299b0c6b55f6c81a31"
    ]
   },
@@ -244,6 +262,7 @@
   },
   "heat-integration-minimum-utility-targets": {
    "SKILL.md": [
+    "29b03c18b5743dea91f8d54e3ff0d0ef9020c8f2043736a88e7808a3b8204092",
     "c7c1ba10555ed324ee0c7d351bc4ad37fab6aae12bf96d8139e1caa67695e189"
    ]
   },
@@ -264,6 +283,7 @@
   },
   "heat-integration-stream-data": {
    "SKILL.md": [
+    "1dca44118c5a137e2683edca25bec10283945cd0f40a7e1f0a758f52508013a3",
     "fdc64e8b9f47488630efa808c601cefe8fdebe526f1cb7cac2927eb2d353515c"
    ]
   },
@@ -298,6 +318,8 @@
   },
   "lca": {
    "SKILL.md": [
+    "4603fd8506375fb6348633c6e330d256a10384d9ebd1581db4fbcd24a31fdc3a",
+    "c0ce80bab9367278d48059fa7f6bd3f74f3d82165b7f05415b6fb976b390aa1b",
     "4e6fd3cfaf6faa490c8fbe2710c6f4b7d1afdc80b0f6421c5511ddd05bad9817",
     "5a86aaad0699e37e15d89741f7396fd02b6bb3473f73c089827feb1eeb1a3c63",
     "52f7e1279b40ef55e1313b7b3d49729bc1f60e9e321bf9a01150ea3b6d37cf8d",
@@ -388,6 +410,11 @@
     "6b3188851f23e2799803766300c7a941f67e94183153b19b103ed9ac3d961d87"
    ]
   },
+  "pfd-drawing": {
+   "SKILL.md": [
+    "a2c652c6e12a24951884b38d3a9148d0fcb740c2cedd5a4569669442da020343"
+   ]
+  },
   "phase-calculation": {
    "SKILL.md": [
     "7c4d852b913a3c20f513637728339d54554f8f47a7a4beb4a682dd65b88fb1b1",
@@ -459,6 +486,7 @@
   },
   "pid-draft": {
    "SKILL.md": [
+    "c54adca0da4b456b596808da0431edb927299c3f20eda39d4f9b7722744fd6dc",
     "f3879229cd719a38c6f50aaa4885a24a68c97377a2d272519c4e087c37ba8946",
     "5ccc14807e4f939682048245303d1ded90098c93bd695da54c0ba352b58312fc",
     "adf0394e8f8099bf28be6a4ae18df367dd6adb5410688fefeaadd7f35495c1f3",
@@ -480,8 +508,16 @@
     "95fb5c8fdf6e4a69db712232425a0eb4a6c30090399668fe21daee6afeefdc79"
    ]
   },
+  "pid-drafting-standards": {
+   "SKILL.md": [
+    "cd0e1a327b90b1453d3360c5f45c67fe24efbd47062100c8d01c3654c4e1d0ce",
+    "0e5621cc82705da7a2c8539e56ac1606c52abcfd0d77625832e9484a02254088",
+    "ea93ccf9a605722f05794171e7bc152b5fa102ae8d2d00fab8f69cd8b211090c"
+   ]
+  },
   "pid-edit": {
    "SKILL.md": [
+    "4794f319064640c9651253d17ad70e60839a6b50dbc042275d23b5387228546d",
     "294f5e69d204834fd0f06e9aae56403f63ec2b493ef485804ff9f8ef6f6bbb12",
     "a9c4361256074991639a5f980e8c4ab9377d05de654786ca0b5a0cbd348f5644",
     "8fa62fe25061345735a3c976699b0032c9d58df2af831d4ad7a66aa3f0c34397",
@@ -568,6 +604,7 @@
   },
   "process-simulation": {
    "SKILL.md": [
+    "4c88c41848b8470751933c17f4f892e3addfeed0d1851f4eb5b3787cb5d94875",
     "cca9e5f6861564f7ebacf813aa78e9f23adf32684b3c74ff11e04826aa7734fb",
     "e8646eb59b17d589fe380dfffe6c03a465493f91c22bced141c0ce18bbea10dc",
     "0c5c98c65b6d49c7cdd6220c499a4355f85d2bda1f9ef34d28b6dfc2cf073f6d",
@@ -617,6 +654,7 @@
   },
   "reactions": {
    "SKILL.md": [
+    "18904d53c6928575aa93f071dbf6028e28215ec4b0786ba4d29c491b7883fe5e",
     "f1c0a1dba5afb520e30ba3608b71586bfd437d051be204e20777111e191fa0e2",
     "95053b7d29fd422f4f9d2f49a947e43e2a9ab7eaf9e89864632020f7e0b3c773",
     "31bd2457b2a97d003dd43464b4033d917ea67f3d4422c9d5ff686aac0890e458",
@@ -707,6 +745,14 @@
     "8fe7168489db1d8faa17d2e371869bd2b956f16bb4132b6eb871b4c7708f89cd"
    ]
   },
+  "skid-design": {
+   "SKILL.md": [
+    "84194ebd9a1871e7281461cca6336744f21b92c2b46f435194252634c7ca1371",
+    "f9f3ddd1c33910619da8753f660842a1ed1e41087f63c243b5dee9538cc0fc09",
+    "b7053e71113afae01c3964c58431754062ecf28f1594b5a864b4d371a54a47fa",
+    "1337e9d9b33263465cf9d086c383213d3dc1531c0952944adf2f44f132677621"
+   ]
+  },
   "structures-access": {
    "SKILL.md": [
     "dbf6eb70599d14693dc33e8d4a34ff5622f4c9af41d81b0c25fb25fd7bb60999",
@@ -730,6 +776,7 @@
   },
   "tea": {
    "SKILL.md": [
+    "9670f0081d6c99941e73e42157868e2bb19803ff77ef99228a2b0182d53c8f57",
     "756810237e8bf8ff98cf7aacf2a03d02dcd46e82bb91f0d9db16c6717590ae81",
     "024ec7642f7c2632267a0b318c6b71e80d4fe47b727e5d6517725a8f1847e904",
     "2afdcb9e0849727172331b085f8781fe10de05e223e2702713b2dabcff53631f",

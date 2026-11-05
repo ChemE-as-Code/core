@@ -128,6 +128,9 @@ nav:
       - Engineering contract: framework/contract.md
       - Calculation maturity: framework/maturity.md
       - Electrochemical cells: framework/electrochemical-cells.md
+      - Electrochemical measurements: framework/electrochemical-measurements.md
+      - Electrolysis duties: framework/electrolysis-duties.md
+      - Electrolyser stacks: framework/electrolyser-stacks.md
       - Restructuring summary: framework/SUMMARY.md
       - Contributing: framework/contributing.md
       - Repository baseline: framework/monorepo-baseline.md
@@ -176,4 +179,16 @@ nav:
       - "0037 Several power trays per rack, by voltage class and fill": adr/0037-several-power-trays-per-rack.md
       - "0038 A specified split's energy imbalance is stated": adr/0038-stated-imbalance-of-specified-splits.md
       - "0039 IDAES as an optional second simulation backend": adr/0039-idaes-as-an-optional-second-simulation-backend.md
+      - "0040 Pinch targets from the recorded simulation run": adr/0040-pinch-targets-from-the-recorded-simulation-run.md
+      - "0041 Measured electrochemical performance and a membrane block": adr/0041-measured-electrochemical-performance-and-membrane-block.md
+      - "0042 WaterTAP and IDAES not reused for electrochemical cells": adr/0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md
+      - "0043 Dynamic electrolysis duties and the anolyte model interface": adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md
+      - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
+      - "0045 A design case's LCI dataset with its own identity": adr/0045-a-design-case-lci-dataset-with-its-own-identity.md
+      - "0046 The PFD drawn as an engineering sheet": adr/0046-pfd-drawn-as-an-engineering-sheet.md
+      - "0047 Valve, pipe and slant drawing rules in the gate": adr/0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md
+      - "0050 Semi-batch reactor with dosing accumulation": adr/0050-semi-batch-reactor-with-dosing-accumulation.md
+      - "0051 Batch recipe derives the cycle time": adr/0051-batch-recipe-derives-the-cycle-time.md
+      - "0052 Batch vessel and jacket from the recipe": adr/0052-batch-vessel-and-jacket-from-the-recipe.md
+      - "0053 Per-batch LCA consumables": adr/0053-per-batch-lca-consumables.md
       - Template: adr/template.md

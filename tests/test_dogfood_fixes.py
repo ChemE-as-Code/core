@@ -564,3 +564,54 @@ def test_rename_still_refuses_a_tag_shared_with_an_unrelated_object(fresh: Path)
     result = invoke("rename", "XV-104", "XV-105")
     assert result.exit_code != 0
     assert "names 2 objects" in result.output
+
+
+# -- instrument: actuators towards the bubble, orthogonal measuring lines -----------------------
+
+
+def test_instrument_actuators_face_the_bubble_and_lines_stay_orthogonal(fresh: Path):
+    from chemeascode.domains.piping.authoring import (
+        Nozzle,
+        Sheet,
+        equipment,
+        instrument,
+        line,
+        valve,
+    )
+
+    sheet = Sheet.load(fresh / "pid" / "P-01.xml")
+    vessel = "VESSEL_WITH_DISHED_HEADS_SHAPE"
+    a = equipment(
+        sheet,
+        "Tank",
+        "T-1",
+        shape=vessel,
+        at=(60, 100),
+        nozzles=[Nozzle("N1", (10, 0), 80), Nozzle("N2", (0, 20), 80)],
+    )
+    b = equipment(
+        sheet, "Tank", "T-2", shape=vessel, at=(260, 100), nozzles=[Nozzle("N1", (-10, 0), 80)]
+    )
+    c = equipment(
+        sheet, "Tank", "T-3", shape=vessel, at=(60, 220), nozzles=[Nozzle("N1", (0, -20), 80)]
+    )
+    across = line(sheet, "80-A-1", dn=80, route=[a["N1"], valve("PV1", at=(180, 100)), b["N1"]])
+    down = line(sheet, "80-A-2", dn=80, route=[a["N2"], valve("FV1", at=(60, 160)), c["N1"]])
+    # bubbles off the sensing points: the old helper drew slanted measuring lines, actuators
+    # always up and signal lines through the valve bodies
+    instrument(
+        sheet, "PIC-101", at=(140, 135), sensing=across, sensing_at=(115, 100), signal_to="PV1"
+    )
+    instrument(sheet, "FIC-102", at=(100, 185), sensing=down, sensing_at=(60, 140), signal_to="FV1")
+    sheet.save()
+
+    rotations = _rotations(f"<!-- x -->{(fresh / 'pid' / 'P-01.xml').read_text()}")
+    assert rotations["Inst_PIC101_Actuator_SymbolShape"] == 90.0  # down, towards the bubble
+    assert rotations["Inst_FIC102_Actuator_SymbolShape"] == 0.0  # sideways off the vertical line
+    drawing = {
+        f["rule"]
+        for f in _findings("pid/P-01.xml")
+        if f["rule"]
+        in ("cheme.line-through-valve", "cheme.line-on-pipe", "cheme.line-not-orthogonal")
+    }
+    assert drawing == set()

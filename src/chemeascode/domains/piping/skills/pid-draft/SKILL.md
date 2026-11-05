@@ -131,7 +131,8 @@ items assigned to it; do not create empty frames to silence it.
    sheet and `--crop` for details, and check every listed equipment item, line and instrument is
    on the sheet (`equipment-not-on-pid`, `line-not-on-pid`, `instrument-not-on-pid`). Clear the
    drawing findings (`line-through-label`, `line-crossing`, `label-overlap`,
-   `label-far-from-owner`; each has a `[crop ...]`): a generator that places labels by a fixed
+   `label-far-from-owner`, `line-through-symbol`, `line-through-valve`, `line-on-pipe`,
+   `line-not-orthogonal`; each has a `[crop ...]`): a generator that places labels by a fixed
    offset gets them wrong everywhere at once, so fix the offset in the script and regenerate.
    Then sweep the whole sheet: `cheme render pid/<sheet>.xml --png --tiles auto` and read
    every tile (`--findings` marks the lint's findings on them).

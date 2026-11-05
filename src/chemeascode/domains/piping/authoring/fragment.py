@@ -781,8 +781,8 @@ def _rendered(info: _SheetInfo, object_id: str, attribute: str, shown: str) -> s
         return None
 
 
-def _symbol_at(drawing: etree._Element) -> tuple[float, float] | None:
-    """Where the drawing's own symbol is (not one of a nested part's, like a nozzle)."""
+def _symbol_usage(drawing: etree._Element) -> etree._Element | None:
+    """The drawing's own placed symbol (not one of a nested part's, like a nozzle)."""
     for usage in drawing.iter("Object"):
         if usage.get("type") != "Core/Diagram.ShapeUsage":
             continue
@@ -791,11 +791,26 @@ def _symbol_at(drawing: etree._Element) -> tuple[float, float] | None:
             for a in usage.iterancestors("Object")
             if a.get("type") == "Core/Diagram.RepresentationGroup"
         ]
-        if groups and groups[0] is drawing:
-            found = point_xy_of(usage)
-            if found:
-                return found
+        if groups and groups[0] is drawing and point_xy_of(usage):
+            return usage
     return None
+
+
+def _symbol_at(drawing: etree._Element) -> tuple[float, float] | None:
+    """Where the drawing's own symbol is (not one of a nested part's, like a nozzle)."""
+    usage = _symbol_usage(drawing)
+    return point_xy_of(usage) if usage is not None else None
+
+
+def _symbol_turn(drawing: etree._Element) -> float | None:
+    """The rotation of the drawing's own symbol, in degrees (0 when it has none)."""
+    usage = _symbol_usage(drawing)
+    if usage is None:
+        return None
+    try:
+        return float(usage.findtext("Data[@property='Rotation']/Double") or 0.0)
+    except ValueError:
+        return 0.0
 
 
 def point_xy_of(element: etree._Element) -> tuple[float, float] | None:

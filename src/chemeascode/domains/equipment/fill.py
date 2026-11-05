@@ -1160,7 +1160,8 @@ def input_data(
     sheet's ``type_specific`` value, else the ``--param`` value, *given*, or the one a fill
     recorded in the sheet's ``sizing_basis``) or ``table:<table>/<row>`` (a row of a table
     cheme-as-code ships: ``overall-coefficients/<row>``, ``roughness/<row>``,
-    ``fittings/<row>``, ``pipe-sizes/<schedule>/DN<dn>``)."""
+    ``fittings/<row>``, ``pipe-sizes/<schedule>/DN<dn>``) or ``recipe:<unit procedure>`` (its
+    entry and the batch size in ``process/recipe.yaml``)."""
     kind, _, name = ref.partition(":")
     model = model or {}
     if kind == "condenser":
@@ -1175,6 +1176,28 @@ def input_data(
         return {"value": found.value, "assumed": found.assumed} if found is not None else None
     if kind == "table":
         return _table_row(name)
+    if kind == "recipe":
+        from chemeascode.domains.process.recipe import load_recipe
+
+        recipe = load_recipe(process.root)[0] if process is not None else None
+        procedures = [u for u in (recipe.unit_procedures if recipe else []) if u.id == name]
+        if not procedures:
+            return None
+        # the batch's content is the batch size over this stream's rate: its state counts too
+        stream = next(
+            (s for s in process.flowsheet.streams if s.id == recipe.batch_size.stream), None
+        )
+        return _stripped(
+            {
+                "batch_size": recipe.batch_size.model_dump(mode="json"),
+                "batch_size_stream": (
+                    {c: q.model_dump(mode="json") for c, q in stream.state.items()}
+                    if stream is not None
+                    else None
+                ),
+                "unit_procedure": procedures[0].model_dump(mode="json", by_alias=True),
+            }
+        )
     if kind == "catalyst":
         catalysts = process.catalysts.by_id() if process is not None and process.catalysts else {}
         found = catalysts.get(name)
@@ -1820,10 +1843,16 @@ def _pump(sheet: _Sheet, context: _Context) -> None:
     try:
         try:
             node, inlet, outlet = context.one_in_one_out(sheet.tag)
-        except _Refused:
+        except _Refused as refusal:
             if sheet.param("suction_from") and sheet.param("discharge_to"):
                 _pump_declared(sheet, context)
                 return
+            if sheet.param("mass_flow_kg_h") is not None:  # meant as a declared pump
+                raise _Refused(
+                    f"{refusal.reason}; for a pump no stream links declare "
+                    "type_specific.suction_from and discharge_to (its end points in the layout "
+                    "model)"
+                ) from refusal
             raise
         if inlet.mass_flow is None:
             raise _Refused(f"stream {inlet.id}: no flow in case {context.case}")
@@ -2106,13 +2135,14 @@ def _pump_declared(sheet: _Sheet, context: _Context) -> None:
             roughness=str(rough.value) if rough else None,
             inputs_assumed=any(p.assumed for p in (schedule, rough) if p is not None),
         )
-    except pumps.SizingError as failure:
-        refusal = _Refused(str(failure))
+    except (pumps.SizingError, _Refused) as failure:
+        refusal = failure if isinstance(failure, _Refused) else _Refused(str(failure))
+        flow = _declared_flow(sheet)
         for key, unit in keys:
-            sheet.tbd_value(key, unit, refusal)
-        return
-    except _Refused as refusal:
-        for key, unit in keys:
+            if key == "flow_m3_h" and flow is not None:
+                # the flow needs no routed line: Q = m / rho from the declared values
+                sheet.put(key, flow[0], unit, flow[1], flow[2], inputs=[], reads=flow[3])
+                continue
             sheet.tbd_value(key, unit, refusal)
         return
     inputs = "; ".join(f"{p.text()}" for p in used)
@@ -2159,6 +2189,28 @@ def _pump_declared(sheet: _Sheet, context: _Context) -> None:
             inputs=depends[key][0],
             reads=depends[key][1],
         )
+
+
+def _declared_flow(sheet: _Sheet) -> tuple[float, str, bool, list[str]] | None:
+    """A declared pump's volume flow from its declared mass flow and density: (m3/h, basis,
+    assumed, the parameters read); None when either is missing or not a positive number."""
+    m, rho = sheet.param("mass_flow_kg_h"), sheet.param("density_kg_m3")
+    if m is None or rho is None:
+        return None
+    try:
+        mass, density = m.number(), rho.number()
+    except _Refused:
+        return None
+    if not (mass > 0 and density > 0):
+        return None
+    return (
+        mass / density,
+        f"Q = m / rho = {mass:.6g} kg/h / {density:.6g} kg/m3 (declared mass_flow_kg_h "
+        f"{m.text()}; density_kg_m3 {rho.text()}); the head, NPSH and power need the routed "
+        "lines",
+        m.assumed or rho.assumed,
+        ["param:mass_flow_kg_h", "param:density_kg_m3"],
+    )
 
 
 def _ends(context: _Context, stream: _Stream, end: str) -> list[str]:
@@ -2773,7 +2825,7 @@ def _reactor(sheet: _Sheet, context: _Context) -> None:
     node = process.nodes[node_id]
     case = context.case or process.flowsheet.default_case()
     inlets = [s.stream for s in context.streams(node_id, "in")]
-    if getattr(node, "reactor", None) in ("cstr", "batch"):
+    if getattr(node, "reactor", None) in ("cstr", "batch", "semibatch"):
         _stirred_reactor(sheet, process, node, node_id, inlets, case)
         return
     try:
@@ -2837,6 +2889,17 @@ def _reactor(sheet: _Sheet, context: _Context) -> None:
         )
 
 
+def _recipe_vessel(process: Any, node_id: str, case: str) -> Any:
+    """The vessel process/recipe.yaml sizes for batch step *node_id*, or None."""
+    from chemeascode.domains.process.recipe import evaluate, load_recipe
+
+    recipe, doc, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    result = evaluate(process, recipe, doc, case)
+    return next((v for v in result.vessels if v.unit == node_id), None)
+
+
 def _stirred_reactor(
     sheet: _Sheet, process: Any, node: Any, node_id: str, inlets: list[Any], case: str
 ) -> None:
@@ -2851,13 +2914,36 @@ def _stirred_reactor(
             {"catalyst_mass_kg": "kg", "pressure_drop_kpa": "kPa"}.get(key, "m3"),
             _Refused(f"{node_id} is a {node.reactor}, not a bed"),
         )
-    if node.reactor == "batch":
+    if node.reactor in ("batch", "semibatch"):
         why = _Refused(
-            f"{node_id} is a batch: its volume follows the batch size and cycle, and its duty "
-            "varies over the batch (cheme process reactors gives the heat released)"
+            f"{node_id} is a {node.reactor}: its volume follows the batch size and cycle, and "
+            "its duty varies over the batch (cheme process reactors gives the heat released)"
         )
-        sheet.tbd_value("volume_m3", "m3", why, add=True)
-        sheet.tbd_value("duty_kw", "kW", why, add=True)
+        vessel = _recipe_vessel(process, node_id, case)
+        if vessel is not None:
+            sheet.put(
+                "volume_m3",
+                vessel.volume,
+                "m3",
+                f"the vessel of {vessel.procedure} in process/recipe.yaml (cheme process "
+                f"recipe): {vessel.working_volume:.4g} m3 of batch, {vessel.fill:.0%} full",
+                True,
+                inputs=[f"recipe:{vessel.procedure}"],
+            )
+        else:
+            sheet.tbd_value("volume_m3", "m3", why, add=True)
+        if vessel is not None and vessel.peak_duty is not None:
+            sheet.put(
+                "duty_kw",
+                -vessel.peak_duty,
+                "kW",
+                f"the peak duty to remove from one batch of {vessel.procedure} "
+                "(process/recipe.yaml, cheme process recipe): negative is heat removed",
+                True,
+                inputs=[f"recipe:{vessel.procedure}"],
+            )
+        else:
+            sheet.tbd_value("duty_kw", "kW", why, add=True)
         return
     try:
         if len(inlets) != 1:

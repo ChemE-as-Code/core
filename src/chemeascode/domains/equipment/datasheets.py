@@ -679,7 +679,13 @@ def draft_datasheet(
             value = getattr(d, name)
             if value is not None:
                 key = f"{name}_{'t' if unit == 't' else 'm'}"
-                specific[key] = _q(value, unit, f"{list_file} dimensions")
+                told = d.source if unit == "m" else ""  # a tool's sizes, not the weight
+                specific[key] = _q(
+                    value,
+                    unit,
+                    f"{list_file} dimensions" + (f": {told}" if told else ""),
+                    assumed=d.assumed and unit == "m",
+                )
     for key, unit in type_fields(item.type):
         if key == "volume_m3" and d is not None and d.diameter and (d.height or d.length):
             # a diameter with a length is a horizontal shell (as the 3D model reads it):

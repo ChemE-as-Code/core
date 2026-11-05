@@ -1,0 +1,4 @@
+# Site plan of the CO2-to-CO skid (tests only).
+site: {name: CO2 skid, width: 26, depth: 18}
+areas:
+  - {id: SKID, box: [1, 1, 25, 17]}

@@ -41,6 +41,7 @@ from chemeascode.domains.control.schemas import (
 )
 from chemeascode.domains.equipment.schemas.datasheet import Datasheet
 from chemeascode.domains.equipment.schemas.equipment import EquipmentItem, EquipmentList
+from chemeascode.domains.experiments.electrochemistry import ElectrochemicalMeasurements
 from chemeascode.domains.experiments.kinetic_fit import KineticData
 from chemeascode.domains.piping.schemas.lines import (
     Instrument,
@@ -52,7 +53,9 @@ from chemeascode.domains.piping.schemas.lines import (
 from chemeascode.domains.piping.schemas.pipe_specs import PipeSpecs
 from chemeascode.domains.piping.schemas.piping_items import PipingItem, PipingItemList
 from chemeascode.domains.process.electrochemical_cell import Cells
+from chemeascode.domains.process.electrolysis_duty import Duties
 from chemeascode.domains.process.furnace import FurnacesFile
+from chemeascode.domains.process.recipe import Recipe
 from chemeascode.domains.process.schema import Flowsheet, Materials
 from chemeascode.domains.process.separations.extraction import ExtractionFile
 from chemeascode.domains.process.separations.schema import Adsorption
@@ -111,13 +114,19 @@ OTHER_SCHEMAS = {
     "process-simulation": (Simulation, "process/simulation.yaml"),
     "process-reactions": (Reactions, "process/reactions.yaml"),
     "process-catalysts": (Catalysts, "process/catalysts.yaml"),
+    "process-recipe": (Recipe, "process/recipe.yaml"),
     "process-assays": (Assays, "process/assays.yaml"),
     "process-cells": (Cells, "process/cells.yaml"),
+    "process-duties": (Duties, "process/duties.yaml"),
     "process-adsorption": (Adsorption, "process/adsorption.yaml"),
     "reaction-evidence": (ReactionEvidence, "process/reaction-evidence.yaml"),
     "process-extraction": (ExtractionFile, "process/extraction.yaml"),
     "furnaces": (FurnacesFile, "process/furnaces.yaml"),
     "kinetic-data": (KineticData, "experiments/kinetics/*.yaml"),
+    "electrochemical-measurements": (
+        ElectrochemicalMeasurements,
+        "experiments/electrochemistry/*.yaml",
+    ),
     "layout_model": (LayoutModelFile, "layout/plant-model.yaml (generated)"),
     "lci_dataset": (LciDataset, "lca/dataset.yaml (generated), lca/datasets/*.yaml"),
     "lci_estimate": (LciEstimate, "lca/estimate.yaml"),
@@ -143,7 +152,9 @@ __all__ = [
     "CostBasis",
     "CheckList",
     "Datasheet",
+    "Duties",
     "ElectricalList",
+    "ElectrochemicalMeasurements",
     "FactorFile",
     "HazopStudy",
     "DesignBasis",
@@ -183,6 +194,7 @@ __all__ = [
     "Reactions",
     "Assays",
     "Catalysts",
+    "Recipe",
     "Cells",
     "ReactionEvidence",
     "ExtractionFile",

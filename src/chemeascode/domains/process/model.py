@@ -709,6 +709,9 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _reaction_rules(out)
     _reactor_rules(out)
     _catalyst_rules(out)
+    from chemeascode.domains.process.recipe import rules as recipe_rules
+
+    out.findings += recipe_rules(process)
     _id_rules(out)
     _unit_rules(out)
     _port_rules(out)
@@ -877,7 +880,7 @@ def _reactor_rules(out: _Out) -> None:
                     hint="remove reactions: (or use reactor: equilibrium)",
                 )
             elif (
-                model in ("equilibrium", "conversion", "pfr", "cstr", "batch")
+                model in ("equilibrium", "conversion", "pfr", "cstr", "batch", "semibatch")
                 and not item.reactions
             ):
                 out.add(
@@ -1019,9 +1022,12 @@ def _reactor_rules(out: _Out) -> None:
                         hint="selectivity: {key, conversion, products: {id: kmol formed per kmol "
                         "of the key converted}} on a conversion reactor",
                     )
+            if model in ("batch", "semibatch"):
+                _dosing_rules(out, item, [key, i], model, reactions)
             for kind, field_name in (("cstr", "tank"), ("batch", "batch")):
                 spec = getattr(item, field_name, None)
-                if model == kind:
+                if model == kind or (kind == "batch" and model == "semibatch"):
+                    kind = model
                     lacking = [r.id for r in reactions if r.rate is None]
                     phases = {r.phase == "liquid" for r in reactions if r.phase != "mixed"}
                     mixed = [r.id for r in reactions if r.phase == "mixed"]
@@ -1070,7 +1076,8 @@ def _reactor_rules(out: _Out) -> None:
                     out.add(
                         "warning",
                         "reactor",
-                        f"{what}: {field_name} is used by reactor: {kind} only",
+                        f"{what}: {field_name} is used by reactor: "
+                        f"{'batch or semibatch' if kind == 'batch' else kind} only",
                         [key, i, field_name],
                         [item.id],
                         hint=f"set reactor: {kind}, or remove {field_name}",
@@ -1148,6 +1155,52 @@ def _reactor_rules(out: _Out) -> None:
                 "formation data",
                 file=REACTIONS_FILE,
             )
+
+
+def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: list[Any]) -> None:
+    """A semi-batch's doses: on ``reactor: semibatch`` only, each an inlet stream of the step,
+    one charge stream besides them, liquid-phase reactions."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    dosing = item.batch.dosing if item.batch is not None else []
+    if model == "batch":
+        if dosing:
+            out.add(
+                "error",
+                "reactor",
+                f"{what}: a batch with dosing",
+                [*at, "batch", "dosing"],
+                [item.id],
+                hint="set reactor: semibatch, or remove batch.dosing",
+            )
+        return
+    if item.batch is None:
+        return  # said by the batch's rules
+    problems = []
+    if not dosing:
+        problems.append("no dosing")
+    inlets = [
+        s.id
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[1]) is not None and end.node == item.id and s.kind == "material"
+    ]
+    if stray := [d.stream for d in dosing if d.stream not in inlets]:
+        problems.append("the dosed stream(s) " + ", ".join(stray) + " are no inlet of it")
+    charges = [s for s in inlets if s not in {d.stream for d in dosing}]
+    if dosing and len(charges) != 1:
+        problems.append(f"{len(charges)} charge streams (one inlet besides the doses)")
+    if gas := [r.id for r in reactions if r.phase != "liquid"]:
+        problems.append("the reaction(s) " + ", ".join(gas) + " not liquid-phase")
+    for problem in problems:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: reactor semibatch with {problem}",
+            [*at, "batch", "dosing"] if dosing else [*at, "reactor"],
+            [item.id],
+            hint="a semibatch: batch.dosing [{stream, time or profile}] naming its dosed inlet "
+            "streams; its other inlet is the charge; liquid-phase reactions",
+        )
 
 
 def _catalyst_rules(out: _Out) -> None:
@@ -1330,6 +1383,7 @@ def _id_rules(out: _Out) -> None:
         _known_class(out, block.class_, block.method, ["blocks", i], block.id)
     for i, step in enumerate(fs.steps):
         _known_class(out, step.class_, step.method, ["steps", i], step.id)
+        _known_symbol(out, step.symbol, ["steps", i, "symbol"], step.id)
     ids = [c.id for c in fs.cases]
     defaults = [c.id for c in fs.cases if c.default]
     if not fs.cases:
@@ -1341,6 +1395,22 @@ def _id_rules(out: _Out) -> None:
             "case ids must be unique and at most one case the default",
             ["cases"],
         )
+
+
+def _known_symbol(out: _Out, name: str | None, loc: list[Any], owner: str) -> None:
+    from chemeascode.domains.process.symbols import BOX, JUNCTION, symbols
+
+    if name is None or name in (JUNCTION, BOX) or name in symbols():
+        return
+    out.add(
+        "warning",
+        "symbol",
+        f"{owner}: symbol {name} is not in the symbol library; the PFD draws its class's",
+        loc,
+        [owner],
+        hint=f"{JUNCTION}, {BOX} or a symbol name, e.g. TANK_CONE_ROOF_SHAPE, MIXER_SHAPE "
+        "(the list: src/chemeascode/domains/process/data/iso_shapes.json)",
+    )
 
 
 def _known_class(out: _Out, name: str, method: str | None, loc: list[Any], owner: str) -> None:

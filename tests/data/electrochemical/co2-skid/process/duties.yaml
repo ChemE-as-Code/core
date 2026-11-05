@@ -1,0 +1,23 @@
+# The skid's duty (tests only): the stacks at 150 mA/cm2 against a 20 L reservoir of 1 M KOH,
+# dosed continuously with 1 M KOH and bled at a lower rate (the volume grows). Run by `cheme process stack` at
+# the sized arrangement over its horizon (the campaign).
+schema: cheme/electrolysis-duties/v1
+kind: electrolysis_duties
+duties:
+  - id: SKID-150
+    title: Skid at 150 mA/cm2, 20 L of 1 M KOH, continuous dosing
+    cell: BPM-100
+    schedule: {kind: constant_current, current_density: {value: 150, unit: mA/cm2}}
+    reservoir:
+      volume: {value: 20, unit: L}
+      composition: {hydroxide: {value: 1, unit: mol/L}}
+      cation: K+
+      model: well-mixed-carbonate
+    dosing:
+      kind: continuous
+      concentration: {value: 1, unit: mol/L}
+      rate: {value: 1.0, unit: L/h}
+      density: {value: 1.05, unit: kg/L, source: "test: about 1 M KOH"}
+    bleed: {rate: {value: 0.8, unit: L/h}}
+    threshold: {ph: 12, source: "test: stated design criterion"}
+    horizon: {value: 100, unit: h}
