@@ -406,3 +406,51 @@ def test_an_energy_stream_into_the_semibatch_is_no_charge(tmp_path):
     assert result.written >= 1, [f.format() for f in result.findings]
     (entry,) = screen(ws.root).entries
     assert entry.accumulation == pytest.approx(0.02778, rel=1e-3)
+
+
+# -- review fixes -------------------------------------------------------------------------------
+
+
+def test_a_product_without_heat_capacity_drops_only_the_cooling_failure():
+    result = _semibatch(1e-3, cp={"A": 150.0, "S": 150.0})  # none for the product B
+    exact = (1 - math.exp(-1e-3 * DOSING)) / (1e-3 * DOSING)
+    assert result.outlet["A"] == pytest.approx(exact, rel=1e-6)
+    assert result.cooling_failure is None
+    assert any("no cooling-failure temperature" in n for n in result.notes)
+
+
+def test_a_batch_with_dosing_is_refused_not_crashed(tmp_path):
+    with pytest.raises(TankError, match="time or target"):
+        solve_batch(
+            _reactions(1e-3),
+            {"S": 5.0, "A": 1.0},
+            300.0,
+            101.325,
+            _batch(),  # dosing but no time or target, and no doses given
+            {},
+            Liquid(V),
+            CP,
+        )
+    one_inlet = FLOWSHEET.replace("reactor: semibatch", "reactor: batch")
+    ws = _plant(tmp_path, one_inlet)
+    (row,) = reactor_report(ws.root).reactors
+    assert row["tank"] is None and any("dosing" in m or "inlet" in m for m in row["missing"])
+
+
+def test_the_mtt_is_of_what_is_in_the_vessel(tmp_path):
+    """A template component no stream carries (N2, boiling at 77 K) is not the MTT."""
+    ws = _plant(tmp_path)
+    path = ws.root / "process/materials.yaml"
+    path.write_text(
+        path.read_text()
+        .replace(
+            "templates:",
+            "  - {id: N2, name: N2, formula: N2, molar_mass: 28.01, liquid_molar_volume: 0.035,\n"
+            "     liquid_heat_capacity: 60, normal_boiling_point: 77.36}\ntemplates:",
+        )
+        .replace("components: [A, B, S]", "components: [A, B, S, N2]")
+    )
+    flowsheet = ws.root / "process/flowsheet.yaml"
+    flowsheet.write_text(flowsheet.read_text().replace("hazard: {mtt: 380, ", "hazard: {"))
+    (entry,) = screen(ws.root).entries
+    assert entry.mtt == pytest.approx(400.0) and "N2" not in entry.mtt_basis

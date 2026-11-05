@@ -246,7 +246,8 @@ def _screen_semibatch(
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
             for n, v in found.items():
-                moles[n] = moles.get(n, 0.0) + v
+                if v > 0:  # a template's component the stream does not carry is not there
+                    moles[n] = moles.get(n, 0.0) + v
             p_in = kpa if p_in is None else min(p_in, kpa)
         solved, _ = solve_node(process, item, inlets, case)
     except TankError as failure:
