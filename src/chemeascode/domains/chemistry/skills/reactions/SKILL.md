@@ -238,7 +238,7 @@ each value taken from the evidence cites its observation in `source`.
    the run, so a dosing-controlled step screens lower than its batch; a vented gas leaves as it
    forms and adds nothing to it, while its peak rate in the notes pressurises a vessel whose
    vent is blocked, which the screening does not assess), the MTT (the reactor's `hazard.mtt`, else the lowest normal boiling point at about
-   atmospheric pressure, vented and passing gases left out) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
+   atmospheric pressure, of what stays in the liquid: the gas that forms and leaves by the vent and a dose's passing share left out) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays
    open (`cheme.reactor-hazard-missing`). These are screening values for the HAZOP study, not a
@@ -248,7 +248,7 @@ each value taken from the evidence cites its observation in `source`.
    give it `kind: phase-change` (one component into one other of the same formula, one of them
    `phase: solid`, is recognised as one unless it declares a `heat_of_reaction`): a step whose
    reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`,
-   info), and a step with both is screened on its reactions alone. A recognised phase change
+   info), and a step with both takes dT_ad and the MTT from its reactions alone (a semi-batch's MTSR is its model's, the phase changes' heat included; a note says so). A recognised phase change
    with a heat of reaction (a caustic dissolution, an acid dilution) stays screened, its heat
    in dT_ad.
 9. Where the reaction data are uncertain (a fit's intervals, a literature range), give them:

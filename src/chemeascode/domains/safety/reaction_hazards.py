@@ -18,7 +18,9 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   then and ``dT_ad`` of the whole batch, charge and doses;
 - a vented batch or semi-batch (``batch.vent``, ADR 0054): the vented gas leaves as it forms,
   so it adds nothing to the content's heat capacity nor to the MTSR, and a dosed gas counts
-  only with its absorbed share; neither sets the MTT. The notes give the vent's peak gas rate:
+  only with its absorbed share. The MTT is set by what stays in the liquid: the charge (a
+  charged vent component included) and the absorbed share of each dose, not the gas that forms
+  and leaves. The notes give the vent's peak gas rate:
   with the vent blocked that gas pressurises the vessel, which this screening does not assess;
 - ``MTT`` from the reactor's ``hazard.mtt``, else the lowest normal boiling point of a
   liquid-phase reactor's components at about atmospheric pressure (110 kPa(a) at most);
@@ -32,9 +34,11 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
 Phase changes are not reactions (ADR 0056): a step whose reactions are all phase changes
 (``kind: phase-change``, or one component into one other of the same formula, one of them
 ``phase: solid``, e.g. a precipitation ``NBS -> NBS_S`` written as a conversion, that declares
-no heat of reaction) is not screened; a step with reactions and phase changes is screened on
-its reactions alone. A phase change detected by its formula that declares a heat of reaction
-(a caustic dissolution) is screened as a reaction: its heat counts in dT_ad.
+no heat of reaction) is not screened; a step with reactions and phase changes takes its dT_ad
+and MTT from its reactions alone, but a semi-batch's cooling-failure MTSR from its whole model,
+the phase changes' kinetics and heat included (a note says so). A phase change detected by its
+formula that declares a heat of reaction (a caustic dissolution) is screened as a reaction: its
+heat counts in dT_ad.
 
 Rules (``cheme.reactor-hazard-*``, findings on ``process/flowsheet.yaml``): ``-class``
 (info for classes 1 and 2, warning for 3 to 5), ``-mtsr`` (warning: the MTSR above the MTT or
@@ -213,7 +217,8 @@ def heated_phase_changes(process: Any, node: str) -> list[str]:
 
 def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     """The screening of reactor *node* in *case* (see the module docstring); its phase
-    changes take no part (the screening of its reactions alone)."""
+    changes take no part in dT_ad and the MTT (a semi-batch's MTSR is its model's, phase
+    changes included)."""
     from chemeascode.domains.process.model import stream_flows
     from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 
@@ -315,13 +320,10 @@ def _screen_semibatch(
     p_in = None
     # a dosed gas counts with the share the liquid takes up; the rest passes to the vent
     absorbed = {d.stream: d.absorbed for d in item.batch.dosing if d.absorbed is not None}
-    through: set[str] = set()
     try:
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
             share = absorbed.get(stream.id, 1.0)
-            if share < 1:
-                through |= {n for n, v in found.items() if v > 0}
             for n, v in found.items():
                 if v > 0:  # a template's component the stream does not carry is not there
                     moles[n] = moles.get(n, 0.0) + v * share
@@ -350,12 +352,17 @@ def _screen_semibatch(
         entry.notes.append("MTSR: T_p + X_ac dT_ad (no cooling-failure temperature over the run)")
     else:
         entry.missing.append("the accumulation of a dosed reactant")
-    boiling = moles
+    if changes := phase_changes(process, item.id):
+        entry.notes.append(
+            "the MTSR from the semibatch model includes the kinetics and heat of its phase "
+            "changes (" + ", ".join(sorted(changes)) + "); dT_ad and the MTT its reactions' alone"
+        )
     if item.batch.vent is not None:
         _vent_note(process, item, entry, inlets, case, solved)
-        gases = set(item.batch.vent.components) | through
-        boiling = {n: v for n, v in moles.items() if n not in gases}
-    _limits(entry, item, reactions, boiling, comps, p_in)
+    # what stays in the liquid sets the MTT: the charge and the absorbed share of each dose (a
+    # charged vent component stays, the vent takes what forms); the gas that forms and leaves
+    # was never in it
+    _limits(entry, item, reactions, moles, comps, p_in)
     return entry
 
 

@@ -93,8 +93,9 @@ cites the PharmaPy papers as literature only.
 - **Screening** (`reaction_hazards`):
   - A vented gas adds nothing to the content's heat capacity or to the MTSR.
   - A partly absorbed dose counts with its absorbed share in `dT_ad`.
-  - Neither a vented gas nor a passing one sets the MTT, which is the lowest boiling point of
-    what stays in the liquid.
+  - The MTT is the lowest boiling point of what stays in the liquid: the charge (a charged
+    vent component included, since the vent takes only what forms) and the absorbed share of
+    each dose. The gas that forms and leaves, and the passing share of a dose, set no MTT.
   - A note gives the vent's peak gas rate. With the vent blocked that gas pressurises the
     vessel, which the thermal screening does not assess.
 - **Rules** (`cheme.process-reactor`):
