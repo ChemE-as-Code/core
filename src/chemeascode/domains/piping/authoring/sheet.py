@@ -47,6 +47,7 @@ from chemeascode.domains.piping.authoring.fragment import (
     _segment,
     _SheetInfo,
     _symbol_at,
+    _symbol_turn,
     _tee,
     _valve,
     dn_number,
@@ -496,6 +497,14 @@ class Sheet:
                 return found
         return None
 
+    def symbol_turn(self, object_id: str) -> float | None:
+        """The rotation (degrees) of the symbol of *object_id*, or None when it is not drawn."""
+        for drawing in self.index.drawings.get(object_id, []):
+            found = _symbol_turn(drawing)
+            if found is not None:
+                return found
+        return None
+
     def port(self, key: str | Port, node: str | None = None) -> Port:
         """A pipe end: a nozzle id (its node), ``ITEM:NODE``, or an item and one of its nodes."""
         if isinstance(key, Port):
@@ -812,6 +821,7 @@ def instrument(
     sensing_at: XY | None = None,
     signal_to: str | Valve | None = None,
     signal_points: list[XY] | None = None,
+    sensing_points: list[XY] | None = None,
     location: str = "central",
     fail_action: str | None = None,
     id: str | None = None,
@@ -819,9 +829,11 @@ def instrument(
     """Add instrument function *tag* (``PIC-4101``) with its bubble at *at*; returns its id.
 
     *sensing*: what it measures (an id, a nozzle port, a line, equipment); the measuring line
-    starts at *sensing_at* (default: the port, node or symbol of *sensing*; a line needs it).
+    starts at *sensing_at* (default: the port, node or symbol of *sensing*; a line needs it) and
+    is drawn orthogonally, through *sensing_points* when given.
     *signal_to*: a valve (control loop or trip: actuating system, actuator symbol on the valve,
-    dashed signal line) or another instrument function id (a cascade).
+    dashed signal line) or another instrument function id (a cascade). The actuator points
+    away from the line towards the bubble's side, so the signal line never crosses the valve.
     """
     object_id = id or _ident(tag, "Inst_")
     sensing_id, default_at = _resolve_sensing(sheet, sensing)
@@ -839,6 +851,7 @@ def instrument(
             options = {
                 "signal_valve": target,
                 "valve_at": sheet.symbol_at(target),
+                "valve_turn": sheet.symbol_turn(target) or 0.0,
                 "valve_tag": data_value(element, "PipingComponentNumber"),
                 "actuator_shape": sheet.shapes.get("CONTROLLED_ACTUATOR_SHAPE"),
             }
@@ -858,6 +871,8 @@ def instrument(
             location=location,
             bubble_shape=sheet.shapes.get(bubble[0]) if bubble else None,
             signal_points=signal_points,
+            sensing_points=sensing_points,
+            sensing_vertical=_runs_vertically(sheet, sensing_at or default_at),
             fail_action=fail_action,
             **options,
         )
@@ -872,6 +887,21 @@ def instrument(
     for drawing in parts.get("SYSTEM DRAWING", []):
         sheet.add_drawing(drawing)
     return object_id
+
+
+def _runs_vertically(sheet: Sheet, at: XY | None) -> bool:
+    """Whether the line drawn through *at* runs vertically there (a vertical pipe or wall)."""
+    if at is None:
+        return False
+    x, y = float(at[0]), float(at[1])
+    across = along = False
+    for path in sheet.line_paths():
+        for (x0, y0), (x1, y1) in zip(path, path[1:], strict=False):
+            if math.isclose(x0, x1, abs_tol=0.01) and math.isclose(x, x0, abs_tol=0.5):
+                along |= min(y0, y1) - 0.5 <= y <= max(y0, y1) + 0.5
+            elif math.isclose(y0, y1, abs_tol=0.01) and math.isclose(y, y0, abs_tol=0.5):
+                across |= min(x0, x1) - 0.5 <= x <= max(x0, x1) + 0.5
+    return along and not across
 
 
 @_atomic

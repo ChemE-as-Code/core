@@ -1547,12 +1547,14 @@ first finding's id:
 
 ```yaml
 - id: drawing-clean
-  title: No line through a label, crossing, overlapping or misplaced label left unaccepted
+  title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
+    misplaced label left unaccepted
   stage: basic
   kind: validate
-  fail_on: warning
+  fail_on: info          # cheme.line-not-orthogonal is an info finding
   rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
-          cheme.label-far-from-owner]
+          cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
+          cheme.line-not-orthogonal]
 ```
 
 `on-sheet` asks the loaded model, not the XML text: a tag is the one the P&ID prints

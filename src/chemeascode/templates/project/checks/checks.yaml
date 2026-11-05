@@ -59,12 +59,15 @@ checks:
     stage: basic
     kind: validate
   - id: drawing-clean
-    title: No line through a label, crossing, overlapping or misplaced label left unaccepted
+    title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
+      misplaced label left unaccepted
     stage: basic
     kind: validate
-    fail_on: warning
+    # info: cheme.line-not-orthogonal (a slanted line) is an info finding
+    fail_on: info
     rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
-            cheme.label-far-from-owner]
+            cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
+            cheme.line-not-orthogonal]
     # A sheet kept from the DEXPI reference P&ID (pyDEXPI's sample, e.g. as a worked example)
     # fails this gate by design: the reference has crossings and labels on its lines. Accept
     # its findings here, naming the sheet:

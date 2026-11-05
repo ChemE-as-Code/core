@@ -93,7 +93,8 @@ BUBBLE_SHAPES = {
 ACTUATOR_SHAPE = ("CONTROLLED_ACTUATOR_SHAPE", "Shape1")
 #: The text size of an equipment tag label (as ``_label`` writes it).
 EQUIPMENT_LABEL_SIZE = 4.5
-#: CONTROLLED_ACTUATOR_SHAPE (13.5 + 4.5 mm long) at scale 0.4, drawn up from the valve centre.
+#: CONTROLLED_ACTUATOR_SHAPE (13.5 + 4.5 mm long) at scale 0.4, drawn from the valve centre away
+#: from its line, towards the side the controller's bubble is on.
 ACTUATOR_SCALE = 0.4
 ACTUATOR_REACH = 7.2
 
@@ -445,6 +446,66 @@ def _orthogonal(start: tuple[float, float], end: tuple[float, float]) -> list[tu
     return [start, (end[0], start[1]), end]
 
 
+def _measuring_route(
+    sense: tuple[float, float],
+    centre: tuple[float, float],
+    half: tuple[float, float],
+    bends: list[tuple[float, float]],
+    vertical: bool = False,
+) -> tuple[tuple[float, float], list[tuple[float, float]]]:
+    """The bubble end and the bends of a measuring line from *sense* to the bubble at *centre*.
+
+    Without *bends* the line leaves the sensing point at right angles to its line (horizontal,
+    or *vertical*) and stays orthogonal: straight when the two line up, else into the bubble's
+    near end through a bend pair halfway, or into its side through one bend.
+    """
+    if bends:
+        return _edge(centre, half, bends[-1])[1], bends
+    if vertical:  # the same route, transposed
+        end, inner = _measuring_route(sense[::-1], centre[::-1], half[::-1], [])
+        return end[::-1], [p[::-1] for p in inner]
+    side, end = _edge(centre, half, sense)
+    if math.isclose(sense[0], end[0]) or math.isclose(sense[1], end[1]):
+        return end, []
+    if side in ("top", "bottom"):
+        middle = round((sense[1] + end[1]) / 2, 3)
+        return end, [(sense[0], middle), (end[0], middle)]
+    return end, [(sense[0], end[1])]
+
+
+def _actuator(
+    valve_at: tuple[float, float], valve_turn: float, bubble_at: tuple[float, float]
+) -> tuple[float, tuple[float, float]]:
+    """The actuator's rotation and its signal end: at right angles to the valve's line, on the
+    side of the bubble, so the signal line reaches it without crossing the valve body."""
+    vx, vy = valve_at
+    if round(valve_turn / 90) % 2:  # a valve in a vertical line: the actuator points sideways
+        if bubble_at[0] >= vx:
+            return 0.0, (vx + ACTUATOR_REACH, vy)
+        return 180.0, (vx - ACTUATOR_REACH, vy)
+    if bubble_at[1] <= vy:
+        return 270.0, (vx, vy - ACTUATOR_REACH)
+    return 90.0, (vx, vy + ACTUATOR_REACH)
+
+
+def _signal_route(
+    centre: tuple[float, float], half: tuple[float, float], end: tuple[float, float], turn: float
+) -> list[tuple[float, float]]:
+    """An orthogonal signal line from the bubble at *centre* to an actuator pointing at *turn*:
+    out of the bubble's side and into the actuator along its stem (one bend at most)."""
+    x, y = centre
+    hx, hy = half
+    if turn in (90.0, 270.0):  # vertical stem
+        if math.isclose(x, end[0]):
+            return [(x, y + hy if end[1] > y else y - hy), end]
+        start = (x + hx if end[0] > x else x - hx, y)
+        return [start, (end[0], y), end]
+    if math.isclose(y, end[1]):
+        return [(x + hx if end[0] > x else x - hx, y), end]
+    start = (x, y + hy if end[1] > y else y - hy)
+    return [start, (x, end[1]), end]
+
+
 def instrument_fragment(
     object_id: str,
     tag: str,
@@ -461,15 +522,21 @@ def instrument_fragment(
     signal_function: str | None = None,
     function_at: tuple[float, float] | None = None,
     signal_points: list[tuple[float, float]] | None = None,
+    sensing_points: list[tuple[float, float]] | None = None,
+    sensing_vertical: bool = False,
+    valve_turn: float = 0.0,
     fail_action: str | None = None,
 ) -> Fragment:
     """An instrument function *tag* with its bubble at *at*.
 
     *sensing* (an object id) and *sensing_at* (where the measuring line starts) add the sensor
-    and the measuring line. *signal_valve* (a valve id drawn at *valve_at*) adds an actuating
-    function, a signal and an actuating system with a controlled actuator on that valve;
-    *signal_function* (another instrument function's id, its bubble at *function_at*) a signal
-    to it (a cascade). *signal_points* are the signal line's bends.
+    and the measuring line, drawn orthogonally off its line (*sensing_vertical* when that line
+    runs vertically) or through *sensing_points*.
+    *signal_valve* (a valve id drawn at *valve_at*, rotated *valve_turn*) adds an actuating
+    function, a signal and an actuating system with a controlled actuator on that valve, pointing
+    away from the valve's line towards the bubble; *signal_function* (another instrument
+    function's id, its bubble at *function_at*) a signal to it (a cascade). *signal_points* are
+    the signal line's bends.
     """
     check_id(object_id, "instrument id")
     if location not in BUBBLE_SHAPES:
@@ -506,7 +573,9 @@ def instrument_fragment(
         if sensing_at is None:
             made.notes.append(f"no sensing point for {sensing}: the measuring line is not drawn")
         else:
-            _, bubble_end = _edge(at, (half_x, half_y), sensing_at)
+            bubble_end, inner = _measuring_route(
+                sensing_at, at, (half_x, half_y), list(sensing_points or []), sensing_vertical
+            )
             positions += [
                 obj(
                     f"{object_id}_SensePosition",
@@ -524,6 +593,7 @@ def instrument_fragment(
                 "Core/Diagram.ConnectorLine",
                 ref("Source", f"{object_id}_SensePosition"),
                 ref("Target", f"{object_id}_BubblePosition"),
+                *([points("InnerPoints", inner)] if inner else []),
                 dashed_stroke(INSTRUMENT_RGB, 0.25, "Solid"),
             )
             groups.append(
@@ -537,6 +607,7 @@ def instrument_fragment(
     systems: list[etree._Element] = []
     system_drawings: list[etree._Element] = []
     target_at: tuple[float, float] | None = None
+    actuator_turn: float | None = None
     if signal_valve:
         check_id(signal_valve, "signal_to")
         number_text = valve_tag or f"{category}V{num}"
@@ -599,6 +670,7 @@ def instrument_fragment(
         )
         if valve_at is not None:
             vx, vy = valve_at
+            actuator_turn, target_at = _actuator(valve_at, valve_turn, at)
             system_drawings.append(
                 obj(
                     f"{object_id}_Actuator_Drawing",
@@ -612,7 +684,7 @@ def instrument_fragment(
                                 actuator_shape or ACTUATOR_SHAPE[1],
                                 vx,
                                 vy,
-                                270.0,
+                                actuator_turn,
                                 ACTUATOR_SCALE,
                             ),
                         ),
@@ -620,7 +692,6 @@ def instrument_fragment(
                     ref("Represents", f"{object_id}_Actuator"),
                 )
             )
-            target_at = (vx, vy - ACTUATOR_REACH)
         else:
             made.notes.append(f"{signal_valve} is not drawn: no actuator symbol, no signal line")
     if signal_function:
@@ -641,7 +712,12 @@ def instrument_fragment(
         _, start = _edge(at, (half_x, half_y), first)
         if signal_function and function_at is not None:
             _, target_at = _edge(function_at, (half_x, half_y), bends[-1] if bends else start)
-        route = [start, *bends, target_at] if bends else _orthogonal(start, target_at)
+        if bends:
+            route = [start, *bends, target_at]
+        elif actuator_turn is not None:
+            route = _signal_route(at, (half_x, half_y), target_at, actuator_turn)
+        else:
+            route = _orthogonal(start, target_at)
         groups.append(
             obj(
                 f"{object_id}_Signal_Drawing",

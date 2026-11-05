@@ -40,6 +40,20 @@
   lines off valve bodies, actuator heads and the top of pipes; the template's example generator
   draws its measuring lines orthogonal.
 
+### Changed
+
+- The template's `drawing-clean` gate also fails on `cheme.line-through-valve`,
+  `cheme.line-on-pipe` and `cheme.line-not-orthogonal` (`fail_on: info` for the last). A plant
+  repository made with an earlier template keeps its own `checks/checks.yaml`: add the three
+  rules there to get the stricter gate.
+- The authoring API's `instrument` (`chemeascode.domains.piping.authoring`) draws the actuator
+  at right angles to the valve's line on the bubble's side (down when the bubble is below a
+  horizontal line, sideways on a vertical line; it was always up) and routes the signal line
+  out of the bubble's side into the actuator's stem, so it never crosses the valve body. The
+  measuring line leaves its line at right angles and stays orthogonal (it was a slanted straight
+  line); `sensing_points=[...]` gives its bends. Generator scripts that relied on the old drawing
+  draw differently when rerun (`cheme regen`).
+
 ## 1.5.0 (2026-11-04)
 
 Minor release: electrochemical measurements, measured-performance cells, dynamic electrolysis
