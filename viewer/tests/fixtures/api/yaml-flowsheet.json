@@ -2418,8 +2418,30 @@
               }
             ],
             "default": null,
-            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest normal boiling point of the liquid's components at about atmospheric pressure.",
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (boiling below the process temperature; ADR 0058).",
             "title": "Mtt"
+          },
+          "reactions": {
+            "description": "The reactions of the step whose heat sets dT_ad and the MTSR (each run to completion, the largest counts), e.g. the main reaction without a slow side reaction (ADR 0058). Default: every reaction.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "vent_capacity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+            "title": "Vent Capacity"
           },
           "provenance": {
             "enum": [

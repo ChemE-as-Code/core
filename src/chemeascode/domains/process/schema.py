@@ -447,6 +447,10 @@ class Dosing(Strict):
         exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
     )
 
+    def is_gas(self) -> bool:
+        """Whether the dose is a gas (it declares the share the liquid takes up)."""
+        return self.absorbed is not None
+
     @model_validator(mode="after")
     def _form(self) -> Dosing:
         if (self.time is None) == (not self.profile):
@@ -600,8 +604,25 @@ class ReactionHazard(Strict):
         default=None,
         gt=0,
         description="K: the maximum technical temperature (the boiling point at the reactor's "
-        "pressure, a relief set temperature); default: the lowest normal boiling point of the "
-        "liquid's components at about atmospheric pressure.",
+        "pressure, a relief set temperature); default: the lowest boiling point of the "
+        "liquid's components at the reactor's pressure (the normal boiling point at about "
+        "atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving "
+        "out a batch's vent components, a dosed gas and dissolved gases (boiling below the "
+        "process temperature; ADR 0058).",
+    )
+    reactions: list[str] = Field(
+        default_factory=list,
+        description="The reactions of the step whose heat sets dT_ad and the MTSR (each run to "
+        "completion, the largest counts), e.g. the main reaction without a slow side reaction "
+        "(ADR 0058). Default: every reaction.",
+        exclude_if=lambda value: not value,  # a reactor's dump stays as it was
+    )
+    vent_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="m3/h of gas the vent and its line pass at the vessel's pressure, from the "
+        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+        exclude_if=lambda value: value is None,
     )
     provenance: Provenance
     source: str = ""

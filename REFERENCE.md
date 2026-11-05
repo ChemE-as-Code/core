@@ -1040,6 +1040,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
   JSON `phase_changes`), a step with both takes dT_ad and the MTT from its reactions alone, a
   semi-batch's MTSR from its whole model, the phase changes included, with a note (ADR 0056).
+  The default MTT is the lowest boiling point of what boils in the liquid at the reactor's
+  pressure (ADR 0058): a batch's vent components, a dosed gas (a dose with `absorbed`) and
+  dissolved gases (boiling below `T_p`) are left out with a note (JSON `mtt_left_out`; with
+  nothing else left the MTT needs `hazard.mtt`); from 90 to 110 kPa(a) the normal boiling point,
+  else Clausius-Clapeyron with the component's `heat_of_vaporization` (without it a note, and
+  above atmospheric no MTT where that component could set it). `hazard.reactions: [ids]` names
+  the reactions whose heat sets dT_ad and the MTSR (default: every reaction, the largest); with
+  more than one reaction the output gives each one's dT_ad and MTSR (JSON `per_reaction`,
+  `counted_reactions`, `counted_basis`; `cheme.reactor-hazard-reactions`, warning: a name the
+  step does not hold). A semi-batch gives its MTSR profile, time, `X_ac`, temperature and
+  MTSR at about 21 moments and the worst (JSON `mtsr_profile`, a text line). A vented batch or
+  semi-batch gives its gas release at the MTSR (JSON `gas_release`): the vent components forming
+  at the rate laws with the worst moment's content at the MTSR, an upper bound, in kmol/s and
+  m3/h at the MTSR and the vessel's pressure, per batch of `process/recipe.yaml` (else per hour
+  of flows), and the gas the largest reaction forms run to completion; `cheme.reactor-hazard-vent`
+  warns without `hazard.vent_capacity` (m3/h) or above it, and is info within it. The pressure
+  of a blocked vent is not screened.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1103,9 +1120,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
-  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT, which is the
-  lowest boiling point of what stays in the liquid (the charge, a charged vent component
-  included, and each dose's absorbed share; a note gives the vent's peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
+  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
+  components, a dosed gas and dissolved gases do not set it, ADR 0058; a note gives the vent's
+  peak rate) and reports the gas release at the MTSR against `hazard.vent_capacity`. `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
   more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
   a vent stream whose template lacks a vent component or a passing dose's component, (warning)
   one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`

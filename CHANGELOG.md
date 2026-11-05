@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Semi-batch thermal screening (ADR 0058, #178) in `cheme process reactor-hazards`:
+  - `hazard.reactions: [ids]` names the reactions whose heat sets dT_ad and the MTSR (default
+    unchanged: every reaction, the largest run to completion). With more than one reaction, or
+    that choice, the output gives the reactions counted and why (`counted_reactions`,
+    `counted_basis`), and each reaction alone (`per_reaction`: dT_ad, MTSR and, in a
+    semi-batch, the time of its own worst moment), on a text line too. A name the step does
+    not hold is a warning, `cheme.reactor-hazard-reactions`.
+  - A semi-batch's MTSR profile (`mtsr_profile`: time, `X_ac`, temperature and MTSR at the
+    model's steps nearest 21 even moments, and the worst), and a compact text line.
+  - A vented batch or semi-batch's gas release at the MTSR (`gas_release`): the vent
+    components forming at the rate laws with the content of the worst moment, at the MTSR, an
+    upper bound. It is given in kmol/s and m3/h at the MTSR and the vessel's pressure, per
+    batch of `process/recipe.yaml` (else per hour of flows), with the gas the largest reaction
+    forms run to completion. `hazard.vent_capacity` (m3/h) is compared with it. The new rule
+    `cheme.reactor-hazard-vent` is a warning without a capacity, above it, or with no batch
+    size to compare on, and info within it.
+  - A default MTT at the reactor's pressure outside 90 to 110 kPa(a), by Clausius-Clapeyron
+    from the normal boiling point and the component's `heat_of_vaporization`. Above
+    atmospheric pressure the MTT was missing until now; without the heat of vaporization a
+    note names it.
+  - `stirred_tank`: `TankResult.cooling_profile` (a `CoolingPoint` per step: each reaction's
+    cooling-failure rise and the content), and `vent_gas_rate`.
+
+### Changed
+
+- The default MTT (no `hazard.mtt`) leaves out a batch's vent components (charged ones too), a
+  dosed gas (a dose with `absorbed`) and dissolved gases, whose boiling point is below the
+  process temperature. A note names them, and the JSON gives `mtt_left_out`. With nothing else
+  boiling, the MTT needs `hazard.mtt`. Until 1.8.0 they set it (HCl's 188 K, methyl nitrite's
+  261 K), which meant nothing. Under vacuum (below 90 kPa(a)) a component with
+  `heat_of_vaporization` now boils at the vessel's pressure, not at its normal boiling point.
+  Without one, a note says the MTT is lower. These are fixes: a reactor without vent, dosed or
+  dissolved gases and at about atmospheric pressure screens as before.
+- Every vented batch gets a `cheme.reactor-hazard-vent` warning until it states
+  `hazard.vent_capacity`. The vent note no longer says the blocked vent is "not screened here":
+  it points to the gas release.
+- Other reactors report as in 1.8.0: the new JSON keys appear only when they hold something,
+  and the new `ReactionHazard` fields stay out of a reactor's dump. Every BFD/PFD needs
+  `cheme process build` once, because the process schema changed.
+
 ## 1.8.0 (2026-11-05)
 
 Minor release: batch work-up (#165) and gas evolution (#174). A batch or semi-batch vents the
