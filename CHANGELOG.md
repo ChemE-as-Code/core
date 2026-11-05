@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- `reactor: semibatch` (ADR 0048, core#158): a liquid batch with feeds dosed into its charge,
+  `batch.dosing: [{stream, time | profile, start}]`, each dosed stream an inlet of the step and
+  the other inlet the charge; `batch.time` or `target` is the post-reaction. The same rate laws
+  and integrator as `reactor: batch` (`stirred_tank.solve_batch` with doses, the doses'
+  sensible heat in the energy balance). `cheme process reactors` reports the accumulation of
+  the dosed reactant over time and its maximum, the cooling-failure temperature at the worst
+  moment and the peak cooling duty per m3. `cheme process reactor-hazards` takes `X_ac` from
+  that maximum and the MTSR from the worst moment (Stoessel's semi-batch treatment), so a
+  dosing-controlled step no longer screens as an all-charged batch; a batch keeps `X_ac = 1`.
+  `process propagate --fill`, `process reactor-uncertainty`, `datasheets fill` (volume and duty
+  TBD, as a batch) and the model basis take it; `process simulate` refuses it (DWSIM's reactors
+  take one inlet). Rules: a batch with `dosing`, a semi-batch without it, a dosed stream that is
+  no inlet, not one charge stream, a gas-phase reaction (`cheme.process-reactor`, errors).
+  Example `examples/process-semibatch` (acetic anhydride dosed into water).
+
 ### Changed
 
 - The PFD is drawn as an engineering sheet (ADR 0046; generator 6: every BFD/PFD needs

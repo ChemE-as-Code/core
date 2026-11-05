@@ -12,6 +12,10 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
 - the accumulation ``X_ac``: 1 for a batch (all charged; cooling fails at the start) and for
   a plug-flow or conversion reactor (fresh feed at its inlet), the unconverted fraction of the
   key for a CSTR; ``MTSR = T_p + X_ac dT_ad``;
+- a semi-batch (Stoessel's treatment of dosing-controlled reactions): ``X_ac`` the largest
+  accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
+  its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
+  then and ``dT_ad`` of the whole batch, charge and doses;
 - ``MTT`` from the reactor's ``hazard.mtt``, else the lowest normal boiling point of a
   liquid-phase reactor's components at about atmospheric pressure (110 kPa(a) at most);
   ``TD24`` from ``hazard.td24`` only (calorimetry; never estimated);
@@ -157,6 +161,8 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     entry = HazardEntry(node, model)
     reactions, _ = process.reactions_of(node)
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
+    if model == "semibatch":
+        return _screen_semibatch(process, item, entry, reactions, inlets, case)
     if len(inlets) != 1:
         entry.missing.append("one inlet stream")
         return entry
@@ -216,6 +222,68 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     entry.adiabatic_rise = rise
     if rise is not None:
         entry.mtsr = t_p + accumulation * rise
+    _limits(entry, item, reactions, moles, comps, p_in)
+    bed = getattr(item, "bed", None)
+    if model == "pfr" and bed is not None and bed.heat == "cooled" and bed.coolant_temperature:
+        entry.sensitivity = _sensitivity(process, item, inlet, case)
+    return entry
+
+
+def _screen_semibatch(
+    process: Any, item: Any, entry: HazardEntry, reactions: list[Any], inlets: list[Any], case: str
+) -> HazardEntry:
+    """A semi-batch (Stoessel's treatment): ``X_ac`` the largest accumulation of the dosed
+    reactant over the run, the MTSR the cooling-failure temperature at the worst moment (the
+    dosing stopped, the content then reacting to completion adiabatically), ``T_p`` the
+    process temperature then; ``dT_ad`` of the whole batch, charge and doses."""
+    from chemeascode.domains.process.stirred_tank import TankError, solve_node, stream_moles
+
+    comps = process.components()
+    moles: dict[str, float] = {}
+    p_in = None
+    try:
+        for stream in inlets:
+            found, t_in, kpa = stream_moles(process, stream, case)
+            for n, v in found.items():
+                moles[n] = moles.get(n, 0.0) + v
+            p_in = kpa if p_in is None else min(p_in, kpa)
+        solved, _ = solve_node(process, item, inlets, case)
+    except TankError as failure:
+        entry.missing.append(f"the semibatch: {failure}")
+        return entry
+    worst = solved.cooling_failure
+    entry.process_temperature = worst[1] if worst else solved.profile[0][1]
+    rise, lacking = _adiabatic_rise(
+        reactions, moles, entry.process_temperature, comps, process.ideal_gas()
+    )
+    entry.missing += lacking
+    entry.adiabatic_rise = rise
+    entry.accumulation = solved.max_accumulation
+    if worst is not None:
+        entry.mtsr = worst[2]
+        entry.notes.append(
+            f"accumulation: the dosed reactant's largest, {solved.max_accumulation or 0:.3g} at "
+            f"{solved.max_accumulation_time or 0:.6g} s; MTSR at the worst moment, {worst[0]:.6g} "
+            "s (dosing stopped, the content's heat capacity then)"
+        )
+    elif rise is not None and solved.max_accumulation is not None:
+        entry.mtsr = entry.process_temperature + solved.max_accumulation * rise
+        entry.notes.append("MTSR: T_p + X_ac dT_ad (no cooling-failure temperature over the run)")
+    else:
+        entry.missing.append("the accumulation of a dosed reactant")
+    _limits(entry, item, reactions, moles, comps, p_in)
+    return entry
+
+
+def _limits(
+    entry: HazardEntry,
+    item: Any,
+    reactions: list[Any],
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    p_in: float | None,
+) -> None:
+    """The MTT and TD24 of *entry*, and its class once the MTSR is known."""
     hazard = getattr(item, "hazard", None)
     if hazard is not None and hazard.mtt:
         entry.mtt, entry.mtt_basis = hazard.mtt, "hazard.mtt"
@@ -238,10 +306,6 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         entry.missing.append("TD24 of the decomposition (hazard.td24, from calorimetry)")
     if entry.mtsr is not None and entry.mtt is not None and entry.td24 is not None:
         entry.criticality = criticality(entry.mtsr, entry.mtt, entry.td24)
-    bed = getattr(item, "bed", None)
-    if model == "pfr" and bed is not None and bed.heat == "cooled" and bed.coolant_temperature:
-        entry.sensitivity = _sensitivity(process, item, inlet, case)
-    return entry
 
 
 def _sensitivity(process: Any, item: Any, inlet: Any, case: str) -> float | None:

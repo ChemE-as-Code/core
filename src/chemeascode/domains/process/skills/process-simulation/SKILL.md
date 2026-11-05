@@ -256,7 +256,9 @@ the same way: cheme-as-code solves it (`domains/process/stirred_tank.py`) at the
 gives, DWSIM sees a conversion reactor with its conversions and outlet temperature (isothermal
 when the tank stays at its inlet's temperature), and the outer loop runs until they agree. A
 liquid tank's reactions are liquid-phase in DWSIM too; a batch's outlet keeps the inlet's
-pressure (its vessel's pressure is not the stream's).
+pressure (its vessel's pressure is not the stream's). A semi-batch (`reactor: semibatch`) is not
+coupled: DWSIM's reactors take one inlet, and the charge and its doses are several. `process
+simulate` refuses it; solve it with `process propagate`.
 
 Not simulated (keep these parts assumed and `exclude:` them): kinetic reactors other than a
 fixed bed, a stirred tank or a batch, solids, a liquid side draw from the condenser stage. Evaporators and dryers need `unit:` (their heat duty matters; a component

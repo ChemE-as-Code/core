@@ -1,0 +1,83 @@
+# A semi-batch hydrolysis: water is charged, acetic anhydride is dosed over 2 h at 25 C, then
+# 30 min of post-reaction, isothermal. Flows are per hour of charge (the batch's amounts).
+# `cheme process propagate --fill` integrates the batch and writes the outlet; `cheme process
+# reactors` gives the accumulation of the anhydride (at most about 5 %: the dosing controls the
+# reaction) and the peak cooling duty; `cheme process reactor-hazards` takes the accumulation
+# for the MTSR. Put all the anhydride in at once (reactor: batch, the doses mixed into the
+# charge) and the MTSR passes the boiling point of water. Regenerate the sheets with
+# `cheme process build`.
+schema: cheme/process/v1
+kind: flowsheet
+title: Semi-batch hydrolysis
+units: {pressure: kPa(a), temperature: K, flow: kmol/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 1.0, rel: 0.005}
+
+feeds:
+  - {id: WATER, title: Process water, ports: [{id: out, direction: out}]}
+  - {id: ANHYDRIDE, title: Acetic anhydride, ports: [{id: out, direction: out}]}
+products:
+  - {id: PRODUCT, title: Dilute acetic acid, ports: [{id: in, direction: in}]}
+
+blocks:
+  - id: HYDROLYSIS
+    title: Hydrolysis
+    class: ReactingChemicals
+    ports:
+      - {id: in, direction: in}
+      - {id: dose, direction: in}
+      - {id: out, direction: out}
+
+steps:
+  - id: R1
+    block: HYDROLYSIS
+    title: Hydrolysis reactor
+    class: ReactingChemicals
+    reactions: [HYD]
+    reactor: semibatch
+    batch:
+      dosing: [{stream: S2, time: 7200}]
+      time: 1800
+      heat: isothermal
+      provenance: assumed
+      source: "dosing over 2 h, 30 min post-reaction: illustrative"
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: dose, direction: in, delegates: dose}
+      - {id: out, direction: out, delegates: out}
+
+streams:
+  - id: S1
+    title: Water charge
+    from: WATER.out
+    to: R1.in
+    template: liquid
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 30, basis: mole, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {H2O: 1.0}, provenance: given, source: basis of design}
+  - id: S2
+    title: Anhydride dose
+    from: ANHYDRIDE.out
+    to: R1.dose
+    template: liquid
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: basis of design}
+        temperature: {value: 298.15, provenance: given, source: basis of design}
+        flow: {value: 5, basis: mole, provenance: given, source: basis of design}
+        composition: {basis: mole_fraction, values: {AC2O: 1.0}, provenance: given, source: basis of design}
+  - id: S3
+    title: Hydrolysate
+    from: R1.out
+    to: PRODUCT.in
+    template: liquid
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {H2O: 0.71438, AC2O: 9.42238e-05, ACOH: 0.285526}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1 S2', fingerprint: 6c7ae617422db328}
+        flow: {value: 1050.9, unit: kg/h, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1 S2', fingerprint: 607bd9dea7064e77}
+        temperature: {value: 298.15, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1 S2', fingerprint: 6c7ae617422db328}
+        pressure: {value: 101.325, provenance: calculated, source: 'cheme process propagate: reactor R1 from S1 S2', fingerprint: 6c7ae617422db328}

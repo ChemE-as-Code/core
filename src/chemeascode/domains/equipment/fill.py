@@ -2802,7 +2802,7 @@ def _reactor(sheet: _Sheet, context: _Context) -> None:
     node = process.nodes[node_id]
     case = context.case or process.flowsheet.default_case()
     inlets = [s.stream for s in context.streams(node_id, "in")]
-    if getattr(node, "reactor", None) in ("cstr", "batch"):
+    if getattr(node, "reactor", None) in ("cstr", "batch", "semibatch"):
         _stirred_reactor(sheet, process, node, node_id, inlets, case)
         return
     try:
@@ -2880,10 +2880,10 @@ def _stirred_reactor(
             {"catalyst_mass_kg": "kg", "pressure_drop_kpa": "kPa"}.get(key, "m3"),
             _Refused(f"{node_id} is a {node.reactor}, not a bed"),
         )
-    if node.reactor == "batch":
+    if node.reactor in ("batch", "semibatch"):
         why = _Refused(
-            f"{node_id} is a batch: its volume follows the batch size and cycle, and its duty "
-            "varies over the batch (cheme process reactors gives the heat released)"
+            f"{node_id} is a {node.reactor}: its volume follows the batch size and cycle, and "
+            "its duty varies over the batch (cheme process reactors gives the heat released)"
         )
         sheet.tbd_value("volume_m3", "m3", why, add=True)
         sheet.tbd_value("duty_kw", "kW", why, add=True)

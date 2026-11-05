@@ -1034,7 +1034,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **Reactive hazard screening**: **`cheme process reactor-hazards [--json]`** gives each
   reactor's adiabatic rise, MTSR, MTT and, with a TD24 from calorimetry (`hazard:` on the
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
-  (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`).
+  (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
+  accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
+  cooling-failure temperature at the worst moment (ADR 0048); a batch keeps `X_ac = 1`.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1058,7 +1060,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
   liquid; `process propagate --fill` writes the outlet and `process reactors` reports the tanks'
-  conversions and duty, or the batch's profile and heat release.
+  conversions and duty, or the batch's profile and heat release. `reactor: semibatch` (liquid)
+  is a batch with `batch.dosing: [{stream, time | profile, start}]` dosed into its charge: the
+  dosed streams are inlets of the step, the other inlet the charge, `time`/`target` the
+  post-reaction. `process reactors` adds the accumulation of the dosed reactant over time and
+  its maximum, the worst cooling-failure temperature and the peak cooling duty per m3
+  (`stirred_tank.solve_batch` with doses; ADR 0048). `process simulate` does not couple it.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
