@@ -1042,19 +1042,25 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   semi-batch's MTSR from its whole model, the phase changes included, with a note (ADR 0056).
   The default MTT is the lowest boiling point of what boils in the liquid at the reactor's
   pressure (ADR 0058): a batch's vent components, a dosed gas (a dose with `absorbed`) and
-  dissolved gases (boiling below `T_p`) are left out with a note (JSON `mtt_left_out`; with
-  nothing else left the MTT needs `hazard.mtt`); from 90 to 110 kPa(a) the normal boiling point,
+  dissolved gases (under 5 % of the liquid, boiling below `T_p`) are left out with a note
+  (JSON `mtt_left_out`; with nothing else left the MTT needs `hazard.mtt`; a larger share
+  boiling below `T_p`, a solvent at reflux, sets the MTT at or below `T_p`, with a note); from 90 to 110 kPa(a) the normal boiling point,
   else Clausius-Clapeyron with the component's `heat_of_vaporization` (without it a note, and
   above atmospheric no MTT where that component could set it). `hazard.reactions: [ids]` names
   the reactions whose heat sets dT_ad and the MTSR (default: every reaction, the largest); with
-  more than one reaction the output gives each one's dT_ad and MTSR (JSON `per_reaction`,
+  more than one reaction the output gives each one's dT_ad and MTSR (an endothermic one's MTSR
+  is `T_p`; JSON `per_reaction`,
   `counted_reactions`, `counted_basis`; `cheme.reactor-hazard-reactions`, warning: a name the
   step does not hold). A semi-batch gives its MTSR profile, time, `X_ac`, temperature and
   MTSR at about 21 moments and the worst (JSON `mtsr_profile`, a text line). A vented batch or
   semi-batch gives its gas release at the MTSR (JSON `gas_release`): the vent components forming
-  at the rate laws with the worst moment's content at the MTSR, an upper bound, in kmol/s and
-  m3/h at the MTSR and the vessel's pressure, per batch of `process/recipe.yaml` (else per hour
-  of flows), and the gas the largest reaction forms run to completion; `cheme.reactor-hazard-vent`
+  at the rate laws at the MTSR, the larger with the worst moment's content and with the content
+  once the reaction setting the MTSR ran to completion (gas from its products; `rate_from`; a
+  longer chain is not covered), in kmol/s and m3/h at the MTSR and the vessel's pressure, per
+  batch of `process/recipe.yaml` (else per hour of flows), and the most gas one reaction forms
+  run to completion (`formed_by`, `formed_from`: of the counted reactions from the worst
+  moment's content, or of a reaction consuming a product of the one setting the MTSR);
+  `cheme.reactor-hazard-vent`
   warns without `hazard.vent_capacity` (m3/h) or above it, and is info within it. The pressure
   of a blocked vent is not screened.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]

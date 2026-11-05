@@ -42,24 +42,30 @@ accepted step: its time, temperature, accumulation, each reaction's rise and the
    at the reactor's pressure (its inlets' lowest). It leaves out three kinds of component:
    - a batch's vent components, even when charged;
    - the components of a dosed gas (a dose that declares `absorbed`);
-   - dissolved gases, whose boiling point is below the process temperature `T_p`.
+   - dissolved gases: a minor share of the liquid (a mole fraction of the charge and doses
+     under `DISSOLVED`, 5 %) whose boiling point is below the process temperature `T_p`.
 
    A note names each one left out, and the JSON gives them as `mtt_left_out`. They boil off
-   on a cooling failure; they do not boil the batch. When nothing else boils, the MTT needs
+   on a cooling failure; they do not boil the batch. A larger share boiling below `T_p` is
+   the liquor at its boiling point (a solvent at reflux, an adiabatic semi-batch above the
+   solvent's boiling point): it sets the MTT, at or below `T_p`, with a note, as in 1.8.0.
+   Leaving it out would take the next, higher boiling point as the MTT and lower the class,
+   the unsafe direction. When nothing else boils, the MTT needs
    `hazard.mtt` (`-missing`). From 90 to 110 kPa(a) the normal boiling point stands, as
    before. Outside that band the MTT comes from Clausius-Clapeyron,
    `1/T = 1/T_b - R ln(P/101.325)/dH_vap`, with the component's `heat_of_vaporization`.
    Without it:
    - under vacuum the normal boiling point stays, and a note says the MTT is lower;
    - above atmospheric pressure, a component that could set the MTT leaves the MTT missing,
-     and a note names the `heat_of_vaporization` it needs. A component whose normal boiling
-     point is above the lowest known one cannot set the MTT.
+     and a note names the `heat_of_vaporization` of every such component. A component whose
+     normal boiling point is at or above the lowest known boiling point cannot set the MTT.
 2. **Reactions that count.** `hazard.reactions: [ids]` names the reactions whose heat sets
    dT_ad and the MTSR. The default is unchanged: every reaction, the largest run to
    completion. With more than one reaction, or with that choice, the output gives the
    reactions counted and the reason (`counted_reactions`, `counted_basis`). It also gives each
    reaction alone (`per_reaction`): its dT_ad over the whole batch and its MTSR, for a
-   semi-batch at its own worst moment and with that moment's time. The counted MTSR is the
+   semi-batch at its own worst moment and with that moment's time. An endothermic reaction
+   alone does not heat the content: its MTSR is `T_p` (its dT_ad stays negative). The counted MTSR is the
    largest over time of `T + max over the counted j of rise_j`. With every reaction counted,
    this is the model's own cooling-failure temperature, to the last digit. A name the step
    does not hold is a warning, `cheme.reactor-hazard-reactions`, and every reaction then
@@ -70,12 +76,19 @@ accepted step: its time, temperature, accumulation, each reaction's rise and the
    of six of them and the worst.
 4. **Gas release at the MTSR.** A vented batch or semi-batch reports `gas_release`: the rate
    at which the vent's components form, `f_g sum_j max(nu_gj M_j r_j, 0)`. Every reaction runs
-   at its rate law, with the content of the worst moment (the accumulated reactant), at the
-   MTSR and the vessel's pressure. That is an upper bound: the content reacts away as it heats.
+   at its rate law at the MTSR and the vessel's pressure, with two contents, and the larger
+   counts (`rate_from` says which): the worst moment's (the accumulated reactant) and the
+   content once the reaction setting the MTSR ran to completion of its limiting reactant (the
+   cooling failure's end state, its vented share gone). The second catches gas formed from
+   that reaction's products, a consecutive decomposition (a diazonium, an intermediate). Each
+   content is taken whole at the MTSR, so the rate bounds the gas from the reactants and from
+   that reaction's products; gas from a longer chain of consecutive reactions is not covered.
    The rate is given in kmol/s and in m3/h at the MTSR and the vessel's pressure. It is per
    batch (`process/recipe.yaml`'s batch size), else per hour of the flowsheet's flows, and the
-   output says which. The output also gives the gas one reaction, the largest, forms run to
-   completion. The new rule `cheme.reactor-hazard-vent` reports it:
+   output says which. The output also gives the most gas one reaction forms run to completion
+   (`formed_by`, `formed_from`): of the counted reactions (`hazard.reactions`, else every
+   one) from the worst moment's content, or of a reaction consuming a product of the one
+   setting the MTSR from the content after it. The new rule `cheme.reactor-hazard-vent` reports it:
    - a warning without `hazard.vent_capacity` (m3/h at the vessel's pressure, from the vent
      sizing);
    - a warning above that capacity, or when there is no batch size to compare on;
@@ -83,7 +96,10 @@ accepted step: its time, temperature, accumulation, each reaction's rise and the
 
 Stoessel's classes, the accumulation and the semi-batch model are unchanged. The new
 `ReactionHazard` fields have `exclude_if`, so a reactor's dump and fingerprints stay as they
-were. The JSON gives the new keys only when they hold something.
+were. The JSON gives the new keys only when they hold something: `per_reaction` and
+`counted_*` for every reactor with more than one reaction, `mtsr_profile` for every
+semi-batch, `gas_release` for every vented batch. A reactor with one reaction, no dosing and
+no vent reports as in 1.8.0.
 
 ## Consequences
 
@@ -96,13 +112,19 @@ were. The JSON gives the new keys only when they hold something.
   copies.
 - Negative: two behaviours change for plants that do not use the new fields. They are fixes,
   stated in the CHANGELOG:
-  - a vent component, a dosed gas and a dissolved gas no longer set the default MTT;
+  - a vent component, a dosed gas and a minor dissolved component no longer set the default
+    MTT;
   - under vacuum a component with `heat_of_vaporization` boils lower.
 
-  Every vented batch gets the new `-vent` warning until it states a vent capacity.
-- Negative: the dissolved-gas rule follows the declared boiling points, not a phase
-  equilibrium. A gas held in solution well above its boiling point (a solvate, a complex) is
-  still left out, and a dissolved gas does not lower the liquor's boiling point.
+  Every vented batch gets the new `-vent` warning until it states a vent capacity, so
+  `cheme process reactor-hazards` exits 1 for it. Every reactor with more than one reaction,
+  every semi-batch and every vented batch gets new JSON keys and text lines. The MTT, MTSR
+  and class of the core examples and the process library's entries are those of 1.8.0.
+- Negative: the dissolved-gas rule follows the declared boiling points and a share
+  threshold, not a phase equilibrium. A minor gas held in solution well above its boiling
+  point (a solvate, a complex) is still left out, a dissolved gas does not lower the liquor's
+  boiling point, and a dosed reactant whose share of the charge and doses is above 5 % but
+  small in the vessel at any time (it reacts away) still sets the MTT.
 - Known limitations: the products are not candidates for the MTT, only what is charged and
   dosed (as before). The blocked-vent pressure is not screened: there is no head space or
   relief model. Nor is a dissolved toxic gas boiling off on cooling failure (core#178 item 5).
@@ -118,5 +140,6 @@ were. The JSON gives the new keys only when they hold something.
   stirred_tank.py` (`CoolingPoint`, `TankResult.cooling_profile`, `vent_gas_rate`),
   `src/chemeascode/domains/process/schema.py` (`ReactionHazard.reactions`, `.vent_capacity`).
 - `tests/test_semibatch_screening.py` against closed forms (the first-order dosed semi-batch's
-  profile, two parallel reactions, Clausius-Clapeyron, the gas rate `k(MTSR) n_A`);
+  profile, two parallel reactions, Clausius-Clapeyron, the gas rate `k(MTSR) n_A`, a
+  consecutive gas-forming reaction, a solvent at reflux, an endothermic reaction);
   `tests/test_semibatch_vent.py` (the vent and dosed gas left out of the MTT).

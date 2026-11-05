@@ -2,7 +2,9 @@
 dissolved gases and at the vessel's pressure (Clausius-Clapeyron), the reactions that count
 (``hazard.reactions``) with each reaction's dT_ad and MTSR, the MTSR profile over the batch and
 the gas release at the MTSR against ``hazard.vent_capacity``; each against its closed form.
-A reactor that uses none of it screens and reports as in 1.8.0."""
+A reactor that uses none of it screens to the MTT, MTSR and class of 1.8.0; a reactor with more
+than one reaction, a semi-batch and a vented batch report more (per_reaction, mtsr_profile,
+gas_release), one reaction without dosing or vent reports as in 1.8.0."""
 
 import json
 import math
@@ -183,7 +185,9 @@ def test_a_batch_counts_the_chosen_reactions(tmp_path):
 
 
 def test_a_reactor_without_the_new_inputs_reports_as_before(tmp_path):
-    """One reaction, no vent, no dosing: the JSON holds none of the new keys."""
+    """One reaction, no vent, no dosing: the JSON holds none of the new keys. With two
+    reactions the values are those of 1.8.0 (the largest counts) and the JSON adds the
+    reactions counted and each reaction alone, the text a line."""
     report = screen(plain._plant(tmp_path))
     (data,) = json.loads(report.to_json())["reactors"]
     assert not set(OPTIONAL) & set(data)
@@ -194,6 +198,46 @@ def test_a_reactor_without_the_new_inputs_reports_as_before(tmp_path):
     assert "reactions (" not in hazard_text(report)
     hazard = ReactionHazard.model_validate({"td24": 400, "provenance": "assumed"})
     assert hazard.model_dump(exclude_none=False).keys() == {"td24", "mtt", "provenance", "source"}
+    root = plain._plant(tmp_path / "two", plain.FLOWSHEET.replace("[R1]", "[R1, R2]"))
+    (root / "process/reactions.yaml").write_text(ENDO)
+    report = screen(root)
+    (data,) = json.loads(report.to_json())["reactors"]
+    assert set(data) - set(OPTIONAL) == {
+        "node", "model", "process_temperature", "adiabatic_rise", "accumulation", "mtsr", "mtt",
+        "mtt_basis", "td24", "criticality", "sensitivity", "missing", "notes",
+    }  # fmt: skip
+    assert set(data) & set(OPTIONAL) == {"counted_reactions", "counted_basis", "per_reaction"}
+    rise = 80000.0 / 560.0  # R1 alone, as in 1.8.0: R2 is endothermic
+    assert (data["adiabatic_rise"], data["mtsr"]) == (
+        pytest.approx(rise),
+        pytest.approx(330 + rise),
+    )
+    assert (data["mtt"], data["criticality"]) == (373.0, 4)
+    assert "  reactions (every reaction, the largest: R1, R2): " in hazard_text(report)
+
+
+ENDO = plain.REACTIONS + (
+    "  - {id: R2, stoichiometry: {A: -1, B: 1}, phase: liquid,\n"
+    "     heat_of_reaction: {value: 50000, provenance: assumed},\n"
+    "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.001},\n"
+    "            orders: {A: 1}, provenance: assumed}}\n"
+)
+
+
+def test_an_endothermic_reaction_alone_does_not_cool_the_mtsr_below_t_p(tmp_path):
+    """R1 exothermic (80 MJ/kmol), R2 endothermic (+50 MJ/kmol) on 1 kmol A over 560 kJ/K: R2's
+    dT_ad is -89.3 K, its MTSR T_p 330 K (until this fix 240.7 K), as in the semi-batch."""
+    root = plain._plant(tmp_path, plain.FLOWSHEET.replace("[R1]", "[R1, R2]"))
+    (root / "process/reactions.yaml").write_text(ENDO)
+    report = screen(root)
+    (entry,) = report.entries
+    assert entry.per_reaction["R2"] == {
+        "adiabatic_rise": pytest.approx(-50000 / 560),
+        "mtsr": 330.0,
+    }
+    assert entry.per_reaction["R1"]["mtsr"] == pytest.approx(330 + 80000 / 560)
+    assert all(v["mtsr"] >= entry.process_temperature for v in entry.per_reaction.values())
+    assert "R2 dT_ad -89.3 K (endothermic), MTSR 330.0 K" in hazard_text(report)
 
 
 # -- the MTT ------------------------------------------------------------------------------------
@@ -253,15 +297,75 @@ def test_the_mtt_at_the_vessels_pressure(tmp_path):
     assert any("at 50 kPa(a) A, S boil(s) below the normal" in n for n in entry.notes)
 
 
+WITH_D = plain.MATERIALS.replace(
+    "templates:",
+    "  - {id: D, name: D, formula: CH4, molar_mass: 16.04, liquid_molar_volume: 0.05,\n"
+    "     liquid_heat_capacity: 100, normal_boiling_point: 250}\ntemplates:",
+).replace("components: [A, B, S]}", "components: [A, B, S, D]}")
+
+
+def _charged(tmp_path, values, materials=WITH_D, temperature=330, kpa=101.325):
+    flowsheet = (
+        plain.FLOWSHEET.replace("values: {A: 0.2, S: 0.8}", f"values: {values}")
+        .replace("temperature: {value: 330,", f"temperature: {{value: {temperature},")
+        .replace("pressure: {value: 101.325,", f"pressure: {{value: {kpa},")
+    )
+    (entry,) = screen(plain._plant(tmp_path, flowsheet, materials)).entries
+    return entry
+
+
 def test_a_dissolved_gas_is_left_out_of_the_mtt(tmp_path):
-    """At 380 K, S (373 K) is a dissolved gas: A's 390 K is the MTT; at 395 K A is one too."""
-    entry = _at(tmp_path / "a", 101.325, temperature=380)
-    assert (entry.mtt, entry.mtt_basis) == (390.0, "normal boiling point of A")
-    assert entry.mtt_left_out == {"S": "dissolved gas (boils at 373.0 K, below T_p 380.0 K)"}
-    assert any(n.startswith("MTT: left out S (dissolved gas") for n in entry.notes)
-    entry = _at(tmp_path / "b", 101.325, temperature=395)
-    assert entry.mtt is None  # B is not charged: nothing else boils
+    """D (250 K), 2 % of the charge at 330 K, is a dissolved gas: the solvent's 373 K is the
+    MTT. At 6 % it is no minor share (DISSOLVED 5 %): it sets the MTT, below T_p."""
+    entry = _charged(tmp_path / "a", "{A: 0.2, S: 0.78, D: 0.02}")
+    assert (entry.mtt, entry.mtt_basis) == (373.0, "normal boiling point of S")
+    assert entry.mtt_left_out == {
+        "D": "dissolved gas (2.00% of the liquid, boils at 250.0 K, below T_p 330.0 K)"
+    }
+    assert any(n.startswith("MTT: left out D (dissolved gas") for n in entry.notes)
+    entry = _charged(tmp_path / "b", "{A: 0.2, S: 0.74, D: 0.06}")
+    assert (entry.mtt, entry.mtt_basis) == (250.0, "normal boiling point of D")
+    assert not entry.mtt_left_out
+    # nothing else with a boiling point: the MTT needs hazard.mtt
+    no_bp = WITH_D.replace(", normal_boiling_point: 390}", "}").replace(
+        ", normal_boiling_point: 373}", "}"
+    )
+    entry = _charged(tmp_path / "c", "{A: 0.2, S: 0.78, D: 0.02}", no_bp)
+    assert entry.mtt is None and set(entry.mtt_left_out) == {"D"}
     assert any("nothing else boils in the liquid" in m for m in entry.missing)
+
+
+@pytest.mark.parametrize("temperature", [373.15, 380.0, 395.0])
+def test_a_solvent_at_reflux_keeps_the_mtt_at_or_below_t_p(tmp_path, temperature):
+    """S (373 K), 80 % of the charge, at or above its boiling point: the liquor boils (at
+    reflux), the MTT is S's boiling point, below T_p (until this fix A's 390 K, or none), and
+    the class is that of an MTSR above the MTT."""
+    entry = _charged(tmp_path, "{A: 0.2, S: 0.8}", temperature=temperature)
+    assert (entry.mtt, entry.mtt_basis) == (373.0, "normal boiling point of S")
+    assert entry.mtt <= entry.process_temperature and not entry.mtt_left_out
+    assert any(
+        n.startswith(f"MTT 373.0 K (normal boiling point of S) below T_p {temperature:.1f} K")
+        for n in entry.notes
+    )
+    assert entry.mtsr > entry.mtt and entry.criticality in (3, 4)
+
+
+def test_above_atmospheric_every_unknown_that_could_set_the_mtt_is_named(tmp_path):
+    """At 300 kPa S (373 K, 30 kJ/mol) boils at 420.1 K; A (330 K) and D (340 K) without a heat
+    of vaporization both boil below that at 101 kPa, so either could set the MTT: both named."""
+    materials = (
+        _vaporization(S=30000)
+        .replace("normal_boiling_point: 390}", "normal_boiling_point: 330}")
+        .replace(
+            "templates:",
+            "  - {id: D, name: D, formula: CH4, molar_mass: 16.04, liquid_molar_volume: 0.05,\n"
+            "     liquid_heat_capacity: 100, normal_boiling_point: 340}\ntemplates:",
+        )
+        .replace("components: [A, B, S]}", "components: [A, B, S, D]}")
+    )
+    entry = _charged(tmp_path, "{A: 0.2, S: 0.6, D: 0.2}", materials, kpa=300)
+    assert entry.mtt is None
+    assert any("needs heat_of_vaporization of A, D (" in n for n in entry.notes), entry.notes
 
 
 # -- the gas release ----------------------------------------------------------------------------
@@ -352,23 +456,103 @@ def test_an_unvented_semibatch_has_no_gas_release(tmp_path):
     assert not [f for f in report.findings if f.rule == "cheme.reactor-hazard-vent"]
 
 
+#: the vented plant as a batch: 1 kmol A in 5 kmol S charged (per hour of flows)
+BATCH = (
+    vented.FLOWSHEET.replace("reactor: semibatch", "reactor: batch")
+    .replace("batch: {dosing: [{stream: S2, time: 3600}], ", "batch: {time: 3600, ")
+    .replace("{id: dose, direction: in}, ", "")
+    .replace("    from: G.out\n    to: R.dose", "    from: G.out\n    to: P2.in")
+    .replace("products:\n", "products:\n  - {id: P2, ports: [{id: in, direction: in}]}\n")
+    .replace("flow: {value: 5, provenance: given}", "flow: {value: 6, provenance: given}")
+    .replace("values: {S: 1.0}", "values: {S: 0.8333333333333334, A: 0.16666666666666666}")
+)
+
+
 def test_a_vented_batch_has_its_gas_release_at_the_start(tmp_path):
     """A batch of 1 kmol A in 5 kmol S: cooling fails at the start, the MTSR is 300 + 1e5 /
     (6 x 150) K, and G forms at k n_A0 = 0.01 kmol/s (on the flowsheet's hour of flows)."""
-    flowsheet = (
-        vented.FLOWSHEET.replace("reactor: semibatch", "reactor: batch")
-        .replace("batch: {dosing: [{stream: S2, time: 3600}], ", "batch: {time: 3600, ")
-        .replace("{id: dose, direction: in}, ", "")
-        .replace("    from: G.out\n    to: R.dose", "    from: G.out\n    to: P2.in")
-        .replace("products:\n", "products:\n  - {id: P2, ports: [{id: in, direction: in}]}\n")
-        .replace("flow: {value: 5, provenance: given}", "flow: {value: 6, provenance: given}")
-        .replace("values: {S: 1.0}", "values: {S: 0.8333333333333334, A: 0.16666666666666666}")
-    )
-    (entry,) = screen(_vent_plant(tmp_path, flowsheet).root).entries
+    (entry,) = screen(_vent_plant(tmp_path, BATCH).root).entries
     assert entry.model == "batch"
     assert entry.mtsr == pytest.approx(300.0 + 1e5 / 900.0, rel=1e-9)
     assert entry.gas_release["rate_kmol_s"] == pytest.approx(0.01, rel=1e-9)
     assert entry.gas_release["formed_kmol"] == pytest.approx(1.0, rel=1e-9)
+    assert entry.gas_release["rate_from"] == "the worst moment's content"
+
+
+#: two hours of the batch's flows (6 kmol/h of A and S, 44.05 kg/kmol) per batch
+BATCH_RECIPE = RECIPE | {"batch_size": RECIPE["batch_size"] | {"value": 2 * 6 * 44.05}}
+
+
+def _gas_plant(tmp_path, reactions, flowsheet=BATCH, intermediate=False):
+    flowsheet = flowsheet.replace("    reactions: [R1]", "    reactions: [R1, R2]")
+    ws = _vent_plant(tmp_path, flowsheet, BATCH_RECIPE)
+    (ws.root / "process/reactions.yaml").write_text(
+        "schema: cheme/reactions/v1\nkind: reactions\nreactions:\n" + reactions
+    )
+    if intermediate:
+        path = ws.root / "process/materials.yaml"
+        path.write_text(
+            path.read_text()
+            .replace(
+                "templates:",
+                "  - {id: I, name: I, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,"
+                "\n     liquid_heat_capacity: 150, normal_boiling_point: 400}\ntemplates:",
+            )
+            .replace("components: [A, B, S, G]}", "components: [A, B, S, G, I]}")
+        )
+    return screen(ws.root)
+
+
+def _reaction(rid, stoichiometry, heat, order="A"):
+    """A liquid reaction, first order in *order*, k 0.01 1/s (the pre-exponential factor A)."""
+    return (
+        f"  - {{id: {rid}, stoichiometry: {stoichiometry}, phase: liquid,\n"
+        f"     heat_of_reaction: {{value: {heat}, provenance: assumed}},\n"
+        "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.01},\n"
+        f"            orders: {{{order}: 1}}, provenance: assumed}}}}\n"
+    )
+
+
+def test_the_gas_release_counts_gas_formed_from_the_runaways_product(tmp_path):
+    """R1: A -> I (100 MJ/kmol) forms no gas, R2: I -> B + G forms it from R1's product. The
+    worst moment (the fresh charge) holds no I, so G forms at 0 there; once R1 ran to
+    completion the vessel holds 1 kmol of I: G forms at k n_I = 0.01 kmol/s at the MTSR, and R2
+    forms 1 kmol of it. Until this fix the release was about 0, 'within' any vent capacity."""
+    reactions = _reaction("R1", "{A: -1, I: 1}", -100000) + _reaction(
+        "R2", "{I: -1, B: 1, G: 1}", -1000, order="I"
+    )
+    flowsheet = BATCH.replace("hazard: {td24: 390,", "hazard: {vent_capacity: 100, td24: 390,")
+    report = _gas_plant(tmp_path, reactions, flowsheet, intermediate=True)
+    (entry,) = report.entries
+    gas = entry.gas_release
+    assert entry.mtsr == pytest.approx(300.0 + 1e5 / 900.0, rel=1e-9)
+    # two hours of flows per batch (the recipe): 2 kmol of A
+    assert gas["rate_kmol_s"] == pytest.approx(2 * 0.01, rel=1e-9)
+    assert gas["rate_m3_h"] == pytest.approx(0.02 * R * entry.mtsr / 101.325 * 3600, rel=1e-9)
+    assert gas["rate_from"] == "the content after R1"
+    assert (gas["formed_by"], gas["formed_from"]) == ("R2", "the content after R1")
+    assert gas["formed_kmol"] == pytest.approx(2.0, rel=1e-9)
+    (finding,) = [f for f in report.findings if f.rule == "cheme.reactor-hazard-vent"]
+    assert finding.level == "warning" and "(above it)" in finding.message
+    assert "(the content after R1)" in hazard_text(report)
+
+
+def test_the_gas_formed_counts_only_the_chosen_reactions(tmp_path):
+    """R1: A -> B + G (100 MJ/kmol) and R2: A -> B + 2 G (50 MJ/kmol) in parallel: by default
+    R2 forms the most gas, 2 kmol per kmol of A; with hazard.reactions: [R1] R1 alone counts,
+    1 kmol (until this fix R2's 2 kmol, a reaction the user left out)."""
+    reactions = _reaction("R1", "{A: -1, B: 1, G: 1}", -100000) + _reaction(
+        "R2", "{A: -1, B: 1, G: 2}", -50000
+    )
+    (entry,) = _gas_plant(tmp_path / "a", reactions).entries
+    assert entry.gas_release["formed_by"] == "R2"
+    assert entry.gas_release["formed_kmol"] == pytest.approx(2 * 2.0, rel=1e-9)
+    flowsheet = BATCH.replace("hazard: {td24: 390,", "hazard: {reactions: [R1], td24: 390,")
+    (entry,) = _gas_plant(tmp_path / "b", reactions, flowsheet).entries
+    assert entry.counted_reactions == ["R1"]
+    assert entry.gas_release["formed_by"] == "R1"
+    assert entry.gas_release["formed_kmol"] == pytest.approx(2 * 1.0, rel=1e-9)
+    assert entry.gas_release["formed_from"] == "the worst moment's content"
 
 
 def test_the_new_hazard_fields_load_and_keep_dumps(tmp_path):

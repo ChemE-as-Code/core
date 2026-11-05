@@ -9,15 +9,20 @@
     unchanged: every reaction, the largest run to completion). With more than one reaction, or
     that choice, the output gives the reactions counted and why (`counted_reactions`,
     `counted_basis`), and each reaction alone (`per_reaction`: dT_ad, MTSR and, in a
-    semi-batch, the time of its own worst moment), on a text line too. A name the step does
+    semi-batch, the time of its own worst moment; an endothermic reaction's MTSR is `T_p`),
+    on a text line too. A name the step does
     not hold is a warning, `cheme.reactor-hazard-reactions`.
   - A semi-batch's MTSR profile (`mtsr_profile`: time, `X_ac`, temperature and MTSR at the
     model's steps nearest 21 even moments, and the worst), and a compact text line.
   - A vented batch or semi-batch's gas release at the MTSR (`gas_release`): the vent
-    components forming at the rate laws with the content of the worst moment, at the MTSR, an
-    upper bound. It is given in kmol/s and m3/h at the MTSR and the vessel's pressure, per
-    batch of `process/recipe.yaml` (else per hour of flows), with the gas the largest reaction
-    forms run to completion. `hazard.vent_capacity` (m3/h) is compared with it. The new rule
+    components forming at the rate laws at the MTSR, the larger with the worst moment's
+    content and with the content once the reaction setting the MTSR ran to completion, so gas
+    formed from its products (a consecutive decomposition) counts (`rate_from` says which); a
+    longer chain is not covered. It is given in kmol/s and m3/h at the MTSR and the vessel's
+    pressure, per batch of `process/recipe.yaml` (else per hour of flows), with the most gas
+    one reaction forms run to completion (`formed_by`, `formed_from`): of the counted reactions
+    from the worst moment's content, or of a reaction consuming a product of the one setting
+    the MTSR. `hazard.vent_capacity` (m3/h) is compared with it. The new rule
     `cheme.reactor-hazard-vent` is a warning without a capacity, above it, or with no batch
     size to compare on, and info within it.
   - A default MTT at the reactor's pressure outside 90 to 110 kPa(a), by Clausius-Clapeyron
@@ -30,19 +35,32 @@
 ### Changed
 
 - The default MTT (no `hazard.mtt`) leaves out a batch's vent components (charged ones too), a
-  dosed gas (a dose with `absorbed`) and dissolved gases, whose boiling point is below the
+  dosed gas (a dose with `absorbed`) and dissolved gases: a component under 5 % of the liquid
+  (mole fraction of the charge and doses, `DISSOLVED`) whose boiling point is below the
   process temperature. A note names them, and the JSON gives `mtt_left_out`. With nothing else
   boiling, the MTT needs `hazard.mtt`. Until 1.8.0 they set it (HCl's 188 K, methyl nitrite's
-  261 K), which meant nothing. Under vacuum (below 90 kPa(a)) a component with
+  261 K), which meant nothing. A larger share boiling below the process temperature is the
+  liquor at its boiling point (a solvent at reflux): it still sets the MTT, at or below `T_p`,
+  with a note, as in 1.8.0. Under vacuum (below 90 kPa(a)) a component with
   `heat_of_vaporization` now boils at the vessel's pressure, not at its normal boiling point.
-  Without one, a note says the MTT is lower. These are fixes: a reactor without vent, dosed or
-  dissolved gases and at about atmospheric pressure screens as before.
-- Every vented batch gets a `cheme.reactor-hazard-vent` warning until it states
-  `hazard.vent_capacity`. The vent note no longer says the blocked vent is "not screened here":
-  it points to the gas release.
-- Other reactors report as in 1.8.0: the new JSON keys appear only when they hold something,
-  and the new `ReactionHazard` fields stay out of a reactor's dump. Every BFD/PFD needs
-  `cheme process build` once, because the process schema changed.
+  Without one, a note says the MTT is lower. These are fixes: the MTT changes only where a
+  vent component, a dosed gas or a minor dissolved component boiling below `T_p` set it, or
+  outside 90 to 110 kPa(a); the MTT, MTSR and class of the core examples and of the process
+  library's 73 entries are those of 1.8.0.
+- New output for plants that use none of the new fields:
+  - every reactor with more than one reaction gets `counted_reactions`, `counted_basis` and
+    `per_reaction` in the JSON and a `reactions (...)` text line (methanol-1, ammonia-1,
+    formaldehyde-1);
+  - every semi-batch gets `mtsr_profile` and an `MTSR over the batch` text line;
+  - every vented batch or semi-batch gets `gas_release`, a text line and a
+    `cheme.reactor-hazard-vent` warning until it states `hazard.vent_capacity`, so `cheme
+    process reactor-hazards` exits 1 for it (sodium-azide-1, methylmagnesium-bromide-1). The
+    vent note no longer says the blocked vent is "not screened here": it points to the gas
+    release.
+
+  A reactor with one reaction, no dosing and no vent reports as in 1.8.0. The new
+  `ReactionHazard` fields stay out of a reactor's dump. Every BFD/PFD needs `cheme process
+  build` once, because the process schema changed.
 
 ## 1.8.0 (2026-11-05)
 

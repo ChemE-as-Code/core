@@ -239,9 +239,10 @@ each value taken from the evidence cites its observation in `source`.
    forms and adds nothing to it), the MTT (the reactor's `hazard.mtt`, else the lowest boiling
    point of what boils in the liquid at the reactor's pressure: the normal boiling point from
    90 to 110 kPa(a), else Clausius-Clapeyron with `heat_of_vaporization`, which you give for
-   a pressurised or vacuum reactor; a vent component, a dosed gas and a dissolved gas boiling
-   below the process temperature are left out with a note, and with nothing else left set
-   `hazard.mtt`) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
+   a pressurised or vacuum reactor; a vent component, a dosed gas and a dissolved gas (under
+   5 % of the liquid, boiling below the process temperature) are left out with a note, and
+   with nothing else left set `hazard.mtt`; a solvent at reflux sets it, at or below the
+   process temperature) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays
    open (`cheme.reactor-hazard-missing`). With several reactions the output gives each one's

@@ -2418,7 +2418,7 @@
               }
             ],
             "default": null,
-            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (boiling below the process temperature; ADR 0058).",
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature; ADR 0058).",
             "title": "Mtt"
           },
           "reactions": {

@@ -151,9 +151,11 @@ class Component(Strict):
     heat_of_vaporization: float | None = Field(
         default=None,
         gt=0,
-        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000) near the "
-        "still's temperature: a batch still's boil-up from its duty, and its duty from its "
-        "boil-up.",
+        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000): a batch "
+        "still's boil-up from its duty, and its duty from its boil-up (give it near the "
+        "still's temperature); also the default MTT of a reactor away from atmospheric "
+        "pressure (Clausius-Clapeyron from normal_boiling_point; give it near the normal "
+        "boiling point; ADR 0058).",
         exclude_if=lambda value: value is None,
     )
     phase: Literal["solid"] | None = Field(
@@ -447,10 +449,6 @@ class Dosing(Strict):
         exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
     )
 
-    def is_gas(self) -> bool:
-        """Whether the dose is a gas (it declares the share the liquid takes up)."""
-        return self.absorbed is not None
-
     @model_validator(mode="after")
     def _form(self) -> Dosing:
         if (self.time is None) == (not self.profile):
@@ -607,8 +605,8 @@ class ReactionHazard(Strict):
         "pressure, a relief set temperature); default: the lowest boiling point of the "
         "liquid's components at the reactor's pressure (the normal boiling point at about "
         "atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving "
-        "out a batch's vent components, a dosed gas and dissolved gases (boiling below the "
-        "process temperature; ADR 0058).",
+        "out a batch's vent components, a dosed gas and dissolved gases (a minor share of the "
+        "liquid boiling below the process temperature; ADR 0058).",
     )
     reactions: list[str] = Field(
         default_factory=list,
