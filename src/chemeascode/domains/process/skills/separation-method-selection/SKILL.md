@@ -138,7 +138,10 @@ with units, fallback, notes and the test that solves each arrangement):
   vessel; the drying time for the recipe from a `drying_rate` and the vessel's heated area).
   In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
   holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
-  (ADR 0057);
+  (ADR 0057). A precipitation in the reactor that is filtered and dried there lists the batch
+  step too (`units: [reactor, filter, dryer]`): its batch sizes the vessel, whose plate and
+  `heated_area` the filter and dry times take. At most one batch or semi-batch step per
+  vessel; a step is never both a `still:` and a `dryer:`;
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
 - **specified split**: a `component_separator` with given recoveries (`basis: specified`, a
   `basis_source` and an `operating_basis`); its convergence closes balances, it predicts

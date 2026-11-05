@@ -151,7 +151,7 @@ def crystallizers(
     typer.echo(report.to_json() if as_json else report_text(report))
     if not as_json:
         for finding in report.findings:
-            if finding.rule.startswith("cheme.process-crystallizer"):
+            if finding.rule.startswith(("cheme.process-crystallizer", "cheme.process-dryer")):
                 typer.echo(finding.format())
     if any(f.level == "error" for f in report.findings):
         raise typer.Exit(1)

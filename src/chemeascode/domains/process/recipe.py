@@ -48,7 +48,8 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
   ``from:`` on a step that is no batch or semi-batch (a ``distil``: no still; a ``dry``: no
   dryer; a ``filter``: no filter with filtration), a ``dose`` from a step without dosing, a
   ``start.after`` that is no earlier unit procedure, a duplicate id, a step in the ``units`` of
-  one vessel and named by another unit procedure;
+  one vessel and named by another unit procedure, a vessel or vent of a unit (a block, or
+  ``units``) that holds several batch or semi-batch steps;
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
 - ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
@@ -62,7 +63,7 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -248,7 +249,8 @@ class UnitProcedure(Strict):
     vessel: Vessel | None = Field(
         default=None,
         description="Size the unit's vessel and check its jacket (the unit: a batch or "
-        "semibatch step), or a dryer's vessel (its heated area, the filter's plate).",
+        "semibatch step, or a block or units holding exactly one), or a dryer's vessel (its "
+        "heated area, the filter's plate).",
     )
 
     @model_validator(mode="after")
@@ -432,7 +434,10 @@ def _vent(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> VentRes
     from chemeascode.domains.chemistry.thermochemistry import R
     from chemeascode.domains.process.stirred_tank import TankError, solve_node, tank_inlet
 
-    unit = _tank(process, up)
+    try:
+        unit = _tank(process, up)
+    except _Reference:
+        return None  # evaluate reports it
     node = process.nodes.get(unit)
     vent = getattr(getattr(node, "batch", None), "vent", None)
     if vent is None or getattr(node, "reactor", None) not in ("batch", "semibatch"):
@@ -473,11 +478,37 @@ def _nodes(process: Any, up: UnitProcedure) -> list[Any]:
 
 
 def _tank(process: Any, up: UnitProcedure) -> str:
-    """The batch or semibatch step of *up* (its unit, when it has none)."""
-    for node in _nodes(process, up):
-        if getattr(node, "reactor", None) in ("batch", "semibatch") and node.batch is not None:
-            return node.id
-    return up.members()[0]
+    """The batch or semibatch step of *up* (its unit, when it has none). Raises _Reference
+    when *up* (a block, or its units) holds several: which one's batch sizes the vessel is
+    not said."""
+    tanks = [
+        node.id
+        for node in _nodes(process, up)
+        if getattr(node, "reactor", None) in ("batch", "semibatch") and node.batch is not None
+    ]
+    if len(tanks) > 1:
+        raise _Reference(
+            f"{up.label} holds {', '.join(tanks)}: several batch or semibatch steps, name one "
+            "as unit: to size its vessel"
+        )
+    return tanks[0] if tanks else up.members()[0]
+
+
+def batch_vessel(process: Any, recipe: Recipe, result: Any, node_id: str) -> Any:
+    """The vessel *result* (of :func:`evaluate`) sizes from batch or semibatch step
+    *node_id*'s batch: a unit procedure's unit, or the one batch step of its block or units;
+    None when none does."""
+    procedures = {up.id: up for up in recipe.unit_procedures}
+    for vessel in result.vessels:
+        up = procedures.get(vessel.procedure)
+        if up is None:
+            continue
+        try:
+            if _tank(process, up) == node_id:
+                return vessel
+        except _Reference:
+            continue
+    return None
 
 
 def _inlets(process: Any, node_id: str) -> list[Any]:
@@ -640,13 +671,42 @@ def _step_contents(
     return found
 
 
+def _wet_cake(process: Any, recipe: Recipe, dryer: Any, case: str) -> float | None:
+    """m3: dryer step *dryer*'s wet cake of one batch (its inlet over its cake_density); None
+    without a cake_density. Raises ValueError."""
+    from chemeascode.domains.process.model import stream_flows
+
+    density = dryer.dryer.cake_density
+    if density is None:
+        return None
+    wet = stream_flows(process, _one_inlet(process, dryer), case).total
+    if wet is None:
+        raise ValueError(f"no flow of {dryer.id}'s wet cake")
+    return wet * batch_hours(process, recipe, case) / density.value
+
+
+def _heated_area(
+    process: Any, recipe: Recipe, up: UnitProcedure, case: str, diameter: float
+) -> float | None:
+    """m2 heating the cake in *up*'s vessel of *diameter*: ``vessel.heated_area``, else the
+    jacket's area, else the shell and bottom the dryer's wet cake wets; None when none is
+    known. Raises ValueError."""
+    vessel = up.vessel
+    heated = vessel.heated_area or (vessel.jacket.area if vessel.jacket else None)
+    dryer, _ = _solids(process, up)
+    if heated is None and dryer is not None:
+        cake = _wet_cake(process, recipe, dryer, case)
+        if cake:
+            heated = wetted_area(cake, diameter)
+    return heated
+
+
 def _cake_vessel(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> VesselResult:
     """The vessel of a filter-dryer or dryer procedure *up*: its largest content of one batch
     over the fill fraction, rounded up, or the given volume. The content is the largest of the
     wet cake (the dryer's inlet over its cake_density) and what each of its steps takes in (the
     slurry, the reslurry wash: :func:`_step_contents`). Its heated area is given, the jacket's,
     or the shell and bottom the cake wets (in ``jacket_area``). Raises ValueError."""
-    from chemeascode.domains.process.model import stream_flows
 
     vessel = up.vessel
     dryer, _ = _solids(process, up)
@@ -655,13 +715,9 @@ def _cake_vessel(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> 
     measured = None
     if dryer is not None:
         temperature = dryer.dryer.temperature
-        density = dryer.dryer.cake_density
-        if density is not None:
+        cake = _wet_cake(process, recipe, dryer, case)
+        if cake is not None:
             measured = dryer.id
-            wet = stream_flows(process, _one_inlet(process, dryer), case).total
-            if wet is None:
-                raise ValueError(f"no flow of {dryer.id}'s wet cake")
-            cake = wet * batch_hours(process, recipe, case) / density.value
     contents = _step_contents(process, recipe, up, case, skip=measured)
     working = max(cake or 0.0, contents or 0.0) or None
     if vessel.volume is not None:
@@ -865,12 +921,19 @@ def evaluate(
         ops: list[tuple[Operation, float, str]] = []
         names: set[str] = set()
         content: _Content | None = None
-        cake: VesselResult | None = None
-        solids = _solids(process, up) if up.vessel is not None else (None, None)
-        if any(solids) and getattr(process.nodes.get(_tank(process, up)), "reactor", None) not in (
+        cake: VesselResult | None = None  # a filter-dryer's vessel
+        found: VesselResult | None = None  # a batch or semibatch step's vessel
+        several: _Reference | None = None
+        try:
+            tank = _tank(process, up)
+        except _Reference as failure:
+            tank, several = None, failure
+        reacts = several is not None or getattr(process.nodes.get(tank), "reactor", None) in (
             "batch",
             "semibatch",
-        ):
+        )
+        solids = _solids(process, up) if up.vessel is not None else (None, None)
+        if any(solids) and not reacts:
             try:
                 cake = _cake_vessel(process, recipe, up, case)
             except ValueError as failure:
@@ -907,6 +970,27 @@ def evaluate(
                     "the batch-size stream's flow",
                     [up.id],
                 )
+        elif several is not None and any(
+            getattr(getattr(node, "batch", None), "vent", None) is not None
+            for node in _nodes(process, up)
+        ):
+            add(
+                "error",
+                "reference",
+                f"{up.id}: no vent of {up.label}: {several}",
+                [*at, "units" if many else "unit"],
+                "name the vented batch or semibatch step as the unit procedure's unit:",
+                [up.id],
+            )
+        solids_vessel = cake
+        if content is not None and up.vessel is not None:
+            found = _vessel(up, content)
+            if any(solids):  # a filter or dryer in the reactor's vessel: its area, its plate
+                try:
+                    heated = _heated_area(process, recipe, up, case, found.diameter)
+                except ValueError:
+                    heated = None  # the dry operation says what is missing
+                solids_vessel = replace(found, jacket_area=heated)
         dosed = False
         for j, op in enumerate(up.operations):
             dosed |= op.kind == "dose"
@@ -947,7 +1031,7 @@ def evaluate(
                 continue
             try:
                 if op.kind in ("dry", "filter"):
-                    hours = _solids_time(process, recipe, op, cake, case)
+                    hours = _solids_time(process, recipe, op, solids_vessel, case)
                 else:
                     hours = _duration_from(process, op.from_ or "", op.kind, case)
             except ValueError as failure:
@@ -1012,8 +1096,7 @@ def evaluate(
         result.units.append(
             UnitCycle(up.id, up.label, up.parallel, occupancy, occupancy / up.parallel)
         )
-        if up.vessel is not None and content is not None:
-            found = _vessel(up, content)
+        if up.vessel is not None and found is not None:
             result.vessels.append(found)
             _vessel_findings(up, found, at, add)
         elif cake is not None:

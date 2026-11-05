@@ -879,3 +879,58 @@ def test_the_solvent_swap_example_is_current():
     swap = next(s for s in recipe.steps if s.operation == "swap")
     assert swap.basis == "calculated"
     assert swap.end - swap.start == pytest.approx(sol["boilup_time_h"], rel=1e-9)
+
+
+def test_a_still_is_not_also_a_dryer(tmp_path):
+    """A dryer: beside a still: (separate mixins, so the schema takes both) is an error, not a
+    still in propagate and a dryer in process crystallizers."""
+    both = FLOWSHEET.replace(
+        "      outlets: {distillate: top, residue: bottom}\n      provenance: assumed\n",
+        "      outlets: {distillate: top, residue: bottom}\n      provenance: assumed\n"
+        "    dryer:\n      volatiles: [A]\n"
+        "      residual_moisture: {value: 0.01, basis: mass_fraction, provenance: assumed}\n"
+        "      temperature: 330\n      outlets: {product: bottom, vapour: top}\n",
+    )
+    assert "dryer:" in both
+    messages = [
+        f.message for f in _findings(_plant(tmp_path, flowsheet=both)) if f.level == "error"
+    ]
+    assert "S: a still is not also a dryer" in messages
+
+
+def test_the_adrs_example_of_one_stages_purity():
+    """ADR 0055: at alpha 4 from x0 = 0.5 the distillate's mean mole fraction at 84 % and 99 %
+    recovery of the light key, from solve_still, is what the ADR quotes (two figures)."""
+    from pathlib import Path
+
+    adr = (
+        Path(__file__).resolve().parents[1] / "docs/adr/0055-batch-still-and-solvent-swap.md"
+    ).read_text()
+    text = " ".join(adr.split())
+    quoted = []
+    for recovery in (0.84, 0.99):
+        lo, hi = 1e-9, 0.5  # the residue's x_A for that recovery (closed form)
+        for _ in range(200):
+            x = (lo + hi) / 2
+            w = 100 / math.exp(_rayleigh(0.5, x, alpha=4.0))
+            lo, hi = (x, hi) if (50 - x * w) / 50 > recovery else (lo, x)
+        result = solve_still(
+            _still(
+                volatility={
+                    "model": "constant",
+                    "alpha": {"A": 4.0, "B": 1.0},
+                    "provenance": "assumed",
+                },
+                end={"residue": {"key": "A", "mole_fraction": x}},
+            ),
+            {"A": 50, "B": 50},
+            None,
+            {},
+            None,
+        )
+        (cut,) = result.cuts
+        assert cut.moles["A"] / 50 == pytest.approx(recovery, rel=1e-6)
+        quoted.append(f"{cut.moles['A'] / sum(cut.moles.values()):.2f}")
+    assert quoted == ["0.70", "0.59"]
+    assert f"distillate of {quoted[0]} mole fraction at 84 %" in text
+    assert f"{quoted[1]} at 99 %" in text
