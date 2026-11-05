@@ -423,11 +423,22 @@ class Event(Strict):
 
 
 class Batch(Strict):
-    """Batch operation: the flowsheet's rates are those of one batch over ``basis_hours``."""
+    """Batch operation: the flowsheet's rates are those of one batch over ``basis_hours``.
+    With ``recipe: true`` the cycle time and the batches per year come from
+    ``process/recipe.yaml`` (cheme process recipe), the flowsheet's rates being its year
+    averages."""
 
-    cycle_time: Positive = Field(description="Hours per batch, cleaning and turnaround included.")
-    basis_hours: FiniteFloat = Field(
-        gt=0, description="Hours over which the flowsheet's rates make one batch."
+    recipe: bool = Field(
+        default=False,
+        description="Take cycle_time and batches_per_year from process/recipe.yaml (give "
+        "neither, nor basis_hours: the flowsheet's rates are the recipe's year averages).",
+        exclude_if=lambda value: not value,
+    )
+    cycle_time: Positive | None = Field(
+        default=None, description="Hours per batch, cleaning and turnaround included."
+    )
+    basis_hours: FiniteFloat | None = Field(
+        default=None, gt=0, description="Hours over which the flowsheet's rates make one batch."
     )
     trains: int = Field(default=1, ge=1)
     batches_per_year: Positive | None = Field(
@@ -437,6 +448,18 @@ class Batch(Strict):
         default=None, description="Share of batches sold (products only)."
     )
     source: str = Field(min_length=3)
+
+    @model_validator(mode="after")
+    def _basis(self) -> Batch:
+        given = [n for n in ("cycle_time", "basis_hours", "batches_per_year") if getattr(self, n)]
+        if self.recipe and given:
+            raise ValueError(
+                "batch: recipe: true takes the cycle from process/recipe.yaml; remove "
+                + ", ".join(given)
+            )
+        if not self.recipe and (self.cycle_time is None or self.basis_hours is None):
+            raise ValueError("batch: give cycle_time and basis_hours, or recipe: true")
+        return self
 
 
 class Operation(Strict):

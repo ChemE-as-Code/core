@@ -131,8 +131,10 @@ decision depends on the economics.
   ```
 
   A batch plant gives `operation.batch: {cycle_time, basis_hours, trains, batches_per_year,
-  success_rate, source}` (the flowsheet's rates are those of one batch over `basis_hours`), and
-  variable items may be `per: batch`. An ISBL from a reference plant gives `isbl: {source: given,
+  success_rate, source}` (the flowsheet's rates are those of one batch over `basis_hours`), or,
+  with a batch recipe in `process/recipe.yaml`, `operation.batch: {recipe: true, source}`: the
+  cycle time and batches per year then come from `cheme process recipe` and the flowsheet's
+  rates are its year averages. Variable items may be `per: batch`. An ISBL from a reference plant gives `isbl: {source: given,
   value, scaling: {reference, unit, exponent}}`.
 
 - **Never invent a price.** Every price, factor and rate needs `status` (`ASSUMED`, or `QUOTED`

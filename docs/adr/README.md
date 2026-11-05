@@ -96,3 +96,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0046](0046-pfd-drawn-as-an-engineering-sheet.md) | The PFD drawn as an engineering sheet: ISO frame, stream table, utility stubs, junctions | Proposed | 2026-11-05 |
 | [0047](0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md) | Lines through valves, along pipes and slanted lines are drawing findings the gate fails on | Proposed | 2026-11-05 |
 | [0048](0048-semi-batch-reactor-with-dosing-accumulation.md) | A semi-batch reactor with dosed feeds, its accumulation taken by the thermal screening | Proposed | 2026-11-05 |
+| [0049](0049-batch-recipe-derives-the-cycle-time.md) | A batch recipe in process/recipe.yaml derives the cycle time; the flowsheet holds year averages | Proposed | 2026-11-05 |

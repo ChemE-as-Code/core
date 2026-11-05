@@ -1,5 +1,6 @@
 # A semi-batch hydrolysis: water is charged, acetic anhydride is dosed over 2 h at 25 C, then
-# 30 min of post-reaction, isothermal. Flows are per hour of charge (the batch's amounts).
+# 30 min of post-reaction, isothermal. The flows are the year averages of the recipe
+# (process/recipe.yaml, `cheme process recipe`): a batch of 6.3 t every 6 h.
 # `cheme process propagate --fill` integrates the batch and writes the outlet; `cheme process
 # reactors` gives the accumulation of the anhydride (at most about 5 %: the dosing controls the
 # reaction) and the peak cooling duty; `cheme process reactor-hazards` takes the accumulation

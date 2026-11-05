@@ -1056,6 +1056,18 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   conversion, products: {id: S}}` (kmol formed per kmol of the key converted); `process
   propagate` solves the extents of its parallel and series reactions
   (`chemistry.reactions.selectivity_extents`), refusing selectivities the reactions cannot give.
+- **Batch recipe**: **`cheme process recipe [--case C] [--svg FILE] [--json]`** reads
+  `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0049): the `batch_size` (kg, t or m3 of one
+  stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
+  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
+  dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
+  semi-batch step's model). It gives each unit's occupancy, the cycle time (the bottleneck), the
+  batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
+  its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
+  Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
+  `-duration` and `-basis` (warning: the flowsheet's rate of that stream differs from batch size
+  x batches / hours by more than 1 %). `estimate/tea.yaml` `operation.batch: {recipe: true}`
+  takes the cycle time and batches per year from it (`domains/process/recipe.py`).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or

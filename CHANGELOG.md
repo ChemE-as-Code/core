@@ -4,6 +4,18 @@
 
 ### Added
 
+- Batch recipe (ADR 0049, core#158): `process/recipe.yaml` (`cheme/recipe/v1`) declares the
+  batch size (kg, t or m3 of one stream), the operating hours and the unit procedures with their
+  ordered operations (charge, heat, dose, react, cool, transfer, filter, dry, clean, hold,
+  other), each with a duration or, for dose and react, `from:` a batch or semi-batch step.
+  `cheme process recipe [--svg FILE] [--json]` derives each unit's occupancy, the cycle time and
+  bottleneck (with parallel units), the batches per year, one batch's timeline and its Gantt
+  chart (SVG, light and dark). `cheme.recipe-basis` (warning) when the flowsheet's rate of the
+  batch-size stream differs from batch size x batches / hours; `-schema`, `-reference`,
+  `-duration` (errors). `cheme schema process-recipe`. The TEA's `operation.batch: {recipe:
+  true}` takes its cycle time and batches per year from it (`cheme.tea-batch-recipe`); the
+  hand-entered form stays valid. `examples/process-semibatch` has a recipe.
+
 - `reactor: semibatch` (ADR 0048, core#158): a liquid batch with feeds dosed into its charge,
   `batch.dosing: [{stream, time | profile, start}]`, each dosed stream an inlet of the step and
   the other inlet the charge; `batch.time` or `target` is the post-reaction. The same rate laws
