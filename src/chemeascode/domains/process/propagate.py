@@ -878,13 +878,13 @@ def _duty(
             result, inputs = beds.get(node.id), solved_inputs.get(node.id)
             if result is None or inputs is None:
                 result, inputs = solve_tank(work, node, tank_inlet(node, ins), case)
-            duty = duties.batch_duty(node, result)
+            duty = duties.batch_duty(node, result, work, case)
         elif model in ("still", "crystallizer"):
             if node.id not in solutions:
                 return None  # not solved: propagate reports the still or crystallizer already
             result, inputs = solutions[node.id]
             if model == "still":
-                duty = duties.still_duty(node, result)
+                duty = duties.still_duty(node, result, work, case)
                 comps = work.components()
                 inputs = inputs | {
                     "heat_of_vaporization": {
@@ -893,7 +893,7 @@ def _duty(
                     },
                 }
             else:
-                duty = duties.crystallizer_duty(node, result)
+                duty = duties.crystallizer_duty(node, result, work, case)
         else:
             duty, inputs = duties.conversion_duty(work, node, case)
             used = [*ins, *outs]
@@ -953,6 +953,7 @@ def _duty(
             )
         return None
     extra |= inputs
+    extra |= duty.inputs  # the heat-up and the vessel's metal (ADR 0063): none without them
     extra["temperature"] = {
         s.id: t.model_dump(mode="json", exclude=NOT_INPUTS)
         for s in used

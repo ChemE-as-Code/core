@@ -250,6 +250,7 @@ def _reactor_basis(
                 "semibatch": "semi-batch (stirred, well mixed, dosed feeds)",
             }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
+            assumptions += _heat_assumptions(spec) if model != "cstr" else []
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled
@@ -485,6 +486,32 @@ def _sourced(value: Any) -> bool:
     return value is not None and value.provenance == "given" and bool(value.source.strip())
 
 
+#: What a still with ``heat_up`` adds to its assumptions (ADR 0063).
+STILL_HEAT_UP = (
+    "heat_up: the charge heated from its inlet temperature to its bubble point at its "
+    "liquid_heat_capacity, counted in the duty; the content's sensible rise while it boils "
+    "is not"
+)
+
+
+def _heat_assumptions(batch: Any) -> list[str]:
+    """What a batch's heats of solution and heat-up add to its assumptions (ADR 0063); none
+    without them, so a batch that uses neither reports as before."""
+    found = []
+    if batch is not None and any(d.heat_of_solution is not None for d in batch.dosing):
+        found.append(
+            "a dose's heat_of_solution is released as it mixes in, at the dose's rate (not "
+            "accumulated: not in the MTSR); the heats of the reactions consuming a dissolved "
+            "dose are taken on the dissolved basis"
+        )
+    if batch is not None and batch.heat_up:
+        found.append(
+            "heat_up: the charge heated from its inlet temperature to the batch's at its heat "
+            "capacity, counted in the duty (no heating time: the recipe's)"
+        )
+    return found
+
+
 def still_basis(process: Process, node: Any) -> UnitBasis:
     """The basis of a batch still or solvent swap (``rayleigh``, predictive: one equilibrium
     stage); :mod:`.batch_still`. Sourced when the volatility data are given with a source: the
@@ -534,7 +561,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         not lacking,
         detail=detail,
         sources=sources,
-        assumptions=list(ASSUMPTIONS),
+        assumptions=list(ASSUMPTIONS) + ([STILL_HEAT_UP] if spec.heat_up else []),
         limitations=[
             "not part of a converged simulation: solved by cheme process propagate",
             "no rectification: a column above the still (reflux) is not modelled",

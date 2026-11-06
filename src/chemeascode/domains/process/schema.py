@@ -426,6 +426,21 @@ class BatchTarget(Strict):
     conversion: float = Field(gt=0, lt=1)
 
 
+class HeatOfSolution(Strict):
+    """The integral heat of solution, dilution or mixing of a dose's components as they mix into
+    the batch's liquid (ADR 0063): per kmol of the component dosed (kJ/kmol = J/mol), at the
+    batch's dilution and temperature, negative when mixing releases heat (as a heat of
+    reaction). A dosed gas's heat of absorption (its dissolved share, ``absorbed``) goes here
+    too; the heats of the reactions that consume it are then on the dissolved basis."""
+
+    values: dict[str, float] = Field(
+        min_length=1, description="Component of the dose -> kJ/kmol (J/mol) of it dosed."
+    )
+    unit: Literal["kJ/kmol"] = "kJ/kmol"
+    provenance: Provenance
+    source: str = ""
+
+
 class Dosing(Strict):
     """A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,
     its flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over
@@ -446,6 +461,13 @@ class Dosing(Strict):
         le=1,
         description="A dosed gas: the share of the dose the liquid takes up (it dissolves on "
         "entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
+        exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
+    )
+    heat_of_solution: HeatOfSolution | None = Field(
+        default=None,
+        description="The heat its components release (or take up) as they mix into the "
+        "liquid, released at the dose's rate: in the semi-batch's heat, duty, peak cooling "
+        "duty and dT_ad, not in the MTSR (ADR 0063).",
         exclude_if=lambda value: value is None,  # a dose's fingerprint stays as it was
     )
 
@@ -527,6 +549,13 @@ class Batch(Strict):
         "fraction} (ADR 0054).",
         exclude_if=lambda value: value is None,  # an unvented batch's fingerprint stays
     )
+    heat_up: bool = Field(
+        default=False,
+        description="An isothermal batch or semi-batch: count the charge's heat-up from its "
+        "inlet temperature to the batch's in the model's duty (ADR 0063); default: the model "
+        "holds the batch at its temperature from the start and leaves it to the recipe.",
+        exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -534,6 +563,8 @@ class Batch(Strict):
     def _end(self) -> Batch:
         if self.time is not None and self.target is not None:
             raise ValueError("give time or target, one of them")
+        if self.heat_up and self.heat == "adiabatic":
+            raise ValueError("heat_up: an isothermal batch (an adiabatic one exchanges no heat)")
         if not self.dosing and self.time is None and self.target is None:
             raise ValueError("give time or target, one of them")
         streams = [d.stream for d in self.dosing]
@@ -1197,6 +1228,13 @@ class Still(Strict):
     outlets: dict[Literal["distillate", "residue"], str] = Field(
         description="Role -> the step's outlet port."
     )
+    heat_up: bool = Field(
+        default=False,
+        description="Count the charge's heat-up from its inlet temperature to its bubble point "
+        "(volatility raoult) in the still's energy and duty (ADR 0063); default: the boil-up's "
+        "latent heat alone.",
+        exclude_if=lambda value: not value,  # a still's dump stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -1213,6 +1251,8 @@ class Still(Strict):
         ends = [self.end] if self.end is not None else [c.end for c in self.cuts]
         if self.volatility.model == "constant" and any(e.temperature for e in ends):
             raise ValueError("an end at a temperature needs volatility raoult")
+        if self.heat_up and self.volatility.model == "constant":
+            raise ValueError("heat_up needs volatility raoult (the charge's bubble point)")
         ports = [c.outlet for c in self.cuts]
         if len(set(ports)) != len(ports):
             raise ValueError("cuts: each outlet once")

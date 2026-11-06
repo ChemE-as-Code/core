@@ -1270,6 +1270,53 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
             hint="a semibatch: batch.dosing [{stream, time or profile}] naming its dosed inlet "
             "streams; its other inlet is the charge; liquid-phase reactions",
         )
+    _solution_rules(out, item, at, dosing)
+
+
+def _solution_rules(out: _Out, item: Any, at: list[Any], dosing: list[Any]) -> None:
+    """A dose's ``heat_of_solution`` (ADR 0063): its components declared (error) and carried
+    by the dosed stream (warning: no heat of the others is counted)."""
+    process = out.process
+    declared = process.components()
+    streams = {s.id: s for s in process.flowsheet.streams}
+    templates = process.templates()
+    for k, dose in enumerate(dosing):
+        heat = dose.heat_of_solution
+        if heat is None:
+            continue
+        where = [*at, "batch", "dosing", k, "heat_of_solution"]
+        if unknown := [n for n in heat.values if n not in declared]:
+            out.add(
+                "error",
+                "reactor",
+                f"{at[0][:-1]} {item.id}: heat_of_solution of the undeclared component(s) "
+                + ", ".join(unknown),
+                where,
+                [item.id],
+                hint="key heat_of_solution.values by the dosed components' ids",
+            )
+        stream = streams.get(dose.stream)
+        if stream is None:
+            continue  # said above
+        carried = {
+            n
+            for state in stream.state.values()
+            if state.composition is not None
+            for n, y in state.composition.values.items()
+            if y > 0
+        }
+        if not carried and (t := templates.get(stream.template or "")) is not None:
+            carried = set(t.components)
+        if carried and (absent := [n for n in heat.values if n in declared and n not in carried]):
+            out.add(
+                "warning",
+                "reactor",
+                f"{at[0][:-1]} {item.id}: heat_of_solution of {', '.join(absent)}, which the "
+                f"dose {dose.stream} does not carry (no heat of it is counted)",
+                where,
+                [item.id, dose.stream],
+                hint="give the heat of solution of the components the dose carries",
+            )
 
 
 def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> None:

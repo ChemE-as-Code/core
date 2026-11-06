@@ -514,6 +514,12 @@
             "default": null,
             "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
           },
+          "heat_up": {
+            "default": false,
+            "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
+            "title": "Heat Up",
+            "type": "boolean"
+          },
           "provenance": {
             "enum": [
               "given",
@@ -1652,6 +1658,18 @@
             "default": null,
             "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
             "title": "Absorbed"
+          },
+          "heat_of_solution": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfSolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The heat its components release (or take up) as they mix into the liquid, released at the dose's rate: in the semi-batch's heat, duty, peak cooling duty and dT_ad, not in the MTSR (ADR 0063)."
           }
         },
         "required": [
@@ -2077,6 +2095,47 @@
           "provenance"
         ],
         "title": "Filtration",
+        "type": "object"
+      },
+      "HeatOfSolution": {
+        "additionalProperties": false,
+        "description": "The integral heat of solution, dilution or mixing of a dose's components as they mix into\nthe batch's liquid (ADR 0063): per kmol of the component dosed (kJ/kmol = J/mol), at the\nbatch's dilution and temperature, negative when mixing releases heat (as a heat of\nreaction). A dosed gas's heat of absorption (its dissolved share, ``absorbed``) goes here\ntoo; the heats of the reactions that consume it are then on the dissolved basis.",
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component of the dose -> kJ/kmol (J/mol) of it dosed.",
+            "minProperties": 1,
+            "title": "Values",
+            "type": "object"
+          },
+          "unit": {
+            "const": "kJ/kmol",
+            "default": "kJ/kmol",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "values",
+          "provenance"
+        ],
+        "title": "HeatOfSolution",
         "type": "object"
       },
       "ImposedYield": {
@@ -3290,6 +3349,12 @@
             },
             "title": "Outlets",
             "type": "object"
+          },
+          "heat_up": {
+            "default": false,
+            "description": "Count the charge's heat-up from its inlet temperature to its bubble point (volatility raoult) in the still's energy and duty (ADR 0063); default: the boil-up's latent heat alone.",
+            "title": "Heat Up",
+            "type": "boolean"
           },
           "provenance": {
             "enum": [

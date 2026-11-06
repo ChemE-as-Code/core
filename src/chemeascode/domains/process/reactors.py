@@ -362,7 +362,9 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             if vent is not None:
                 tank_entry |= vent_entry(solved_tank, vent.stream)
             if item.reactor in ("batch", "semibatch"):
-                model_duty = report_entry(process, item, case, batch_duty(item, solved_tank))
+                model_duty = report_entry(
+                    process, item, case, batch_duty(item, solved_tank, process, case)
+                )
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
     if with_bed and duty_model(item) == "conversion" and not process.inside(node):

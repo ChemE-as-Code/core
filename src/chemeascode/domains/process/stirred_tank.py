@@ -55,6 +55,11 @@ the rest passes through to the vent, warmed to the vessel's temperature (its ide
 capacity, where known). The vent reports what left (kmol per hour of charge) and its peak
 rate, kmol/s per m3 of the content at the end, for sizing the off-gas line and scrubber.
 
+A dose's ``heat_of_solution`` (ADR 0063) is released as it mixes in, at the dose's rate: in the
+adiabatic balance, the peak cooling duty and the heat term ``solution``; it is not accumulated,
+so the cooling-failure potentials leave it out. With ``batch.heat_up`` the charge's heat-up
+from its inlet temperature to the batch's is the heat term ``charge heat-up``.
+
 Phases: every reaction of a tank is gas-phase or every one liquid-phase (:mod:`.chemistry.liquid`
 gives a liquid's mole fractions, activities or concentrations). A gas's enthalpies are the
 ideal-gas data's; a liquid's are ``heat_of_reaction`` plus ``liquid_heat_capacity`` (both needed
@@ -176,6 +181,9 @@ class TankResult:
     #: None with ``heat_missing`` what it lacks
     heat_terms: dict[str, float] | None = None
     heat_missing: list[str] = field(default_factory=list)
+    #: K of the charge as it enters (the batch may be held at another temperature: its
+    #: heat-up, ``batch.heat_up``, ADR 0063)
+    charge_temperature: float | None = None
     #: semi-batch, every accepted step (the thermal screening's MTSR profile, ADR 0058): the
     #: cooling-failure potential of each reaction then
     cooling_profile: list[CoolingPoint] = field(default_factory=list, repr=False)
@@ -544,6 +552,9 @@ class Dose:
     #: kmol by component of a dosed gas that passes through to the vent (``absorbed`` < 1);
     #: ``moles`` is then the share that dissolves
     passing: Mapping[str, float] = field(default_factory=dict)
+    #: kJ the whole dose releases as it mixes into the liquid (its ``heat_of_solution``,
+    #: ADR 0063; positive: exothermic), released at its rate; None: none declared
+    solution: float | None = None
 
     def rate(self, t: float) -> float:
         """The share of the feed per second at time *t* s."""
@@ -631,6 +642,7 @@ def solve_batch(
     else:  # the profile's conversion: of the first charged reactant, else of a charged one
         key = next((n for n in charged if n in is_reactant), charged[0])
     ki = names.index(key)
+    charge_temperature = temperature
     if batch.heat == "isothermal" and isothermal_at:
         temperature = isothermal_at  # the batch is held at its given temperature
     gas_volume = None if mix.liquid is not None else total0 * R * temperature / pressure
@@ -680,11 +692,13 @@ def solve_batch(
             return pressure
         return sum(moles) * R * t / gas_volume
 
-    def feeding(t: float) -> tuple[list[float], list[tuple[float, float]]]:
-        """kmol/s by component dosed at time *t*, and (kW/K, K) of each dose then: its heat
-        capacity flow and temperature (of a dosed gas passing through to the vent too)."""
+    def feeding(t: float) -> tuple[list[float], list[tuple[float, float]], float]:
+        """kmol/s by component dosed at time *t*, (kW/K, K) of each dose then: its heat
+        capacity flow and temperature (of a dosed gas passing through to the vent too), and the
+        kW the doses release as they mix in (their heat of solution, ADR 0063)."""
         found = [0.0] * len(names)
         sensible = []
+        mixing = 0.0
         for d, amounts, cap, gas in zip(
             doses, dose_moles, dose_capacity, passing_capacity, strict=True
         ):
@@ -694,7 +708,8 @@ def solve_batch(
                     sensible.append((share * cap, d.temperature))
                 if gas is not None:
                     sensible.append((share * gas, d.temperature))
-        return found, sensible
+                mixing += share * (d.solution or 0.0)
+        return found, sensible, mixing
 
     def passing_rate(t: float) -> float:
         """kmol/s of dosed gas passing through to the vent at time *t*."""
@@ -759,9 +774,11 @@ def solve_batch(
         source: list[float],
         sensible: list[tuple[float, float]],
         post: bool,
+        mixing: float = 0.0,
     ) -> tuple[list[float], float]:
         """From *state* at *clock* s to *t_end* s or the *target* conversion, *source* kmol/s
-        dosed meanwhile; the accepted steps go into the result."""
+        dosed meanwhile and *mixing* kW released as it mixes in (a heat of solution); the
+        accepted steps go into the result."""
         nonlocal heat, peak, cooling, stalled
 
         def derivatives(state: list[float]) -> list[float]:
@@ -786,7 +803,7 @@ def solve_batch(
                 cap = mix.capacity(dict(zip(names, moles, strict=True)), t)
                 heats = energies(t)
                 gain = sum(-h * e for h, e in zip(heats, extent, strict=True))
-                gain += sum(c * (t_dose - t) for c, t_dose in sensible)
+                gain += sum(c * (t_dose - t) for c, t_dose in sensible) + mixing
                 dt = gain / cap
             return [*dn, *leaving, dt, 0.0]
 
@@ -830,9 +847,10 @@ def solve_batch(
                 if h > 0 and v > 0:
                     peak = max(peak, released / h / v)
                 if doses and h > 0 and not adiabatic:
-                    # kW to remove: the reaction's heat and the doses' warming to the batch
+                    # kW to remove: the reaction's heat, the doses' warming to the batch and
+                    # their heat of solution as they mix in (ADR 0063)
                     warming = sum(c * (t_dose - new[-2]) for c, t_dose in sensible)
-                    cooling = max(cooling, released / h + warming)
+                    cooling = max(cooling, released / h + warming + mixing)
             previous = conversion(state, clock)
             clock += h
             progress = abs(conversion(new, clock) - previous)
@@ -918,9 +936,9 @@ def solve_batch(
     record(state, clock)
     zero = [0.0] * len(names)
     for a, b in zip(breaks, breaks[1:], strict=False):
-        source, sensible = feeding((a + b) / 2)
+        source, sensible, mixing = feeding((a + b) / 2)
         passing_now = passing_rate((a + b) / 2)
-        state, clock = run(state, clock, b, None, source, sensible, post=False)
+        state, clock = run(state, clock, b, None, source, sensible, post=False, mixing=mixing)
     dosing_end = clock
     passing_now = 0.0
     target = batch.target.conversion if batch.target else None
@@ -996,6 +1014,7 @@ def solve_batch(
             result.peak_cooling_duty = cooling / result.volume
         if reagent is None:
             result.notes.append("no dosed reactant: no accumulation")
+    result.charge_temperature = charge_temperature
     if not adiabatic:
         _heat_terms(result, known, unknown_heat, heat, temperature, doses, dose_capacity)
         if result.heat_terms is not None:
@@ -1006,6 +1025,11 @@ def solve_batch(
             )
             if gas:
                 result.heat_terms["vent gas"] = gas
+            if any(d.solution is not None for d in doses):
+                # every dose has mixed in by the end: its whole heat of solution (ADR 0063)
+                result.heat_terms["solution"] = -sum(d.solution or 0.0 for d in doses)
+            if getattr(batch, "heat_up", False):
+                _heat_up(result, mix, charge, charge_temperature, temperature)
     for r in reactions:
         hottest = max(p[1] for p in result.profile)
         if not r.rate.covers(hottest) or not r.rate.covers(temperature):
@@ -1053,6 +1077,28 @@ def _heat_terms(
     if doses:
         terms["doses"] = warming
     result.heat_terms = terms
+
+
+def _heat_up(
+    result: TankResult,
+    mix: _Mixture,
+    charge: Mapping[str, float],
+    t_charge: float,
+    temperature: float,
+) -> None:
+    """The charge's heat-up from *t_charge* to the batch's *temperature* K (``batch.heat_up``,
+    ADR 0063) as the heat term ``charge heat-up``: a liquid's ``liquid_heat_capacity``, a closed
+    gas's ideal-gas cv at the mean temperature; what is missing otherwise (the duty then is
+    not known)."""
+    moles = {n: v for n, v in charge.items() if v > 0}
+    try:
+        capacity = mix.capacity(moles, (t_charge + temperature) / 2)
+    except TankError as failure:
+        result.heat_terms = None
+        result.heat_missing = [f"the charge's heat-up (batch.heat_up): {failure}"]
+        return
+    if result.heat_terms is not None:
+        result.heat_terms["charge heat-up"] = capacity * (temperature - t_charge)
 
 
 def _released(
@@ -1150,7 +1196,7 @@ def _solve_node(
             through = {n: v * (1.0 - share) for n, v in moles.items()} if share < 1 else {}
             if share < 1:
                 moles = {n: v * share for n, v in moles.items()}
-            doses.append(Dose(moles, kelvin, dosing.segments(), through))
+            doses.append(Dose(moles, kelvin, dosing.segments(), through, _solution(dosing, moles)))
     moles, kelvin, kpa = stream_moles(process, inlet, case)
     outlet_t = None
     vent = getattr(node.batch, "vent", None) if node.reactor != "cstr" else None
@@ -1164,6 +1210,15 @@ def _solve_node(
             if given is not None and given.provenance != "calculated":
                 outlet_t = to_kelvin(given.value, given.unit or fs.units.temperature)
     return solve_moles(process, node, moles, kelvin, kpa, outlet_t, doses)
+
+
+def _solution(dosing: Any, moles: Mapping[str, float]) -> float | None:
+    """kJ a dose of *moles* (kmol, its dissolving share) releases as it mixes in: minus its
+    components' ``heat_of_solution`` (kJ/kmol) times their amounts; None without one."""
+    heat = getattr(dosing, "heat_of_solution", None)
+    if heat is None:
+        return None
+    return -sum(moles.get(n, 0.0) * h for n, h in heat.values.items())
 
 
 def _deactivation(process: Any, node: Any) -> Any:
@@ -1187,7 +1242,8 @@ def tank_inputs(process: Any, node: Any, reactions: list[Any], names: list[str])
     comps = process.components()
     data = process.ideal_gas()
     found: dict[str, Any] = {
-        "batch" if kind == "semibatch" else kind: spec.model_dump(mode="json"),
+        # the charge's heat-up changes the duty, not the outlet (its fingerprint: the duty's)
+        "batch" if kind == "semibatch" else kind: spec.model_dump(mode="json", exclude={"heat_up"}),
         "reactions": [r.inputs_dump() for r in reactions],
         "ideal_gas": {n: data[n].model_dump(mode="json") if data.get(n) else None for n in names},
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
@@ -1262,6 +1318,7 @@ def solve_moles(
         inputs["doses"] = [
             {"moles": dict(d.moles), "T": d.temperature, "segments": d.segments}
             | ({"passing": dict(d.passing)} if d.passing else {})
+            | ({"solution": d.solution} if d.solution is not None else {})
             for d in doses
         ]
     if kind == "cstr":

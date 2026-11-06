@@ -115,6 +115,11 @@ class StillResult:
     peak_duty: float | None = None  # kW
     temperatures: tuple[float, float] | None = None  # K of the still at the start and end
     key: str = ""
+    #: K of the charge as it enters; with ``heat_up`` (ADR 0063) the kJ per batch that heat
+    #: the charge to its bubble point (None: not known, ``heat_up_missing`` why)
+    charge_temperature: float | None = None
+    heat_up: float | None = None
+    heat_up_missing: str = ""
     #: (share of all charged and fed distilled, s, K or None, mole fraction of the key)
     profile: list[tuple[float, float, float | None, float]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -697,6 +702,9 @@ def solve_node(
         raise StillError(str(failure)) from failure
     if not basis.startswith("process/recipe.yaml"):
         result.notes.append(f"one batch: {basis}")
+    result.charge_temperature = _temperature(process, charge, case)
+    if spec.heat_up:
+        _heat_up(result, comps)
     names = sorted({*moles, *(fed or {})})
     # the fingerprint holds what the outlets' flows and compositions depend on: not the
     # provenance and source texts, not the vapour pressures' fitted ranges (notes only), and
@@ -704,7 +712,13 @@ def solve_node(
     inputs: dict[str, Any] = {
         "still": spec.model_dump(
             mode="json",
-            exclude={"boilup": True, "provenance": True, "source": True, "volatility": _TEXTS},
+            exclude={
+                "boilup": True,
+                "heat_up": True,  # the duty's, not the outlets'
+                "provenance": True,
+                "source": True,
+                "volatility": _TEXTS,
+            },
         ),
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
         "nonvolatile": sorted(nonvolatile & set(names)),
@@ -726,6 +740,40 @@ def solve_node(
                 n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
             }
     return result, inputs
+
+
+def _temperature(process: Any, stream: Any, case: str) -> float | None:
+    from chemeascode.foundation.units import to_kelvin
+
+    q = getattr(stream.state.get(case), "temperature", None)
+    return to_kelvin(q.value, q.unit or process.flowsheet.units.temperature) if q else None
+
+
+def _heat_up(result: StillResult, comps: Mapping[str, Any]) -> None:
+    """The charge's heat-up from its inlet temperature to its bubble point at the start, kJ per
+    batch at the components' ``liquid_heat_capacity`` (``still.heat_up``, ADR 0063), or why it
+    is not known. A charge at or above its bubble point takes none (its flash is not
+    modelled: a note says so)."""
+    t_in = result.charge_temperature
+    bubble = result.temperatures[0] if result.temperatures else None
+    if t_in is None or bubble is None:
+        result.heat_up_missing = "the charge's temperature and its bubble point"
+        return
+    lacking = sorted(
+        n for n, v in result.charge.items() if v > 0 and not comps[n].liquid_heat_capacity
+    )
+    if lacking:
+        result.heat_up_missing = "the liquid_heat_capacity of " + ", ".join(lacking)
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in result.charge.items() if v > 0)
+    if t_in >= bubble:
+        result.notes.append(
+            f"heat_up: the charge enters at {t_in:.5g} K, at or above its bubble point "
+            f"{bubble:.5g} K (its flash is not modelled): no heat-up"
+        )
+        result.heat_up = 0.0
+        return
+    result.heat_up = capacity * (bubble - t_in) * result.hours
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
@@ -1055,10 +1103,37 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         ],
         "notes": result.notes,
     }
+    _heat_entry(process, node, case, result, entry["solution"])
     entry["differences"] = _flowsheet_differences(
         process, node, case, node_outlets(process, spec, result)
     )
     return entry
+
+
+def _heat_entry(
+    process: Any, node: Any, case: str, result: StillResult, solution: dict[str, Any]
+) -> None:
+    """With ``heat_up`` or a recipe vessel's metal (ADR 0063): the year-average duty its
+    energy stream carries is the model's whole duty, with its terms (and the heat-up per
+    batch); a still without them reports as before."""
+    from chemeascode.domains.process.duties import still_duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        metal = metal_of(process, node.id, case) is not None
+    except ValueError:
+        metal = True  # declared, its batch's hours not known: the duty says so
+    if not node.still.heat_up and not metal:
+        return
+    duty = still_duty(node, result, process, case)
+    solution["year_average_duty_kW"] = duty.heat_kW
+    solution["duty_terms_kW"] = dict(duty.terms_kW)
+    if duty.missing:
+        solution["duty_missing"] = list(duty.missing)
+    if node.still.heat_up:
+        solution["heat_up_kWh_per_batch"] = (
+            result.heat_up / 3600.0 if result.heat_up is not None else None
+        )
 
 
 def still_report(root: Path, case: str | None = None) -> StillReport:
@@ -1159,6 +1234,17 @@ def report_text(report: StillReport) -> str:
                     else ""
                 )
             )
+            if "duty_terms_kW" in sol:  # the heat-up and the vessel's metal (ADR 0063)
+                terms = ", ".join(f"{k} {v:.6g}" for k, v in sol["duty_terms_kW"].items())
+                lines.append(
+                    f"  year-average duty {num(sol['year_average_duty_kW'], ' kW')}"
+                    + (f" ({terms} kW)" if terms else "")
+                    + (
+                        f"; missing {'; '.join(sol['duty_missing'])}"
+                        if "duty_missing" in sol
+                        else ""
+                    )
+                )
             rows = [("charge", sol["charge"])]
             if sol["fed"] is not None:
                 rows.append(("fed", sol["fed"]))

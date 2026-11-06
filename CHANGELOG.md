@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Heats of solution and mixing, the charge's heat-up and the vessel's metal in the batch
+  energy (ADR 0063, #191). Each is opted in by a new field, left out of the dump when not
+  given, so a plant without them solves and fingerprints as in 1.9.0.
+  - `batch.dosing[].heat_of_solution: {values: {component: kJ/kmol}, provenance, source}`:
+    the integral heat of solution, dilution or mixing (J/mol) of a dosed liquid or gas (its
+    absorbed share), negative when it releases heat. The semi-batch releases it at the dose's
+    rate: in the adiabatic balance, the peak cooling duty (so the recipe's jacket check) and the
+    model duty's new term `solution`. `process reactor-hazards` counts it in dT_ad
+    (`heat_of_solution`, a note) and not in the MTSR: it is released as the dose mixes in, so
+    nothing of it is accumulated when a cooling failure stops the dosing. The heats of the
+    reactions consuming a dissolved gas are then on the dissolved basis. `cheme.process-reactor`:
+    an undeclared component (error), one the dose does not carry (warning).
+  - `batch.heat_up: true` (isothermal batch or semi-batch) and `still.heat_up: true`
+    (volatility raoult): the charge heated from its inlet temperature to the batch's, or to its
+    bubble point, as the duty's term `charge heat-up`; `process stills` shows the duty's terms
+    and the heat-up per batch.
+  - `vessel.metal_heat_capacity: kJ/K` on a recipe unit procedure's vessel: in the `heat` and
+    `cool` jacket times (`C + C_m`), and as the term `vessel metal` of each model in the vessel
+    that changes the content's temperature (a batch from its charge's temperature, a still to
+    its end temperature, a crystallizer from its feed's; `process crystallizers` shows it).
+  - `process recipe` reports the heat of each `heat` or `cool` operation with `temperatures`
+    (`heats`: the content's and the metal's kJ per batch, the mean and the year-average kW).
+    This is the one new output a plant without the new fields gets (a recipe without jacket
+    times reports as before, its JSON without `heats`).
+  - A unit procedure holding a still may give a `vessel`, sized from what its steps take in or
+    its `volume` (no jacket check); 1.9.0 refused it as `cheme.recipe-reference`.
+  - `stirred_tank.Dose.solution`, `TankResult.charge_temperature`, `StillResult.heat_up`,
+    `recipe.HeatResult` and `metal_of`, `duties.with_metal` and `ModelDuty.inputs`; the duty
+    functions take the process and case for the metal.
+- Every BFD/PFD needs `cheme process build` once (the process schema changed).
+
 ## 1.9.0 (2026-11-06)
 
 Minor release: screening, energy and recycles for batch plants. A semi-batch's thermal screening

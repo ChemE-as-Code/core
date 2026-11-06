@@ -195,7 +195,16 @@ liquid step's heat of reaction on the liquid basis. Direction matters: a cooling
 the utility, a heating stream from the utility to the step; the duty is positive. A duty you
 keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
 `cheme.process-duty` names both values when they differ: record the difference in
-`DESIGN.md`. The charge's heat-up, agitation, condensers and the dryer (its own
+`DESIGN.md`. Before typing such a stream, use the model's own terms (ADR 0063): a dosed
+liquid's or gas's heat of dilution or absorption goes in the dose's `heat_of_solution: {values:
+{ID: kJ/kmol}, provenance, source}` (negative: released; with it, write the heats of the
+reactions consuming a dissolved gas on the dissolved basis, not as a gas, or the absorption
+counts twice); the charge's heat-up in `batch.heat_up: true` or `still.heat_up: true` (to the
+bubble point); the vessel's steel in the recipe's `vessel.metal_heat_capacity` (kJ/K, mass x
+cp), which also lengthens the jacket's heat and cool times and adds `vessel metal` to the duty
+of each model in that vessel that changes the content's temperature. `cheme process recipe`
+reports each jacket-timed heat-up's heat per batch: the basis for a heater step without a
+model. A charged solid's heat of solution, agitation, condensers and the dryer (its own
 `energy.port`) are not written: give those streams yourself.
 
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a

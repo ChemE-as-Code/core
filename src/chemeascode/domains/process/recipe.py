@@ -30,6 +30,11 @@ instead of a duration: ``t = C / (U A) ln((T_m - T_0) / (T_m - T_1))`` with the 
 constant temperature, the content's heat capacity C (the charge's before a dose, else the
 end's).
 
+A vessel's ``metal_heat_capacity`` (kJ/K, ADR 0063) heats and cools with the content: in the
+jacket times (``C + C_m``) and each jacket-timed operation's heat per batch (``heats``), and in
+the duty of each model in the vessel (:func:`metal_of`). A still's unit may give a vessel too,
+sized from what its steps take in.
+
 A vented batch or semi-batch unit (``batch.vent``, ADR 0054) reports its off-gas per batch:
 the model's peak gas rate (kmol/s, and m3/h at the vessel's temperature and pressure) and
 what one batch gives off, for sizing the off-gas line and scrubber.
@@ -219,6 +224,14 @@ class Vessel(Strict):
         exclude_if=lambda value: value is None,  # a reactor's vessel stays as it was
     )
     jacket: Jacket | None = None
+    metal_heat_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="kJ/K of the vessel's metal (its mass x cp) heated and cooled with the "
+        "content: in the heat and cool times and duties, and in the duty of each model in the "
+        "vessel (ADR 0063).",
+        exclude_if=lambda value: value is None,  # a vessel stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -341,6 +354,31 @@ class VesselResult:
     jacket_area: float | None = None  # m2 at the smallest content (the charge)
     removable: float | None = None  # kW: U A (T - T_coolant) there
     coolant_temperature: float | None = None
+
+
+@dataclass
+class HeatResult:
+    """A heat-up's or cool-down's heat per batch (ADR 0063): an operation with
+    ``temperatures``, the content's heat capacity and the vessel's metal times the change."""
+
+    procedure: str
+    unit: str
+    operation: str
+    kind: str  # heat or cool
+    temperatures: tuple[float, float]  # K, start and end
+    content_kJ: float  # kJ per batch into the content (negative: removed)
+    metal_kJ: float  # kJ per batch into the vessel's metal
+    hours: float  # h the operation takes
+    year_average_kW: float | None = None  # its kJ per batch x batches per year / hours
+
+    @property
+    def kJ(self) -> float:
+        return self.content_kJ + self.metal_kJ
+
+    @property
+    def mean_kW(self) -> float | None:
+        """kW over the operation: its heat over its time."""
+        return self.kJ / (self.hours * 3600.0) if self.hours > 0 else None
 
 
 @dataclass
@@ -613,11 +651,54 @@ def _jacket_time(up: UnitProcedure, op: Operation, content: _Content, before_dos
     capacity = content.charge_capacity if before_dose else content.end_capacity
     if capacity is None:
         raise ValueError("no liquid_heat_capacity of the content")
+    capacity += up.vessel.metal_heat_capacity or 0.0  # the metal heats and cools with it
     volume = content.charge_volume if before_dose else content.end_volume
     diameter = _diameter(_vessel(up, content).volume, up.vessel.aspect_ratio)
     area = jacket.area or wetted_area(volume, diameter)
     ua = jacket.u * area / 1000.0  # kW/K
     return capacity / ua * math.log((medium - start) / (medium - end)) / 3600.0
+
+
+def _jacket_heat(
+    up: UnitProcedure, op: Operation, content: _Content, before_dose: bool, hours: float
+) -> HeatResult:
+    """The heat of *op* (a heat or cool with temperatures) per batch: the content's (the
+    charge's before the dose, else the end's) and the vessel's metal times the change."""
+    start, end = op.temperatures or (0.0, 0.0)
+    capacity = (content.charge_capacity if before_dose else content.end_capacity) or 0.0
+    metal = (up.vessel.metal_heat_capacity if up.vessel is not None else None) or 0.0
+    return HeatResult(
+        up.id,
+        up.label,
+        op.id,
+        op.kind,
+        (start, end),
+        capacity * (end - start),
+        metal * (end - start),
+        hours,
+    )
+
+
+def metal_of(process: Any, node_id: str, case: str) -> tuple[float, float, str] | None:
+    """The metal of the vessel step or block *node_id* runs in (ADR 0063): (kJ/K of the
+    vessel's ``metal_heat_capacity``, h of the flowsheet's flows one batch makes, the unit
+    procedure's id); None without a recipe, or a vessel with metal holding *node_id*. Raises
+    ValueError when the batch's hours are not known."""
+    recipe, _, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    for up in recipe.unit_procedures:
+        metal = up.vessel.metal_heat_capacity if up.vessel is not None else None
+        if metal is None:
+            continue
+        if any(node.id == node_id for node in _nodes(process, up)):
+            return metal, batch_hours(process, recipe, case), up.id
+    return None
+
+
+def _stills(process: Any, up: UnitProcedure) -> list[Any]:
+    """The still steps among *up*'s steps."""
+    return [n for n in _nodes(process, up) if getattr(n, "still", None) is not None]
 
 
 def _solids(process: Any, up: UnitProcedure) -> tuple[Any, Any]:
@@ -804,11 +885,18 @@ class RecipeResult:
     steps: list[Step] = field(default_factory=list)
     vessels: list[VesselResult] = field(default_factory=list)
     vents: list[VentResult] = field(default_factory=list)
+    #: the heat-ups' and cool-downs' heat per batch (ADR 0063), operations with temperatures
+    heats: list[HeatResult] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         found = asdict(self)
         found["findings"] = [f.format() for f in self.findings]
+        if self.heats:
+            for entry, heat in zip(found["heats"], self.heats, strict=True):
+                entry["kJ"], entry["mean_kW"] = heat.kJ, heat.mean_kW
+        else:
+            del found["heats"]  # a recipe without jacket times reports as before
         return found
 
 
@@ -956,6 +1044,25 @@ def evaluate(
                     "give the heat-up's or cool-down's duration",
                     [up.id],
                 )
+        elif (
+            up.vessel is not None
+            and not reacts
+            and _stills(process, up)
+            and not any(op.temperatures for op in up.operations)
+        ):
+            # a still's pot (ADR 0063): sized from what its steps take in, its metal heated
+            # with the charge in the still's duty; no jacket check (no peak duty to remove)
+            try:
+                cake = _cake_vessel(process, recipe, up, case)
+            except ValueError:
+                add(
+                    "error",
+                    "duration",
+                    f"{up.id}: no vessel of {up.label}: no volume of what its still takes in",
+                    [*at, "vessel"],
+                    "give vessel.volume, or the liquid_molar_volume of the still's charge",
+                    [up.id],
+                )
         elif up.vessel is not None or any(op.temperatures for op in up.operations):
             try:
                 content = _content(process, recipe, up, case)
@@ -1006,13 +1113,9 @@ def evaluate(
             if op.temperatures is not None:
                 if content is None:
                     continue
+                before = not dosed and any(o.kind == "dose" for o in up.operations)
                 try:
-                    hours = _jacket_time(
-                        up,
-                        op,
-                        content,
-                        before_dose=not dosed and any(o.kind == "dose" for o in up.operations),
-                    )
+                    hours = _jacket_time(up, op, content, before_dose=before)
                 except ValueError as failure:
                     failed = True
                     add(
@@ -1025,6 +1128,7 @@ def evaluate(
                     )
                     continue
                 ops.append((op, hours, "calculated"))
+                result.heats.append(_jacket_heat(up, op, content, before, hours))
                 continue
             if op.duration is not None:
                 ops.append((op, op.duration.hours(), op.duration.provenance))
@@ -1119,6 +1223,10 @@ def evaluate(
     result.makespan = clock_end
     for u in result.units:
         u.utilisation = u.cycle / slowest.cycle
+    for heat in result.heats:
+        heat.year_average_kW = (
+            heat.kJ * result.batches_per_year / recipe.hours_per_year.value / 3600.0
+        )
     result.rate = size.value * (1000.0 if size.unit == "t" else 1.0) * result.batches_per_year
     result.rate /= recipe.hours_per_year.value
     _basis(process, recipe, result, case, add)
@@ -1320,6 +1428,23 @@ def recipe_text(result: RecipeResult) -> str:
                 if v.removable is not None and v.peak_duty is not None
                 else f"; heated area {v.jacket_area:.3g} m2"
                 if v.jacket_area is not None and v.coolant_temperature is None and _dries(result, v)
+                else ""
+            )
+        )
+    for q in result.heats:
+        lines.append(
+            f"  {'heat-up' if q.kind == 'heat' else 'cool-down'} {q.operation} of {q.unit} "
+            f"({q.procedure}) {q.temperatures[0]:.5g} -> {q.temperatures[1]:.5g} K: "
+            f"{q.kJ / 1000:.4g} MJ per batch"
+            + (
+                f" (content {q.content_kJ / 1000:.4g}, vessel metal {q.metal_kJ / 1000:.4g} MJ)"
+                if q.metal_kJ
+                else ""
+            )
+            + (f", {q.mean_kW:.4g} kW over {q.hours:.3g} h" if q.mean_kW is not None else "")
+            + (
+                f", year average {q.year_average_kW:.4g} kW"
+                if q.year_average_kW is not None
                 else ""
             )
         )

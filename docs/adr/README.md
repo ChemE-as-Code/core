@@ -106,3 +106,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0058](0058-semi-batch-thermal-screening.md) | Semi-batch thermal screening: the MTT of what boils, the reactions that count, the MTSR over time, the gas release | Proposed | 2026-11-05 |
 | [0059](0059-batch-models-write-their-energy-streams.md) | Batch models write and check the duty of their energy streams | Proposed | 2026-11-05 |
 | [0060](0060-recycle-convergence-with-tear-streams.md) | Propagate converges recycles at declared tear streams (substitution or Wegstein) | Proposed | 2026-11-05 |
+| [0063](0063-heats-of-solution-heat-up-and-vessel-metal.md) | Heats of solution and mixing, the heat-up of the charge and of the vessel's metal | Proposed | 2026-11-06 |

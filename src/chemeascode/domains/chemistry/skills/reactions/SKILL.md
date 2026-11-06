@@ -152,7 +152,11 @@ each value taken from the evidence cites its observation in `source`.
      reactions that consume it with the dosed gas as a gas (as calorimetry with gas dosing
      measures it), so this heat is counted as the dose reacts. That keeps the MTSR
      conservative, but the cooling duty during dosing leaves out the absorption of the gas not
-     yet reacted; on the dissolved basis both miss it. When only part is taken up, give the
+     yet reacted; on the dissolved basis both miss it. Where the heat of absorption matters
+     (gas left dissolved, a dosed liquid's heat of dilution), give the dose `heat_of_solution:
+     {values: {ID: kJ/kmol}, provenance, source}` instead (ADR 0063) and write those reactions'
+     heats on the dissolved basis: it is released as the dose mixes in, in the duty, the peak
+     cooling and dT_ad, not in the MTSR. When only part is taken up, give the
      dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to the vessel's
      temperature (its ideal-gas cp, else left out and noted). `process propagate` writes both
      outlets (composition, flow, the liquid's temperature and pressure) and the balance closes

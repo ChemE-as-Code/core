@@ -16,6 +16,9 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
   its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
   then and ``dT_ad`` of the whole batch, charge and doses;
+- a semi-batch's doses with ``heat_of_solution`` (ADR 0063): their heat over the batch's heat
+  capacity counts in ``dT_ad`` (``heat_of_solution``), not in the MTSR: it is released as each
+  dose mixes in, so a cooling failure that stops the dosing finds none of it accumulated;
 - a vented batch or semi-batch (``batch.vent``, ADR 0054): the vented gas leaves as it forms,
   so it adds nothing to the content's heat capacity nor to the MTSR, and a dosed gas counts
   only with its absorbed share. The notes give the vent's peak gas rate over the run;
@@ -129,6 +132,10 @@ class HazardEntry:
     gas_release: dict[str, Any] | None = None
     #: component -> why the default MTT leaves it out
     mtt_left_out: dict[str, str] = field(default_factory=dict)
+    #: a semi-batch whose doses give heat_of_solution (ADR 0063): the heat they release as they
+    #: mix in (kJ per hour of flows, the batch's basis) and its adiabatic rise, in dT_ad and not
+    #: in the MTSR (released on mixing, not accumulated)
+    heat_of_solution: dict[str, Any] | None = None
 
 
 #: HazardEntry's fields the JSON gives only when they hold something (ADR 0058): a reactor
@@ -141,6 +148,7 @@ OPTIONAL = (
     "mtsr_profile",
     "gas_release",
     "mtt_left_out",
+    "heat_of_solution",
 )
 
 
@@ -462,7 +470,9 @@ def _screen_semibatch(
     p_in = None
     # a dosed gas counts with the share the liquid takes up; the rest passes to the vent
     absorbed = {d.stream: d.absorbed for d in item.batch.dosing if d.absorbed is not None}
+    solutions = {d.stream: d.heat_of_solution for d in item.batch.dosing if d.heat_of_solution}
     gases: list[str] = []  # the components of a dosed gas
+    mixing = 0.0  # kJ the doses release as they mix in (ADR 0063)
     try:
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
@@ -472,6 +482,8 @@ def _screen_semibatch(
                     moles[n] = moles.get(n, 0.0) + v * share
                     if stream.id in absorbed:
                         gases.append(n)
+            if (heat := solutions.get(stream.id)) is not None:
+                mixing -= sum(found.get(n, 0.0) * share * h for n, h in heat.values.items())
             p_in = kpa if p_in is None else min(p_in, kpa)
         solved, _ = solve_node(process, item, inlets, case)
     except TankError as failure:
@@ -486,6 +498,8 @@ def _screen_semibatch(
     )
     entry.missing += lacking
     entry.adiabatic_rise = rise
+    if solutions:
+        _solution_rise(entry, moles, comps, mixing)
     entry.accumulation = solved.max_accumulation
     if worst is not None:
         entry.mtsr = worst.mtsr(counted)
@@ -530,6 +544,39 @@ def _screen_semibatch(
             counted,
         )
     return entry
+
+
+def _solution_rise(
+    entry: HazardEntry, moles: dict[str, float], comps: dict[str, Any], mixing: float
+) -> None:
+    """The doses' heat of solution in dT_ad (ADR 0063): *mixing* kJ (per hour of flows) over the
+    heat capacity of the whole batch, charge and doses (as the reactions' dT_ad). It is
+    released as each dose mixes in, so a cooling failure with the dosing stopped finds none of
+    it left: it counts in dT_ad (all of it dosed at once, a dosing error) and not in the
+    MTSR."""
+    lacking = sorted(
+        n
+        for n, v in moles.items()
+        if v > 0 and not getattr(comps.get(n), "liquid_heat_capacity", 0)
+    )
+    if lacking:
+        entry.missing.append(
+            "the heat of solution's rise: liquid_heat_capacity of " + ", ".join(lacking)
+        )
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in moles.items() if v > 0)
+    rise = mixing / capacity if capacity > 0 else 0.0
+    entry.heat_of_solution = {
+        "kJ_per_hour_of_flows": mixing,
+        "adiabatic_rise_K": rise,
+        "in_mtsr": False,
+    }
+    if entry.adiabatic_rise is not None:
+        entry.adiabatic_rise += rise
+    entry.notes.append(
+        f"dT_ad includes the doses' heat of solution, {rise:.3g} K (released as they mix in, "
+        "not accumulated: not in the MTSR)"
+    )
 
 
 def _profile(points: list[Any], counted: list[str] | None) -> list[dict[str, float | None]]:

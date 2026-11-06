@@ -1106,7 +1106,14 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   1.7.0 gave `cheme.recipe-reference` for a block); several such steps are
   `cheme.recipe-reference` (name one as `unit:`). A filter or dryer in the same vessel takes
   its plate and heated area (`vessel.heated_area`, else the jacket's area, else the shell and
-  bottom the dryer's wet cake wets) from it.
+  bottom the dryer's wet cake wets) from it. `vessel.metal_heat_capacity` (kJ/K, ADR 0063)
+  counts the vessel's steel in the `heat` and `cool` times (`C + C_m`) and adds the term `vessel
+  metal`, `C_m (T_1 - T_0)` per batch, to the duty of each model in the vessel that changes the
+  content's temperature (a batch from its charge's, a still to its end temperature, a
+  crystallizer from its feed's). `process recipe` reports the heat of each heat-up or cool-down
+  with `temperatures` (`heats`: content and metal kJ per batch, mean and year-average kW). A unit
+  procedure holding a still may give a `vessel` (sized from what its steps take in, or its
+  `volume`; no jacket check).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1124,7 +1131,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   concentrations nor heat capacity, and their `heat_of_reaction` forms them as gas at the
   vessel's temperature. A dose may give `absorbed: share`: that share dissolves, the rest passes
   through to the vent. A dissolving dose adds no heat of absorption or condensation: write the
-  `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
+  `heat_of_reaction` of its reactions with the dosed gas as a gas, or give the dose's
+  `heat_of_solution` and its reactions' heats on the dissolved basis (below).
+  A dose's `heat_of_solution: {values: {component: kJ/kmol}, provenance}` (ADR 0063) is the
+  integral heat of solution, dilution or mixing (J/mol of the component dosed, negative:
+  released) of a liquid or of a gas's absorbed share: released at the dose's rate, it counts in
+  the adiabatic balance, the peak cooling duty and the recipe's jacket check, the duty's term
+  `solution`, and in `reactor-hazards`' dT_ad (`heat_of_solution`), not in the MTSR (released on
+  mixing, nothing of it is accumulated when the cooling fails and the dosing stops).
+  `batch.heat_up: true` adds the charge heated from its inlet temperature to the batch's to the
+  duty (`charge heat-up`). `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
   `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
@@ -1250,8 +1266,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
     energy is its own. An end at a time with the recipe's batch-size stream downstream of the
     still is circular and refused.
-  - Not modelled: rectification with reflux, activity coefficients (azeotropes), heat-up,
-    sensible heat and losses, constant level by volume. `process simulate` does not couple it.
+  - `still.heat_up: true` (raoult, ADR 0063) adds the charge heated from its inlet
+    temperature to its bubble point to the energy and duty (`charge heat-up`); `process stills`
+    then gives the duty's terms.
+  - Not modelled: rectification with reflux, activity coefficients (azeotropes), the
+    content's sensible rise while it boils (and the heat-up without `heat_up`), losses, constant level by volume. `process simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
     and the constant-level swap's closed form (`tests/test_batch_still.py`).
 - **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal
@@ -1260,8 +1279,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   exchange per hour of the flowsheet's flows (the year average), and `process propagate
   --fill` writes it as the `duty` of their energy stream, `calculated` with a fingerprint.
   - The heat: a batch's is minus the heat its reactions release over the batch plus each dose
-    warmed to the batch's temperature (and a dosed gas passing to the vent; the charge's
-    heat-up is the recipe's, not included); a still's the latent heat of its distillate, `sum
+    warmed to the batch's temperature (and a dosed gas passing to the vent; the doses' heat of
+    solution, the charge's heat-up with `heat_up` and the vessel's metal, ADR 0063); a still's the latent heat of its distillate, `sum
     dHvap_i D_i`; a crystallizer's its lumped duty; a conversion step's (batch or continuous)
     `sum xi dHr` at the heats' own `heat_of_reaction.temperature` with every inlet brought to
     it and every outlet from it (`liquid_heat_capacity`, or the ideal-gas enthalpy for a stream
