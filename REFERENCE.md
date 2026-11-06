@@ -1109,9 +1109,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   bottom the dryer's wet cake wets) from it. `vessel.metal_heat_capacity` (kJ/K, ADR 0063)
   counts the vessel's steel in the `heat` and `cool` times (`C + C_m`) and adds the term `vessel
   metal`, `C_m (T_1 - T_0)` per batch, to the duty of each model in the vessel that changes the
-  content's temperature (a batch from its charge's, a still to its end temperature, a
-  crystallizer from its feed's). `process recipe` reports the heat of each heat-up or cool-down
-  with `temperatures` (`heats`: content and metal kJ per batch, mean and year-average kW). A unit
+  content's temperature: the metal follows the content (a batch with `heat_up` from its
+  charge's temperature, none without it; a still from its bubble point to its end temperature,
+  from its charge's with `heat_up`; a crystallizer from its feed's). `process recipe` reports
+  the heat of each heat-up or cool-down with `temperatures` in a vessel with metal (`heats`:
+  content and metal kJ per batch, mean and year-average kW; a recipe without metal reports as in
+  1.9.0). A unit
   procedure holding a still may give a `vessel` (sized from what its steps take in, or its
   `volume`; no jacket check).
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
@@ -1140,7 +1143,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `solution`, and in `reactor-hazards`' dT_ad (`heat_of_solution`), not in the MTSR (released on
   mixing, nothing of it is accumulated when the cooling fails and the dosing stops).
   `batch.heat_up: true` adds the charge heated from its inlet temperature to the batch's to the
-  duty (`charge heat-up`). `process propagate` writes both outlets and the balance
+  duty (`charge heat-up`), and the vessel's metal with it; without it the model holds the batch
+  at its temperature from the start and leaves both to the recipe's heat operation. `heat_up`
+  and an isothermal batch's `heat_of_solution` change only the duty: the outlets and a recycle's
+  tears do not go stale on them. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
   `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
@@ -1267,8 +1273,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     energy is its own. An end at a time with the recipe's batch-size stream downstream of the
     still is circular and refused.
   - `still.heat_up: true` (raoult, ADR 0063) adds the charge heated from its inlet
-    temperature to its bubble point to the energy and duty (`charge heat-up`); `process stills`
-    then gives the duty's terms.
+    temperature to its bubble point to the duty (`charge heat-up`), and a swap's feed warmed
+    from its inlet temperature to the still's as it mixes in (`feed heat-up`, the still's
+    temperature averaged by the kmol fed); `process stills` then gives the duty's terms, the
+    whole energy per batch on the duty's basis (`total_energy_kWh_per_batch`, beside the year
+    average; `energy_kWh_per_batch` stays the latent heat) and assumptions that say what the
+    duty holds.
   - Not modelled: rectification with reflux, activity coefficients (azeotropes), the
     content's sensible rise while it boils (and the heat-up without `heat_up`), losses, constant level by volume. `process simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene

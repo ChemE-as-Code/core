@@ -65,29 +65,43 @@ Options considered:
     cv at the mean temperature), from the charge's inlet temperature to the batch's.
   - `still.heat_up: true` (volatility raoult): the term `charge heat-up`, the charge from its
     inlet temperature to its bubble point at the start, in the still's duty and in `process
-    stills`; a charge at or above its bubble point takes none (its flash is not modelled).
-  - The recipe reports the heat of every `heat` or `cool` operation with `temperatures`
-    (`RecipeResult.heats`, `process recipe`): the content's and the metal's kJ per batch, the
-    mean kW over the operation and the year average. This is a report, the basis of a heater
-    step's hand duty: a model in the same vessel that changes the temperature (a crystallizer's
-    cool-down) holds the same heat in its own duty.
+    stills`; a charge at or above its bubble point takes none (its flash is not modelled). A
+    solvent swap's feed is warmed too, the term `feed heat-up`: `sum_i F_i cp_i (T_mix -
+    T_feed)`, with `T_mix` the still's temperature as the feed mixes in, averaged by the kmol
+    fed (along the profile at constant level, the bubble point each portion reaches); a feed
+    without `liquid_heat_capacity` leaves the duty unknown, saying why. `process stills` reports
+    the whole energy per batch on the duty's basis (`total_energy_kWh_per_batch`) beside the
+    year average, and `energy_kWh_per_batch` stays the boil-up's latent heat; the assumptions
+    "no heat-up to the bubble point" and "the duty is the vapour's latent heat" are replaced by
+    what the duty holds.
+  - The recipe reports the heat of every `heat` or `cool` operation with `temperatures` in a
+    vessel with `metal_heat_capacity` (`RecipeResult.heats`, `process recipe`): the content's
+    and the metal's kJ per batch, the mean kW over the operation and the year average. This is a
+    report, the basis of a heater step's hand duty: a model in the same vessel that changes the
+    temperature (a crystallizer's cool-down, a batch with `heat_up`) holds the same heat in its
+    own duty. A recipe whose vessels give no metal reports as in 1.9.0.
 - **Vessel metal** (`recipe.py`): `vessel.metal_heat_capacity: kJ/K` on a unit procedure's
   vessel, the vessel's mass times its cp.
   - The jacket's heat and cool times use `C + C_m`, the metal at the content's temperature.
   - Each model in the vessel (its `unit` or `units`) that changes the content's temperature
-    gets the term `vessel metal`, `C_m (T_1 - T_0)` over the batch's hours of flows: a batch or
-    semi-batch from its charge's temperature to its own, a still from its charge's to its end
-    temperature, a crystallizer from its feed's to its own. A model at its charge's temperature
-    gets none.
+    gets the term `vessel metal`, `C_m (T_1 - T_0)` over the batch's hours of flows. The metal
+    follows the content, so a model heats both or neither: a batch or semi-batch with `heat_up`
+    from its charge's temperature to its own (without `heat_up` the model holds the batch at its
+    temperature from the start, its duty holds neither heat-up and its basis says the metal is
+    left out: the recipe's `heat` operation holds both); a still from its bubble point at the
+    start to its end temperature (with `heat_up` from its charge's); a crystallizer from its
+    feed's to its own. A model at its charge's temperature gets none.
   - A unit procedure holding a still (and no batch step) may now give a `vessel`: it is sized
     from what its steps take in (or its given `volume`), with no jacket check (the still's pot,
     MTPPB L-1); 1.9.0 refused it as `cheme.recipe-reference`.
 - **Provenance and fingerprints.** The terms are in the `calculated` duty's fingerprint: the
   heats of solution (in the batch's inputs), `heat_up`, the charge's heat capacities, the metal's
-  kJ/K, the batch's hours and the temperatures. `heat_up` is left out of the outlets'
-  fingerprints (it changes no outlet). Every new field is left out of the dump when not given
-  (`exclude_if`), so a plant without them solves, reports and fingerprints as in 1.9.0; the only
-  report a plant gets without them is the recipe's heat of its jacket-timed operations.
+  kJ/K, the batch's hours and the temperatures. `heat_up`, and an isothermal batch's heats of
+  solution, are left out of the outlets' and the tears' fingerprints (`stirred_tank.duty_only`,
+  `recycle.loop_inputs`): they change no outlet, only the duty, which holds them. An adiabatic
+  batch's heats of solution stay in its outlets' (its temperature takes them). Every new field
+  is left out of the dump when not given (`exclude_if`), so a plant without them solves,
+  reports and fingerprints as in 1.9.0.
 - **Rules** (`cheme.process-reactor`): a heat of solution of an undeclared component (error) or
   of one the dose does not carry (warning). `heat_up` on an adiabatic batch, or on a still at
   constant volatility, is a schema error.
@@ -111,7 +125,8 @@ Options considered:
   retained share (ADR 0054's `fraction`; write its dissolution into the heat of reaction) and
   acetyl-chloride-1's heat of mixing on phase separation are not covered.
 - Limitations: the metal follows the content and starts each operation at its temperature (a
-  vessel left warmer by the previous batch is not modelled); the equipment list's mass is not
+  vessel left warmer by the previous batch is not modelled); a swap's feed hotter than the
+  still as it mixes in is taken to bring no heat (its flash is not modelled); the equipment list's mass is not
   read, the recipe's vessel holds the kJ/K; a conversion step gets no metal or heat-up term; the
   still's content's sensible rise while it boils and its heat losses are still left out; the
   recipe's heat of an operation is reported, not written to a stream.

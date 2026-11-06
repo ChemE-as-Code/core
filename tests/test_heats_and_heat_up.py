@@ -294,10 +294,27 @@ def _charge_moles():
     return 100.0 / mw * 0.8, 100.0 / mw * 0.2
 
 
-def test_a_still_with_heat_up_heats_its_charge_to_its_bubble_point(tmp_path):
-    from chemeascode.domains.process.batch_still import still_report
+def _mixing_temperature(sol, fed_share):
+    """K of the still as the swap's feed mixes in at constant level (fed = boiled up): the
+    profile's temperature averaged over the share distilled while it feeds (trapezoids)."""
+    points = [(p["distilled"], p["temperature_K"]) for p in sol["profile"]]
+    area = 0.0
+    for (a, ta), (b, tb) in zip(points, points[1:], strict=False):
+        if a >= fed_share:
+            break
+        top = min(b, fed_share)
+        tb = ta + (tb - ta) * (top - a) / (b - a)
+        area += (top - a) * (ta + tb) / 2
+    return area / fed_share
 
-    (unit,) = still_report(_still_plant(tmp_path).root).units
+
+def test_a_still_with_heat_up_heats_its_charge_to_its_bubble_point(tmp_path):
+    """The charge from 300 K to its bubble point, and the swap's feed (B, 120 kg/h at 300 K)
+    to the still's temperature as it mixes in: F cp (T_mix - 300)."""
+    from chemeascode.domains.process.batch_still import report_text, still_report
+
+    report = still_report(_still_plant(tmp_path).root)
+    (unit,) = report.units
     sol = unit["solution"]
     a, p = _charge_moles()
     bubble = _bubble()
@@ -305,14 +322,61 @@ def test_a_still_with_heat_up_heats_its_charge_to_its_bubble_point(tmp_path):
     heat_up = (a * 136.0 + p * 200.0) * (bubble - 300.0)  # kJ/h: per hour of flows
     assert sol["heat_up_kWh_per_batch"] == pytest.approx(heat_up * 4.0 / 3600.0, rel=1e-5)
     assert sol["duty_terms_kW"]["charge heat-up"] == pytest.approx(heat_up / 3600.0, rel=1e-5)
-    assert sol["year_average_duty_kW"] == pytest.approx(
-        sol["duty_terms_kW"]["boil-up"] + heat_up / 3600.0, rel=1e-9
+    fed = 120.0 / 92.14  # kmol/h of toluene
+    t_mix = _mixing_temperature(sol, fed / (a + p + fed))
+    assert bubble < t_mix < sol["temperatures_K"][1]
+    feed_heat = fed * 157.0 * (t_mix - 300.0)
+    assert sol["duty_terms_kW"]["feed heat-up"] == pytest.approx(feed_heat / 3600.0, rel=2e-3)
+    assert sol["feed_heat_up_kWh_per_batch"] == pytest.approx(
+        sol["duty_terms_kW"]["feed heat-up"] * 4.0, rel=1e-9
     )
+    assert sol["year_average_duty_kW"] == pytest.approx(
+        sum(sol["duty_terms_kW"][k] for k in ("boil-up", "charge heat-up", "feed heat-up")),
+        rel=1e-12,
+    )
+    # the whole energy per batch is on the year average's basis; the latent heat stays apart
+    assert sol["total_energy_kWh_per_batch"] == pytest.approx(
+        sol["year_average_duty_kW"] * 4.0, rel=1e-12
+    )
+    assert sol["energy_kWh_per_batch"] == pytest.approx(
+        sol["duty_terms_kW"]["boil-up"] * 4.0, rel=1e-9
+    )
+    text = report_text(report)
+    assert f"year average {sol['year_average_duty_kW']:.6g} kW" in text
+    assert f"whole duty {sol['total_energy_kWh_per_batch']:.4g} kWh per batch" in text
+    assert text.count("year average") == 1
+    # the assumptions say what the duty holds, not that there is no heat-up
+    assumptions = unit["assumptions"]
+    assert not any("no heat-up to the bubble point" in a for a in assumptions)
+    assert not any(
+        a.startswith("the duty is the vapour's latent heat (") and a.endswith(")")
+        for a in assumptions
+    )
+    assert any(a.startswith("heat_up: the charge heated") and "the feed" in a for a in assumptions)
     (plain,) = still_report(_still_plant(tmp_path / "plain", heat_up=False).root).units
     assert "duty_terms_kW" not in plain["solution"]  # as in 1.9.0
+    assert "total_energy_kWh_per_batch" not in plain["solution"]
     assert plain["solution"]["year_average_duty_kW"] == pytest.approx(
         sol["duty_terms_kW"]["boil-up"], rel=1e-12
     )
+    from chemeascode.domains.process.batch_still import ASSUMPTIONS
+
+    assert plain["assumptions"] == list(ASSUMPTIONS)
+
+
+def test_a_swap_without_the_feeds_heat_capacity_has_no_duty_and_says_why(tmp_path):
+    from chemeascode.domains.process.batch_still import still_report
+
+    materials = STILL_CP.replace(
+        "    heat_of_vaporization: 33180\n    liquid_heat_capacity: 157\n",
+        "    heat_of_vaporization: 33180\n",
+    )
+    flowsheet = STILL_FLOWSHEET.replace("    still:\n", "    still:\n      heat_up: true\n")
+    ws = still._plant(tmp_path, flowsheet=flowsheet, materials=materials, recipe=still.RECIPE)
+    (unit,) = still_report(ws.root).units
+    sol = unit["solution"]
+    assert sol["year_average_duty_kW"] is None
+    assert "liquid_heat_capacity of B (the feed)" in sol["duty_missing"][0]
 
 
 # -- the vessel's metal ---------------------------------------------------------------------------
@@ -358,17 +422,46 @@ def test_a_recipe_without_jacket_times_reports_no_heats(tmp_path):
     assert result.heats == [] and "heats" not in result.as_dict()
 
 
-def test_the_metal_and_the_heat_up_are_terms_of_the_semibatchs_duty(tmp_path):
-    """The charge enters at 290 K, the batch is held at 300 K (its outlet's given temperature):
-    heat_up adds 5 x 150 x 10 kJ/h, and the vessel's 1000 kJ/K metal heated by 10 K each batch
-    of 4.5 h of flows adds 1000 x 10 / 4.5 kJ/h."""
-    recipe = recipes._jacketed(metal_heat_capacity=1000.0)
+def test_a_recipe_without_a_vessels_metal_reports_as_in_1_9_0(tmp_path):
+    """Jacket-timed heat and cool operations without metal_heat_capacity: no heats, no lines."""
+    recipe = recipes._jacketed()
+    ops = recipe["unit_procedures"][0]["operations"]
+    ops.insert(1, {"id": "heatup", "kind": "heat", "temperatures": [290, 300]})
+    ops.insert(4, {"id": "cooldown", "kind": "cool", "temperatures": [300, 290]})
+    result = recipe_report(recipes._plant(tmp_path, recipe).root)
+    assert {s.operation for s in result.steps} >= {"heatup", "cooldown"}
+    assert result.heats == [] and "heats" not in result.as_dict()
+    text = recipe_text(result)
+    assert "heat-up heatup" not in text and "cool-down cooldown" not in text
+    # with metal, a cool-down's metal heat is negative, never -0.0 for want of metal
+    metal = recipes._jacketed(metal_heat_capacity=500.0)
+    metal["unit_procedures"][0]["operations"] = ops
+    up, down = recipe_report(recipes._plant(tmp_path / "metal", metal).root).heats
+    assert (up.metal_kJ, down.metal_kJ) == (5000.0, -5000.0)
+
+
+def _held_at_300(tmp_path, recipe, heat_up=True, cooling=False):
+    """The recipe's semi-batch R charged at 290 K and held at 300 K (its outlet's given
+    temperature), with *heat_up*; *cooling*: its duty on a cooling-water stream Q1."""
     ws = recipes._plant(tmp_path, recipe, propagate=False)
     path = ws.root / "process/flowsheet.yaml"
-    text = path.read_text().replace(
-        "batch: {dosing: [{stream: S2, time: 3600}], time: 1800, ",
-        "batch: {dosing: [{stream: S2, time: 3600}], time: 1800, heat_up: true, ",
-    )
+    text = path.read_text()
+    if heat_up:
+        text = text.replace(
+            "batch: {dosing: [{stream: S2, time: 3600}], time: 1800, ",
+            "batch: {dosing: [{stream: S2, time: 3600}], time: 1800, heat_up: true, ",
+        )
+    if cooling:
+        text = (
+            text.replace("products:\n", "products:\n" + duties.CW)
+            .replace(
+                "{id: dose, direction: in}, {id: out, direction: out}]",
+                "{id: dose, direction: in}, {id: out, direction: out}, "
+                "{id: q, direction: out, kind: energy}]",
+            )
+            .rstrip("\n")
+            + "\n  - {id: Q1, kind: energy, from: R.q, to: CW.r}\n"
+        )
     text = text.replace(
         "        temperature: {value: 300, provenance: given}\n",
         "        temperature: {value: 290, provenance: given}\n",
@@ -381,11 +474,43 @@ def test_the_metal_and_the_heat_up_are_terms_of_the_semibatchs_duty(tmp_path):
     path.write_text(text)
     process, _ = load(ws.root)
     run(ws, process, "design", write=True)
+    return ws
+
+
+def test_the_metal_and_the_heat_up_are_terms_of_the_semibatchs_duty(tmp_path):
+    """The charge enters at 290 K, the batch is held at 300 K (its outlet's given temperature):
+    heat_up adds 5 x 150 x 10 kJ/h, and the vessel's 1000 kJ/K metal heated by 10 K each batch
+    of 4.5 h of flows adds 1000 x 10 / 4.5 kJ/h."""
+    ws = _held_at_300(tmp_path, recipes._jacketed(metal_heat_capacity=1000.0))
     (row,) = [r for r in reactor_report(ws.root).reactors if r["node"] == "R"]
     terms = row["model_duty"]["terms_kW"]
     assert terms["charge heat-up"] == pytest.approx(5 * 150.0 * 10.0 / 3600.0, rel=1e-9)
     assert terms["vessel metal"] == pytest.approx(1000.0 * 10.0 / 4.5 / 3600.0, rel=1e-6)
     assert "the vessel's metal (UP1, 1000 kJ/K) from 290 to 300 K" in row["model_duty"]["basis"]
+
+
+def test_without_heat_up_the_batch_leaves_the_metal_to_the_recipes_heat_up(tmp_path):
+    """heat_up false: the model holds the batch at 300 K from the start, so neither the content's
+    heat-up nor the metal's is in its duty; the recipe's heat operation 290 -> 300 K holds both
+    (counted once)."""
+    recipe = recipes._jacketed(metal_heat_capacity=1000.0)
+    recipe["unit_procedures"][0]["operations"].insert(
+        1, {"id": "heatup", "kind": "heat", "temperatures": [290, 300]}
+    )
+    ws = _held_at_300(tmp_path, recipe, heat_up=False)
+    (row,) = [r for r in reactor_report(ws.root).reactors if r["node"] == "R"]
+    duty = row["model_duty"]
+    assert "vessel metal" not in duty["terms_kW"] and "charge heat-up" not in duty["terms_kW"]
+    assert duty["heat_in_kW"] == pytest.approx(sum(duty["terms_kW"].values()), rel=1e-12)
+    assert "the vessel's metal (UP1) not included" in duty["basis"]
+    (heat,) = recipe_report(ws.root).heats
+    assert (heat.content_kJ, heat.metal_kJ) == (pytest.approx(5 * 150 * 4.5 * 10), 10000)
+    # with heat_up the model holds both, from the charge's 290 K
+    ws = _held_at_300(tmp_path / "heated", recipe)
+    (row,) = [r for r in reactor_report(ws.root).reactors if r["node"] == "R"]
+    assert row["model_duty"]["terms_kW"]["vessel metal"] == pytest.approx(
+        1000.0 * 10.0 / 4.5 / 3600.0, rel=1e-6
+    )
 
 
 def test_the_metal_is_a_term_of_the_stills_duty_and_its_pot_is_sized(tmp_path):
@@ -402,8 +527,19 @@ def test_the_metal_is_a_term_of_the_stills_duty_and_its_pot_is_sized(tmp_path):
     ws = _still_plant(tmp_path, heat_up=False, recipe=recipe)
     (unit,) = still_report(ws.root).units
     sol = unit["solution"]
-    end = sol["temperatures_K"][1]
+    start, end = sol["temperatures_K"]
+    # without heat_up the model starts at the bubble point, and so does the metal
     assert sol["duty_terms_kW"]["vessel metal"] == pytest.approx(
+        2500.0 * (end - start) / 4.0 / 3600.0, rel=1e-6
+    )
+    assert any(
+        "vessel's metal (UP1, 2500 kJ/K)" in a and "from the bubble point" in a
+        for a in unit["assumptions"]
+    )
+    assert any("no heat-up to the bubble point" in a for a in unit["assumptions"])
+    (heated,) = still_report(_still_plant(tmp_path / "heated", recipe=recipe).root).units
+    end = heated["solution"]["temperatures_K"][1]
+    assert heated["solution"]["duty_terms_kW"]["vessel metal"] == pytest.approx(
         2500.0 * (end - 300.0) / 4.0 / 3600.0, rel=1e-6
     )
     result = recipe_report(ws.root)
@@ -454,3 +590,79 @@ def test_a_plant_without_the_new_fields_keeps_its_duties_and_fingerprints(tmp_pa
     assert q1["value"] == pytest.approx(duties._removed(), rel=1e-5)
     process, _ = load(ws.root)
     assert not [f for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+
+
+# -- what changes only a duty leaves the outlets and the tears fresh -----------------------------
+
+
+def _stale(ws):
+    process, _ = load(ws.root)
+    return sorted(
+        {
+            f.message.split(":")[0]
+            for f in rules(process)
+            if f.rule == "cheme.process-calculated-stale"
+        }
+    )
+
+
+def _edit(ws, old, new, file="process/flowsheet.yaml"):
+    path = ws.root / file
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new))
+
+
+def test_heat_up_and_a_heat_of_solution_make_only_the_duty_stale(tmp_path):
+    """batch.heat_up and an isothermal batch's heat_of_solution change its duty, not its outlet:
+    only the energy stream Q1 is stale, S3 (composition, flow) stays fresh."""
+    ws = semi._plant(tmp_path, duties._cooled())
+    run(ws, load(ws.root)[0], "design", write=True)
+    assert _stale(ws) == []
+    _edit(
+        ws,
+        "batch: {dosing: [{stream: S2, time: 3600}], ",
+        "batch: {heat_up: true, dosing: [{stream: S2, time: 3600}], ",
+    )
+    stale = _stale(ws)
+    assert stale and all("Q1" in m for m in stale), stale
+    run(ws, load(ws.root)[0], "design", write=True)
+    assert _stale(ws) == []
+    _edit(ws, "{stream: S2, time: 3600}", MIXING)
+    stale = _stale(ws)
+    assert stale and all("Q1" in m for m in stale), stale
+
+
+def test_the_vessels_metal_makes_only_the_duty_stale(tmp_path):
+    ws = _held_at_300(tmp_path, recipes._jacketed(metal_heat_capacity=1000.0), cooling=True)
+    q1 = duties._streams(ws)["Q1"]["state"]["design"]["duty"]
+    assert q1["provenance"] == "calculated"
+    assert _stale(ws) == []
+    _edit(ws, "metal_heat_capacity: 1000.0", "metal_heat_capacity: 2000.0", "process/recipe.yaml")
+    stale = _stale(ws)
+    assert stale and all("Q1" in m for m in stale), stale
+
+
+def test_a_tear_downstream_of_a_duty_only_input_keeps_its_fingerprint(tmp_path):
+    """The tear fingerprint (loop_inputs) leaves out still.heat_up, batch.heat_up and an
+    isothermal batch's heats of solution; an adiabatic batch's heat of solution is in it."""
+    from chemeascode.domains.process.recycle import loop_inputs
+
+    def fingerprint(ws, tear):
+        process, _ = load(ws.root)
+        return loop_inputs(process, "design", [tear])
+
+    assert fingerprint(_still_plant(tmp_path / "a", heat_up=False), "S4") == fingerprint(
+        _still_plant(tmp_path / "b"), "S4"
+    )
+    plain = semi._plant(tmp_path / "c")
+    heated = semi._plant(
+        tmp_path / "d",
+        semi.FLOWSHEET.replace("batch: {", "batch: {heat_up: true, "),
+    )
+    mixed = semi._plant(tmp_path / "e", _mixing(semi.FLOWSHEET))
+    assert fingerprint(plain, "S3") == fingerprint(heated, "S3") == fingerprint(mixed, "S3")
+    adiabatic = semi.FLOWSHEET.replace("batch: {", "batch: {heat: adiabatic, ")
+    assert fingerprint(semi._plant(tmp_path / "f", adiabatic), "S3") != fingerprint(
+        semi._plant(tmp_path / "g", _mixing(adiabatic)), "S3"
+    )

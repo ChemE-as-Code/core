@@ -1242,8 +1242,9 @@ def tank_inputs(process: Any, node: Any, reactions: list[Any], names: list[str])
     comps = process.components()
     data = process.ideal_gas()
     found: dict[str, Any] = {
-        # the charge's heat-up changes the duty, not the outlet (its fingerprint: the duty's)
-        "batch" if kind == "semibatch" else kind: spec.model_dump(mode="json", exclude={"heat_up"}),
+        "batch" if kind == "semibatch" else kind: spec.model_dump(
+            mode="json", exclude=duty_only(spec)
+        ),
         "reactions": [r.inputs_dump() for r in reactions],
         "ideal_gas": {n: data[n].model_dump(mode="json") if data.get(n) else None for n in names},
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
@@ -1259,6 +1260,17 @@ def tank_inputs(process: Any, node: Any, reactions: list[Any], names: list[str])
         }
     if kind == "cstr" and spec.time_on_stream:
         found["deactivation"] = _deactivation(process, node).model_dump(mode="json")
+    return found
+
+
+def duty_only(spec: Any) -> dict[str, Any]:
+    """What of batch or tank *spec* changes its duty and not its outlets, as a ``model_dump``
+    exclude (ADR 0063): the charge's heat-up, and an isothermal batch's heats of solution
+    (held at its temperature: an adiabatic batch's outlet temperature takes them). They are in
+    the duty's fingerprint (:func:`.duties.batch_duty`)."""
+    found: dict[str, Any] = {"heat_up": True}
+    if getattr(spec, "heat", None) == "isothermal" and getattr(spec, "dosing", None):
+        found["dosing"] = {"__all__": {"heat_of_solution": True}}
     return found
 
 
@@ -1315,10 +1327,11 @@ def solve_moles(
     inputs = {"T_in": kelvin, "P_in": kpa, **tank_inputs(process, node, reactions, names)}
     inputs["T_out_given"] = outlet_t
     if doses:
+        mixing = "dosing" not in duty_only(spec)  # the heat of solution: an outlet's input
         inputs["doses"] = [
             {"moles": dict(d.moles), "T": d.temperature, "segments": d.segments}
             | ({"passing": dict(d.passing)} if d.passing else {})
-            | ({"solution": d.solution} if d.solution is not None else {})
+            | ({"solution": d.solution} if mixing and d.solution is not None else {})
             for d in doses
         ]
     if kind == "cstr":

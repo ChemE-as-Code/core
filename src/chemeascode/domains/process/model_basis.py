@@ -486,12 +486,49 @@ def _sourced(value: Any) -> bool:
     return value is not None and value.provenance == "given" and bool(value.source.strip())
 
 
-#: What a still with ``heat_up`` adds to its assumptions (ADR 0063).
+#: What replaces a still's "no heat-up" assumption with ``heat_up`` (ADR 0063).
 STILL_HEAT_UP = (
     "heat_up: the charge heated from its inlet temperature to its bubble point at its "
-    "liquid_heat_capacity, counted in the duty; the content's sensible rise while it boils "
-    "is not"
+    "liquid_heat_capacity, counted in the duty; then constant boil-up, no sensible heat of the "
+    "content while it boils, no heat losses"
 )
+#: ... of a solvent swap with ``heat_up``.
+SWAP_HEAT_UP = (
+    "heat_up: the charge heated from its inlet temperature to its bubble point, and the feed "
+    "from its inlet temperature to the still's as it mixes in, at their liquid_heat_capacity, "
+    "counted in the duty; then constant boil-up, no sensible heat of the content while it "
+    "boils, no heat losses"
+)
+
+
+def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:
+    """A still's *assumptions* (:data:`.batch_still.ASSUMPTIONS`), with ``heat_up`` or a recipe
+    vessel's metal (ADR 0063) the heat-up's and the duty's replaced by what the duty holds; as
+    they are without either, so such a still reports as before."""
+    from chemeascode.domains.process.recipe import vessel_metal
+
+    spec = node.still
+    metal = vessel_metal(process, node.id)
+    if not spec.heat_up and metal is None:
+        return list(assumptions)
+    duty = "the duty is the vapour's latent heat (heat_of_vaporization near the still's "
+    duty += "temperature)"
+    if spec.heat_up:
+        duty += " and the heat-up"
+    if metal is not None:
+        start = "its charge's temperature" if spec.heat_up else "the bubble point at the start"
+        duty += (
+            f", with the vessel's metal ({metal[1]}, {metal[0]:g} kJ/K) heated with the content "
+            f"from {start} to its end temperature"
+        )
+    found = []
+    for text in assumptions:
+        if text.startswith("constant boil-up from the start") and spec.heat_up:
+            text = SWAP_HEAT_UP if spec.feed is not None else STILL_HEAT_UP
+        elif text.startswith("the duty is the vapour's latent heat"):
+            text = duty
+        found.append(text)
+    return found
 
 
 def _heat_assumptions(batch: Any) -> list[str]:
@@ -561,7 +598,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         not lacking,
         detail=detail,
         sources=sources,
-        assumptions=list(ASSUMPTIONS) + ([STILL_HEAT_UP] if spec.heat_up else []),
+        assumptions=_still_assumptions(process, node, ASSUMPTIONS),
         limitations=[
             "not part of a converged simulation: solved by cheme process propagate",
             "no rectification: a column above the still (reflux) is not modelled",

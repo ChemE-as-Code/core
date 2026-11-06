@@ -311,7 +311,7 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
         "tolerance": fs.tolerance.model_dump(mode="json"),
         "streams": values,
         "nodes": {
-            n: nodes[n].model_dump(mode="json", by_alias=True, exclude=set(NOT_SWEPT))
+            n: nodes[n].model_dump(mode="json", by_alias=True, exclude=_not_swept(nodes[n]))
             for n in sorted(seen)
         },
         "reactions": reactions,
@@ -321,6 +321,20 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
         "catalysts": process.catalysts.model_dump(mode="json") if process.catalysts else None,
     }
     return value_fingerprint(data)
+
+
+def _not_swept(node: Any) -> dict[str, Any]:
+    """What of *node* no sweep reads, as a ``model_dump`` exclude: :data:`NOT_SWEPT`, and what
+    changes only its duty (ADR 0063: a batch's or still's ``heat_up``, an isothermal batch's
+    heats of solution), which is in the duty's own fingerprint."""
+    from chemeascode.domains.process.stirred_tank import duty_only
+
+    found: dict[str, Any] = dict.fromkeys(NOT_SWEPT, True)
+    if getattr(node, "batch", None) is not None:
+        found["batch"] = duty_only(node.batch)
+    if getattr(node, "still", None) is not None:
+        found["still"] = {"heat_up": True}
+    return found
 
 
 def _step(

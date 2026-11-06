@@ -48,6 +48,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from chemeascode.foundation.provenance import NOT_INPUTS
+
 #: The utilities whose energy streams are heat (the others: electricity, fuel, other).
 HEAT_UTILITIES = frozenset(
     {"steam", "hot_oil", "fired_heat", "cooling_water", "air_cooling", "refrigerant"}
@@ -232,10 +234,39 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
         return ModelDuty(node.id, model, None, basis=BATCH_BASIS, missing=result.heat_missing)
     terms = {k: v / 3600.0 for k, v in result.heat_terms.items()}
     duty = ModelDuty(node.id, model, sum(terms.values()), terms, _batch_basis(terms))
-    if getattr(node.batch, "heat_up", False):
-        duty.inputs["heat_up"] = True
+    solutions = [
+        d.heat_of_solution.model_dump(mode="json", exclude=NOT_INPUTS)
+        for d in getattr(node.batch, "dosing", ())
+        if d.heat_of_solution is not None
+    ]
+    if solutions:  # the duty's, not an isothermal batch's outlets (their fingerprint)
+        duty.inputs["heat_of_solution"] = solutions
+    if not getattr(node.batch, "heat_up", False):
+        # the model holds the batch at its temperature from the start: neither the content's
+        # heat-up nor the metal's is in its duty (the recipe's heat operation holds both)
+        return _metal_left_out(process, node, case, duty)
+    duty.inputs["heat_up"] = True
     temperatures = (getattr(result, "charge_temperature", None), result.temperature)
     return with_metal(process, node, case, duty, temperatures)
+
+
+def _metal_left_out(process: Any, node: Any, case: str | None, duty: ModelDuty) -> ModelDuty:
+    """*duty* of a batch without ``heat_up`` in a recipe vessel with ``metal_heat_capacity``:
+    its basis says the metal is not in it (ADR 0063); unchanged otherwise."""
+    if process is None or case is None:
+        return duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        found = metal_of(process, node.id, case)
+    except ValueError:
+        return duty
+    if found is not None:
+        duty.basis += (
+            f"; the vessel's metal ({found[2]}) not included: the batch is at its temperature "
+            "from the start (heat_up)"
+        )
+    return duty
 
 
 #: What a still's duty holds with ``heat_up`` (ADR 0063).
@@ -244,6 +275,13 @@ STILL_HEAT_UP_BASIS = (
     "from its inlet temperature to its bubble point (liquid_heat_capacity), per hour of the "
     "flowsheet's flows; the content's sensible rise while it boils and heat losses not included"
 )
+#: What a solvent swap's duty holds with ``heat_up`` (ADR 0063).
+SWAP_HEAT_UP_BASIS = (
+    "solvent swap: the latent heat of what boils up (heat_of_vaporization), the charge heated "
+    "from its inlet temperature to its bubble point and the feed from its inlet temperature to "
+    "the still's as it mixes in (liquid_heat_capacity), per hour of the flowsheet's flows; the "
+    "content's sensible rise while it boils and heat losses not included"
+)
 
 
 def still_duty(node: Any, result: Any, process: Any = None, case: str | None = None) -> ModelDuty:
@@ -251,7 +289,8 @@ def still_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     a batch over its hours of flows; with ``still.heat_up`` the charge's heat-up to its bubble
     point, and with *process* and *case* the vessel's metal (ADR 0063)."""
     heat_up = getattr(node.still, "heat_up", False)
-    basis = STILL_HEAT_UP_BASIS if heat_up else STILL_BASIS
+    swap = getattr(node.still, "feed", None) is not None
+    basis = (SWAP_HEAT_UP_BASIS if swap else STILL_HEAT_UP_BASIS) if heat_up else STILL_BASIS
     if result.energy is None or not result.hours:
         missing = [n for n in result.notes if n.startswith("no duty")] or [
             "the heat_of_vaporization of the volatile components"
@@ -260,21 +299,28 @@ def still_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     heat = result.energy / (result.hours * 3600.0)
     duty = ModelDuty(node.id, "still", heat, {"boil-up": heat}, basis)
     if heat_up:
-        if result.heat_up is None:
-            missing = [f"the charge's heat-up (still.heat_up): {result.heat_up_missing}"]
+        feed_heat = getattr(result, "feed_heat_up", None)
+        if result.heat_up is None or (swap and feed_heat is None):
+            what = "the charge's and the feed's heat-up" if swap else "the charge's heat-up"
+            missing = [f"{what} (still.heat_up): {result.heat_up_missing}"]
             return ModelDuty(node.id, "still", None, basis=basis, missing=missing)
-        term = result.heat_up / (result.hours * 3600.0)
-        duty.terms_kW["charge heat-up"] = term
-        duty.heat_kW = heat + term
+        duty.terms_kW["charge heat-up"] = result.heat_up / (result.hours * 3600.0)
+        if swap:
+            duty.terms_kW["feed heat-up"] = feed_heat / (result.hours * 3600.0)
+        duty.heat_kW = sum(duty.terms_kW.values())
         duty.inputs["heat_up"] = True
         if process is not None:
             comps = process.components()
             duty.inputs["liquid_heat_capacity"] = {
                 n: getattr(comps.get(n), "liquid_heat_capacity", None)
-                for n in sorted(result.charge)
+                for n in sorted({*result.charge, *result.fed})
             }
-    end = result.temperatures[1] if result.temperatures else None
-    return with_metal(process, node, case, duty, (result.charge_temperature, end))
+    # the metal follows the content: from the charge's temperature with its heat-up, else
+    # from the bubble point the model starts at
+    start, end = result.temperatures or (None, None)
+    if heat_up:
+        start = result.charge_temperature
+    return with_metal(process, node, case, duty, (start, end))
 
 
 def crystallizer_duty(

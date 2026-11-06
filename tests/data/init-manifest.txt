@@ -74,7 +74,7 @@ cd0e1a327b90b1453d3360c5f45c67fe24efbd47062100c8d01c3654c4e1d0ce  .claude/skills
 81d11f6e4145f2318535c9685b6463ac7dc398e5c6a071a52bac8dec467bbfe9  .claude/skills/pid-review-commissioning-readiness/SKILL.md
 e5780d10fd71b90411dc7868207c5dadfee04961520d194c532bdb127cf8ddc5  .claude/skills/pid-review-design-review/SKILL.md
 1a4ccaae67d432572a692e594ddd1fed5cd0b1f107d588e2fbeabdc2ff61862d  .claude/skills/pipe-routing/SKILL.md
-6684b9e5d24f9bc8663d2e59f90ee5256e3d48102cd77e82de4e4053ac742aba  .claude/skills/process-design/SKILL.md
+12d47b3006d554c7a5ddf80218064a84796d33b1eb42fa2b0dc79fc6a0368466  .claude/skills/process-design/SKILL.md
 53c51f4c1d7a1a1107b2c3f04df14979fda3d31a70d039e5d1c78eb1dde55132  .claude/skills/process-safety/SKILL.md
 2e123b043abd65172823c9faf2568e0a5fe0c1e04c06fc650a96411b16b6b809  .claude/skills/process-simulation/SKILL.md
 cd6e4b703da02302852838c81a1b770a3462af8456c69b445ad2174fe959b8c9  .claude/skills/property-retrieval/SKILL.md

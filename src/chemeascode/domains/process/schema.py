@@ -1231,8 +1231,9 @@ class Still(Strict):
     heat_up: bool = Field(
         default=False,
         description="Count the charge's heat-up from its inlet temperature to its bubble point "
-        "(volatility raoult) in the still's energy and duty (ADR 0063); default: the boil-up's "
-        "latent heat alone.",
+        "(volatility raoult), and a swap's feed warmed to the still's temperature as it mixes "
+        "in, in the still's duty and its whole energy per batch (ADR 0063); default: the "
+        "boil-up's latent heat alone.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
     provenance: Provenance

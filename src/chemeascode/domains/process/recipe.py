@@ -31,7 +31,8 @@ constant temperature, the content's heat capacity C (the charge's before a dose,
 end's).
 
 A vessel's ``metal_heat_capacity`` (kJ/K, ADR 0063) heats and cools with the content: in the
-jacket times (``C + C_m``) and each jacket-timed operation's heat per batch (``heats``), and in
+jacket times (``C + C_m``) and each of its jacket-timed operations' heat per batch (``heats``,
+reported only for a vessel with metal, so a recipe without reports as in 1.9.0), and in
 the duty of each model in the vessel (:func:`metal_of`). A still's unit may give a vessel too,
 sized from what its steps take in.
 
@@ -359,7 +360,8 @@ class VesselResult:
 @dataclass
 class HeatResult:
     """A heat-up's or cool-down's heat per batch (ADR 0063): an operation with
-    ``temperatures``, the content's heat capacity and the vessel's metal times the change."""
+    ``temperatures`` in a vessel with ``metal_heat_capacity``, the content's heat capacity and
+    the vessel's metal times the change."""
 
     procedure: str
     unit: str
@@ -674,16 +676,15 @@ def _jacket_heat(
         op.kind,
         (start, end),
         capacity * (end - start),
-        metal * (end - start),
+        metal * (end - start) if metal else 0.0,  # no -0.0 for a cool-down
         hours,
     )
 
 
-def metal_of(process: Any, node_id: str, case: str) -> tuple[float, float, str] | None:
+def vessel_metal(process: Any, node_id: str) -> tuple[float, str, Recipe] | None:
     """The metal of the vessel step or block *node_id* runs in (ADR 0063): (kJ/K of the
-    vessel's ``metal_heat_capacity``, h of the flowsheet's flows one batch makes, the unit
-    procedure's id); None without a recipe, or a vessel with metal holding *node_id*. Raises
-    ValueError when the batch's hours are not known."""
+    vessel's ``metal_heat_capacity``, the unit procedure's id, the recipe); None without a
+    recipe, or a vessel with metal holding *node_id*."""
     recipe, _, _ = load_recipe(process.root)
     if recipe is None:
         return None
@@ -692,8 +693,20 @@ def metal_of(process: Any, node_id: str, case: str) -> tuple[float, float, str] 
         if metal is None:
             continue
         if any(node.id == node_id for node in _nodes(process, up)):
-            return metal, batch_hours(process, recipe, case), up.id
+            return metal, up.id, recipe
     return None
+
+
+def metal_of(process: Any, node_id: str, case: str) -> tuple[float, float, str] | None:
+    """The metal of the vessel step or block *node_id* runs in (ADR 0063): (kJ/K of the
+    vessel's ``metal_heat_capacity``, h of the flowsheet's flows one batch makes, the unit
+    procedure's id); None without a recipe, or a vessel with metal holding *node_id*. Raises
+    ValueError when the batch's hours are not known."""
+    found = vessel_metal(process, node_id)
+    if found is None:
+        return None
+    metal, procedure, recipe = found
+    return metal, batch_hours(process, recipe, case), procedure
 
 
 def _stills(process: Any, up: UnitProcedure) -> list[Any]:
@@ -896,7 +909,7 @@ class RecipeResult:
             for entry, heat in zip(found["heats"], self.heats, strict=True):
                 entry["kJ"], entry["mean_kW"] = heat.kJ, heat.mean_kW
         else:
-            del found["heats"]  # a recipe without jacket times reports as before
+            del found["heats"]  # a recipe without a vessel's metal reports as in 1.9.0
         return found
 
 
@@ -1128,7 +1141,10 @@ def evaluate(
                     )
                     continue
                 ops.append((op, hours, "calculated"))
-                result.heats.append(_jacket_heat(up, op, content, before, hours))
+                if up.vessel is not None and up.vessel.metal_heat_capacity is not None:
+                    # a vessel with its metal (ADR 0063): the heat of its heat-up or cool-down;
+                    # a recipe without reports as in 1.9.0
+                    result.heats.append(_jacket_heat(up, op, content, before, hours))
                 continue
             if op.duration is not None:
                 ops.append((op, op.duration.hours(), op.duration.provenance))

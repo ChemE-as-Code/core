@@ -120,6 +120,10 @@ class StillResult:
     charge_temperature: float | None = None
     heat_up: float | None = None
     heat_up_missing: str = ""
+    #: a swap's feed: K of the still as the feed mixes in (its mean, by the kmol fed: None
+    #: without a temperature), and with ``heat_up`` the kJ per batch that warm the feed to it
+    fed_temperature: float | None = None
+    feed_heat_up: float | None = None
     #: (share of all charged and fed distilled, s, K or None, mole fraction of the key)
     profile: list[tuple[float, float, float | None, float]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -334,12 +338,23 @@ def solve_still(
     boiled = 0.0  # kmol per hour of flows boiled up so far
     fed = [0.0] * k
     removed = [0.0] * k  # distilled into the cuts closed so far
+    #: kmol fed (per hour of flows) and their sum times the still's K as they mix in
+    mixed_in = {"fed": 0.0, "fed_K": 0.0, "known": True}
     energy_before = 0.0  # kJ per batch taken by the cuts closed so far
     peak = 0.0
     key = _profile_key(spec, names, phase, n0)
     ki = names.index(key) if key in names else None
     result.key = key
     seen_ranges: set[str] = set()
+
+    def mixing(amount: float, *temperatures: float | None) -> None:
+        """*amount* kmol of feed mixes in at the mean of *temperatures* (the still's)."""
+        mixed_in["fed"] += amount
+        known = [t for t in temperatures if t is not None]
+        if len(known) < len(temperatures):
+            mixed_in["known"] = False
+            return
+        mixed_in["fed_K"] += amount * sum(known) / len(known)
 
     def record(state: list[float]) -> None:
         moles = state[:k]
@@ -419,7 +434,10 @@ def solve_still(
                 fed[:] = [a + share * h for a, share in zip(fed, feed_share, strict=True)]
             boiled += h
             state = new
+            before = result.profile[-1][2]
             record(state)
+            if feeding:
+                mixing(h, before, result.profile[-1][2])
             if stop is not None and stop(state, boiled) >= -1e-15:
                 return
             if end is not None and boiled >= end * (1 - 1e-12):
@@ -448,6 +466,7 @@ def solve_still(
                 state[:k] = [a + b for a, b in zip(state[:k], portion, strict=True)]
                 fed[:] = [a + b for a, b in zip(fed, portion, strict=True)]
                 record(state)
+                mixing(sum(portion), result.profile[-1][2])  # heated to the new bubble point
             fed[:] = list(z)
     mass0 = sum((a + b) * (m or 0.0) for a, b, m in zip(n0, z, mw, strict=True))
 
@@ -508,6 +527,8 @@ def solve_still(
         )
         energy_before = state[k + 1]
     result.fed = dict(zip(names, fed, strict=True))
+    if mixed_in["fed"] > 0 and mixed_in["known"]:
+        result.fed_temperature = mixed_in["fed_K"] / mixed_in["fed"]
     result.residue = dict(zip(names, state[:k], strict=True))
     result.time = state[k]
     if energy_known:
@@ -705,6 +726,8 @@ def solve_node(
     result.charge_temperature = _temperature(process, charge, case)
     if spec.heat_up:
         _heat_up(result, comps)
+        if feed is not None:
+            _feed_heat_up(result, comps, _temperature(process, feed, case))
     names = sorted({*moles, *(fed or {})})
     # the fingerprint holds what the outlets' flows and compositions depend on: not the
     # provenance and source texts, not the vapour pressures' fitted ranges (notes only), and
@@ -774,6 +797,37 @@ def _heat_up(result: StillResult, comps: Mapping[str, Any]) -> None:
         result.heat_up = 0.0
         return
     result.heat_up = capacity * (bubble - t_in) * result.hours
+
+
+def _feed_heat_up(result: StillResult, comps: Mapping[str, Any], t_feed: float | None) -> None:
+    """A swap's feed warmed from its inlet temperature *t_feed* K to the still's as it mixes
+    in (``still.heat_up``, ADR 0063): ``sum_i F_i cp_i (T_mix - T_feed)``, kJ per batch, with
+    ``T_mix`` the still's mean temperature by the kmol fed (the bubble point each portion
+    reaches), or why it is not known (``heat_up_missing``). A feed at or above that
+    temperature takes none (its flash is not modelled: a note says so)."""
+    t_mix = result.fed_temperature
+    if t_feed is None or t_mix is None:
+        result.heat_up_missing = result.heat_up_missing or (
+            "the feed's temperature and the still's as it mixes in"
+        )
+        return
+    lacking = sorted(
+        n for n, v in result.fed.items() if v > 0 and not comps[n].liquid_heat_capacity
+    )
+    if lacking:
+        result.heat_up_missing = result.heat_up_missing or (
+            "the liquid_heat_capacity of " + ", ".join(lacking) + " (the feed)"
+        )
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in result.fed.items() if v > 0)
+    if t_feed >= t_mix:
+        result.notes.append(
+            f"heat_up: the feed enters at {t_feed:.5g} K, at or above the still's {t_mix:.5g} K "
+            "as it mixes in (its flash is not modelled): no heat-up of the feed"
+        )
+        result.feed_heat_up = 0.0
+        return
+    result.feed_heat_up = capacity * (t_mix - t_feed) * result.hours
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
@@ -1114,8 +1168,10 @@ def _heat_entry(
     process: Any, node: Any, case: str, result: StillResult, solution: dict[str, Any]
 ) -> None:
     """With ``heat_up`` or a recipe vessel's metal (ADR 0063): the year-average duty its
-    energy stream carries is the model's whole duty, with its terms (and the heat-up per
-    batch); a still without them reports as before."""
+    energy stream carries is the model's whole duty, with its terms, the heat-up per batch and
+    the whole energy per batch on the duty's basis (``total_energy_kWh_per_batch``;
+    ``energy_kWh_per_batch`` stays the boil-up's latent heat); a still without them reports as
+    before."""
     from chemeascode.domains.process.duties import still_duty
     from chemeascode.domains.process.recipe import metal_of
 
@@ -1127,6 +1183,10 @@ def _heat_entry(
         return
     duty = still_duty(node, result, process, case)
     solution["year_average_duty_kW"] = duty.heat_kW
+    # kWh per batch: the year-average kW over the batch's hours of flows
+    solution["total_energy_kWh_per_batch"] = (
+        duty.heat_kW * result.hours if duty.heat_kW is not None else None
+    )
     solution["duty_terms_kW"] = dict(duty.terms_kW)
     if duty.missing:
         solution["duty_missing"] = list(duty.missing)
@@ -1134,6 +1194,10 @@ def _heat_entry(
         solution["heat_up_kWh_per_batch"] = (
             result.heat_up / 3600.0 if result.heat_up is not None else None
         )
+        if node.still.feed is not None:
+            solution["feed_heat_up_kWh_per_batch"] = (
+                result.feed_heat_up / 3600.0 if result.feed_heat_up is not None else None
+            )
 
 
 def still_report(root: Path, case: str | None = None) -> StillReport:
@@ -1225,7 +1289,9 @@ def report_text(report: StillReport) -> str:
                 f"{num(sol['energy_kWh_per_batch'], ' kWh', '.4g')}"
                 + (
                     f", year average {sol['year_average_duty_kW']:.6g} kW"
-                    if sol.get("year_average_duty_kW") is not None
+                    # with the terms of ADR 0063 the year average is the whole duty's: below,
+                    # beside the whole energy per batch on its basis
+                    if sol.get("year_average_duty_kW") is not None and "duty_terms_kW" not in sol
                     else ""
                 )
                 + (
@@ -1237,7 +1303,8 @@ def report_text(report: StillReport) -> str:
             if "duty_terms_kW" in sol:  # the heat-up and the vessel's metal (ADR 0063)
                 terms = ", ".join(f"{k} {v:.6g}" for k, v in sol["duty_terms_kW"].items())
                 lines.append(
-                    f"  year-average duty {num(sol['year_average_duty_kW'], ' kW')}"
+                    f"  whole duty {num(sol['total_energy_kWh_per_batch'], ' kWh', '.4g')} per "
+                    f"batch, year average {num(sol['year_average_duty_kW'], ' kW')}"
                     + (f" ({terms} kW)" if terms else "")
                     + (
                         f"; missing {'; '.join(sol['duty_missing'])}"
