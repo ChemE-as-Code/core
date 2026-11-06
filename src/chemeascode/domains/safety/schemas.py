@@ -503,6 +503,12 @@ class Outcome(Strict):
         default=None, min_length=1, description="walk: the tag or object id where the walk ends."
     )
     family: CauseFamily | None = Field(default=None, description="cause: required.")
+    item: str | None = Field(
+        default=None,
+        min_length=1,
+        description="cause: the one utility or site hazard a study-wide prompt is about (at the "
+        "study's node without members); none: the node's family as a whole.",
+    )
     causes: list[str] = Field(
         default_factory=list,
         description="walk: the causes (tags) it is about, none: every cause; cause: the plant "

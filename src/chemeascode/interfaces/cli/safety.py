@@ -271,6 +271,14 @@ def propagate(
             "outcome per gap of every kind; decided outcomes kept as they are).",
         ),
     ] = False,
+    no_walk: Annotated[
+        bool,
+        typer.Option(
+            "--no-walk",
+            help="With --coverage: only the deviation and cause checks, not the walk (before "
+            "drafting, to see what the node calls for without the walk's candidates).",
+        ),
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Candidate scenarios of a node: each failure mode of its objects (from the library) walked
@@ -282,15 +290,15 @@ def propagate(
     from chemeascode.project.hazop import node_propagation, study_coverage, study_propagation
 
     workspace = _workspace()
-    if write and not coverage:
-        typer.echo("--write needs --coverage", err=True)
+    if (write or no_walk) and not coverage:
+        typer.echo("--write and --no-walk need --coverage", err=True)
         raise typer.Exit(2)
     if coverage:
         if deviation:
             typer.echo("--coverage compares every deviation: drop --deviation", err=True)
             raise typer.Exit(2)
         try:
-            report = study_coverage(workspace, study, node, library, write)
+            report = study_coverage(workspace, study, node, library, write, walk_too=not no_walk)
         except ValueError as failure:
             typer.echo(str(failure), err=True)
             raise typer.Exit(2) from failure
@@ -452,7 +460,12 @@ def _complete_json(c: Any) -> dict[str, Any]:
             "dismissed": c.causes_dismissed,
             "questions": c.causes_questions,
             "prompts": [
-                {"family": p.family, "asks": p.asks, "items": [asdict(i) for i in p.items]}
+                {
+                    "family": p.family,
+                    "item": p.item,
+                    "asks": p.asks,
+                    "items": [asdict(i) for i in p.items],
+                }
                 for p in c.causes
             ],
         },
@@ -510,8 +523,8 @@ def _print_coverage(report: Any, as_json: bool) -> int:
         )
     if report.library is None:
         typer.echo(
-            "walk: skipped, no failure-mode library (safety/failure-modes.yaml); the deviation "
-            "and cause checks ran"
+            "walk: skipped (--no-walk, or no failure-mode library safety/failure-modes.yaml); "
+            "the deviation and cause checks ran"
         )
     else:
         covered = sum(f.coverage.covered for f in found_all)
@@ -557,7 +570,7 @@ def _print_coverage(report: Any, as_json: bool) -> int:
             shown = ", ".join(i.text() for i in p.items[:SHOWN_ITEMS]) or "none listed"
             more = len(p.items) - SHOWN_ITEMS
             typer.echo(
-                f"{node_id} {p.family}: {p.asks}: {shown}"
+                f"{node_id} {p.family}{f' {p.item}' if p.item else ''}: {p.asks}: {shown}"
                 + (f" and {more} more" if more > 0 else "")
             )
     return gaps

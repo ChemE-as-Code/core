@@ -891,7 +891,7 @@ def _triage_key(o: Outcome) -> tuple[Any, ...]:
         return (o.node, o.kind, o.guide_word, o.parameter, o.top_event, o.at)
     if o.kind == "deviation":
         return (o.node, o.kind, o.guide_word, o.parameter)
-    return (o.node, o.kind, o.family)
+    return (o.node, o.kind, o.family, o.item)
 
 
 def triage(

@@ -291,6 +291,7 @@ def study_coverage(
     node_id: str | None = None,
     library_file: str = LIBRARY_FILE,
     write: bool = False,
+    walk_too: bool = True,
 ) -> StudyCoverage:
     """Every node's (or one node's) scenarios against the walk (when the project has a
     failure-mode library), the deviations its equipment calls for and the cause families it
@@ -306,7 +307,15 @@ def study_coverage(
     from chemeascode.foundation import provenance
 
     inputs = _propagation_inputs(workspace, study_id, library_file, need_library=False)
-    nodes = [n for n in inputs.study.nodes if n.members and node_id in (None, n.id)]
+    if not walk_too:  # --no-walk: the deviation and cause checks only, as if there were no library
+        inputs.library = None
+    # The study's node without members takes the study-wide prompts (utilities, site hazards).
+    study_wide = next((n.id for n in inputs.study.nodes if not n.members), None)
+    nodes = [
+        n
+        for n in inputs.study.nodes
+        if (n.members or n.id == study_wide) and node_id in (None, n.id)
+    ]
     if node_id is not None and not nodes:
         raise ValueError(f"{inputs.path}: no node {node_id} with members")
     recorded = inputs.triage
@@ -314,10 +323,15 @@ def study_coverage(
     problems = check_decisions(inputs.study.nodes, outcomes_before)
     if problems:
         raise ValueError(f"{COVERAGE_FILE} of {study_id}: " + "; ".join(problems))
-    found = [_walk_node(inputs, node, None) for node in nodes] if inputs.library else []
+    found = [_walk_node(inputs, n, None) for n in nodes if n.members] if inputs.library else []
     index = _index(inputs.models)
     complete = [
-        (node.id, completeness(index, node, inputs.plant, outcomes_before, inputs.matrix))
+        (
+            node.id,
+            completeness(
+                index, node, inputs.plant, outcomes_before, inputs.matrix, study_wide=study_wide
+            ),
+        )
         for node in nodes
     ]
     root = workspace.root

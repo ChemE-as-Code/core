@@ -34,7 +34,11 @@ nobody followed far enough. You propose; the team decides what is credible.
 
 ## Workflow and tools
 
-1. **The deviations to ask.** The parameters of the node's design intent and of its objects:
+1. **The deviations to ask.** Start each node with `cheme safety hazop propagate H-01 --node N1
+   --coverage --no-walk`: before you write anything it lists the deviations the node's equipment
+   calls for and the cause families that apply, with their plant items (below, *Completeness*).
+   That is the grid you work through; go beyond it where the node needs more. The parameters of
+   the node's design intent and of its objects:
    lines and pumps (flow, pressure, and temperature where it matters), control valves (flow,
    pressure), vessels (level, pressure, temperature, composition), exchangers (temperature,
    flow on each side), reactors (reaction, temperature, composition). Combine each with the guide
@@ -52,6 +56,13 @@ nobody followed far enough. You propose; the team decides what is credible.
      position"; a wrong line-up where there is a manual valve);
    - *induced*: a deviation that enters from a neighbouring node. It is analysed in that node;
      here it is a reference ("less flow: see N1, P-101 stops"), not a new cause.
+
+   For every deviation go through the cause families in turn, not only the equipment you see
+   first: the node's own equipment (skill `hazop-equipment-causes`), control and trip functions,
+   operator and maintenance actions (line-ups, draining, cleaning, opening, reinstating), loss of
+   each utility the node uses, external and site causes (fire, weather and climate, impact), the
+   plant beyond the study boundary, and changes in the fluid. The prompts of step 1 name this
+   node's items for each; a family with no credible cause here is a decision, not an omission.
 3. **Consequences: follow the deviation.** Start at the node's own objects, then go outward
    along the connections `cheme show` prints (downstream for an outlet effect, upstream for an
    inlet effect). At each object decide one of:
@@ -185,7 +196,7 @@ they still run), each a gap kind of the same triage file:
   stream, no other fluid connected to the node"}`);
 - **cause families** (`kind: cause`), one prompt per node and family that applies, listing the
   items that make it concrete: `utility` (the design basis utilities), `external` (the design
-  basis site entries, and fire), `boundary` (the off-page connectors at the node: what the
+  basis site entries that name a hazard, and fire), `boundary` (the off-page connectors at the node: what the
   plant beyond the boundary can send in), `operator` (manual valves, filters, strainers,
   blinds, hand switches: wrong line-up, left open, maintenance) and `control` (the node's
   controllers and the C&E interlocks naming its members: spurious action, failure to act, wrong
@@ -193,10 +204,13 @@ they still run), each a gap kind of the same triage file:
   covers a boundary, operator or control prompt. Otherwise write the scenario, or decide it:
   `covered` with the ids of the node's scenarios that answer it (`scenarios: [S12]`; the tool
   refuses an id that is no scenario of that node), `dismissed` or `question` with the reason.
-  A utility or external cause analysed once in a global node is `dismissed` here with the
-  reason naming that node's scenario.
+  When the study has a node without members (a global node), utilities and site hazards are
+  asked there instead, one prompt per item (`item: nitrogen`), each decided on its own: the
+  scenarios answering it may sit in any node a loss of that utility or that hazard reaches,
+  written there and named by the decision.
 ```yaml
-  - {kind: cause, node: N4, family: utility, status: covered, scenarios: [S19], by: agent}
+  - {kind: cause, node: N18, family: utility, item: nitrogen, status: covered, scenarios: [S80],
+     by: agent}
   - {kind: cause, node: N9, family: external, status: dismissed, by: agent,
      reason: "buried header, no exposed small bore; fire at the station: N18 S40"}
 ```

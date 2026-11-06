@@ -10,7 +10,8 @@ propagate --coverage``; ADR 0036).
   cheme-as-code; ``safety/deviation-matrix.yaml`` replaces it.
 - **Cause families.** One prompt per node and family that applies, listing the plant items that
   make it concrete: ``utility`` (the design basis utilities) and ``external`` (the design basis
-  site entries, and fire) for every node with members; ``boundary`` (the off-page connectors
+  site entries that name a hazard, and fire), asked once per item at the study's node without
+  members when it has one, else for every node with members; ``boundary`` (the off-page connectors
   in or next to the node), ``operator`` (manual valves, filters and strainers, blinds, hand
   switches) and ``control`` (controllers, and the C&E interlocks that name a member) where the
   node has them. A prompt whose items a scenario of the node names in its ``refs`` (tag or
@@ -102,6 +103,12 @@ MANUAL_CLASSES = ("Filter", "Strainer", "ConicalStrainer", "LineBlind")
 FAMILIES: tuple[CauseFamily, ...] = ("utility", "external", "boundary", "operator", "control")
 #: Families covered when a scenario names one of their items in ``refs``.
 BY_REFS = ("boundary", "operator", "control")
+#: Design basis ``site`` keys that name a hazard (fire is always asked); others (location,
+#: occupancy) describe the site and ask nothing.
+SITE_HAZARDS = (
+    "climate", "ambient", "temperature", "weather", "seismic", "earthquake", "flood", "wind",
+    "lightning", "snow", "ice", "storm", "rain", "sand", "dust", "corros", "tsunami", "hazard",
+)  # fmt: skip
 #: What each family asks.
 ASKS = {
     "utility": "loss or degradation of a utility the node depends on",
@@ -156,6 +163,8 @@ class CausePrompt:
 
     family: CauseFamily
     items: list[Item]
+    #: A study-wide prompt is about one item (a utility, a site hazard) and is decided alone.
+    item: str | None = None
 
     @property
     def asks(self) -> str:
@@ -251,7 +260,15 @@ def deviation_gaps(
 
 
 def _site_items(site: dict[str, Any]) -> list[Item]:
-    return [Item(str(k), (), _short(v)) for k, v in site.items()] + [Item("fire")]
+    hazards = [k for k in site if any(h in str(k).lower() for h in SITE_HAZARDS)]
+    return [Item(str(k), (), _short(site[k])) for k in hazards] + [Item("fire")]
+
+
+def _utility_items(plant: Plant) -> list[Item]:
+    return [
+        Item(str(u.get("id") or u.get("title") or "?"), (), _short(u.get("title") or ""))
+        for u in plant.utilities
+    ]
 
 
 def _short(value: Any, width: int = 60) -> str:
@@ -263,23 +280,29 @@ def _names(obj: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(n for n in (obj.tag, obj.id) if n))
 
 
-def cause_prompts(index: _Index, node: Node, plant: Plant) -> list[CausePrompt]:
-    """Every cause family that applies to *node*, with its items (before any coverage)."""
+def cause_prompts(
+    index: _Index, node: Node, plant: Plant, study_wide: str | None = None
+) -> list[CausePrompt]:
+    """Every cause family that applies to *node*, with its items (before any coverage). With
+    *study_wide* (the study's node without members), utilities and site hazards are asked there,
+    one prompt per item, instead of once per node."""
+    if study_wide is not None and node.id == study_wide:
+        return [CausePrompt("utility", [i], i.label) for i in _utility_items(plant)] + [
+            CausePrompt("external", [i], i.label) for i in _site_items(plant.site)
+        ]
     if not node.members:
         return []
     keys, segments, _ = _members(index, node.members)
     items = [k for k in keys if k in index.objects]
     functions = [index.functions[k] for k in keys if k in index.functions]
-    prompts = [
-        CausePrompt(
-            "utility",
-            [
-                Item(str(u.get("id") or u.get("title") or "?"), (), _short(u.get("title") or ""))
-                for u in plant.utilities
-            ],
-        ),
-        CausePrompt("external", _site_items(plant.site)),
-    ]
+    prompts = (
+        []
+        if study_wide is not None
+        else [
+            CausePrompt("utility", _utility_items(plant)),
+            CausePrompt("external", _site_items(plant.site)),
+        ]
+    )
     # The study limits in the node, next to one of its objects, or on one of its lines.
     in_node = set(items)
     limits = [k for k in items if index.objects[k].limit]
@@ -325,14 +348,14 @@ def cause_coverage(
     the counts covered, dismissed, questions."""
     refs = {str(r.tag or r.object) for _, _, s in _rows(node) for r in s.refs}
     decisions = {
-        o.family: o
+        (o.family, o.item): o
         for o in decided
         if o.kind == "cause" and o.node == node.id and o.status != "open"
     }
     counts = {"covered": 0, "dismissed": 0, "question": 0}
     open_: list[CausePrompt] = []
     for prompt in prompts:
-        decision = decisions.get(prompt.family)
+        decision = decisions.get((prompt.family, prompt.item))
         if decision is not None:
             counts[decision.status] += 1
         elif prompt.family in BY_REFS and any(n in refs for i in prompt.items for n in i.names):
@@ -349,7 +372,10 @@ def _rows(node: Node) -> list[tuple[Node, Any, Any]]:
 def check_decisions(nodes: Iterable[Node], outcomes: Iterable[Outcome]) -> list[str]:
     """What is wrong with the ``covered`` decisions of *outcomes*: a scenario id that is no
     scenario of its node (or a node not in the study)."""
+    nodes = list(nodes)
     scenarios = {n.id: {s.id for _, _, s in _rows(n)} for n in nodes}
+    every = {s for ids in scenarios.values() for s in ids}
+    global_ = {n.id for n in nodes if not n.members}  # its study-wide prompts: any node's rows
     problems = []
     for o in outcomes:
         if o.status != "covered":
@@ -357,7 +383,8 @@ def check_decisions(nodes: Iterable[Node], outcomes: Iterable[Outcome]) -> list[
         if o.node not in scenarios:
             problems.append(f"{o.node} {o.family}: no node {o.node} in the study")
             continue
-        unknown = [s for s in o.scenarios if s not in scenarios[o.node]]
+        allowed = every if o.node in global_ else scenarios[o.node]
+        unknown = [s for s in o.scenarios if s not in allowed]
         if unknown:
             problems.append(
                 f"{o.node} {o.family}: covered by {', '.join(unknown)}, no scenario of {o.node}"
@@ -371,17 +398,20 @@ def completeness(
     plant: Plant,
     triage: Iterable[Outcome] = (),
     matrix: DeviationMatrix = DEFAULT_MATRIX,
+    study_wide: str | None = None,
 ) -> Completeness:
     """Both checks for one node over the loaded P&IDs' *index*, the triage's decisions applied.
-    A node without members gets neither."""
-    if not node.members:
+    A node without members gets no deviation gaps, and cause prompts only as *study_wide*."""
+    if not node.members and node.id != study_wide:
         return Completeness([], [])
     decided = [o for o in triage if o.node == node.id and o.status != "open"]
-    gaps, developed, dismissed, questions = deviation_gaps(
-        node, node_classes(index, node), decided, matrix
+    gaps, developed, dismissed, questions = (
+        deviation_gaps(node, node_classes(index, node), decided, matrix)
+        if node.members
+        else ([], 0, 0, 0)
     )
     prompts, covered, c_dismissed, c_questions = cause_coverage(
-        node, cause_prompts(index, node, plant), decided
+        node, cause_prompts(index, node, plant, study_wide), decided
     )
     return Completeness(
         gaps, prompts, developed, dismissed, questions, covered, c_dismissed, c_questions
@@ -408,6 +438,7 @@ def wanted(node_id: str, result: Completeness, by: str) -> list[Outcome]:
                 "kind": "cause",
                 "node": node_id,
                 "family": p.family,
+                "item": p.item,
                 "causes": [i.label for i in p.items],
                 "by": by,
             }

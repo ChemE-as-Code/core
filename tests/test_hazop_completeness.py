@@ -81,6 +81,48 @@ def test_a_node_without_members_gets_no_gaps(index):
     assert comp.completeness(index, node([], node_id="N18"), PLANT) == comp.Completeness([], [])
 
 
+def test_utilities_and_site_hazards_are_asked_once_each_at_the_global_node(index):
+    site = comp.Plant(
+        utilities=[{"id": "power"}, {"id": "nitrogen"}],
+        site={
+            "climate": "cold winters",
+            "location": "inland",
+            "occupancy": "low",
+            "seismic": "zone 2",
+        },
+    )
+    found = comp.completeness(index, node([], node_id="N18"), site, study_wide="N18")
+    assert [(p.family, p.item) for p in found.causes] == [
+        ("utility", "power"), ("utility", "nitrogen"),
+        ("external", "climate"), ("external", "seismic"), ("external", "fire"),
+    ]  # fmt: skip
+    assert found.deviations == []  # no members: nothing to deviate
+    # A node with members then asks only its own families.
+    member = prompts(comp.completeness(index, node(["P-101", "50-P-102"]), site, study_wide="N18"))
+    assert "utility" not in member and "external" not in member
+    # Each item is decided on its own.
+    one = decision(node="N18", kind="cause", family="utility", item="power", status="dismissed")
+    left = comp.completeness(index, node([], node_id="N18"), site, [one], study_wide="N18")
+    assert ("utility", "power") not in [(p.family, p.item) for p in left.causes]
+    assert ("utility", "nitrogen") in [(p.family, p.item) for p in left.causes]
+    assert left.causes_dismissed == 1
+    # A study-wide decision may name a scenario of any node; a node's own may not.
+    row = {"id": "S5", "cause": "nitrogen lost", "refs": ["P-101"]}
+    flow = {"guide_word": "more", "parameter": "flow", "scenarios": [row]}
+    study = [node([], node_id="N18"), node(["P-101"], [flow])]
+    wide = decision(
+        node="N18",
+        kind="cause",
+        family="utility",
+        item="nitrogen",
+        status="covered",
+        scenarios=["S5"],
+    )
+    assert comp.check_decisions(study, [wide]) == []
+    own = decision(node="N3", kind="cause", family="operator", status="covered", scenarios=["S5"])
+    assert comp.check_decisions([*study, node(["V-101"], node_id="N3")], [own])
+
+
 def prompts(result) -> dict[str, list[str]]:
     return {p.family: [i.label for i in p.items] for p in result.causes}
 
@@ -184,7 +226,7 @@ def test_the_command_checks_completeness_without_a_library(plant):  # noqa: F811
     coverage = ["safety", "hazop", "propagate", "H-01", "--coverage"]
     text = runner.invoke(app, coverage)
     assert text.exit_code == 1, text.output
-    assert "walk: skipped, no failure-mode library" in text.output
+    assert "walk: skipped (--no-walk, or no failure-mode library" in text.output
     assert "N2: reverse flow [line, machine]" in text.output
     assert "N2 control: a control or trip function acting wrongly" in text.output
     assert "FIC-104 (controller)" in text.output
@@ -230,6 +272,18 @@ def test_the_command_checks_completeness_without_a_library(plant):  # noqa: F811
         "N2": [{"guide_word": "more", "parameter": "flow", "families": ["pump"]}],
     }
     assert "changed since it was written" in runner.invoke(app, coverage).output
+
+    # With a library the walk runs, unless --no-walk asks for the two checks only.
+    from tests.test_hazop_propagation import LIBRARY
+
+    (plant / "safety" / "failure-modes.yaml").write_text(LIBRARY, encoding="utf-8")
+    walked = {
+        n["node"]: n for n in json.loads(runner.invoke(app, [*coverage, "--json"]).output)["nodes"]
+    }
+    assert "gaps" in walked["N2"]
+    checks = runner.invoke(app, [*coverage, "--no-walk", "--json"])
+    assert "gaps" not in {n["node"]: n for n in json.loads(checks.output)["nodes"]}["N2"]
+    assert runner.invoke(app, ["safety", "hazop", "propagate", "H-01", "--no-walk"]).exit_code == 2
 
 
 def test_the_matrix_kind_is_in_the_schema_catalogue():

@@ -46,7 +46,7 @@ ADR 0005):
   spacing aside.
 - **Cause families** (`kind: cause`). One prompt per node and family that applies, listing the
   plant items that make it concrete: `utility` (the design basis `utilities`) and `external`
-  (the design basis `site` entries, and fire) for every node; `boundary` where an off-page
+  (the design basis `site` entries whose key names a hazard, and fire); `boundary` where an off-page
   connector is a member, next to one or on a member line; `operator` where the node has a valve
   without an actuator (not a check or safety valve), a filter, a strainer, a line blind or a
   hand switch (ISA first letter H); `control` where it has a controller (ISA: a C after the
@@ -61,19 +61,27 @@ ADR 0005):
   kind is open; `--write` lists every kind; decisions of every kind survive later writes. The
   file's `walk.inputs` records the fingerprints of the design basis, the cause and effect and
   the project's matrix, and the command says when they changed.
-- A node without members (a global node) gets no prompts in this version.
+- **Study-wide prompts.** When the study has a node without members (a global node), utility and
+  external are asked there, one prompt per item (`item:` a utility id or a site hazard), each
+  decided on its own and `covered` by scenarios of any node; the nodes with members then get only
+  their boundary, operator and control prompts. Without a global node both families are asked
+  per node, as one prompt each. On the pump station this halves the open cause prompts (46 to
+  19) and leaves no prompt repeated across nodes.
+- **`--no-walk`** (with `--coverage`) runs the two checks without the walk: the skill starts each
+  node with it, so the drafter sees the deviations and the cause families it has to answer
+  before writing, without the walk's candidates (which, read first, crowd out the causes a team
+  finds; ADR 0032).
 
 ## Consequences
 
 - Positive: the two systematic misses become questions the drafter must answer in writing;
   every decision is in one reviewable file with its reason, next to the walk's.
 - Positive: deterministic and general; a project adapts the deviations without code.
-- Negative: more open items per study (on the 17 nodes with members of the pump station: 100
-  deviations and 46 cause families before any decision, besides 22 walk gaps). Parameter-wide
-  decisions keep the triage short, but a decision copied into every node satisfies the tool
-  without the thought; the skill says so and the reviewer has to read the reasons.
-- Negative: a utility or external cause analysed once in a global node is asked again in every
-  node, to be dismissed there with the reason naming the global row.
+- Negative: more open items per study (on the pump station: 100 deviations and 19 cause prompts
+  before any decision, besides 22 walk gaps). Parameter-wide decisions keep the triage short,
+  but a decision copied into every node satisfies the tool without the thought; the skill says
+  so and the reviewer has to read the reasons.
+- Negative: without a global node, utilities and site hazards are asked in every node.
 - Known limitations: a deviation's or a decision's text is never judged, only its presence; the
   parameter of a deviation must use the matrix's word (`level`, not `seal oil level`) to count;
   operator items are the members only, not the items of a member line; a pig trap or another
