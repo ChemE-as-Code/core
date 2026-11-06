@@ -111,3 +111,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0061](0061-batch-rectification-on-the-shortcut.md) | Batch rectification: a column on the batch still, on the Fenske-Underwood-Gilliland shortcut | Proposed | 2026-11-06 |
 | [0062](0062-vent-vapour-condenser-and-gas-solubility.md) | A batch's vent carries the liquid's vapour, with a partial vent condenser and a Henry split | Proposed | 2026-11-06 |
 | [0063](0063-heats-of-solution-heat-up-and-vessel-metal.md) | Heats of solution and mixing, the heat-up of the charge and of the vessel's metal | Proposed | 2026-11-06 |
+| [0064](0064-feos-pc-saft-as-an-optional-property-backend.md) | feos (PC-SAFT) as an optional property backend, first for liquid water-methanol density | Proposed | 2026-11-06 |

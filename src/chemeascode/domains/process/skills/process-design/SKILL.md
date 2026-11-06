@@ -300,6 +300,7 @@ range is calculated:
 |---|---|---|---|
 | `air-pr-chemsep` | N2, O2, Ar | 77 to 315 K; vapour 100 to 3200 kPa(a); liquid and two-phase 100 to 600 kPa(a) (Peng-Robinson, ChemSep kij, COSTALD liquid density) | NIST WebBook reference EOS values, `tests/test_process_props.py` |
 | `syngas-pr-vapor` | H2, N2, Ar, CH4, CO, CO2 and their mixtures; NH3 pure, and in mixtures with H2, N2, Ar, CH4 up to mole fraction 0.25 (Ar and CH4 then up to 0.10 and 0.20) | vapour only, 250 to 1000 K, 100 to 30000 kPa(a), in per-component boxes (cold, dense gas excluded; CO to 500 K; CH4 to 625 K, in mixtures up to mole fraction 0.2026 to 673.1 K; NH3 pure 350 to 725 K, dilute 320 to 725 K, away from saturation) | CoolProp 8.0.0 reference EOS, GERG-2008 mixtures and the Neumann et al. (2020) NH3 mixture models; measured N2-NH3/Ar-NH3 (Date 1973) and hot H2-CO2-CH4 (Cheng et al. 2019) densities; density within 2 % (pure) / 3 % (mixtures, measured), enthalpy differences within 300 kJ/kmol, `tests/test_property_packages.py` |
+| `water-methanol-pcsaft-liquid` (extra `saft`: feos) | water, methanol and their mixtures, water up to mole fraction 0.75 (0.64 below 323.15 K) | liquid density only, PC-SAFT: methanol 240 to 420 K, pure water 360 to 550 K, mixtures to 420 K, to 60 MPa(a); no enthalpy, exergy, VLE or viscosity; liquid at 1.2 times PC-SAFT's bubble pressure or above, nearer only with the phase given or assumed `liquid` | CoolProp 8.0.0 reference EOS (IAPWS-95, methanol); measured densities (Coquelet et al. 2005, Safarov et al. 2004) within 1 %; measured bubble points for the 20 % phase margin, `tests/test_property_packages_pcsaft.py` |
 
 - Run `cheme process props --coverage` first: it names the package (the one recorded as
   `property_method.package`, else the one covering the most streams' component sets) and, per
@@ -310,9 +311,10 @@ range is calculated:
   `property_method: {package: <id>}` in `materials.yaml`; an unknown id is an error
   (`cheme.process-property-package`). Streams outside it are refused, never computed with
   another method.
-- What no package covers (water, methanol, ammonia above mole fraction 0.25 or with CO or CO2,
-  liquid synthesis products, hot converter gas with CH4 above 673.1 K or above mole fraction
-  0.2026 beyond 625 K, CO above 500 K) stays refused: give such values with
+- What no package covers (water and methanol as vapour, with other components or outside the
+  liquid boxes, their enthalpies, ammonia above mole fraction 0.25 or with CO or CO2, liquid
+  synthesis products, hot converter gas with CH4 above 673.1 K or above mole fraction 0.2026
+  beyond 625 K, CO above 500 K) stays refused: give such values with
   their source (`given`, or `assumed` with the reason), or run the flowsheet in
   `process simulate` with a method its skill accepts. Do not widen a range in `materials.yaml`
   to make a stream pass (a recorded range only narrows the package's).

@@ -1,0 +1,19 @@
+[
+  {
+    "id1": {
+      "cas": "67-56-1",
+      "name": "methanol",
+      "iupac_name": "methanol",
+      "smiles": "CO",
+      "inchi": "InChI=1S/CH4O/c1-2/h2H,1H3"
+    },
+    "id2": {
+      "cas": "7732-18-5",
+      "name": "water",
+      "iupac_name": "oxidane",
+      "smiles": "O",
+      "inchi": "InChI=1S/H2O/h1H2"
+    },
+    "k_ij": -0.0159473671673194
+  }
+]

@@ -29,7 +29,12 @@ It is refused when the EOS has no such root (beyond the spinodal; ``property-pha
 root is metastable beyond :data:`METASTABLE_TOLERANCE`, its molar Gibbs energy above the stable
 flash's by more than that fraction of RT (``property-metastable``).
 
-Everything but :class:`Adapter` works without thermo: ``validate`` computes fingerprints with it.
+A package with ``adapter: feos`` (PC-SAFT, extra ``saft``) is calculated by
+:class:`~chemeascode.domains.process.props_feos.FeosAdapter` instead; :func:`adapter_for` picks
+the adapter of the process's package. Its result may carry no enthalpy (``Result.enthalpy``
+None) where the package claims none.
+
+Everything but the adapters works without thermo: ``validate`` computes fingerprints with it.
 """
 
 from __future__ import annotations
@@ -92,7 +97,7 @@ class Result:
     phase: str  # vapor, liquid, two-phase
     vapor_fraction: float
     density: float | None  # kg/m3; None for two-phase
-    enthalpy: float  # kJ/kmol on ENTHALPY_REFERENCE
+    enthalpy: float | None  # kJ/kmol on ENTHALPY_REFERENCE; None: the package claims none
     #: Phase-constrained (``flash(inputs, phase=...)``): the phase of the stable flash, which
     #: differs from :attr:`phase`, and the root's (G - G_stable) / RT; None when unconstrained.
     stable_phase: str | None = None
@@ -437,13 +442,39 @@ def constraining_phase(state: Any) -> str | None:
     return phase.value
 
 
-# -- the thermo adapter -------------------------------------------------------------------------
+# -- the adapters -------------------------------------------------------------------------------
 
 
-def versions() -> dict[str, str]:
+def adapter_for(process: Process) -> Any:
+    """The adapter of the process's property package: :class:`Adapter` (thermo) or
+    :class:`~chemeascode.domains.process.props_feos.FeosAdapter` (feos); :class:`Unsupported`
+    when the package is unknown or its library is not installed."""
+    if package_of(process).adapter == "feos":
+        from chemeascode.domains.process.props_feos import FeosAdapter
+
+        return FeosAdapter(process)
+    return Adapter(process)
+
+
+def versions(package: Package | None = None) -> dict[str, str]:
+    """The versions of the libraries *package*'s adapter calculates with (thermo's by default)."""
     from importlib.metadata import version
 
+    if package is not None and package.adapter == "feos":
+        from chemeascode.integrations.feos import versions as feos_versions
+
+        return feos_versions()
     return {name: version(name) for name in ("thermo", "chemicals")}
+
+
+def method_label(package: Package) -> str:
+    """The library and equation of state in the source of a calculated value."""
+    if package.adapter == "feos":
+        return f"feos {versions(package)['feos']}, PC-SAFT"
+    return f"thermo {versions()['thermo']}, PR"
+
+
+# -- the thermo adapter -------------------------------------------------------------------------
 
 
 def _close_thermo_db() -> None:

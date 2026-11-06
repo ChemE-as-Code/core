@@ -30,6 +30,7 @@ The YAML is edited in place (only the ``phase:`` and ``calculated:`` entries of 
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -42,13 +43,14 @@ from chemeascode.domains.process.exergy import stream_exergy
 from chemeascode.domains.process.model import Process
 from chemeascode.domains.process.props import (
     EOS,
-    Adapter,
     Unsupported,
+    adapter_for,
     choose_package,
     constraining_phase,
     fingerprint,
     gather,
     method_config,
+    method_label,
     range_problems,
     stale,
     versions,
@@ -94,7 +96,7 @@ def configured_method(process: Process) -> PropertyMethod:
     """The method --fill records: the process's property package, a range configured for that
     package kept."""
     package = choose_package(process).package
-    assert package is not None  # Adapter(process) refused an unknown package
+    assert package is not None  # adapter_for(process) refused an unknown package
     current = method_config(process)
     own = current.application_range if current.status == "configured" else None
     if (current.package or packages.LEGACY.id) != package.id:
@@ -107,7 +109,7 @@ def configured_method(process: Process) -> PropertyMethod:
         eos=package.eos,
         binary_interaction=package.binary_interaction,
         application_range=own or package.validated,
-        versions=versions(),
+        versions=versions(package),
         benchmark=package.benchmark,
     )
 
@@ -147,10 +149,11 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
         result.adapter = _adapter_result(workspace.root, case, result, "refused")
         return result
     try:
-        adapter = Adapter(process)
+        adapter = adapter_for(process)
     except Unsupported as failure:
+        extra = "saft" if "feos" in str(failure) else "props"
         hint = (
-            "pip install 'cheme-as-code[props]'"
+            f"pip install 'cheme-as-code[{extra}]'"
             if "not installed" in str(failure)
             else "name a package cheme process props --coverage lists, or remove "
             "property_method.package"
@@ -164,14 +167,18 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
         result.lines.append(
             f"{MATERIALS_FILE}: property_method is a placeholder; run cheme process props --fill"
         )
-    if not write and recorded.versions and recorded.versions != versions():
+    installed = versions(adapter.package)
+    if not write and recorded.versions and recorded.versions != installed:
         result.lines.append(
-            f"recorded versions {recorded.versions}, installed {versions()}: values are "
+            f"recorded versions {recorded.versions}, installed {installed}: values are "
             "recalculated with the installed ones"
         )
     process.materials.property_method = method
     no_enthalpy = _enthalpy_ok(process)
-    if no_enthalpy:
+    if not adapter.package.enthalpy:
+        no_enthalpy = f"package {adapter.package.id} claims no enthalpy"
+        result.lines.append(f"enthalpy not calculated: {no_enthalpy}")
+    elif no_enthalpy:
         result.lines.append(
             f"enthalpy not calculated: {no_enthalpy} (thermo's reference: ideal_gas, 298.15 K, "
             "101.325 kPa)"
@@ -269,7 +276,7 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
         fp = fingerprint(
             process, stream, case, constrained=constrain if outcome.constrained else None
         )
-        source = f"cheme process props: thermo {versions()['thermo']}, PR"
+        source = f"cheme process props: {method_label(adapter.package)}"
         if adapter.package is not packages.LEGACY:
             source += f", package {adapter.package.id}"
         exergy_source = EXERGY_SOURCE
@@ -293,14 +300,14 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
                 "the stream is close to saturation; the values are marked phase-constrained",
             )
         values = {"molar_mass": outcome.molar_mass, "density": outcome.density}
-        if not no_enthalpy:
+        if not no_enthalpy and outcome.enthalpy is not None:
             values["enthalpy"] = outcome.enthalpy
         # exergy (chemical + physical, dead state 298.15 K, 101.325 kPa): only where every
         # component has a tabulated chemical exergy and the dead state is inside the range
-        try:
-            values["exergy"], _ = stream_exergy(adapter, gathered.inputs, constrain)
-        except Unsupported:
-            values["exergy"] = None
+        values["exergy"] = None
+        if adapter.package.enthalpy:
+            with contextlib.suppress(Unsupported):
+                values["exergy"], _ = stream_exergy(adapter, gathered.inputs, constrain)
         new_calc = dict(state.calculated)
         changed = False
         for name, value in values.items():
@@ -374,7 +381,11 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
             + (f" vf {outcome.vapor_fraction:.3f}" if outcome.phase == "two-phase" else "")
             + f", M {outcome.molar_mass:.4g} kg/kmol"
             + (f", rho {outcome.density:.4g} kg/m3" if outcome.density is not None else "")
-            + ("" if no_enthalpy else f", h {outcome.enthalpy:.6g} kJ/kmol")
+            + (
+                ""
+                if no_enthalpy or outcome.enthalpy is None
+                else f", h {outcome.enthalpy:.6g} kJ/kmol"
+            )
             + (
                 f" (phase-constrained; flash {outcome.stable_phase}, dG/RT "
                 f"{outcome.metastability:.2g})"
@@ -432,6 +443,7 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
         "not-converged" if unsolved else "converged",
         unsolved,
         calculated,
+        adapter.package,
     )
     return result
 
@@ -443,21 +455,23 @@ def _adapter_result(
     status: str,
     messages: list[str] | None = None,
     streams: list[dict[str, Any]] | None = None,
+    package: packages.Package | None = None,
 ) -> AdapterResult:
     """The run as an adapter result: one flash per stream, so no iterations; *messages* the
-    streams left uncalculated."""
+    streams left uncalculated; the solver is *package*'s library (thermo when None)."""
     from importlib.metadata import PackageNotFoundError
 
     from chemeascode.foundation.provenance import source_revision
 
+    name = "feos" if package is not None and package.adapter == "feos" else "thermo"
     try:
-        version = versions()["thermo"]
+        version = versions(package)[name]
     except PackageNotFoundError:  # not installed: the run was refused
         version = None
     return AdapterResult(
         case=case,
         status=status,  # type: ignore[arg-type]
-        solver=Solver(name="thermo", version=version, method=EOS),
+        solver=Solver(name=name, version=version, method=package.eos if package else EOS),
         inputs=source_revision(root, (MATERIALS_FILE, FLOWSHEET_FILE)).as_dict(),
         messages=messages or [],
         streams=streams or [],

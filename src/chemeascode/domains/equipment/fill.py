@@ -266,20 +266,21 @@ class _Context:
         return self._network
 
     def adapter(self) -> Any:
-        from chemeascode.domains.process.props import Adapter, Unsupported
+        from chemeascode.domains.process.props import Unsupported, adapter_for
 
         if self._adapter is None and self._adapter_error is None:
             try:
-                self._adapter = Adapter(self.process)
+                self._adapter = adapter_for(self.process)
             except Unsupported as failure:
                 self._adapter_error = str(failure)
         if self._adapter is None:
+            extra = "saft" if "feos" in (self._adapter_error or "") else "props"
             raise _Refused(
                 f"property adapter unavailable: {self._adapter_error}",
                 "cheme.datasheet-fill-props",
                 "warning",
-                "install cheme-as-code with the props extra "
-                "(uv tool install 'cheme-as-code[props]')",
+                f"install cheme-as-code with the {extra} extra "
+                f"(uv tool install 'cheme-as-code[{extra}]')",
             )
         return self._adapter
 
@@ -1499,6 +1500,14 @@ class _Side:
         if a.mass_flow is None:
             raise _Refused(f"stream {a.id}: no flow in case {context.case}")
         ra, rb = context.flash(a), context.flash(b)
+        if ra.enthalpy is None or rb.enthalpy is None:
+            package = context.adapter().package
+            raise _Refused(
+                f"streams {a.id} -> {b.id}: package {package.id} claims no enthalpy",
+                "cheme.datasheet-fill-property-unsupported",
+                "warning",
+                "give the duty with its source, or use a package that claims enthalpy",
+            )
         mw = ra.molar_mass
         duty = a.mass_flow / mw * (rb.enthalpy - ra.enthalpy)
         basis = (

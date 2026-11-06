@@ -28,6 +28,9 @@ serve = ["fastapi>=0.143.3", "uvicorn>=0.54.0"]
 png = ["resvg-py>=0.5.0"]
 # `cheme process props`: stream properties through thermo (pinned: the validated method).
 props = ["thermo==0.6.1", "chemicals==1.5.2", "CoolProp==8.0.0"]
+# `cheme process props` with a PC-SAFT package: feos (pinned: its 0.x API and parameter format
+# change between minor versions, ADR 0064).
+saft = ["feos==0.10.5"]
 # foundation.units: conversion between any units through Pint (K, °C and the (a)/(g) pressure
 # units of the process YAML need no extra).
 units = ["pint>=0.24.4"]
@@ -60,6 +63,7 @@ dev = [
     "thermo==0.6.1",
     "chemicals==1.5.2",
     "CoolProp==8.0.0",
+    "feos==0.10.5",
     "pint>=0.24.4",
     "rdkit>=2024.3.5",
     "cantera>=3.2; python_version < '3.15'",

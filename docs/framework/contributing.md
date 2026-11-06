@@ -70,7 +70,7 @@ no longer needed, so remove it when you fix the cause.
 
 - Base dependencies are what `import chemeascode` and a plain `cheme validate` need. Anything
   heavy (thermodynamics, simulators, CAD, ML models, web servers) goes into an extra in
-  `pyproject.toml` (today `props`, `serve`, `png`, `units`, `chemistry`, `lca`).
+  `pyproject.toml` (today `props`, `saft`, `serve`, `png`, `units`, `chemistry`, `lca`).
 - Import an optional library inside the function that uses it, never at module level, and
   only from `integrations/` or the domain function that needs it. When it is missing, return
   a finding or raise an error that names the extra (`pip install 'cheme-as-code[props]'`).
