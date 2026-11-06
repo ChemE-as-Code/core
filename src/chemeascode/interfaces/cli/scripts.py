@@ -66,6 +66,8 @@ def run(
                 typer.echo(f"{sheet}: fmt refused: {refusal}", err=True)
                 code = 1
                 continue
+            if result.generated:
+                typer.echo(f"{sheet}: {result.GENERATED_NOTE}", err=True)
             if result.changed:
                 typer.echo(f"{sheet}: reformatted", err=True)
             if result.dropped:

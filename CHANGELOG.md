@@ -19,6 +19,14 @@
 - The `drawing-clean` gate also fails on `cheme.offpage-not-on-edge`; add it to an existing
   plant's `checks/checks.yaml` to get it. The template's example generator draws its off-page
   connectors on the right edge.
+- `cheme process build` writes the BFD and PFD without indentation (ADR 0048; generator 7:
+  every BFD/PFD needs `cheme process build`): the same tree, model and rendering, 44 to 48 %
+  fewer bytes (process library methanol-1 PFD 1.72 to 0.90 MB, ammonia-1 7.53 to 3.92 MB).
+  The generator fingerprint now also covers `pfd_sheet.py`, `symbols.py` and the ISO shapes,
+  so editing the stream table or a symbol marks the sheets outdated.
+  `cheme fmt` (also with paths, `--check` and `cheme run --fmt`) leaves such a generated sheet
+  as built and says "generated, not formatted (cheme process build)", so formatting a freshly
+  built BFD/PFD is no edit (`cheme.generated-edited`).
 
 ## 1.10.0 (2026-11-06)
 
