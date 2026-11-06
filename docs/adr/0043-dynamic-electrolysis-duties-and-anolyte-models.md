@@ -1,7 +1,7 @@
 # 0043. Dynamic electrolysis duties with an anolyte model interface, on a concentration basis
 
-- **Status:** Proposed
-- **Date:** 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-11-06 (proposed 2026-11-04)
 
 ## Context
 
@@ -93,7 +93,7 @@ ODE solver; `fixed_bed._dopri_step` clamps the bed's own states.
 - Negative: the pure-Python integrator is slower than a compiled one; operating maps with
   frequent dosing switches take seconds.
 - Follow-ups: an activity-based or finite-rate anolyte model; temperature dependence of the
-  constants; stack sizing from the duties (core#139).
+  constants; stack sizing from the duties (core#139, done: ADR 0044).
 
 ## Evidence
 
