@@ -1,0 +1,119 @@
+# A loop reactor: fresh feed and recycled effluent are mixed (M1), react at a per-pass conversion
+# (R1), and the recycle split X1 returns 75 % of the effluent to M1; the rest is the product. The
+# fresh feed S1 is the only given stream. `cheme process propagate --fill` tears the loop at the
+# recycle S5 (`tears:`), converges it by Wegstein's method and writes every other stream. The
+# steady state is analytic (r = 0.75 recycled, X = 0.4 converted per pass, feed F):
+#   reactor feed       F / (1 - r)                         = 4000 kg/h
+#   n-butane into R1   F_NC4 / (1 - r (1 - X))             = 950 / 0.55 kg/h
+#   product            F_NC4 (1 - r)(1 - X) / (1 - r (1 - X)) n-butane, the rest isobutane
+# tests/test_recycle.py checks the converged streams against these. Feed values are ASSUMED
+# illustration values. Regenerate the sheets with `cheme process build` (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Isomerisation loop with a recycle split
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 0.1, rel: 0.001}
+tears:
+  - stream: S5
+convergence: {method: wegstein, max_iterations: 50, tolerance: {abs: 0.0001, rel: 1.0e-7}}
+
+feeds:
+  - id: FEED
+    title: Field butanes
+    ports: [{id: out, direction: out}]
+products:
+  - id: PROD
+    title: Isomerate
+    ports: [{id: in, direction: in}]
+
+blocks:
+  - id: RXN
+    title: Isomerisation loop
+    class: ReactingChemicals
+    ports:
+      - {id: feed, direction: in}
+      - {id: product, direction: out}
+
+steps:
+  - id: M1
+    block: RXN
+    title: Feed and recycle mixer
+    class: Mixing
+    ports:
+      - {id: feed, direction: in, delegates: feed}
+      - {id: recycle, direction: in}
+      - {id: out, direction: out}
+  - id: R1
+    block: RXN
+    title: Isomerisation reactor
+    class: ReactingChemicals
+    reactions: [ISOM]
+    reactor: conversion
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out}
+  - id: X1
+    block: RXN
+    title: Recycle split
+    class: SplittingMaterial
+    split: {recycle: 0.75}
+    ports:
+      - {id: in, direction: in}
+      - {id: recycle, direction: out}
+      - {id: product, direction: out, delegates: product}
+
+streams:
+  - id: S1
+    title: Fresh feed
+    from: FEED.out
+    to: M1.feed
+    template: butanes
+    state:
+      design:
+        temperature: {value: 310, provenance: assumed, source: ASSUMED illustration value}
+        pressure: {value: 1500, provenance: assumed, source: ASSUMED illustration value}
+        flow: {value: 1000, provenance: assumed, source: ASSUMED illustration value}
+        composition: {basis: mass_fraction, values: {NC4: 0.95, IC4: 0.0, C3: 0.05}, provenance: assumed, source: ASSUMED illustration value}
+  - id: S2
+    title: Reactor feed
+    from: M1.out
+    to: R1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.425058, IC4: 0.51007, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: d3c29a49d4a1ecd5}
+        flow: {value: 4000.0, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S5', fingerprint: d8328479fb116dda}
+  - id: S3
+    title: Reactor effluent
+    from: R1.out
+    to: X1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: fba9ed1f7fbe4a7e}
+        flow: {value: 4000.0, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 0a93847adeeabd74}
+  - id: S4
+    title: Isomerate
+    from: X1.product
+    to: PROD.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3', fingerprint: cf443fe00d687ac9}
+        flow: {value: 1000.0, provenance: calculated, source: 'cheme process propagate: splitter X1 from S3 S5', fingerprint: 616cedb596e519f5}
+  - id: S5
+    title: Recycle
+    from: X1.recycle
+    to: M1.recycle
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.255035, IC4: 0.680093, C3: 0.0648722}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: 4587c96d2fcdce9e}
+        flow: {value: 3000.0, provenance: calculated, source: 'cheme process propagate: recycle X1 from S3 (tear, wegstein)', fingerprint: 4587c96d2fcdce9e}

@@ -151,9 +151,11 @@ class Component(Strict):
     heat_of_vaporization: float | None = Field(
         default=None,
         gt=0,
-        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000) near the "
-        "still's temperature: a batch still's boil-up from its duty, and its duty from its "
-        "boil-up.",
+        description="kJ/kmol (not kJ/mol: NIST gives kJ/mol, multiply by 1000): a batch "
+        "still's boil-up from its duty, and its duty from its boil-up (give it near the "
+        "still's temperature); also the default MTT of a reactor away from atmospheric "
+        "pressure (Clausius-Clapeyron from normal_boiling_point; give it near the normal "
+        "boiling point; ADR 0058).",
         exclude_if=lambda value: value is None,
     )
     phase: Literal["solid"] | None = Field(
@@ -600,8 +602,25 @@ class ReactionHazard(Strict):
         default=None,
         gt=0,
         description="K: the maximum technical temperature (the boiling point at the reactor's "
-        "pressure, a relief set temperature); default: the lowest normal boiling point of the "
-        "liquid's components at about atmospheric pressure.",
+        "pressure, a relief set temperature); default: the lowest boiling point of the "
+        "liquid's components at the reactor's pressure (the normal boiling point at about "
+        "atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving "
+        "out a batch's vent components, a dosed gas and dissolved gases (a minor share of the "
+        "liquid boiling below the process temperature; ADR 0058).",
+    )
+    reactions: list[str] = Field(
+        default_factory=list,
+        description="The reactions of the step whose heat sets dT_ad and the MTSR (each run to "
+        "completion, the largest counts), e.g. the main reaction without a slow side reaction "
+        "(ADR 0058). Default: every reaction.",
+        exclude_if=lambda value: not value,  # a reactor's dump stays as it was
+    )
+    vent_capacity: float | None = Field(
+        default=None,
+        gt=0,
+        description="m3/h of gas the vent and its line pass at the vessel's pressure, from the "
+        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+        exclude_if=lambda value: value is None,
     )
     provenance: Provenance
     source: str = ""
@@ -1216,7 +1235,21 @@ class Distilling(Strict):
     )
 
 
-class Block(Node, Reacting, Solids, Distilling):
+class Energetic(Strict):
+    """Which energy stream carries the duty of a block's or step's model (ADR 0059)."""
+
+    energy_port: str | None = Field(
+        default=None,
+        description="A batch or semi-batch reactor, batch still, crystallizer or conversion "
+        "step: the energy port whose stream carries the model's year-average duty (cheme "
+        "process propagate writes it, or compares a given one); default: its one heat stream "
+        "(an energy stream from or to a heating or cooling utility). A stream from or to "
+        "another block or step is heat only where energy_port names it.",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling, Energetic):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -1236,7 +1269,7 @@ class Block(Node, Reacting, Solids, Distilling):
     )
 
 
-class Step(Node, Reacting, Solids, Distilling):
+class Step(Node, Reacting, Solids, Distilling, Energetic):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
@@ -1443,6 +1476,52 @@ class BfdView(Strict):
         return any({a, b} == set(pair) for pair in self.aggregate)
 
 
+class TearGuess(Strict):
+    """The first guess of a tear stream, where its loop's iterations start (ADR 0060)."""
+
+    flow: float = Field(default=0.0, ge=0, description="In `unit`; 0: an empty recycle.")
+    unit: str | None = Field(default=None, description="A flow unit; default: units.flow.")
+    basis: Literal["mole_fraction", "mass_fraction"] = "mass_fraction"
+    composition: dict[str, float] = Field(
+        default_factory=dict, description="Component id -> fraction on `basis`."
+    )
+
+
+class Tear(Strict):
+    """A stream at which ``cheme process propagate`` tears a recycle loop (ADR 0060): its flow
+    and composition are iterated until the loop closes, then written as calculated. A given or
+    assumed flow or composition of the stream stays fixed (a design specification)."""
+
+    stream: str = Field(description="A material stream between two steps (or blocks).")
+    initial: TearGuess | None = Field(
+        default=None,
+        description="The first guess; default: an empty stream (flow 0).",
+        exclude_if=lambda value: value is None,
+    )
+
+
+class Convergence(Strict):
+    """How ``cheme process propagate`` converges the loops torn at ``tears`` (ADR 0060)."""
+
+    method: Literal["wegstein", "substitution"] = Field(
+        default="wegstein",
+        description="Successive substitution, accelerated by Wegstein's method per component "
+        "(q bounded to [-5, 0]) or not.",
+    )
+    max_iterations: int = Field(default=100, ge=1, le=10000)
+    damping: float = Field(
+        default=1.0,
+        gt=0,
+        le=1,
+        description="Substitution only: the share of the step to the new iterate taken.",
+    )
+    tolerance: Tolerance | None = Field(
+        default=None,
+        description="Per component of every tear stream, kg/h; default: the flowsheet's.",
+        exclude_if=lambda value: value is None,
+    )
+
+
 class Flowsheet(Versioned):
     """Feeds, products, blocks, steps and streams: the source of the BFD and PFD."""
 
@@ -1456,6 +1535,17 @@ class Flowsheet(Versioned):
     blocks: list[Block] = Field(default_factory=list)
     steps: list[Step] = Field(default_factory=list)
     streams: list[StreamDef] = Field(default_factory=list)
+    tears: list[Tear] = Field(
+        default_factory=list,
+        description="Recycle loops torn for cheme process propagate (ADR 0060).",
+        exclude_if=lambda value: not value,  # a plant without recycles dumps as it did
+    )
+    convergence: Convergence | None = Field(
+        default=None,
+        description="How propagate converges the torn loops; default: Wegstein, 100 "
+        "iterations, the flowsheet's tolerance.",
+        exclude_if=lambda value: value is None,
+    )
     bfd: BfdView | None = Field(default=None, description="How the BFD draws the streams.")
     layout: Layout = Field(default_factory=Layout)
 

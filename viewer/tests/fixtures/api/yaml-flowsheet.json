@@ -761,6 +761,19 @@
       "Block": {
         "additionalProperties": false,
         "properties": {
+          "energy_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
+            "title": "Energy Port"
+          },
           "still": {
             "anyOf": [
               {
@@ -1292,6 +1305,51 @@
           "provenance"
         ],
         "title": "CompositionValue",
+        "type": "object"
+      },
+      "Convergence": {
+        "additionalProperties": false,
+        "description": "How ``cheme process propagate`` converges the loops torn at ``tears`` (ADR 0060).",
+        "properties": {
+          "method": {
+            "default": "wegstein",
+            "description": "Successive substitution, accelerated by Wegstein's method per component (q bounded to [-5, 0]) or not.",
+            "enum": [
+              "wegstein",
+              "substitution"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "max_iterations": {
+            "default": 100,
+            "maximum": 10000,
+            "minimum": 1,
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "damping": {
+            "default": 1.0,
+            "description": "Substitution only: the share of the step to the new iterate taken.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Damping",
+            "type": "number"
+          },
+          "tolerance": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Tolerance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Per component of every tear stream, kg/h; default: the flowsheet's."
+          }
+        },
+        "title": "Convergence",
         "type": "object"
       },
       "Crystallizer": {
@@ -2418,8 +2476,30 @@
               }
             ],
             "default": null,
-            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest normal boiling point of the liquid's components at about atmospheric pressure.",
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature; ADR 0058).",
             "title": "Mtt"
+          },
+          "reactions": {
+            "description": "The reactions of the step whose heat sets dT_ad and the MTSR (each run to completion, the largest counts), e.g. the main reaction without a slow side reaction (ADR 0058). Default: every reaction.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "vent_capacity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+            "title": "Vent Capacity"
           },
           "provenance": {
             "enum": [
@@ -2873,6 +2953,19 @@
       "Step": {
         "additionalProperties": false,
         "properties": {
+          "energy_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
+            "title": "Energy Port"
+          },
           "still": {
             "anyOf": [
               {
@@ -3523,6 +3616,79 @@
         "title": "Tank",
         "type": "object"
       },
+      "Tear": {
+        "additionalProperties": false,
+        "description": "A stream at which ``cheme process propagate`` tears a recycle loop (ADR 0060): its flow\nand composition are iterated until the loop closes, then written as calculated. A given or\nassumed flow or composition of the stream stays fixed (a design specification).",
+        "properties": {
+          "stream": {
+            "description": "A material stream between two steps (or blocks).",
+            "title": "Stream",
+            "type": "string"
+          },
+          "initial": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/TearGuess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The first guess; default: an empty stream (flow 0)."
+          }
+        },
+        "required": [
+          "stream"
+        ],
+        "title": "Tear",
+        "type": "object"
+      },
+      "TearGuess": {
+        "additionalProperties": false,
+        "description": "The first guess of a tear stream, where its loop's iterations start (ADR 0060).",
+        "properties": {
+          "flow": {
+            "default": 0.0,
+            "description": "In `unit`; 0: an empty recycle.",
+            "minimum": 0,
+            "title": "Flow",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A flow unit; default: units.flow.",
+            "title": "Unit"
+          },
+          "basis": {
+            "default": "mass_fraction",
+            "enum": [
+              "mole_fraction",
+              "mass_fraction"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "composition": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component id -> fraction on `basis`.",
+            "title": "Composition",
+            "type": "object"
+          }
+        },
+        "title": "TearGuess",
+        "type": "object"
+      },
       "Terminal": {
         "additionalProperties": false,
         "description": "An external feed (DEXPI Source) or product (DEXPI Sink).",
@@ -4094,6 +4260,26 @@
         },
         "title": "Streams",
         "type": "array"
+      },
+      "tears": {
+        "description": "Recycle loops torn for cheme process propagate (ADR 0060).",
+        "items": {
+          "$ref": "#/$defs/Tear"
+        },
+        "title": "Tears",
+        "type": "array"
+      },
+      "convergence": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Convergence"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "How propagate converges the torn loops; default: Wegstein, 100 iterations, the flowsheet's tolerance."
       },
       "bfd": {
         "anyOf": [

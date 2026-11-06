@@ -81,12 +81,19 @@ Options considered:
   - A step listed in one vessel's `units` and named by another unit procedure is
     `cheme.recipe-reference`.
   - A unit (or units) that is a block, or holds a batch or semi-batch step, sizes the vessel
-    from that step, as in ADR 0052.
-  - The results name such a unit `F101+W101+F102+D101`.
+    from that step, as in ADR 0052. A `unit:` naming such a block was
+    `cheme.recipe-reference` in 1.7.0 ("no batch or semibatch"). A unit or units that hold
+    several batch or semi-batch steps are `cheme.recipe-reference`: the vessel is not sized,
+    nor the vent reported, from the first of them in the file's order; name one as `unit:`.
+  - A filter or dryer in the vessel of a batch or semi-batch step (a reactor-filter-dryer)
+    takes its filter area and heated area from that vessel, as in a filter-dryer's.
+  - The results name such a unit `F101+W101+F102+D101`. `datasheets fill` finds a batch
+    step's vessel by the step its batch was sized from, not by that label.
 - **Unchanged behaviour.** `dryer`, `filtration`, `units` and `heated_area` are left out of a
   model dump when they are not given. Fingerprints of flowsheets and recipes that do not use
   them (propagate's outlets, datasheets fill's `recipe:` input) and the behaviour of plain
-  batches, semi-batches, crystallizers, filters and recipes stay as they were.
+  batches, semi-batches, crystallizers, filters and recipes stay as they were, except that a
+  `unit:` naming a block that holds one batch or semi-batch step now sizes its vessel (above).
 
 ## Consequences
 

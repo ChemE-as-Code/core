@@ -839,6 +839,7 @@ def rules(process: Any) -> list[Finding]:
                 ("reactions", node.reactions or node.reactor),
                 ("crystallizer", node.crystallizer),
                 ("solid_separation", node.solid_separation),
+                ("dryer", getattr(node, "dryer", None)),
             )
             if value
         ]
@@ -848,7 +849,7 @@ def rules(process: Any) -> list[Finding]:
                 f"{node.id}: a still is not also a {' or '.join(others)}",
                 loc,
                 node.id,
-                "split the step: the reaction or crystallizer first, the still after it",
+                "split the step: the reaction, crystallizer or dryer apart from the still",
             )
         outs = _ports(node, "out")
         mapped = [spec.outlets["residue"], *(port for port, _ in spec.ends())]
@@ -1044,6 +1045,8 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         "duty_kW": result.duty,
         "peak_duty_kW": result.peak_duty,
         "energy_kWh_per_batch": energy / 3600.0 if energy is not None else None,
+        # the year average its energy stream carries (ADR 0059): per hour of flows
+        "year_average_duty_kW": energy / (h * 3600.0) if energy is not None and h else None,
         "temperatures_K": list(result.temperatures) if result.temperatures else None,
         "key": result.key,
         "profile": [
@@ -1145,6 +1148,11 @@ def report_text(report: StillReport) -> str:
                 f"duty {num(sol['duty_kW'], ' kW', '.4g')} (peak "
                 f"{num(sol['peak_duty_kW'], ' kW', '.4g')}), "
                 f"{num(sol['energy_kWh_per_batch'], ' kWh', '.4g')}"
+                + (
+                    f", year average {sol['year_average_duty_kW']:.6g} kW"
+                    if sol.get("year_average_duty_kW") is not None
+                    else ""
+                )
                 + (
                     f", still {sol['temperatures_K'][0]:.5g} -> {sol['temperatures_K'][1]:.5g} K"
                     if sol["temperatures_K"]

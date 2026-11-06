@@ -1,0 +1,11 @@
+# n-Butane isomerisation as a conversion reaction: an ASSUMED per-pass conversion, no rate law.
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - id: ISOM
+    title: n-Butane isomerisation
+    equation: n-C4H10 -> i-C4H10
+    stoichiometry: {NC4: -1, IC4: 1}
+    phase: liquid
+    reversible: false
+    conversion: {key: NC4, value: 0.4, provenance: assumed, source: ASSUMED per-pass conversion}

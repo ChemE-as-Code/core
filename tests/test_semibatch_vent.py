@@ -499,8 +499,9 @@ def test_vent_rules(tmp_path):
 
 def test_a_dosed_gas_dissolves_on_entry_like_any_dose(tmp_path):
     """A gas dosed into the liquid (A boiling at 250 K, the vessel at 300 K) needs only its
-    liquid_molar_volume and heat capacity: without absorbed it is a dose like any other, and
-    as what is in the vessel it sets the MTT."""
+    liquid_molar_volume and heat capacity: without absorbed it is a dose like any other. A sixth
+    of the liquid, it is no minor dissolved gas: boiling below T_p it sets the MTT, the liquor
+    at its boiling point (ADR 0058), as in 1.8.0."""
     ws = _plant(tmp_path)
     path = ws.root / "process/materials.yaml"
     path.write_text(
@@ -514,7 +515,12 @@ def test_a_dosed_gas_dissolves_on_entry_like_any_dose(tmp_path):
     left = (1 - math.exp(-0.01 * DOSING)) / (0.01 * DOSING)
     assert _states(ws)["S4"]["flow"]["value"] == pytest.approx((1 - left) * 16.0, rel=1e-5)
     (entry,) = screen(ws.root).entries
-    assert entry.mtt == pytest.approx(250.0) and "A" in entry.mtt_basis
+    assert entry.mtt == pytest.approx(250.0) and "of A" in entry.mtt_basis
+    assert not entry.mtt_left_out  # G forms and leaves: never in the liquid
+    assert any(
+        n.startswith("MTT 250.0 K (normal boiling point of A) below T_p") for n in entry.notes
+    )
+    assert entry.criticality == 3  # the MTSR above the MTT
 
 
 def test_a_partly_absorbed_gas_dose_in_a_plant(tmp_path):
@@ -539,6 +545,74 @@ def test_a_partly_absorbed_gas_dose_in_a_plant(tmp_path):
     (entry,) = screen(ws.root).entries
     # the dose counts with its absorbed share in the adiabatic rise: 0.8 kmol of A
     assert entry.adiabatic_rise == pytest.approx(0.8 * 100000.0 / (5.8 * 150.0), rel=1e-6)
+
+
+def test_vent_components_and_dosed_gases_are_left_out_of_the_mtt(tmp_path):
+    """A gas dose (absorbed, 99 % taken up) and a charged vent component (G boiling at 188 K,
+    10 % of the charge) do not set the MTT (ADR 0058; until 1.8.0 they did): what else boils
+    in the liquid does, and with nothing else left the MTT needs hazard.mtt."""
+    low_a = MATERIALS.replace(
+        "normal_boiling_point: 400}\n  - {id: B", "normal_boiling_point: 450}\n  - {id: B", 1
+    ).replace("{id: gas, components: [G]}", "{id: gas, components: [A, G]}")
+    ws = _plant(tmp_path / "a", FLOWSHEET.replace("time: 3600}]", "time: 3600, absorbed: 0.99}]"))
+    (ws.root / "process/materials.yaml").write_text(low_a)
+    (entry,) = screen(ws.root).entries
+    # A (450 K) is a dosed gas: B and S (400 K) set it
+    assert entry.mtt == pytest.approx(400.0) and "of A" not in entry.mtt_basis
+    assert entry.mtt_left_out == {"A": "dosed gas"}
+    charged = FLOWSHEET.replace(
+        "composition: {basis: mole_fraction, values: {S: 1.0}",
+        "composition: {basis: mole_fraction, values: {S: 0.9, G: 0.1}",
+        1,
+    )
+    assert charged != FLOWSHEET
+    ws = _plant(tmp_path / "b", charged)
+    (ws.root / "process/materials.yaml").write_text(
+        MATERIALS.replace(
+            "normal_boiling_point: 188}",
+            "normal_boiling_point: 188, liquid_molar_volume: 0.05, liquid_heat_capacity: 50}",
+        )
+    )
+    (entry,) = screen(ws.root).entries
+    assert entry.mtt == pytest.approx(400.0) and "of G" not in entry.mtt_basis
+    assert entry.mtt_left_out == {"G": "vent component"}
+    # the solvent S and the dose A boiling at 290 K, below T_p: no dissolved gases (the bulk
+    # of the liquid), the liquor boils at T_p (at reflux) and sets the MTT, as in 1.8.0
+    ws = _plant(tmp_path / "c")
+    (ws.root / "process/materials.yaml").write_text(
+        MATERIALS.replace("normal_boiling_point: 400}", "normal_boiling_point: 290}")
+    )
+    (entry,) = screen(ws.root).entries
+    assert entry.mtt == pytest.approx(290.0) and not entry.mtt_left_out
+    assert any("below T_p 300.0 K: the liquor is at its boiling point" in n for n in entry.notes)
+
+
+def test_a_semibatch_says_its_mtsr_includes_its_phase_changes(tmp_path):
+    """dT_ad leaves a declared phase change out (ADR 0056), but the semi-batch's cooling-failure
+    MTSR is its model's, the phase change's heat included: the screening says so."""
+    materials = MATERIALS.replace(
+        "templates:",
+        "  - {id: B_s, name: B crystals, formula: C2H4, molar_mass: 28.05, phase: solid,\n"
+        "     liquid_molar_volume: 0.1, liquid_heat_capacity: 150}\ntemplates:",
+    ).replace("components: [A, B, S, G]}", "components: [A, B, S, G, B_s]}")
+    entries = {}
+    for heat in (0, -200000):
+        ws = _plant(
+            tmp_path / str(heat), FLOWSHEET.replace("reactions: [R1]", "reactions: [R1, P1]")
+        )
+        (ws.root / "process/materials.yaml").write_text(materials)
+        (ws.root / "process/reactions.yaml").write_text(
+            REACTIONS
+            + "  - {id: P1, kind: phase-change, stoichiometry: {B: -1, B_s: 1}, phase: liquid,\n"
+            f"     heat_of_reaction: {{value: {heat}, provenance: assumed}},\n"
+            "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.01},\n"
+            "            orders: {B: 1}, provenance: assumed}}\n"
+        )
+        (entries[heat],) = screen(ws.root).entries
+    plain, heated = entries[0], entries[-200000]
+    assert plain.adiabatic_rise == pytest.approx(heated.adiabatic_rise)
+    assert heated.mtsr > plain.mtsr + 1  # the heat of crystallization counts in the MTSR
+    assert any("MTSR from the semibatch model includes" in n and "P1" in n for n in heated.notes)
 
 
 def test_the_recipe_reports_the_vent_per_batch(tmp_path):

@@ -488,7 +488,9 @@ def _sourced(value: Any) -> bool:
 def still_basis(process: Process, node: Any) -> UnitBasis:
     """The basis of a batch still or solvent swap (``rayleigh``, predictive: one equilibrium
     stage); :mod:`.batch_still`. Sourced when the volatility data are given with a source: the
-    relative volatilities, or the vapour pressure of every volatile component it holds."""
+    relative volatilities, or, for Raoult's law, the ideal liquid itself (the volatility's own
+    provenance: an assumed ideal liquid, as for a pair with an azeotrope, is not sourced) and the
+    vapour pressure of every volatile component it holds."""
     from chemeascode.domains.process.batch_still import ASSUMPTIONS, _present, inlets_of
     from chemeascode.domains.process.solids import solid_components
 
@@ -506,6 +508,8 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
             lacking.append("relative volatilities")
     else:
         detail = "Raoult's law, Antoine vapour pressures"
+        if not _sourced(vol):
+            lacking.append("ideal liquid (volatility assumed)")
         comps = process.components()
         stays = set(spec.nonvolatile) | solid_components(process)
         for name in sorted(_present(process, inlets_of(process, node)) - stays):
