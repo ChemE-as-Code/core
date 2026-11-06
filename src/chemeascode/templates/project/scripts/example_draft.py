@@ -72,24 +72,27 @@ line(
     "50-W-102",
     dn=50,
     fluid="Water",
-    route=[pump["N2"], (160, 100), offpage("out", at=(240, 100), note="to P-02")],
+    route=[pump["N2"], (160, 100), offpage("out", at=(405, 100), note="to P-02")],
 )
 line(
     sheet,
     "25-W-103",
     dn=25,
     fluid="Water",
-    route=[branch.branch, (branch.branch.xy[0], 180), offpage("out", at=(140, 180))],
+    route=[branch.branch, (branch.branch.xy[0], 180), offpage("out", at=(405, 180))],
 )
 
+# Off-page connectors go on the sheet's edges (incoming left, outgoing right):
+# cheme.offpage-not-on-edge reports one left mid-sheet.
+
 # Instruments: tag, bubble position, what they sense, and the valve they act on.
-instrument(sheet, "PI-101", at=(175, 125), sensing=pump["N2"])
+instrument(sheet, "PI-101", at=(175, 142.5), sensing=pump["N2"])
 instrument(
     sheet,
     "FIC-101",
-    at=(130, 130),
+    at=(128, 128),
     sensing="Line_80W101_S2",
-    sensing_at=(135, 150),
+    sensing_at=(128, 150),
     signal_to="FV101",
 )
 note(sheet, "Trip: LALL-101 stops P-101", at=(60, 180))

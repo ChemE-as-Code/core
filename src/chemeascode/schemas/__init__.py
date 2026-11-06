@@ -55,6 +55,7 @@ from chemeascode.domains.piping.schemas.piping_items import PipingItem, PipingIt
 from chemeascode.domains.process.electrochemical_cell import Cells
 from chemeascode.domains.process.electrolysis_duty import Duties
 from chemeascode.domains.process.furnace import FurnacesFile
+from chemeascode.domains.process.recipe import Recipe
 from chemeascode.domains.process.schema import Flowsheet, Materials
 from chemeascode.domains.process.separations.extraction import ExtractionFile
 from chemeascode.domains.process.separations.schema import Adsorption
@@ -113,6 +114,7 @@ OTHER_SCHEMAS = {
     "process-simulation": (Simulation, "process/simulation.yaml"),
     "process-reactions": (Reactions, "process/reactions.yaml"),
     "process-catalysts": (Catalysts, "process/catalysts.yaml"),
+    "process-recipe": (Recipe, "process/recipe.yaml"),
     "process-assays": (Assays, "process/assays.yaml"),
     "process-cells": (Cells, "process/cells.yaml"),
     "process-duties": (Duties, "process/duties.yaml"),
@@ -192,6 +194,7 @@ __all__ = [
     "Reactions",
     "Assays",
     "Catalysts",
+    "Recipe",
     "Cells",
     "ReactionEvidence",
     "ExtractionFile",

@@ -35,6 +35,14 @@ from chemeascode.domains.chemistry.thermochemistry import (
     reaction_enthalpy,
 )
 from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
+from chemeascode.domains.process.duties import (
+    batch_duty,
+    conversion_duty,
+    duty_model,
+    report_entry,
+    report_lines,
+    vent_condenser_duty,
+)
 from chemeascode.domains.process.model import Process, balance_of, stream_flows
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.provenance import SourceRevision, source_revision
@@ -151,21 +159,31 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     lacking: list[str] = []
     t_in = [_state_value(process, s, case, "temperature") for s in ins]
     t_out = [_state_value(process, s, case, "temperature") for s in outs]
-    p_out = [_state_value(process, s, case, "pressure") for s in outs]
-    t = t_out[0] if len(t_out) == 1 else None
-    p = p_out[0] if len(p_out) == 1 else None
-    if len(outs) == 1:
+    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other;
+    # a vent condenser's condensate to a stream of its own (ADR 0062) is no liquid outlet either
+    vent = getattr(getattr(item, "batch", None), "vent", None)
+    condenser = getattr(vent, "condenser", None)
+    skip = set() if vent is None else {vent.stream}
+    if condenser is not None and condenser.returns != "vessel":
+        skip.add(condenser.returns)
+    liquid_outs = [s for s in outs if s.id not in skip]
+    t_liquid = [_state_value(process, s, case, "temperature") for s in liquid_outs]
+    p_liquid = [_state_value(process, s, case, "pressure") for s in liquid_outs]
+    t = t_liquid[0] if len(t_liquid) == 1 else None
+    p = p_liquid[0] if len(p_liquid) == 1 else None
+    if len(liquid_outs) == 1:
         with contextlib.suppress(ValueError):  # what is missing is reported below
-            t, p = equilibrium_conditions(process.flowsheet.units, case, ins, outs[0])
+            t, p = equilibrium_conditions(process.flowsheet.units, case, ins, liquid_outs[0])
     approach = getattr(item, "approach", 0.0) or 0.0
     if t is None:
         lacking.append("one outlet with a temperature")
     entries = []
     moles_out = [_moles(process, s, case) for s in outs]
     y = None
-    if len(outs) == 1 and moles_out[0] is not None:
-        total = sum(moles_out[0].values())
-        y = {n: v / total for n, v in moles_out[0].items()} if total > 0 else None
+    moles_liquid = [_moles(process, s, case) for s in liquid_outs]
+    if len(liquid_outs) == 1 and moles_liquid[0] is not None:
+        total = sum(moles_liquid[0].values())
+        y = {n: v / total for n, v in moles_liquid[0].items()} if total > 0 else None
     phi = None
     real_gas_unknown = False
     if getattr(item, "fugacity", "ideal") == "peng_robinson" and y and t is not None and p:
@@ -322,14 +340,13 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         except BedError as failure:
             lacking.append(f"the bed: {failure}")
     tank_entry = None
-    if with_bed and getattr(item, "reactor", None) in ("cstr", "batch"):
-        from chemeascode.domains.process.stirred_tank import TankError
+    model_duty = None
+    if with_bed and getattr(item, "reactor", None) in ("cstr", "batch", "semibatch"):
+        from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
         from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
 
         try:
-            if len(ins) != 1:
-                raise TankError(f"a {item.reactor} takes one inlet stream")
-            solved_tank, _ = solve_tank(process, item, ins[0], case)
+            solved_tank, _ = solve_tank(process, item, tank_inlet(item, ins), case)
             tank_entry = {
                 "kind": solved_tank.kind,
                 "volume_m3": solved_tank.volume,
@@ -346,9 +363,28 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 ],
                 "notes": solved_tank.notes,
             }
+            if solved_tank.kind == "semibatch":
+                tank_entry |= semibatch_entry(solved_tank)
+            if vent is not None:
+                tank_entry |= vent_entry(solved_tank, vent.stream)
+            if item.reactor in ("batch", "semibatch"):
+                model_duty = report_entry(
+                    process, item, case, batch_duty(item, solved_tank, process, case)
+                )
+                if vent is not None and vent.condenser is not None:
+                    # the vent condenser's duty on its own stream (ADR 0062)
+                    tank_entry["vent"]["condenser_duty"] = report_entry(
+                        process,
+                        item,
+                        case,
+                        vent_condenser_duty(item, solved_tank),
+                        vent_condenser=True,
+                    )
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
-    return {
+    if with_bed and duty_model(item) == "conversion" and not process.inside(node):
+        model_duty = report_entry(process, item, case, conversion_duty(process, item, case)[0])
+    found = {
         "node": node,
         "kind": process.kinds.get(node),
         "bed": bed_entry,
@@ -372,6 +408,15 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
         ),
         "missing": lacking,
     }
+    # ADR 0059: only where the model knows a duty or a stream wants one; other reactors'
+    # entries stay as they were
+    if model_duty is not None and (
+        model_duty["heat_in_kW"] is not None
+        or model_duty["stream"] is not None
+        or model_duty["stream_note"]
+    ):
+        found["model_duty"] = model_duty
+    return found
 
 
 def reactor_report(root: Path, case: str | None = None) -> ReactorReport:
@@ -414,7 +459,7 @@ def reactor_text(report: ReactorReport) -> str:
             f"{r['kind']} {r['node']} ({r['model'] or 'holds reactors'}): balance {r['balance']}; "
             f"T out {num(r['temperature_out_K'], ' K')}, P out {num(r['pressure_out_kPa'], ' kPa')}"
             + (f", approach {r['approach_K']:g} K" if r["approach_K"] else "")
-            + f"; duty {num(r['duty_kW'], ' kW')}"
+            + f"; duty {_duty_shown(r, num)}"
             + "".join(f" ({note})" for note in r.get("duty_assumptions", []))
         )
         for e in r["reactions"]:
@@ -447,14 +492,129 @@ def reactor_text(report: ReactorReport) -> str:
         elif tank:
             end = tank["profile"][-1]["conversion"] if tank["profile"] else 0.0
             heat = tank["heat_released_kJ_kmol"]
+            semi = tank["kind"] == "semibatch"
             lines.append(
-                f"  batch: {tank['time_s']:.6g} s to conversion {end:.4g}, outlet "
+                f"  {tank['kind']}: {tank['time_s']:.6g} s to conversion {end:.4g}, outlet "
                 f"{tank['outlet_temperature_K']:.6g} K"
-                + (f", heat released {heat:.6g} kJ/kmol of charge" if heat is not None else "")
-                + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
+                + (
+                    f", heat released {heat:.6g} kJ/kmol of charge{' and doses' if semi else ''}"
+                    if heat is not None
+                    else ""
+                )
+                + (f"; {'; '.join(tank['notes'])}" if tank["notes"] and not semi else "")
             )
+            if tank.get("vent"):
+                gas = tank["vent"]
+                lines.append(
+                    f"    vent {gas['stream']}: "
+                    + ", ".join(f"{n} {v:.4g}" for n, v in gas["kmol_h"].items())
+                    + " kmol/h; peak "
+                    + num(gas["peak_rate_kmol_s_m3"], " kmol/(s m3)", ".4g")
+                    + (f" at {gas['peak_time_s']:.6g} s" if gas["peak_time_s"] is not None else "")
+                )
+                lines += _vent_lines(gas)
+            if semi:
+                worst = tank["cooling_failure"]
+                x = tank["max_accumulation"]
+                lines.append(
+                    f"    dosing {tank['dosing_time_s']:.6g} s; accumulation of the dosed "
+                    + (
+                        f"reactant at most {x:.3g} (at {tank['max_accumulation_time_s']:.6g} s)"
+                        if x is not None
+                        else "reactant unknown"
+                    )
+                    + (
+                        f"; cooling failure at worst {worst['mtsr_K']:.6g} K "
+                        f"(at {worst['time_s']:.6g} s)"
+                        if worst
+                        else ""
+                    )
+                    + f"; peak cooling duty {num(tank['peak_cooling_duty_kW_m3'], ' kW/m3')}"
+                    + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
+                )
+        if r.get("model_duty"):
+            lines += report_lines(r["model_duty"])
         if r["missing"]:
             lines.append("  missing: " + "; ".join(dict.fromkeys(r["missing"])))
     if not report.reactors:
         lines.append("no reactors (no block or step names reactions or a reactor model)")
     return "\n".join(lines)
+
+
+def _vent_lines(gas: dict[str, Any]) -> list[str]:
+    """The lines of a vent's vapour, condenser and Henry split (ADR 0062)."""
+    lines = []
+    if gas.get("vapour_kmol_h"):
+        share = gas.get("vapour_share")
+        lines.append(
+            "      vapour carried off the liquid: "
+            + ", ".join(f"{n} {v:.4g}" for n, v in gas["vapour_kmol_h"].items())
+            + " kmol/h"
+            + (f" (the vapour {share:.3g} of the gas over the liquid at the end)" if share else "")
+        )
+    if gas.get("condensate_kmol_h"):
+        lines.append(
+            f"      condenser at {gas['temperature_K']:.6g} K condenses "
+            + ", ".join(f"{n} {v:.4g}" for n, v in gas["condensate_kmol_h"].items())
+            + " kmol/h"
+        )
+    if gas.get("condenser_duty"):
+        lines += ["    " + line for line in report_lines(gas["condenser_duty"])]
+    for n, h in (gas.get("henry") or {}).items():
+        lines.append(
+            f"      {n} dissolved {h['dissolved_kmol_h']:.4g} kmol/h "
+            f"(x {h['solubility_mole_fraction']:.4g} "
+            f"at {h['partial_pressure_kPa']:.4g} kPa, H {h['henry_kPa']:.4g} kPa), "
+            f"{h['share_vented']:.4g} of what formed vented; {h['state']}"
+        )
+    return lines
+
+
+def _duty_shown(r: dict[str, Any], num: Any) -> str:
+    """The header's duty: the ideal-gas H(out) - H(in), else the model's year-average duty
+    (ADR 0059), else ?."""
+    model = (r.get("model_duty") or {}).get("heat_in_kW")
+    if r["duty_kW"] is None and model is not None:
+        return f"{model:.6g} kW ({r['model_duty']['model']} model, year average)"
+    return num(r["duty_kW"], " kW")
+
+
+def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
+    """What ``process reactors`` adds for a vented batch or semi-batch (ADR 0054): what left by
+    the vent (kmol/h, the flowsheet's basis) and its peak rate per m3 of the content at the end,
+    for sizing the off-gas line and its scrubber (per batch: ``cheme process recipe``). With
+    the vent's vapour, condenser or Henry split (ADR 0062) also what the gas carried off the
+    liquid, what the condenser condensed, the vent's temperature and each gas's solubility."""
+    found: dict[str, Any] = {
+        "stream": stream,
+        "kmol_h": dict(solved.vent),
+        "peak_rate_kmol_s_m3": solved.peak_vent_rate,
+        "peak_time_s": solved.peak_vent_time,
+    }
+    if solved.vapour:
+        found["vapour_kmol_h"] = dict(solved.vapour)
+        found["vapour_share"] = solved.vapour_share
+        found["temperature_K"] = solved.vent_temperature
+    if solved.condensate:
+        found["condensate_kmol_h"] = dict(solved.condensate)
+    if solved.henry:
+        found["henry"] = {n: dict(v) for n, v in solved.henry.items()}
+    return {"vent": found}
+
+
+def semibatch_entry(solved: Any) -> dict[str, Any]:
+    """What ``process reactors`` adds for a semi-batch (:func:`.stirred_tank.solve_batch`):
+    the dosing, the accumulation of the dosed reactant, the worst cooling failure and the peak
+    cooling duty."""
+    worst = solved.cooling_failure
+    return {
+        "dosing_time_s": solved.dosing_time,
+        "charge_volume_m3": solved.charge_volume,
+        "max_accumulation": solved.max_accumulation,
+        "max_accumulation_time_s": solved.max_accumulation_time,
+        "cooling_failure": (
+            {"time_s": worst[0], "temperature_K": worst[1], "mtsr_K": worst[2]} if worst else None
+        ),
+        "peak_cooling_duty_kW_m3": solved.peak_cooling_duty,
+        "accumulation": [{"time_s": t, "accumulation": x} for t, x in solved.accumulation],
+    }

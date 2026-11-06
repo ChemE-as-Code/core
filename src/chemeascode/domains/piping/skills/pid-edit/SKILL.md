@@ -76,7 +76,10 @@ Read the `dexpi-xml` skill first if you have not in this session; its Convention
    Fix every `error`, then every new `warning`. Repeat until clean. Look at the PNG: symbols on
    their lines, lines meeting at node positions, labels readable and saying the right thing.
    The drawing rules see what an eye misses: `line-through-label`, `line-crossing`,
-   `label-overlap` and `label-far-from-owner` findings come with `[crop X0,Y0,X1,Y1]`; render
+   `label-overlap`, `label-far-from-owner`, `line-through-symbol`, `line-through-valve` (a
+   signal line through a valve to its actuator, an actuator drawn on the pipe: turn the stem at
+   right angles to the pipe, the signal arriving from the far side), `line-on-pipe` and
+   `line-not-orthogonal` (info) findings come with `[crop X0,Y0,X1,Y1]`; render
    that crop, fix the placement, and quote the `drawing <sheet>:` counts validate prints before
    you write "no overlaps" anywhere. A crossing you cannot avoid is accepted with a reason in
    `checks/checks.yaml` (`accept:`, by the finding's `[id ...]`), not left as a warning.

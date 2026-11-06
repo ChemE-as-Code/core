@@ -2,11 +2,12 @@
 
 One solute crystallizes from one solvent, as an anhydrous crystal or a hydrate (the crystal's
 formula is the solute's plus n solvent, e.g. ``Na2CO3(H2O)10`` from ``Na2CO3`` and ``H2O``), in a
-block or step with a ``crystallizer:`` (schema :class:`~.schema.Crystallizer`). The train is,
-in this order: the feed joined by the recycled mother liquor, evaporation of solvent (optional),
-crystallization at the crystallizer's temperature, a filter or centrifuge (optional) that sends
-the crystals with the liquid the cake holds to the cake, and the filtrate divided into the
-recycle and the purge (``mother_liquor``). The model:
+block or step with a ``crystallizer:`` (schema :class:`~.schema.Crystallizer`), from one or more
+material inlets taken together. The train is, in this order: the feed joined by the recycled
+mother liquor, evaporation of solvent (optional), crystallization at the crystallizer's
+temperature, a filter or centrifuge (optional) that sends the crystals with the liquid the cake
+holds to the cake, and the filtrate divided into the recycle and the purge (``mother_liquor``).
+The model:
 
 - **basis: solubility** (predictive within the solubility data): the mother liquor leaves
   saturated at the crystallizer's temperature, so the crystals are what the solute and solvent
@@ -23,20 +24,36 @@ recycle and the purge (``mother_liquor``). The model:
 - the energy balance (with ``energy:``) is lumped over the whole train: the fresh feed's
   sensible heat from its temperature to the crystallizer's (constant heat capacity), the heat of
   crystallization of the crystals formed and the latent heat of the solvent evaporated, every
-  outlet at the crystallizer's temperature: ``Q = F cp (T - T_feed) + C dH_cryst + E lambda``.
+  outlet at the crystallizer's temperature: ``Q = F cp (T - T_feed) + C dH_cryst + E lambda``
+  (several inlets: their mass-weighted mean temperature, exact for one heat capacity);
+- **a mixed liquor** (``spectators:``, ADR 0056): other dissolved components (a salt, a base,
+  unreacted reagent) pass with the liquor unchanged, never crystallizing or evaporating. The
+  solubility then holds in that liquor: measured in it (``measured_in: mother_liquor``; per kg
+  of solvent, per kg of solute-free liquor ``L = W + P`` (P the spectators), or as the solute's
+  mass fraction in the saturated liquor, which is ``x / (1 - x)`` per kg of L), so that
+  ``C = (S - s (W + P)) / (a - s (1 - a))``; or the pure solvent's corrected by Setschenow
+  coefficients, ``log10(s0 / s) = sum k_i m_i`` with ``m_i`` the spectator's molality in the
+  mother liquor (mol per kg of free solvent; with a hydrate solved by successive substitution,
+  the hydrate's water leaving the liquor). A pure-solvent solubility alone is refused;
+- **a reslurry wash** is a crystallizer fed by the cake and the wash liquid (two inlets): the
+  crystals dissolve until the liquid is saturated (all of them when it stays undersaturated),
+  followed by its own or a separate filter.
 
 Not modelled (and so never claimed): supersaturation, nucleation and growth kinetics, crystal
-size distribution (no population balance), several solutes, impurities or common-ion effects,
-solid solutions, polymorph or hydrate transitions (one crystal form, the one declared), washing,
-the evaporator's own solubility limit, heats of dilution, filtration or centrifuge rates.
+size distribution (no population balance), several crystallizing solutes, a spectator's own
+solubility limit, common-ion effects beyond the declared data, electrolyte activity models,
+solid solutions, polymorph or hydrate transitions (one crystal form, the one declared),
+displacement washing, the evaporator's own solubility limit, heats of dilution, filtration or
+centrifuge rates.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from chemeascode.domains.chemistry.formulas import ATOMIC_MASS, parse_formula
 from chemeascode.domains.process import FLOWSHEET_FILE, MATERIALS_FILE
@@ -57,6 +74,13 @@ ASSUMPTIONS = (
     "filter or centrifuge specified: solid recovery and cake liquid given, the liquid divides "
     "with one composition between cake and filtrate (no washing)",
 )
+#: What the crystallizer assumes besides, with spectator solutes (ADR 0056).
+LIQUOR_ASSUMPTIONS = (
+    "spectator solutes stay dissolved and non-volatile: they leave with the liquor unchanged and "
+    "their own solubility limit is not checked",
+    "the solute's solubility in the mixed liquor from data measured in it or from Setschenow "
+    "salting-out coefficients on the molal scale (no electrolyte activity model)",
+)
 #: What a filter or centrifuge on its own assumes.
 SEPARATION_ASSUMPTIONS = (
     "steady state",
@@ -66,6 +90,9 @@ SEPARATION_ASSUMPTIONS = (
 #: Relative tolerance of the recycle loop, on the fresh feed's mass flow.
 RECYCLE_TOLERANCE = 1e-10
 MAX_ITERATIONS = 200_000
+#: The salting-out correction with a hydrate: successive substitution on the free solvent.
+SALTING_TOLERANCE = 1e-13
+SALTING_ITERATIONS = 1000
 
 
 class CrystallizationError(ValueError):
@@ -131,34 +158,86 @@ def crystal_form(solute: str, solvent: str, crystal: str) -> CrystalForm:
 
 @dataclass(frozen=True)
 class Slurry:
-    """kg/h of dissolved (anhydrous) solute, free solvent and crystals."""
+    """kg/h of dissolved (anhydrous) solute, free solvent and crystals, and of each spectator
+    solute (dissolved, carried unchanged)."""
 
     solute: float = 0.0
     solvent: float = 0.0
     crystal: float = 0.0
+    spectators: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def others(self) -> float:
+        """kg/h of the spectator solutes together (P)."""
+        return sum(self.spectators.values())
 
     @property
     def total(self) -> float:
-        return self.solute + self.solvent + self.crystal
+        return self.solute + self.solvent + self.crystal + self.others
 
     @property
     def liquid(self) -> float:
-        return self.solute + self.solvent
+        return self.solute + self.solvent + self.others
 
     def __add__(self, other: Slurry) -> Slurry:
+        names = dict.fromkeys([*self.spectators, *other.spectators])
         return Slurry(
-            self.solute + other.solute, self.solvent + other.solvent, self.crystal + other.crystal
+            self.solute + other.solute,
+            self.solvent + other.solvent,
+            self.crystal + other.crystal,
+            {n: self.spectators.get(n, 0.0) + other.spectators.get(n, 0.0) for n in names},
         )
 
     def scaled(self, factor: float) -> Slurry:
-        return Slurry(self.solute * factor, self.solvent * factor, self.crystal * factor)
+        return Slurry(
+            self.solute * factor,
+            self.solvent * factor,
+            self.crystal * factor,
+            {n: v * factor for n, v in self.spectators.items()},
+        )
 
     def distance(self, other: Slurry) -> float:
+        names = {*self.spectators, *other.spectators}
         return max(
             abs(self.solute - other.solute),
             abs(self.solvent - other.solvent),
             abs(self.crystal - other.crystal),
+            *(abs(self.spectators.get(n, 0.0) - other.spectators.get(n, 0.0)) for n in names),
         )
+
+    def entry(self) -> dict[str, Any]:
+        """As the report gives it (``spectators`` only when there are any)."""
+        found = asdict(self) | {"total": self.total}
+        if not self.spectators:
+            del found["spectators"]
+        return found
+
+
+@dataclass(frozen=True)
+class Liquor:
+    """The spectator solutes of a crystallizer's mother liquor (ADR 0056): their molar masses
+    (kg/kmol) and atoms, what the solubility is per kg of (``solvent``, or ``liquor``: solvent
+    plus spectators) and the Setschenow coefficients (log10 basis, kg/mol) that correct a
+    pure-solvent solubility for them."""
+
+    molar_mass: dict[str, float]
+    atoms: dict[str, dict[str, int]] = field(default_factory=dict)
+    basis: Literal["solvent", "liquor"] = "solvent"
+    salting_out: dict[str, float] = field(default_factory=dict)
+
+    def salting_mass(self, spectators: dict[str, float]) -> float:
+        """kg/h: ``sum_i k_i n_i`` (n_i in mol/h), so that the exponent is this over the free
+        solvent in kg/h."""
+        return sum(
+            k * 1000.0 * spectators.get(n, 0.0) / self.molar_mass[n]
+            for n, k in self.salting_out.items()
+        )
+
+    def molality(self, spectators: dict[str, float], free_solvent: float) -> dict[str, float]:
+        """mol per kg of free solvent of each spectator."""
+        if free_solvent <= 0:
+            return dict.fromkeys(spectators, math.inf)
+        return {n: 1000.0 * v / self.molar_mass[n] / free_solvent for n, v in spectators.items()}
 
 
 def solubility_at(spec: Any, temperature: float | None) -> float:
@@ -195,6 +274,9 @@ class Stage:
     #: Crystals formed at equilibrium (None without solubility data).
     equilibrium_crystal: float | None
     undersaturated: bool = False
+    #: kg/kg (the solubility's basis): the solubility in the mother liquor at the solution (the
+    #: declared one, or the salting-out corrected one).
+    solubility: float | None = None
 
 
 def _evaporated(feed: Slurry, evaporation: Any) -> float:
@@ -210,7 +292,7 @@ def _evaporated(feed: Slurry, evaporation: Any) -> float:
         x = evaporation.concentration
         if feed.solute <= 0:
             raise CrystallizationError("evaporation to a concentration: the feed holds no solute")
-        removed = feed.solvent - feed.solute * (1.0 - x) / x
+        removed = feed.solvent - (feed.solute * (1.0 - x) / x - feed.others)
         if removed < -1e-9 * max(feed.total, 1.0):
             raise CrystallizationError(
                 f"evaporation: the feed's liquid already holds more than {x:g} solute "
@@ -225,6 +307,45 @@ def _evaporated(feed: Slurry, evaporation: Any) -> float:
     return removed
 
 
+def _equilibrium(
+    solute: float,
+    solvent: float,
+    spectators: dict[str, float],
+    a: float,
+    solubility: float,
+    liquor: Liquor | None,
+) -> tuple[float, float]:
+    """(crystals at equilibrium, kg/h, negative when undersaturated; the solubility in the
+    mother liquor) for *solute* (anhydrous, dissolved and as crystals) and *solvent* (free and
+    in the crystals): ``C = (S - s (W + beta P)) / (a - s (1 - a))``, beta 1 when the solubility
+    is per kg of solute-free liquor. A salting-out correction makes ``s`` depend on the free
+    solvent the hydrate leaves, solved by successive substitution."""
+    per_liquor = liquor is not None and liquor.basis == "liquor"
+    base = solvent + (sum(spectators.values()) if per_liquor else 0.0)
+    salting = liquor.salting_mass(spectators) if liquor is not None else 0.0
+    free = solvent
+    for _ in range(SALTING_ITERATIONS):
+        if salting and free <= 0:
+            raise CrystallizationError("the mother liquor holds no free solvent")
+        s = solubility * 10.0 ** (-salting / free) if salting else solubility
+        denominator = a - s * (1.0 - a)
+        if denominator <= 0:
+            raise CrystallizationError(
+                f"the crystal holds less solute ({a:.4g} kg/kg) than the saturated liquor: it "
+                "cannot crystallize from it at this solubility"
+            )
+        crystal = (solute - s * base) / denominator
+        if not salting or a >= 1.0:
+            return crystal, s
+        new = solvent - (1.0 - a) * max(crystal, 0.0)
+        if abs(new - free) <= SALTING_TOLERANCE * max(solvent, 1e-9):
+            return crystal, s
+        free = new
+    raise CrystallizationError(
+        f"the salting-out correction did not converge in {SALTING_ITERATIONS} iterations"
+    )
+
+
 def crystallize(
     feed: Slurry,
     form: CrystalForm,
@@ -232,10 +353,13 @@ def crystallize(
     solubility: float | None = None,
     imposed_yield: float | None = None,
     evaporation: Any = None,
+    liquor: Liquor | None = None,
 ) -> Stage:
-    """Evaporation, then crystallization: by *solubility* (kg/kg solvent; the yield follows) or
+    """Evaporation, then crystallization: by *solubility* (kg/kg solvent, or per kg of
+    solute-free liquor and corrected for salting-out as *liquor* says; the yield follows) or
     by *imposed_yield* (the fraction of the entering anhydrous solute, dissolved or as crystals,
-    that leaves as crystals). Both given: the yield is imposed, the solubility only compared."""
+    that leaves as crystals). Both given: the yield is imposed, the solubility only compared.
+    The feed's spectators pass unchanged."""
     if solubility is None and imposed_yield is None:
         raise CrystallizationError("neither a solubility nor an imposed yield")
     removed = _evaporated(feed, evaporation)
@@ -244,24 +368,23 @@ def crystallize(
     solvent = feed.solvent - removed + (1.0 - a) * feed.crystal
     equilibrium = None
     undersaturated = False
+    effective = None
     if solubility is not None:
-        denominator = a - solubility * (1.0 - a)
-        if denominator <= 0:
-            raise CrystallizationError(
-                f"the crystal holds less solute ({a:.4g} kg/kg) than the saturated liquor: it "
-                "cannot crystallize from it at this solubility"
-            )
-        equilibrium = (solute - solubility * solvent) / denominator
+        equilibrium, effective = _equilibrium(
+            solute, solvent, feed.spectators, a, solubility, liquor
+        )
         undersaturated = equilibrium < 0
         equilibrium = max(equilibrium, 0.0)
     crystal = imposed_yield * solute / a if imposed_yield is not None else equilibrium
     assert crystal is not None
-    liquor = Slurry(solute - a * crystal, solvent - (1.0 - a) * crystal, crystal)
-    if liquor.solvent < -1e-9 * max(feed.total, 1.0):
+    slurry = Slurry(
+        solute - a * crystal, solvent - (1.0 - a) * crystal, crystal, dict(feed.spectators)
+    )
+    if slurry.solvent < -1e-9 * max(feed.total, 1.0):
         raise CrystallizationError(
             "the imposed yield binds more solvent in the hydrate than the liquor holds"
         )
-    return Stage(removed, liquor, equilibrium, undersaturated)
+    return Stage(removed, slurry, equilibrium, undersaturated, effective)
 
 
 def cake_liquid_of(solid: float, cake_liquid: Any) -> float:
@@ -294,10 +417,20 @@ def separate_solids(
 
 def _separate(slurry: Slurry, separation: Any) -> tuple[Slurry, Slurry]:
     mass = {"solute": slurry.solute, "solvent": slurry.solvent, "crystal": slurry.crystal}
+    mass |= {f"spectator:{n}": v for n, v in slurry.spectators.items()}
     cake, filtrate = separate_solids(
         mass, {"crystal"}, separation.solid_recovery, separation.cake_liquid
     )
-    return Slurry(**cake), Slurry(**filtrate)
+
+    def rebuilt(part: dict[str, float]) -> Slurry:
+        return Slurry(
+            part["solute"],
+            part["solvent"],
+            part["crystal"],
+            {n: part[f"spectator:{n}"] for n in slurry.spectators},
+        )
+
+    return rebuilt(cake), rebuilt(filtrate)
 
 
 @dataclass
@@ -307,6 +440,8 @@ class TrainResult:
     streams: dict[str, Slurry]
     form: CrystalForm
     basis: str
+    #: kg/kg of free solvent: the declared solubility, or with spectators the mother liquor's
+    #: at the solution (per kg of solvent, salting out applied).
     solubility: float | None
     temperature: float | None
     crystals_formed: float
@@ -321,9 +456,14 @@ class TrainResult:
     balances: dict[str, Any] = field(default_factory=dict)
     energy: dict[str, Any] | None = None
     notes: list[str] = field(default_factory=list)
+    #: With spectator solutes: the mother liquor's solubility basis, the declared value and
+    #: its value at the solution in that basis (``solubility`` above is then the mother
+    #: liquor's per kg of free solvent), the salting-out factor and the spectators' molality
+    #: (ADR 0056); None for one solute in one solvent.
+    liquor: dict[str, Any] | None = None
 
     def entry(self) -> dict[str, Any]:
-        return {
+        found = {
             "basis": self.basis,
             "temperature_K": self.temperature,
             "solubility_kg_per_kg_solvent": self.solubility,
@@ -336,11 +476,14 @@ class TrainResult:
             "product_recovery": self.product_recovery,
             "iterations": self.iterations,
             "loop_residual_kg_h": self.loop_residual,
-            "streams": {k: asdict(v) | {"total": v.total} for k, v in self.streams.items()},
+            "streams": {k: v.entry() for k, v in self.streams.items()},
             "balances": self.balances,
             "energy": self.energy,
             "notes": self.notes,
         }
+        if self.liquor is not None:
+            found["mother_liquor"] = self.liquor
+        return found
 
 
 def solve_train(
@@ -355,9 +498,13 @@ def solve_train(
     temperature: float | None = None,
     energy: Any = None,
     feed_temperature: float | None = None,
+    liquor: Liquor | None = None,
 ) -> TrainResult:
     """The whole train for the fresh *feed*; see the module docstring. *recycle* is the
-    fraction of the filtrate returned to the feed (needs *separation*)."""
+    fraction of the filtrate returned to the feed (needs *separation*); *liquor* describes the
+    feed's spectator solutes (needed when it has any)."""
+    if feed.spectators and liquor is None:
+        raise CrystallizationError("spectator solutes need their liquor data (Liquor)")
     if recycle and separation is None:
         raise CrystallizationError("a recycle needs a filter or centrifuge (separation)")
     tolerance = RECYCLE_TOLERANCE * max(feed.total, 1e-9)
@@ -373,6 +520,7 @@ def solve_train(
             solubility=solubility,
             imposed_yield=imposed_yield,
             evaporation=evaporation,
+            liquor=liquor,
         )
         if separation is None:
             break
@@ -445,7 +593,30 @@ def solve_train(
             f"{stage.equilibrium_crystal:.6g} kg/h at equilibrium: the liquor would be below its "
             "solubility"
         )
-    result.balances = train_balances(feed, outlets, form)
+    result.balances = train_balances(feed, outlets, form, liquor)
+    if feed.spectators and liquor is not None:
+        ml = stage.slurry
+        free = ml.solvent
+        # the report's solubility_kg_per_kg_solvent: the mother liquor's at the solution, per kg
+        # of free solvent (the declared value may be per kg of liquor, or before salting out)
+        per_solvent = stage.solubility
+        if per_solvent is not None and liquor.basis == "liquor":
+            others = sum(ml.spectators.values())
+            per_solvent = per_solvent * (free + others) / free if free > 0 else None
+        result.solubility = per_solvent
+        result.liquor = {
+            "spectators": sorted(feed.spectators),
+            "solubility_basis": "kg/kg_liquor" if liquor.basis == "liquor" else "kg/kg_solvent",
+            "declared_solubility": solubility,
+            "solubility": stage.solubility,
+            "salting_out_factor": (
+                stage.solubility / solubility
+                if liquor.salting_out and solubility and stage.solubility is not None
+                else None
+            ),
+            "molality_mol_per_kg_solvent": liquor.molality(ml.spectators, free),
+            "solute_mass_fraction": ml.solute / ml.liquid if ml.liquid > 0 else None,
+        }
     if energy is not None:
         result.energy = energy_balance(
             feed, stage.vapour, result.crystals_formed, energy, temperature, feed_temperature
@@ -453,9 +624,11 @@ def solve_train(
     return result
 
 
-def train_balances(feed: Slurry, outlets: dict[str, Slurry], form: CrystalForm) -> dict[str, Any]:
-    """Mass, anhydrous solute, total solvent (with the hydrate's) and elements, fresh feed
-    against the outlets, as (in, out, residual) in kg/h (elements: kmol/h)."""
+def train_balances(
+    feed: Slurry, outlets: dict[str, Slurry], form: CrystalForm, liquor: Liquor | None = None
+) -> dict[str, Any]:
+    """Mass, anhydrous solute, total solvent (with the hydrate's), each spectator and elements,
+    fresh feed against the outlets, as (in, out, residual) in kg/h (elements: kmol/h)."""
     a = form.solute_fraction
 
     def triple(x: float, y: float) -> dict[str, float]:
@@ -472,6 +645,10 @@ def train_balances(feed: Slurry, outlets: dict[str, Slurry], form: CrystalForm) 
         ):
             for element, n in form.atoms[role].items():
                 found[element] = found.get(element, 0.0) + kg / mw * n
+        if liquor is not None:
+            for name, kg in s.spectators.items():
+                for element, n in liquor.atoms.get(name, {}).items():
+                    found[element] = found.get(element, 0.0) + kg / liquor.molar_mass[name] * n
         return found
 
     e_in = elements(feed)
@@ -479,7 +656,7 @@ def train_balances(feed: Slurry, outlets: dict[str, Slurry], form: CrystalForm) 
     for s in out:
         for k, v in elements(s).items():
             e_out[k] = e_out.get(k, 0.0) + v
-    return {
+    found = {
         "mass": triple(feed.total, sum(s.total for s in out)),
         "solute": triple(
             feed.solute + a * feed.crystal, sum(s.solute + a * s.crystal for s in out)
@@ -492,6 +669,12 @@ def train_balances(feed: Slurry, outlets: dict[str, Slurry], form: CrystalForm) 
             e: triple(e_in.get(e, 0.0), e_out.get(e, 0.0)) for e in sorted({*e_in, *e_out})
         },
     }
+    if feed.spectators:
+        found["spectators"] = {
+            n: triple(v, sum(s.spectators.get(n, 0.0) for s in out))
+            for n, v in sorted(feed.spectators.items())
+        }
+    return found
 
 
 def energy_balance(
@@ -558,21 +741,96 @@ def _temperature_of(process: Any, stream: Any, case: str) -> float | None:
     return to_kelvin(q.value, q.unit or process.flowsheet.units.temperature)
 
 
+def _inlets(inlet: Any) -> list[Any]:
+    return list(inlet) if isinstance(inlet, list | tuple) else [inlet]
+
+
 def node_feed(process: Any, spec: Any, inlet: Any, case: str) -> Slurry:
-    """The crystallizer's fresh feed from its inlet stream; Unsupported for a component other
-    than its solute, solvent and crystal."""
-    mass = _inlet_mass(process, inlet, case)
-    others = sorted(n for n, v in mass.items() if v and n not in (spec.solute, spec.solvent))
-    others = [n for n in others if n != spec.crystal]
-    if others:
-        raise Unsupported(
-            f"inlet {inlet.id} holds {', '.join(others)}: the crystallizer models one solute "
-            f"({spec.solute}) in one solvent ({spec.solvent}); impurities and several solutes "
-            "are not modelled"
+    """The crystallizer's fresh feed from its inlet stream (or streams, taken together);
+    Unsupported for a component other than its solute, solvent, crystal and spectators."""
+    feed = Slurry()
+    for stream in _inlets(inlet):
+        mass = _inlet_mass(process, stream, case)
+        known = {spec.solute, spec.solvent, spec.crystal, *spec.spectators}
+        others = sorted(n for n, v in mass.items() if v and n not in known)
+        if others:
+            raise Unsupported(
+                f"inlet {stream.id} holds {', '.join(others)}: the crystallizer models one "
+                f"solute ({spec.solute}) in one solvent ({spec.solvent}); impurities and several "
+                "solutes are not modelled unless declared as spectators: (dissolved, carried "
+                "unchanged, with a solubility measured in that liquor or a salting_out:)"
+            )
+        feed = feed + Slurry(
+            mass.get(spec.solute, 0.0),
+            mass.get(spec.solvent, 0.0),
+            mass.get(spec.crystal, 0.0),
+            {n: mass.get(n, 0.0) for n in spec.spectators},
         )
-    return Slurry(
-        mass.get(spec.solute, 0.0), mass.get(spec.solvent, 0.0), mass.get(spec.crystal, 0.0)
+    return feed
+
+
+def _molar_mass(component: Any) -> float | None:
+    from chemeascode.domains.chemistry.formulas import molar_mass
+
+    if component.molar_mass:
+        return component.molar_mass
+    return molar_mass(component.formula) if component.formula else None
+
+
+def liquor_of(process: Any, spec: Any) -> Liquor | None:
+    """The crystallizer's :class:`Liquor` (None without spectators); CrystallizationError when a
+    spectator is not a component or has no molar mass."""
+    if not spec.spectators:
+        return None
+    comps = process.components()
+    lacking = [n for n in spec.spectators if n not in comps]
+    if lacking:
+        raise CrystallizationError("spectators not in materials.yaml: " + ", ".join(lacking))
+    masses = {n: _molar_mass(comps[n]) for n in spec.spectators}
+    if unknown := [n for n, m in masses.items() if not m]:
+        raise CrystallizationError(
+            "no molar mass (molar_mass or formula) of the spectators " + ", ".join(unknown)
+        )
+    sol = spec.solubility
+    per_liquor = (
+        sol is not None and sol.measured_in == "mother_liquor" and sol.unit != "kg/kg_solvent"
     )
+    salting = sol.salting_out if sol is not None else None
+    factor = 1.0 / math.log(10.0) if salting is not None and salting.log == "ln" else 1.0
+    return Liquor(
+        molar_mass={n: m for n, m in masses.items() if m},
+        atoms={n: dict(parse_formula(comps[n].formula) or {}) for n in spec.spectators},
+        basis="liquor" if per_liquor else "solvent",
+        salting_out={n: k * factor for n, k in (salting.coefficients if salting else {}).items()},
+    )
+
+
+def pure_solvent_only(spec: Any) -> bool:
+    """Whether the crystallizer's solubility is a pure-solvent value although it declares
+    spectators (refused: no silent pure-solvent value in a mixed liquor)."""
+    sol = spec.solubility
+    return bool(
+        spec.spectators
+        and sol is not None
+        and sol.measured_in == "pure_solvent"
+        and sol.salting_out is None
+    )
+
+
+def _feed_temperature(process: Any, inlets: list[Any], case: str) -> float | None:
+    """K: the one inlet's temperature, or the mass-weighted mean of several (None when one is
+    not known)."""
+    if len(inlets) == 1:
+        return _temperature_of(process, inlets[0], case)
+    weighted = total = 0.0
+    for stream in inlets:
+        t = _temperature_of(process, stream, case)
+        if t is None:
+            return None
+        kg = sum(_inlet_mass(process, stream, case).values())
+        weighted += kg * t
+        total += kg
+    return weighted / total if total > 0 else None
 
 
 def form_of(process: Any, spec: Any) -> CrystalForm:
@@ -584,11 +842,21 @@ def form_of(process: Any, spec: Any) -> CrystalForm:
 
 
 def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TrainResult, dict]:
-    """The train of crystallizer *node* fed by stream *inlet* in *case*, and what its
-    solution depends on besides the inlet (for the outlets' fingerprints)."""
+    """The train of crystallizer *node* fed by stream *inlet* (or a list of streams, taken
+    together) in *case*, and what its solution depends on besides the inlets (for the outlets'
+    fingerprints)."""
     spec = node.crystallizer
     form = form_of(process, spec)
-    feed = node_feed(process, spec, inlet, case)
+    inlets = _inlets(inlet)
+    feed = node_feed(process, spec, inlets, case)
+    liquor = liquor_of(process, spec)
+    if feed.others > 0 and pure_solvent_only(spec):
+        raise Unsupported(
+            f"the solubility of {spec.solute} is the pure solvent's, the liquor holds "
+            + ", ".join(n for n, v in feed.spectators.items() if v)
+            + ": no pure-solvent value in a mixed liquor (give data measured_in: mother_liquor "
+            "or salting_out: coefficients)"
+        )
     solubility = (
         solubility_at(spec.solubility, spec.temperature) if spec.solubility is not None else None
     )
@@ -603,10 +871,13 @@ def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TrainRes
         recycle=spec.recycle.fraction if spec.recycle is not None else 0.0,
         temperature=spec.temperature,
         energy=spec.energy,
-        feed_temperature=_temperature_of(process, inlet, case),
+        feed_temperature=_feed_temperature(process, inlets, case),
+        liquor=liquor,
     )
     formulas = {n: process.components()[n].formula for n in (spec.solute, spec.solvent)}
     formulas[spec.crystal] = process.components()[spec.crystal].formula
+    for name in spec.spectators:  # none for one solute in one solvent: the fingerprint stays
+        formulas[name] = process.components()[name].formula
     return result, {"crystallizer": spec.model_dump(mode="json"), "formulas": formulas}
 
 
@@ -616,6 +887,7 @@ def node_outlets(spec: Any, result: TrainResult) -> dict[str, dict[str, float]]:
     for role, port in spec.outlets.items():
         s = result.streams[role]
         found[port] = {spec.solute: s.solute, spec.solvent: s.solvent, spec.crystal: s.crystal}
+        found[port] |= {n: s.spectators.get(n, 0.0) for n in spec.spectators}
         if role == "vapour":
             found[port] = {spec.solvent: s.solvent}
     return found
@@ -629,7 +901,8 @@ def outlet_shape(spec: Any, role: str, result: TrainResult) -> dict[str, float]:
     if role in ("cake",):
         return {spec.crystal: 1.0}
     liquid = source.liquid or 1.0
-    return {spec.solute: source.solute / liquid, spec.solvent: source.solvent / liquid}
+    shape = {spec.solute: source.solute / liquid, spec.solvent: source.solvent / liquid}
+    return shape | {n: source.spectators.get(n, 0.0) / liquid for n in spec.spectators}
 
 
 def separate_node(
@@ -741,14 +1014,42 @@ def rules(process: Any) -> list[Finding]:
                     [node.id],
                     "outlets: {cake: PORT, mother_liquor: PORT, vapour: PORT} or {slurry: PORT}",
                 )
-            if len(_material_ports(node, "in")) != 1:
+            if not _material_ports(node, "in"):
                 add(
                     "error",
                     "crystallizer",
-                    f"{node.id}: a crystallizer takes one material inlet",
+                    f"{node.id}: a crystallizer takes at least one material inlet",
                     [key, index, "ports"],
                     [node.id],
-                    "mix the feeds (and an explicit recycle) in a Mixing step before it",
+                    "give it an inlet port (its inlets are taken together, e.g. a cake and "
+                    "its reslurry wash)",
+                )
+            for i, name in enumerate(spec.spectators):
+                if name not in comps:
+                    problem = "is not a component"
+                elif name in solids:
+                    problem = "is a solid component (a spectator stays dissolved)"
+                else:
+                    continue
+                add(
+                    "error",
+                    "crystallizer",
+                    f"{node.id}: crystallizer spectator {name!r} {problem}",
+                    [*loc, "spectators", i],
+                    [node.id],
+                    "spectators are dissolved components of materials.yaml, not phase: solid",
+                )
+            if pure_solvent_only(spec):
+                add(
+                    "error",
+                    "crystallizer",
+                    f"{node.id}: the solubility of {spec.solute} is the pure solvent's, but the "
+                    f"mother liquor holds the spectators {', '.join(spec.spectators)}",
+                    [*loc, "solubility"],
+                    [node.id],
+                    "give solubility data measured in that liquor (measured_in: mother_liquor) "
+                    "or salting_out: {coefficients: {SPECTATOR: k}} (Setschenow, kg/mol), "
+                    "each with its source",
                 )
             sol = spec.solubility
             if sol is not None and sol.points and spec.temperature is not None:
@@ -763,14 +1064,26 @@ def rules(process: Any) -> list[Finding]:
                         [node.id],
                         "add solubility points that bracket the temperature: no extrapolation",
                     )
-            for part in ("solubility", "yield_", "separation", "recycle", "energy", "evaporation"):
-                value = getattr(spec, part)
+            parts = [
+                (part.rstrip("_"), getattr(spec, part), [*loc, part.rstrip("_")])
+                for part in (
+                    "solubility",
+                    "yield_",
+                    "separation",
+                    "recycle",
+                    "energy",
+                    "evaporation",
+                )
+            ]
+            if sol is not None and sol.salting_out is not None:
+                parts.append(("salting_out", sol.salting_out, [*loc, "solubility", "salting_out"]))
+            for what, value, where in parts:
                 if value is not None and value.provenance == "given" and not value.source.strip():
                     add(
                         "warning",
                         "crystallizer",
-                        f"{node.id}: crystallizer {part.rstrip('_')} is given without a source",
-                        [*loc, part.rstrip("_")],
+                        f"{node.id}: crystallizer {what} is given without a source",
+                        where,
                         [node.id],
                         "give the source (handbook table, paper, vendor test)",
                     )
@@ -855,11 +1168,22 @@ class CrystallizerReport:
         )
 
 
-def _slurry_entries(process: Any, ports: dict[str, dict[str, float]]) -> dict[str, Any]:
+def _slurry_entries(
+    process: Any, ports: dict[str, dict[str, float]], volatiles: list[str] | None = None
+) -> dict[str, Any]:
+    """Outlet port -> its dry solid and liquid: the solid components and the rest, or for a
+    dryer (*volatiles*) its own split, the volatiles the liquid and everything else the dry
+    solid (what the cake liquid held dissolved is dried onto the crystals), so that the
+    product's moisture is the dryer's."""
     from chemeascode.domains.process.solids import divide, solid_components
 
-    solids = solid_components(process)
-    return {port: divide(port, mass, solids).entry() for port, mass in ports.items()}
+    if volatiles is None:
+        solids = solid_components(process)
+        return {port: divide(port, mass, solids).entry() for port, mass in ports.items()}
+    return {
+        port: divide(port, mass, {n for n in mass if n not in volatiles}).entry()
+        for port, mass in ports.items()
+    }
 
 
 def _flowsheet_outlets(process: Any, node: Any, case: str) -> dict[str, Any]:
@@ -899,25 +1223,39 @@ def _compare(process: Any, node: Any, case: str, ports: dict[str, dict[str, floa
 
 
 def _inlet(process: Any, node: Any) -> Any:
+    """The material inlet stream of a filter (one), or a crystallizer's inlet streams (a
+    list, at least one)."""
     ins = [
         s
         for s in process.flowsheet.streams
         if s.kind == "material" and (end := process.ends(s)[1]) is not None and end.node == node.id
     ]
+    if node.crystallizer is not None:
+        if not ins:
+            raise CrystallizationError("no material inlet stream")
+        return ins
     if len(ins) != 1:
         raise CrystallizationError(f"{len(ins)} material inlet streams, one needed")
     return ins[0]
 
 
 def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
-    """One crystallizer or filter in *case*: its basis, solution, outlets as dry solid and
-    liquid, balances, energy, assumptions and limitations (or the reason it is not solved)."""
+    """One crystallizer, filter or dryer in *case*: its basis, solution, outlets as dry solid
+    and liquid, balances, energy, assumptions and limitations (or the reason it is not solved).
+    A dryer's heating stream that differs from its duty is in ``duty_differences``."""
     from chemeascode.domains.process.model_basis import solids_basis
 
     basis = solids_basis(process, node)
+    model = (
+        "crystallizer"
+        if node.crystallizer is not None
+        else "dryer"
+        if node.dryer is not None
+        else "solid_separation"
+    )
     entry: dict[str, Any] = {
         "node": node.id,
-        "model": "crystallizer" if node.crystallizer is not None else "solid_separation",
+        "model": model,
         "basis": basis.basis,
         "predictive": basis.predictive,
         "sourced": basis.sourced,
@@ -928,18 +1266,29 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         "solution": None,
         "outlets": {},
         "differences": [],
+        "duty_differences": [],
         "problem": None,
         "unsupported": False,
     }
     try:
         inlet = _inlet(process, node)
-        if node.crystallizer is not None:
+        if node.dryer is not None:
+            from chemeascode.domains.process.dryer import DryerError, dryer_entry
+
+            try:
+                ports, entry["solution"], differ = dryer_entry(process, node, inlet, case)
+            except DryerError as failure:
+                raise CrystallizationError(str(failure)) from failure
+            entry["duty_differences"] = differ
+        elif node.crystallizer is not None:
             result, _ = solve_node(process, node, inlet, case)
             ports = node_outlets(node.crystallizer, result)
             entry["solution"] = result.entry()
+            _metal_entry(process, node, case, result, entry["solution"])
         else:
             ports, _ = separate_node(process, node, inlet, case)
-        entry["outlets"] = _slurry_entries(process, ports)
+        volatiles = list(node.dryer.volatiles) if node.dryer is not None else None
+        entry["outlets"] = _slurry_entries(process, ports, volatiles)
         entry["differences"] = _compare(process, node, case, ports)
     except CrystallizationError as failure:
         entry["problem"] = str(failure)
@@ -947,9 +1296,25 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
     return entry
 
 
+def _metal_entry(process: Any, node: Any, case: str, result: Any, solution: dict[str, Any]) -> None:
+    """In a recipe vessel with ``metal_heat_capacity`` (ADR 0063): the model's year-average
+    duty its energy stream carries, the metal cooled or heated with the feed included
+    (``model_duty``); a crystallizer outside such a vessel reports as before."""
+    from chemeascode.domains.process.duties import crystallizer_duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        if metal_of(process, node.id, case) is None:
+            return
+    except ValueError:
+        pass  # declared, its batch's hours not known: the duty says so
+    solution["model_duty"] = crystallizer_duty(node, result, process, case).entry()
+
+
 def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerReport:
-    """Every crystallizer and filter or centrifuge (``crystallizer:``, ``solid_separation:``)
-    of the plant repository at *root* in *case* (default: the default case). Raises
+    """Every crystallizer, filter or centrifuge and dryer (``crystallizer:``,
+    ``solid_separation:``, ``dryer:``) of the plant repository at *root* in *case* (default:
+    the default case). Raises
     :class:`NotAPlantRepository` and :class:`UnknownCase`; a process that does not load is
     reported through ``findings``."""
     from chemeascode.domains.process.model import load
@@ -970,7 +1335,7 @@ def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerRepo
     keys = {n.id: ("steps", i) for i, n in enumerate(fs.steps)}
     keys |= {n.id: ("blocks", i) for i, n in enumerate(fs.blocks)}
     for node in [*fs.blocks, *fs.steps]:
-        if node.crystallizer is None and node.solid_separation is None:
+        if node.crystallizer is None and node.solid_separation is None and node.dryer is None:
             continue
         entry = unit_entry(process, node, case)
         report.units.append(entry)
@@ -1005,6 +1370,19 @@ def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerRepo
                     "the specification",
                 )
             )
+        for text in entry["duty_differences"]:
+            report.findings.append(
+                Finding(
+                    FLOWSHEET_FILE,
+                    "warning",
+                    "cheme.process-dryer-duty",
+                    f"{node.id} ({case}): {text}",
+                    line=_yaml_line(process.flowsheet_doc, [*loc, "dryer", "energy"]),
+                    ids=[node.id],
+                    hint="write the model's duty on the heating stream, or correct dryer.energy "
+                    "(heat capacity, latent heats, efficiency)",
+                )
+            )
         for note in (entry["solution"] or {}).get("notes", []):
             report.findings.append(
                 Finding(
@@ -1037,7 +1415,11 @@ def report_text(report: CrystallizerReport) -> str:
         if u["problem"]:
             lines.append(f"  not solved: {u['problem']}")
         sol = u["solution"]
-        if sol:
+        if sol and u["model"] == "dryer":
+            from chemeascode.domains.process.dryer import solution_lines
+
+            lines += solution_lines(sol)
+        elif sol:
             lines.append(
                 f"  crystals formed {num(sol['crystals_formed_kg_h'], ' kg/h')}"
                 + (
@@ -1058,7 +1440,40 @@ def report_text(report: CrystallizerReport) -> str:
                     ".3g",
                 )
             )
+            if ml := sol.get("mother_liquor"):
+                factor = ml.get("salting_out_factor")
+                declared = num(ml.get("declared_solubility"), fmt=".4g")
+                lines.append(
+                    f"  mother liquor: solubility {num(ml['solubility'], fmt='.4g')} "
+                    f"{ml['solubility_basis']} (declared {declared}"
+                    + (f", salting-out factor {factor:.4g}" if factor is not None else "")
+                    + f"), {num(sol['solubility_kg_per_kg_solvent'], fmt='.4g')} kg/kg_solvent"
+                )
+                spectators = b.get("spectators") or {}
+                molality = ml.get("molality_mol_per_kg_solvent") or {}
+                lines.append(
+                    "  spectators: "
+                    + ", ".join(
+                        f"{n} {num(molality.get(n), ' mol/kg', '.4g')}" for n in ml["spectators"]
+                    )
+                    + "; max residual "
+                    + num(
+                        max((abs(v["residual"]) for v in spectators.values()), default=0.0),
+                        " kg/h",
+                        ".3g",
+                    )
+                )
             energy = sol["energy"]
+            if model_duty := sol.get("model_duty"):  # with the vessel's metal (ADR 0063)
+                terms = ", ".join(f"{k} {v:.6g}" for k, v in model_duty["terms_kW"].items())
+                lines.append(
+                    "  year-average duty "
+                    + (
+                        f"{model_duty['heat_in_kW']:.6g} kW ({terms} kW)"
+                        if model_duty["heat_in_kW"] is not None
+                        else "? (" + "; ".join(model_duty["missing"]) + ")"
+                    )
+                )
             if energy:
                 if energy["duty_kW"] is None:
                     lines.append("  energy: missing " + "; ".join(energy["missing"]))
@@ -1076,8 +1491,10 @@ def report_text(report: CrystallizerReport) -> str:
                 f"liquid {o['liquid_kg_h']:.6g}"
                 + (f", moisture {moisture:.4g}" if o["dry_solid_kg_h"] > 0 else "")
             )
-        for text in u["differences"]:
+        for text in u["differences"] + u.get("duty_differences", []):
             lines.append(f"  differs: {text}")
     if not report.units:
-        lines.append("no crystallizer or solid separation (crystallizer:, solid_separation:)")
+        lines.append(
+            "no crystallizer, solid separation or dryer (crystallizer:, solid_separation:, dryer:)"
+        )
     return "\n".join(lines)

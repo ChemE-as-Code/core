@@ -185,7 +185,7 @@ def test_template_and_init_say_how_to_keep_the_reference_sheet(plant: Path, tmp_
     assert not gate.accept
     by_id = {r.id: r for r in run_checks(Workspace(plant), stage="basic")}
     assert by_id["drawing-clean"].status == "fail"
-    marker = "            cheme.label-far-from-owner]\n"
+    marker = "            cheme.line-not-orthogonal, cheme.offpage-not-on-edge]\n"
     assert text.count(marker) == 1
     checks.write_text(text.replace(marker, f"{marker}    accept: {line}\n"), encoding="utf-8")
     by_id = {r.id: r for r in run_checks(Workspace(plant), stage="basic")}

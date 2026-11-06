@@ -21,7 +21,13 @@ ones and never promote either on convergence alone:
 - crystallizers and filters (``crystallizer:``, ``solid_separation:``; :mod:`.crystallization`):
   ``solubility-equilibrium`` (predictive within its solubility data: the mother liquor leaves
   saturated), ``imposed-yield`` and ``solid-split`` (specified); solved by ``cheme process
-  propagate``, never simulated;
+  propagate``, never simulated; a dryer (``dryer:``; :mod:`.dryer`): ``residual-moisture``
+  (specified), solved the same way;
+- batch stills and solvent swaps (``still:``; :mod:`.batch_still`): ``rayleigh`` (predictive:
+  one equilibrium stage, Raoult's law with Antoine vapour pressures or a constant relative
+  volatility), ``batch-shortcut`` with a column (``still.column``: Diwekar's batch shortcut on
+  Fenske-Underwood-Gilliland, predictive); sourced when its volatility data carry a source;
+  solved by ``cheme process propagate``, never simulated;
 - an adsorber with an entry in ``process/adsorption.yaml`` (:mod:`.separations.adsorption`):
   ``adsorption-equilibrium`` (predictive, not simulated: core's equilibrium TSA cycle gives the
   recoveries, inside every isotherm's range, meeting the specification, and the simulator's
@@ -66,6 +72,8 @@ PREDICTIVE = (
     "shortcut",
     "solubility-equilibrium",
     "adsorption-equilibrium",
+    "rayleigh",
+    "batch-shortcut",
 )
 #: The propagate tool's source: its values follow from others and decide nothing here.
 _PROPAGATE = "cheme process propagate"
@@ -220,7 +228,7 @@ def _reactor_basis(
 ) -> UnitBasis:
     reactions, unknown = process.reactions_of(node.id)
     model = node.reactor
-    if model in ("pfr", "cstr", "batch"):
+    if model in ("pfr", "cstr", "batch", "semibatch"):
         lacking = [r.id for r in reactions if r.rate is None]
         unsourced = [
             r.id
@@ -238,8 +246,18 @@ def _reactor_basis(
             spec = node.tank if model == "cstr" else node.batch
             declared = "tank" if model == "cstr" else "batch"
             limitations = [] if spec is not None else [f"no {declared} declared"]
-            what = "stirred tank (CSTR)" if model == "cstr" else "batch (stirred, well mixed)"
+            what = {
+                "cstr": "stirred tank (CSTR)",
+                "batch": "batch (stirred, well mixed)",
+                "semibatch": "semi-batch (stirred, well mixed, dosed feeds)",
+            }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
+            assumptions += _heat_assumptions(spec) if model != "cstr" else []
+            vent = getattr(spec, "vent", None) if model != "cstr" else None
+            if vent is not None and (vent.vapour is not None or vent.henry):
+                from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
+
+                assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled
@@ -475,6 +493,184 @@ def _sourced(value: Any) -> bool:
     return value is not None and value.provenance == "given" and bool(value.source.strip())
 
 
+#: What replaces a still's "no heat-up" assumption with ``heat_up`` (ADR 0063).
+STILL_HEAT_UP = (
+    "heat_up: the charge heated from its inlet temperature to its bubble point at its "
+    "liquid_heat_capacity, counted in the duty; then constant boil-up, no sensible heat of the "
+    "content while it boils, no heat losses"
+)
+#: ... of a solvent swap with ``heat_up``.
+SWAP_HEAT_UP = (
+    "heat_up: the charge heated from its inlet temperature to its bubble point, and the feed "
+    "from its inlet temperature to the still's as it mixes in, at their liquid_heat_capacity, "
+    "counted in the duty; then constant boil-up, no sensible heat of the content while it "
+    "boils, no heat losses"
+)
+
+
+def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:
+    """A still's *assumptions* (:data:`.batch_still.ASSUMPTIONS`, or ``COLUMN_ASSUMPTIONS`` with
+    a column), with ``heat_up`` or a recipe vessel's metal (ADR 0063) the heat-up's and the
+    duty's (with a column the reboiler's) replaced by what the duty holds; as they are without
+    either, so such a still reports as before."""
+    from chemeascode.domains.process.recipe import vessel_metal
+
+    spec = node.still
+    metal = vessel_metal(process, node.id)
+    if not spec.heat_up and metal is None:
+        return list(assumptions)
+    duty = _LATENT
+    if spec.heat_up:
+        duty += " and the heat-up"
+    if metal is not None and spec.volatility.model == "constant":
+        # no temperature modelled: the metal is left out of the duty (ADR 0063)
+        duty += (
+            f"; the vessel's metal ({metal[1]}) is left out: a still at constant volatility "
+            "models no temperature"
+        )
+    elif metal is not None:
+        start = (
+            "its charge's temperature (the bubble point when the charge enters at or above it)"
+            if spec.heat_up
+            else "the bubble point at the start"
+        )
+        duty += (
+            f", with the vessel's metal ({metal[1]}, {metal[0]:g} kJ/K) heated with the content "
+            f"from {start} to its end temperature"
+        )
+    # with a column (ADR 0061): the reboiler's duty holds what the still's does, the
+    # condenser's stays the latent heat condensed (the heat-up and the metal stay in the pot)
+    reboiler = "the reboiler's duty is the latent heat of the vapour boiled up "
+    reboiler += "(heat_of_vaporization of the distillate's composition)" + duty[len(_LATENT) :]
+    reboiler += "; the condenser's the latent heat of the vapour condensed only"
+    found = []
+    for text in assumptions:
+        if text.startswith("constant boil-up from the start") and spec.heat_up:
+            text = SWAP_HEAT_UP if spec.feed is not None else STILL_HEAT_UP
+        elif text.startswith("the duty is the vapour's latent heat"):
+            text = duty
+        elif text.startswith("the reboiler's and the condenser's duty"):
+            text = reboiler
+        found.append(text)
+    return found
+
+
+_LATENT = "the duty is the vapour's latent heat (heat_of_vaporization near the still's temperature)"
+
+
+def _heat_assumptions(batch: Any) -> list[str]:
+    """What a batch's heats of solution and heat-up add to its assumptions (ADR 0063); none
+    without them, so a batch that uses neither reports as before."""
+    found = []
+    if batch is not None and any(d.heat_of_solution is not None for d in batch.dosing):
+        found.append(
+            "a dose's heat_of_solution is released as it mixes in, at the dose's rate (not "
+            "accumulated: not in the MTSR); the heats of the reactions consuming a dissolved "
+            "dose are taken on the dissolved basis"
+        )
+    if batch is not None and batch.heat_up:
+        found.append(
+            "heat_up: the charge heated from its inlet temperature to the batch's at its heat "
+            "capacity, counted in the duty (no heating time: the recipe's)"
+        )
+    return found
+
+
+def still_basis(process: Process, node: Any) -> UnitBasis:
+    """The basis of a batch still or solvent swap (``rayleigh``, predictive: one equilibrium
+    stage); :mod:`.batch_still`. Sourced when the volatility data are given with a source: the
+    relative volatilities, or, for Raoult's law, the ideal liquid itself (the volatility's own
+    provenance: an assumed ideal liquid, as for a pair with an azeotrope, is not sourced) and the
+    vapour pressure of every volatile component it holds."""
+    from chemeascode.domains.process.batch_still import (
+        ASSUMPTIONS,
+        COLUMN_ASSUMPTIONS,
+        _present,
+        inlets_of,
+    )
+    from chemeascode.domains.process.solids import solid_components
+
+    spec = node.still
+    vol = spec.volatility
+    sources: list[str] = []
+    lacking: list[str] = []
+    if vol.model == "constant":
+        detail = "constant relative volatility " + ", ".join(
+            f"{n} {a:g}" for n, a in vol.alpha.items()
+        )
+        if _sourced(vol):
+            sources.append(vol.source)
+        else:
+            lacking.append("relative volatilities")
+    else:
+        detail = "Raoult's law, Antoine vapour pressures"
+        if not _sourced(vol):
+            lacking.append("ideal liquid (volatility assumed)")
+        comps = process.components()
+        stays = set(spec.nonvolatile) | solid_components(process)
+        for name in sorted(_present(process, inlets_of(process, node)) - stays):
+            vp = getattr(comps.get(name), "vapour_pressure", None)
+            if _sourced(vp):
+                if vp.source not in sources:
+                    sources.append(vp.source)
+            else:
+                lacking.append(f"vapour pressure of {name}")
+    detail += f"; boil-up {spec.boilup.value:g} {spec.boilup.unit}"
+    column = spec.column
+    if column is not None:
+        stages = (
+            f"{column.stages:g} stages"
+            if column.stages is not None
+            else f"stages at {column.minimum_reflux_factor:g} x Rmin"
+        )
+        if column.reflux == "constant":
+            held = (
+                f"reflux ratio {column.ratio:g}" if column.ratio is not None else "constant reflux"
+            )
+        else:
+            held = (
+                f"distillate held at {column.distillate.mole_fraction:g} "  # type: ignore[union-attr]
+                f"{column.distillate.key} to reflux {column.maximum_ratio:g}"  # type: ignore[union-attr]
+            )
+        detail += f"; column {stages}, {held}"
+    if spec.feed is not None:
+        detail += f"; solvent swap ({spec.feed.mode.replace('_', ' ')})"
+    if spec.cuts:
+        detail += f"; {len(spec.cuts)} cuts"
+    if lacking:
+        detail += "; not sourced: " + ", ".join(lacking)
+    if column is not None:
+        return UnitBasis(
+            node.id,
+            "separator",
+            "batch-shortcut",
+            True,
+            not lacking,
+            detail=detail,
+            sources=sources,
+            assumptions=_still_assumptions(process, node, COLUMN_ASSUMPTIONS),
+            limitations=[
+                "not part of a converged simulation: solved by cheme process propagate",
+                "shortcut column: Gilliland's correlation, no holdup, constant molar overflow; "
+                "a rigorous column gives a purer distillate at the same reflux",
+            ],
+        )
+    return UnitBasis(
+        node.id,
+        "separator",
+        "rayleigh",
+        True,
+        not lacking,
+        detail=detail,
+        sources=sources,
+        assumptions=_still_assumptions(process, node, ASSUMPTIONS),
+        limitations=[
+            "not part of a converged simulation: solved by cheme process propagate",
+            "no rectification: a column above the still (reflux) is not modelled",
+        ],
+    )
+
+
 def solids_basis(process: Process, node: Any) -> UnitBasis:
     """The basis of a crystallizer (``solubility-equilibrium``, predictive within its
     solubility data; ``imposed-yield``, specified) or of a filter or centrifuge on its own
@@ -482,10 +678,30 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     ``cheme process propagate`` solves them."""
     from chemeascode.domains.process.crystallization import (
         ASSUMPTIONS,
+        LIQUOR_ASSUMPTIONS,
         SEPARATION_ASSUMPTIONS,
     )
 
     outside = "not part of a converged simulation: solved by cheme process propagate"
+    dryer = node.dryer
+    if dryer is not None:
+        from chemeascode.domains.process.dryer import ASSUMPTIONS as DRYER_ASSUMPTIONS
+
+        moisture = dryer.residual_moisture
+        sourced = _sourced(moisture)
+        return UnitBasis(
+            node.id,
+            "separator",
+            "residual-moisture",
+            False,
+            sourced,
+            detail=f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
+            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
+            + ("" if sourced else " (not given with a source: assumed)"),
+            sources=[moisture.source] if sourced else [],
+            assumptions=list(DRYER_ASSUMPTIONS),
+            limitations=["specified moisture: no drying curve or sorption isotherm", outside],
+        )
     sep = node.solid_separation
     if sep is not None:
         sourced = _sourced(sep)
@@ -507,7 +723,12 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     lacking: list[str] = []
     limitations = [outside, "no population balance (crystal size distribution not modelled)"]
     parts = [spec.solubility if spec.basis == "solubility" else spec.yield_, spec.separation]
-    for part, what in zip(parts, (spec.basis, "separation"), strict=True):
+    whats = [spec.basis, "separation"]
+    salting = spec.solubility.salting_out if spec.solubility is not None else None
+    if spec.basis == "solubility" and salting is not None:
+        parts.append(salting)
+        whats.append("salting_out")
+    for part, what in zip(parts, whats, strict=True):
         if part is None:
             continue
         if _sourced(part):
@@ -541,6 +762,24 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         limitations.append("specified separation: no filtration or centrifuge model")
     if spec.recycle is not None:
         detail += f"; mother liquor recycle {spec.recycle.fraction:g}"
+    assumptions = list(ASSUMPTIONS)
+    if spec.spectators:
+        sol = spec.solubility
+        how = (
+            "solubility measured in the mother liquor"
+            if sol is not None and sol.measured_in == "mother_liquor"
+            else "pure-solvent solubility with Setschenow salting-out"
+            if salting is not None
+            else "no solubility in the liquor"
+        )
+        detail += f"; spectators {', '.join(spec.spectators)} ({how})"
+        if sol is not None and sol.measured_in == "pure_solvent" and salting is None:
+            lacking.append("a solubility in the mixed liquor")
+        assumptions += LIQUOR_ASSUMPTIONS
+        limitations.append(
+            "mixed liquor: the solubility data hold at the liquor composition their source "
+            "states; no electrolyte activity model"
+        )
     if lacking:
         detail += "; not sourced: " + ", ".join(lacking)
     return UnitBasis(
@@ -551,7 +790,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         not lacking,
         detail=detail,
         sources=sources,
-        assumptions=list(ASSUMPTIONS),
+        assumptions=assumptions,
         limitations=limitations,
     )
 
@@ -626,7 +865,13 @@ def model_bases(
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]
-        elif node.crystallizer is not None or node.solid_separation is not None:
+        elif node.still is not None:
+            unit = still_basis(process, node)
+        elif (
+            node.crystallizer is not None
+            or node.solid_separation is not None
+            or node.dryer is not None
+        ):
             unit = solids_basis(process, node)
         elif reacting:
             unit = _reactor_basis(process, node, simulated, (runs or {}).get(node.id, []))

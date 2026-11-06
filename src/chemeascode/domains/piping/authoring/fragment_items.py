@@ -861,7 +861,27 @@ class SheetObstacles:
             SYMBOL_COST * sum(_segment_enters(a, b, box) for box in self.symbols)
             + TEXT_COST * sum(_segment_enters(a, b, box) for box in self.texts)
             + CROSSING_COST * sum(_cross(a, b, c, d) is not None for c, d in self.pipes)
+            + SYMBOL_COST * sum(_on_pipe(a, b, c, d) for c, d in self.pipes)
         )
+
+
+def _on_pipe(
+    a: tuple[float, float], b: tuple[float, float], c: tuple[float, float], d: tuple[float, float]
+) -> bool:
+    """Whether a-b runs on top of the pipe stretch c-d (``cheme.line-on-pipe``)."""
+    from chemeascode.domains.piping.drawing import ON_PIPE_DISTANCE, ON_PIPE_LENGTH
+
+    for axis in (0, 1):
+        across = 1 - axis
+        if abs(a[across] - b[across]) > _EPS or abs(c[across] - d[across]) > _EPS:
+            continue
+        if abs(a[across] - c[across]) > ON_PIPE_DISTANCE:
+            continue
+        low = max(min(a[axis], b[axis]), min(c[axis], d[axis]))
+        high = min(max(a[axis], b[axis]), max(c[axis], d[axis]))
+        if high - low > ON_PIPE_LENGTH:
+            return True
+    return False
 
 
 def sheet_obstacles(info: _SheetInfo | None) -> SheetObstacles:
@@ -875,6 +895,7 @@ def sheet_obstacles(info: _SheetInfo | None) -> SheetObstacles:
             context_from_xml,
             equipment_bodies,
             read_drawing,
+            valve_parts,
         )
         from chemeascode.domains.piping.render import load_model, svg_element
 
@@ -893,6 +914,10 @@ def sheet_obstacles(info: _SheetInfo | None) -> SheetObstacles:
     found.symbols += [_bounds(points) for points in bubbles.values()]
     for strokes in equipment_bodies(drawing, context).values():
         found.symbols.append(_bounds([p for stroke in strokes for p in stroke.points]))
+    # Valve bodies and actuator heads (``cheme.line-through-valve``); the signal line's own
+    # actuator is left out where the line ends (``_clear_of``).
+    symbols = [s for s in drawing.strokes if s.kind == "symbol"]
+    found.symbols += [box for parts in valve_parts(symbols, context).values() for _, box in parts]
     found.texts += [label.box for label in drawing.labels]
     return found
 

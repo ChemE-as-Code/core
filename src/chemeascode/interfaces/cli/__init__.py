@@ -192,7 +192,8 @@ def fmt(
     paths: Annotated[list[Path] | None, typer.Argument(help="P&ID files (default: all).")] = None,
     check: Annotated[bool, typer.Option(help="Only report files that would change.")] = False,
 ) -> None:
-    """Write P&IDs in canonical form: readable ids on every object, DEXPI 2.0.1, stable order."""
+    """Write P&IDs in canonical form: readable ids on every object, DEXPI 2.0.1, stable order.
+    Generated BFD/PFD sheets are left as cheme process build wrote them."""
     from chemeascode.domains.piping.fmt import FormatRefused, format_file
 
     # A planned sheet has no file yet: nothing to format.
@@ -204,6 +205,9 @@ def fmt(
         except FormatRefused as refusal:
             typer.echo(f"{path}: refused: {refusal}", err=True)
             failed = True
+            continue
+        if result.generated:
+            typer.echo(f"{path}: {result.GENERATED_NOTE}")
             continue
         if result.changed:
             verb = "would reformat" if check else "reformatted"

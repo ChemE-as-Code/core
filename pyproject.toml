@@ -1,6 +1,6 @@
 [project]
 name = "cheme-as-code"
-version = "1.5.0"
+version = "1.10.0"
 description = "Plant design as code: validate, format, render and diff DEXPI P&IDs, BFD/PFD and engineering YAML kept in git."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,7 +29,7 @@ png = ["resvg-py>=0.5.0"]
 # `cheme process props`: stream properties through thermo (pinned: the validated method).
 props = ["thermo==0.6.1", "chemicals==1.5.2", "CoolProp==8.0.0"]
 # `cheme process props` with a PC-SAFT package: feos (pinned: its 0.x API and parameter format
-# change between minor versions, ADR 0046).
+# change between minor versions, ADR 0064).
 saft = ["feos==0.10.5"]
 # foundation.units: conversion between any units through Pint (K, °C and the (a)/(g) pressure
 # units of the process YAML need no extra).

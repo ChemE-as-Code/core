@@ -29,17 +29,18 @@ from __future__ import annotations
 
 import enum
 import inspect
+import math
 import typing
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, cast
 
 import pydexpi.pydexpi_classes.pydexpi_classes as C
 
 from chemeascode.domains.process import GENERATOR_VERSION, SCHEMA
-from chemeascode.domains.process.layout import Area, LEdge, LNode, layout
+from chemeascode.domains.process.layout import Area, LEdge, LNode, layout, spread
 from chemeascode.domains.process.model import Process
 from chemeascode.domains.process.schema import FLOW_UNITS, PRESSURE_UNITS, StreamDef
-from chemeascode.domains.process.symbols import Symbol, step_symbol
+from chemeascode.domains.process.symbols import JUNCTION, Symbol, step_drawing
 
 VIEWS = ("bfd", "pfd")
 VIEW_TITLES = {"bfd": "Block flow diagram", "pfd": "Process flow diagram"}
@@ -50,6 +51,12 @@ _LINE = C.Stroke(color=_BLACK, dashStyle=C.DashStyle.SOLID, width=0.35)
 _THIN = C.Stroke(color=_GREY, dashStyle=C.DashStyle.SOLID, width=0.25)
 _DASH = C.Stroke(color=_BLACK, dashStyle=C.DashStyle.DASH, width=0.25)
 _TERMINAL = C.Stroke(color=_BLACK, dashStyle=C.DashStyle.SOLID, width=0.25)
+#: PFD: process (material) lines heavier than the equipment, process areas (blocks holding
+#: steps) a light dash-dot boundary.
+_PROCESS = C.Stroke(color=_BLACK, dashStyle=C.DashStyle.SOLID, width=0.5)
+_AREA_GREY = C.Color(r=130, g=130, b=130)
+_AREA = C.Stroke(color=_AREA_GREY, dashStyle=C.DashStyle.LONGDASHSHORTDASH, width=0.25)
+_FILL = C.Stroke(color=_BLACK, dashStyle=C.DashStyle.SOLID, width=0.1)
 
 _PROVENANCE = {
     "given": C.QuantityProvenance.SPECIFIED,
@@ -138,13 +145,11 @@ def _box(id_: str, x0: float, y0: float, x1: float, y1: float, stroke=_LINE) -> 
 
 def _symbol(id_: str, symbol: Symbol, area: tuple[float, float, float, float]) -> C.Static:
     """*symbol* scaled to fit *area* (x0, y0, x1, y1) and centred in it, in the PFD's black."""
-    x0, y0, x1, y1 = symbol.extent()
-    k = min((area[2] - area[0]) / (x1 - x0), (area[3] - area[1]) / (y1 - y0))
-    cx, cy = (area[0] + area[2]) / 2, (area[1] + area[3]) / 2
-    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+    k, fitted = _fit(symbol, area)
 
     def at(x: float, y: float) -> C.Point:
-        return C.Point(x=round(cx + (x - mx) * k, 3), y=round(cy + (y - my) * k, 3))
+        px, py = fitted(x, y)
+        return C.Point(x=px, y=py)
 
     elements: list[Any] = []
     for n, item in enumerate(symbol.primitives, 1):
@@ -273,20 +278,172 @@ SYMBOL_HEIGHT = 16.0
 SYMBOL_LABELS = 8.0
 
 
+def _symbol_width(symbol: Symbol) -> float:
+    """How wide a step draws *symbol* (at :func:`_symbol_height`)."""
+    x0, y0, x1, y1 = symbol.extent()
+    return _symbol_height(symbol) * (x1 - x0) / (y1 - y0)
+
+
 def _symbol_height(symbol: Symbol) -> float:
     """How high a step draws *symbol*: twice :data:`SYMBOL_HEIGHT` for a tall one (a column)."""
     x0, y0, x1, y1 = symbol.extent()
     return SYMBOL_HEIGHT * (2.0 if (y1 - y0) > 1.5 * (x1 - x0) else 1.0)
 
 
-def _node_size(title: str, ident: str, kind: str, ports: int) -> tuple[float, float]:
-    size = 2.8 if kind != "step" else 2.5
-    width = max(
-        36.0 if kind != "step" else 30.0, _text_width(title, size) + 8, _text_width(ident, 2.2) + 8
+#: PFD: the band above a step that holds its utility stubs (:func:`local_terminals`), and a
+#: junction's width.
+STUB_BAND = 11.0
+JUNCTION_W = 10.0
+
+
+def _drawing(process: Process, item_id: str, kind: str) -> Symbol | str | None:
+    """How the PFD draws node *item_id*: a :class:`Symbol`, :data:`JUNCTION` or None (a box)."""
+    if kind != "step":
+        return None
+    item = process.nodes[item_id]
+    return step_drawing(item.class_, getattr(item, "symbol", None))
+
+
+def local_terminals(process: Process, view: str) -> set[str]:
+    """The utility terminals the PFD draws at each step they serve, as a short stub with the
+    utility's id, instead of as a box with a line to every user: ``category: utility``, a
+    ``utility:`` given, or only energy ports (power, a heat sink)."""
+    if view != "pfd":
+        return set()
+    fs = process.flowsheet
+    return {
+        t.id
+        for t in [*fs.feeds, *fs.products]
+        if t.category == "utility"
+        or t.utility is not None
+        or (t.ports and all(p.kind == "energy" for p in t.ports))
+    }
+
+
+def _chain(process: Process, conn: Conn, local: set[str]) -> list[str]:
+    """The port keys of a utility stub, from the block port the stream reaches (the end of the
+    drawn connection) down the delegations to the step port it ends at."""
+    a, b = process.ends(conn.stream)
+    supply = conn.src[0] in local
+    end = b if supply else a
+    outer = conn.dst if supply else conn.src
+    assert end is not None
+    keys = [f"{end.node}.{end.port}"]
+    node, port = end.node, process.port(end)
+    while node != outer[0] and port is not None and port.delegates:
+        home = process.home(node)
+        if home is None:
+            break
+        node = home
+        port = next((p for p in process.nodes[home].ports if p.id == port.delegates), None)
+        if port is not None:
+            keys.insert(0, f"{node}.{port.id}")
+    return keys
+
+
+def _fit(symbol: Symbol, area: tuple[float, float, float, float]):
+    """The transform drawing *symbol* scaled to fit *area* and centred in it: (k, at)."""
+    x0, y0, x1, y1 = symbol.extent()
+    k = min((area[2] - area[0]) / (x1 - x0), (area[3] - area[1]) / (y1 - y0))
+    cx, cy = (area[0] + area[2]) / 2, (area[1] + area[3]) / 2
+    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+
+    def at(x: float, y: float) -> tuple[float, float]:
+        return (round(cx + (x - mx) * k, 3), round(cy + (y - my) * k, 3))
+
+    return k, at
+
+
+def _symbol_area(node: LNode) -> tuple[float, float, float, float]:
+    """Where a step node draws its symbol: below its stub band, above its labels."""
+    return (
+        node.x + 4,
+        node.y + node.port_top,
+        node.x + node.width - 4,
+        node.y + node.height - node.port_bottom,
     )
-    height = max(18.0 if kind not in ("feed", "product") else 14.0, ports * 7.0 + 4)
+
+
+def _outline(symbol: Symbol, area: tuple[float, float, float, float]):
+    """*symbol* fitted to *area* as absolute segments and ellipses (for contact points)."""
+    k, at = _fit(symbol, area)
+    segments, ellipses = [], []
+    for item in symbol.primitives:
+        if "line" in item:
+            pts = [at(x, y) for x, y in item["line"]]
+            segments += list(zip(pts, pts[1:], strict=False))
+        else:
+            ellipses.append(
+                (at(*item["ellipse"]), item["rx"] * k, item["ry"] * k, item["rotation"])
+            )
+    return segments, ellipses
+
+
+def _contact(symbol: Symbol, area, axis: str, value: float, side: str) -> float | None:
+    """Where the line ``x = value`` (*axis* ``x``) or ``y = value`` meets the fitted *symbol*
+    first coming from *side* (``top``, ``left``, ``right``): its y or x; None if it misses."""
+    segments, ellipses = _outline(symbol, area)
+    hits: list[float] = []
+    for (ax, ay), (bx, by) in segments:
+        if axis == "x" and min(ax, bx) <= value <= max(ax, bx) and ax != bx:
+            hits.append(ay + (by - ay) * (value - ax) / (bx - ax))
+        elif axis == "x" and ax == bx == value:
+            hits += [ay, by]
+        elif axis == "y" and min(ay, by) <= value <= max(ay, by) and ay != by:
+            hits.append(ax + (bx - ax) * (value - ay) / (by - ay))
+        elif axis == "y" and ay == by == value:
+            hits += [ax, bx]
+    for (cx, cy), rx, ry, rotation in ellipses:
+        if rotation % 180 == 90:
+            rx, ry = ry, rx
+        elif rotation % 180:
+            continue
+        if axis == "x" and rx > 0 and abs(value - cx) <= rx:
+            h = ry * math.sqrt(max(0.0, 1 - ((value - cx) / rx) ** 2))
+            hits += [cy - h, cy + h]
+        elif axis == "y" and ry > 0 and abs(value - cy) <= ry:
+            h = rx * math.sqrt(max(0.0, 1 - ((value - cy) / ry) ** 2))
+            hits += [cx - h, cx + h]
+    if not hits:
+        return None
+    return max(hits) if side == "right" else min(hits)
+
+
+#: A step's title is wrapped into lines of about this many characters (at most three).
+WRAP = 26
+TITLE_SIZE, TITLE_LEADING = 2.2, 2.9
+
+
+def wrap(text: str, width: int = WRAP, lines: int = 3) -> list[str]:
+    """*text* in at most *lines* lines of about *width* characters, broken between words."""
+    out: list[str] = []
+    for word in text.split():
+        if out and len(out[-1]) + 1 + len(word) <= width:
+            out[-1] += " " + word
+        elif len(out) < lines:
+            out.append(word)
+        else:
+            out[-1] += " " + word
+    return out or [""]
+
+
+def _labels_height(title: str) -> float:
+    """The band below a symbol holding the step's id and its wrapped title."""
+    return 4.6 + TITLE_LEADING * len(wrap(title))
+
+
+def _node_size(title: str, ident: str, kind: str, ports: int) -> tuple[float, float]:
     if kind == "step":
-        height = max(14.0, ports * 6.0 + 4)
+        lines = wrap(title)
+        width = max(
+            30.0,
+            max(_text_width(line, TITLE_SIZE) for line in lines) + 8,
+            _text_width(ident, 2.6) + 8,
+        )
+        height = max(14.0, ports * 6.0 + 4, _labels_height(title) + 6.0)
+        return round(width, 1), round(height, 1)
+    width = max(36.0, _text_width(title, 2.8) + 8, _text_width(ident, 2.2) + 8)
+    height = max(18.0 if kind not in ("feed", "product") else 14.0, ports * 7.0 + 4)
     return round(width, 1), round(height, 1)
 
 
@@ -303,6 +460,19 @@ class Placed:
     #: stream label anchors (centre bottom) and texts, placed clear of lines, nodes and labels
     labels: dict[str, tuple[float, float]] = field(default_factory=dict)
     texts: dict[str, str] = field(default_factory=dict)
+    #: ports placed off their node's sides ("NODE.port" -> point): the ends of utility stubs
+    port_points: dict[str, tuple[float, float]] = field(default_factory=dict)
+    #: utility stubs: stream id -> (terminal id, flag point, point on the step)
+    stubs: dict[str, tuple[str, tuple[float, float], tuple[float, float]]] = field(
+        default_factory=dict
+    )
+    #: the nodes with utility stubs (in the band along their top)
+    hosts: set[str] = field(default_factory=set)
+    #: which side of its stub a stub's flag and label go: -1 left, 0 above (one stub), 1 right
+    stub_side: dict[str, int] = field(default_factory=dict)
+    #: the sheet (size, where the stream table goes) and the table
+    sheet: Any = None
+    table: Any = None
 
     def label_box(self, stream_id: str) -> tuple[float, float, float, float]:
         x, y = self.labels[stream_id]
@@ -321,8 +491,8 @@ class Placed:
                 title = _text_width(f"{node_id}  {process.nodes[node_id].title or ''}", 2.8)
                 boxes += [(x0, y0, x1, y0), (x0, y1, x1, y1), (x0, y0, x0, y1), (x1, y0, x1, y1)]
                 boxes.append((x0, y0, x0 + title + 3.0, y0 + band))
-            else:
-                boxes.append((x0, y0, x1, y1))
+            else:  # a step's stub band holds only its stubs, flags and their labels
+                boxes.append((x0, y0 + (STUB_BAND if node_id in self.hosts else 0.0), x1, y1))
         return boxes
 
 
@@ -334,6 +504,13 @@ def place(process: Process, view: str) -> Placed:
     fs = process.flowsheet
     overrides = getattr(fs.layout, view)
     top, inner = _connections(process, view)
+    local = local_terminals(process, view)
+    stub_conns = [c for c in top if (c.src[0] in local) != (c.dst[0] in local)]
+    top = [c for c in top if c not in stub_conns]
+    chains = {c.stream.id: _chain(process, c, local) for c in stub_conns}
+    hosts: dict[str, list[Conn]] = {}
+    for c in stub_conns:
+        hosts.setdefault(chains[c.stream.id][-1].split(".", 1)[0], []).append(c)
     placed = Placed()
     # the ports drawn on each node: those its connections end at, and those delegating a drawn
     # port of the block it sits in (outer blocks first)
@@ -436,15 +613,33 @@ def place(process: Process, view: str) -> Placed:
         sits in) and size."""
         ins, outs = ports_of(item.id, "in"), ports_of(item.id, "out")
         w, h = _node_size(item.title or item.id, item.id, kind, max(len(ins), len(outs)))
-        symbol = step_symbol(item.class_) if kind == "step" else None
-        if symbol is not None:
-            h = max(h, _symbol_height(symbol) + SYMBOL_LABELS + 2)
+        drawing = _drawing(process, item.id, kind)
+        band = STUB_BAND if item.id in hosts else 0.0
+        port_top, port_bottom = band, 0.0
+        if isinstance(drawing, Symbol):
+            labels = _labels_height(item.title or item.id)
+            w = max(w, _symbol_width(drawing) + 8.0)
+            h = max(h, _symbol_height(drawing) + labels + 2) + band
+            port_top, port_bottom = band + 1.0, labels + 1.0
+        elif drawing == JUNCTION:
+            w, h = JUNCTION_W, max(8.0, (max(len(ins), len(outs)) - 1) * 6.0 + 8.0) + band
+        else:
+            h += band
         nested = holds(item.id)
         if nested:
             b, ins, outs = inner_layout(item, None)[2]
             w = max(w, b[2] + PAD_X)
             h = max(h, b[3] + PAD_BOTTOM)
-        node = LNode(item.id, w, h, ins, outs, fixed_ports=nested)
+        node = LNode(
+            item.id,
+            w,
+            h,
+            ins,
+            outs,
+            fixed_ports=nested,
+            port_top=port_top,
+            port_bottom=port_bottom,
+        )
         pin = overrides.get(item.id)
         if pin is not None and pin.pinned:
             if kind != "step":
@@ -457,10 +652,14 @@ def place(process: Process, view: str) -> Placed:
     nodes: list[LNode] = []
     for kind, items in (("feed", fs.feeds), ("block", fs.blocks), ("product", fs.products)):
         for item in items:
-            if process.home(item.id) is None:
+            if process.home(item.id) is None and item.id not in local:
                 nodes.append(sized(item, kind))
     edges = [LEdge(c.stream.id, c.src[0], c.src[1], c.dst[0], c.dst[1]) for c in top]
-    bounds = layout(nodes, edges, origin=(20.0, 40.0))
+    pull = view == "pfd"
+    bounds = layout(nodes, edges, origin=(20.0, 40.0), pull_sources=pull)
+    rows = _rows(bounds) if not any(p.pinned for p in overrides.values()) else 1
+    if rows > 1:
+        bounds = layout(nodes, edges, origin=(20.0, 40.0), rows=rows, pull_sources=pull)
     for node in nodes:
         placed.nodes[node.id] = node
     for edge in edges:
@@ -475,16 +674,7 @@ def place(process: Process, view: str) -> Placed:
         outer = placed.nodes[holder.id]
         lnodes, ledges, _ = inner_layout(process.nodes[holder.id], holder)
         for node in lnodes:
-            absolute = LNode(
-                node.id,
-                node.width,
-                node.height,
-                node.ins,
-                node.outs,
-                outer.x + node.x,
-                outer.y + node.y,
-                fixed_ports=node.fixed_ports,
-            )
+            absolute = replace(node, x=outer.x + node.x, y=outer.y + node.y)
             placed.nodes[node.id] = absolute
             if node.fixed_ports:
                 queue.append(node)
@@ -500,34 +690,117 @@ def place(process: Process, view: str) -> Placed:
         pin = overrides.get(edge_id)
         if pin is not None and pin.pinned and pin.waypoints and len(points) >= 2:
             placed.routes[edge_id] = _clean([points[0], *pin.waypoints, points[-1]])
+    _place_stubs(process, placed, stub_conns, chains, hosts, local)
     xs = [n.x for n in placed.nodes.values()] + [n.x + n.width for n in placed.nodes.values()]
     ys = [n.y for n in placed.nodes.values()] + [n.y + n.height for n in placed.nodes.values()]
     for pts in placed.routes.values():
         xs += [p[0] for p in pts]
         ys += [p[1] for p in pts]
     placed.bounds = (min(xs), min(ys), max(xs), max(ys)) if xs else bounds
-    if xs and not any(p.pinned for p in overrides.values()):
-        _centre(placed)
-    placed.texts = {c.stream.id: " ".join(c.represents) for c in top + inner}
+    conns = top + stub_conns + inner
+    placed.texts = {c.stream.id: " ".join(c.represents) for c in conns}
+    if view == "pfd":
+        from chemeascode.domains.process import pfd_sheet
+
+        drawn = {c.stream.id for c in conns if len(c.represents) == 1}
+        placed.table = pfd_sheet.stream_table(
+            process,
+            [s.id for s in fs.streams if s.id in drawn and s.kind == "material"],
+            [s.id for s in fs.streams if s.id in drawn and s.kind == "energy"],
+            fs.default_case(),
+        )
+    else:
+        from chemeascode.domains.process.pfd_sheet import Table
+
+        placed.table = Table()
+    _on_sheet(placed, fixed=any(p.pinned for p in overrides.values()))
     _place_labels(placed, process)
     return placed
 
 
-LABEL_SIZE = 2.2
-#: The drawing area of a sheet: below the title, inside the margins.
-SHEET_TOP, SHEET_MARGIN = 35.0, 25.0  # the margin _sheet_size keeps, so the sheet stays
+#: A top-level layout wider than this wraps into rows (:func:`_rows`), mm: an A0 sheet's
+#: drawing width.
+WRAP_WIDTH = 1130.0
+#: The width to height a wrapped layout aims at (the stream table goes below it).
+WRAP_ASPECT = 1.8
 
 
-def _sheet_size(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
-    return max(420.0, round(bounds[2] + 25.0)), max(297.0, round(bounds[3] + 25.0))
+def _rows(bounds: tuple[float, float, float, float]) -> int:
+    """How many rows a top-level layout of *bounds* (laid out in one row) is wrapped into: one
+    while it is narrower than :data:`WRAP_WIDTH`, else the count (up to four) whose estimated
+    size is closest to :data:`WRAP_ASPECT`."""
+    from chemeascode.domains.process.layout import ROW_GAP
+
+    width, height = bounds[2] - bounds[0], bounds[3] - bounds[1]
+    if width <= WRAP_WIDTH or height <= 0:
+        return 1
+
+    def size(rows: int) -> float:
+        w, h = width / rows, rows * height + (rows - 1) * ROW_GAP
+        return max(w, WRAP_ASPECT * h)
+
+    return min(range(1, 5), key=size)
 
 
-def _centre(placed: Placed) -> None:
-    """Move the drawing to the middle of its sheet's drawing area (an unpinned layout only)."""
-    x0, y0, x1, y1 = placed.bounds
-    width, height = _sheet_size(placed.bounds)
-    dx = max(0.0, round(((20.0 + width - SHEET_MARGIN) - (x0 + x1)) / 2, 1))
-    dy = max(0.0, round(((SHEET_TOP + height - SHEET_MARGIN) - (y0 + y1)) / 2, 1))
+def _place_stubs(
+    process: Process,
+    placed: Placed,
+    stub_conns: list[Conn],
+    chains: dict[str, list[str]],
+    hosts: dict[str, list[Conn]],
+    local: set[str],
+) -> None:
+    """Each utility stream as a short vertical stub on the step it serves (its host): from a
+    flag at the top of the host's stub band down to the symbol (the box), the block ports it
+    passes through on the way; several stubs on one host spread over the symbol's width."""
+    for host, conns in hosts.items():
+        node = placed.nodes.get(host)
+        if node is None:
+            continue
+        drawing = _drawing(process, host, process.kinds.get(host, ""))
+        if isinstance(drawing, Symbol):
+            area = _symbol_area(node)
+            segments, ellipses = _outline(drawing, area)
+            sx = [p[0] for seg in segments for p in seg]
+            sx += [c[0] + s * rx for c, rx, _, _ in ellipses for s in (-1, 1)]
+            x0, x1 = min(sx), max(sx)
+        elif drawing == JUNCTION:
+            x0 = x1 = node.x + node.width / 2
+        else:
+            x0, x1 = node.x + 3.0, node.x + node.width - 3.0
+        conns = sorted(conns, key=lambda c: (c.src[0] not in local, c.stream.id))
+        for fraction, c in zip(spread(len(conns)), conns, strict=True):
+            placed.stub_side[c.stream.id] = 0 if len(conns) == 1 else (-1 if fraction < 0.5 else 1)
+            x = round(x0 + (x1 - x0) * fraction, 3)
+            y = node.y + STUB_BAND
+            if isinstance(drawing, Symbol):
+                y = _contact(drawing, _symbol_area(node), "x", x, "top") or node.y + node.port_top
+            elif drawing == JUNCTION:
+                y = node.y + node.height / 2
+            flag = (x, round(node.y + 3.0, 3))
+            touch = (x, round(y, 3))
+            keys = chains[c.stream.id]
+            for i, key in enumerate(keys):
+                f = (i + 1) / len(keys)
+                placed.port_points[key] = (x, round(flag[1] + (touch[1] - flag[1]) * f, 3))
+            supply = c.src[0] in local
+            terminal = c.src if supply else c.dst
+            placed.port_points[f"{terminal[0]}.{terminal[1]}"] = flag
+            first = placed.port_points[keys[0]]
+            placed.routes[c.stream.id] = [flag, first] if supply else [first, flag]
+            for outer, inner in zip(keys, keys[1:], strict=False):
+                placed.delegations[inner] = [placed.port_points[outer], placed.port_points[inner]]
+            placed.stubs[c.stream.id] = (terminal[0], flag, touch)
+        placed.hosts.add(host)
+
+
+def _on_sheet(placed: Placed, fixed: bool) -> None:
+    """Choose the sheet and move the drawing into its drawing area (a layout with pins stays)."""
+    from chemeascode.domains.process.pfd_sheet import choose_sheet
+
+    sheet = choose_sheet(placed.bounds, placed.table, fixed=fixed)
+    placed.sheet = sheet
+    dx, dy = sheet.dx, sheet.dy
     if not dx and not dy:
         return
 
@@ -538,7 +811,15 @@ def _centre(placed: Placed) -> None:
         node.x, node.y = round(node.x + dx, 3), round(node.y + dy, 3)
     placed.routes = {k: move(v) for k, v in placed.routes.items()}
     placed.delegations = {k: move(v) for k, v in placed.delegations.items()}
+    placed.port_points = {k: move([v])[0] for k, v in placed.port_points.items()}
+    placed.stubs = {k: (t, move([f])[0], move([p])[0]) for k, (t, f, p) in placed.stubs.items()}
+    x0, y0, x1, y1 = placed.bounds
     placed.bounds = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+
+
+LABEL_SIZE = 2.2
+#: The text size of a utility stub's flag (the utility's id).
+FLAG_SIZE = 2.2
 
 
 def _place_labels(placed: Placed, process: Process) -> None:
@@ -548,7 +829,14 @@ def _place_labels(placed: Placed, process: Process) -> None:
     lines = [*placed.routes.values(), *placed.delegations.values()]
     segments = [(a, b) for pts in lines for a, b in zip(pts, pts[1:], strict=False)]
     boxes = placed.obstacles(process)
-    boxes.append((0.0, 0.0, 10000.0, 28.0))  # the sheet title
+    for sid, (terminal, (x, y), (_, ty)) in placed.stubs.items():  # flags; stub labels beside
+        fx0, fy0, fx1, fy1 = _flag_box(terminal, x, y, placed.stub_side[sid])
+        boxes.append((fx0, fy0, fx1, fy1))
+        side = placed.stub_side[sid] or 1
+        half = _text_width(placed.texts.get(sid, sid), LABEL_SIZE) / 2
+        lx, ly = x + side * (1.0 + half), (y + ty) / 2 + 1.1
+        placed.labels[sid] = (round(lx, 3), round(ly, 3))
+        boxes.append((lx - half - 0.3, ly - LABEL_SIZE - 0.2, lx + half + 0.3, ly + 0.1))
 
     def hits(box: tuple[float, float, float, float]) -> int:
         x0, y0, x1, y1 = box
@@ -564,7 +852,7 @@ def _place_labels(placed: Placed, process: Process) -> None:
         return count
 
     for stream_id, points in placed.routes.items():
-        if len(points) < 2:
+        if len(points) < 2 or stream_id in placed.stubs:
             continue
         half = _text_width(placed.texts.get(stream_id, stream_id), LABEL_SIZE) / 2
         runs = sorted(
@@ -590,6 +878,15 @@ def _place_labels(placed: Placed, process: Process) -> None:
         assert best is not None
         placed.labels[stream_id] = best[1]
         boxes.append(best[2])
+
+
+def _flag_box(terminal: str, x: float, y: float, side: int) -> tuple[float, float, float, float]:
+    """The box of a utility flag's text at the top end (x, y) of its stub."""
+    w = _text_width(terminal, FLAG_SIZE)
+    if side == 0:
+        return (x - w / 2 - 0.3, y - FLAG_SIZE - 1.0, x + w / 2 + 0.3, y - 0.6)
+    x0 = x - 0.8 - w if side < 0 else x + 0.8
+    return (x0 - 0.3, y - FLAG_SIZE / 2 - 0.4, x0 + w + 0.3, y + FLAG_SIZE / 2 + 0.4)
 
 
 def _clean(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -1125,10 +1422,49 @@ def build_model(process: Process, view: str, meta: dict[str, str]) -> tuple[Any,
     return engineering, placed
 
 
+#: Spaces per nesting level in a generated sheet's XML (``sheets.produce`` serializes): none. A
+#: generated sheet is not edited by hand (``cheme.generated-edited``), and pyDEXPI's default
+#: two-space indentation was half of its bytes. Every element still starts a line of its own, so
+#: sheets diff line by line, and the tree, the model and the drawing are unchanged (ADR 0048).
+XML_INDENT = 0
+
+
+#: A flow arrowhead: length and half width, mm.
+ARROW_L, ARROW_W = 2.6, 0.85
+
+
+def _arrow(id_: str, tip: tuple[float, float], frm: tuple[float, float]) -> Any:
+    """A filled arrowhead with its tip at *tip*, pointing away from *frm*; None for no length."""
+    dx, dy = tip[0] - frm[0], tip[1] - frm[1]
+    d = math.hypot(dx, dy)
+    if d < 1e-6:
+        return None
+    ux, uy = dx / d, dy / d
+    bx, by = tip[0] - ux * ARROW_L, tip[1] - uy * ARROW_L
+    corners = [tip, (bx - uy * ARROW_W, by + ux * ARROW_W), (bx + uy * ARROW_W, by - ux * ARROW_W)]
+    return C.Polygon(
+        id=id_,
+        fillStyle=C.FillStyle.SOLID,
+        points=[C.Point(x=round(x, 3), y=round(y, 3)) for x, y in corners],
+        stroke=_FILL,
+    )
+
+
+def _polyline(id_: str, points: list[tuple[float, float]], stroke: Any) -> Any:
+    return C.PolyLine(
+        id=id_, points=[C.Point(x=round(x, 3), y=round(y, 3)) for x, y in points], stroke=stroke
+    )
+
+
 def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns, meta) -> Any:
+    from chemeascode.domains.process import pfd_sheet
+
     fs = process.flowsheet
-    width, height = _sheet_size(placed.bounds)
+    sheet = placed.sheet
+    local = local_terminals(process, view)
     positions: dict[str, Any] = {}
+    #: inlet ports whose arrowhead the node draws itself (at its symbol), or that need none
+    carried: set[str] = set()
 
     def at(key: str, point: tuple[float, float]) -> Any:
         pos = C.PortNodePosition(
@@ -1139,97 +1475,210 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
         positions[key] = pos
         return pos
 
+    def port_of(key: str) -> Any:
+        return ports.get(key) or delegates.get(key)
+
+    def stroke_of(key: str) -> Any:
+        return _PROCESS if isinstance(port_of(key), C.MaterialPort) else _DASH
+
+    def final(key: str) -> bool:
+        """Whether the line ending at port *key* ends there (no delegation onward) and gets
+        its arrowhead there."""
+        port = port_of(key)
+        return port is not None and not getattr(port, "subReference", None) and key not in carried
+
+    def labels_of(item_id: str, title: str, cx: float, top: float) -> list[Any]:
+        """The step's id and its title, wrapped, centred on *cx* below *top*."""
+        texts = [_label(f"Label_{item_id}_id", item_id, cx, top + 2.8, 2.6)]
+        for n, line in enumerate(wrap(title)):
+            suffix = "" if n == 0 else f"_{n + 1}"
+            texts.append(
+                _label(
+                    f"Label_{item_id}_title{suffix}",
+                    line,
+                    cx,
+                    top + 6.2 + TITLE_LEADING * n,
+                    TITLE_SIZE,
+                )
+            )
+        return texts
+
     def node_group(item_id: str, kind: str, children: list[Any] | None = None) -> Any:
-        node = placed.nodes[item_id]
+        # a utility drawn as stubs has no node of its own (a stand-in for the port lookups)
+        node = placed.nodes.get(item_id) or LNode(item_id, 0.0, 0.0)
         item = process.nodes[item_id]
-        stroke = _TERMINAL if kind in ("feed", "product") else _LINE
         own = [k for k in ports if k.split(".", 1)[0] == item_id]
         own += [k for k in delegates if k.split(".", 1)[0] == item_id and k not in own]
         node_positions = []
         for key in own:
             port_id = key.split(".", 1)[1]
-            if port_id in node.ins + node.outs:
+            if key in placed.port_points:
+                node_positions.append(at(key, placed.port_points[key]))
+            elif port_id in node.ins + node.outs:
                 node_positions.append(at(key, node.port_point(port_id)))
         title = item.title or item.id
-        texts = []
+        texts: list[Any] = []
         inner = bool(children)
-        symbol = step_symbol(item.class_) if kind == "step" else None
-        if symbol is not None:  # the symbol above its labels, the ports joined to it by stubs
-            band = node.y + node.height - SYMBOL_LABELS
-            texts.append(
-                _label(f"Label_{item_id}_id", item_id, node.x + node.width / 2, band + 2.6, 2.2)
-            )
-            texts.append(
-                _label(f"Label_{item_id}_title", title, node.x + node.width / 2, band + 6.2, 2.5)
-            )
-            area = (node.x + 4, node.y + 1, node.x + node.width - 4, band - 1)
-            drawn = _symbol(f"Drawing_{item_id}_Symbol", symbol, area)
-            xs = [p.x for e in drawn.elements if isinstance(e, C.PolyLine) for p in e.points]
-            xs += [
-                e.center.x + s * e.horizontalSemiAxis
-                for e in drawn.elements
-                if isinstance(e, C.Ellipse)
-                for s in (-1, 1)
+        drawing = _drawing(process, item_id, kind)
+        groups: list[Any]
+        if item_id in local:  # a utility: a flag with its id at each stub
+            for sid, (terminal, (fx, fy), _) in sorted(placed.stubs.items()):
+                if terminal != item_id:
+                    continue
+                side = placed.stub_side.get(sid, 0)
+                at_x = fx if side == 0 else fx + 0.8 * side
+                align = {0: "CENTERBOTTOM", -1: "RIGHTCENTER", 1: "LEFTCENTER"}[side]
+                at_y = fy - 0.8 if side == 0 else fy
+                texts.append(
+                    _label(f"Label_{item_id}_{sid}", item_id, at_x, at_y, FLAG_SIZE, align)
+                )
+            groups = []
+        elif isinstance(drawing, Symbol):  # the symbol above its labels, ports joined by stubs
+            area = _symbol_area(node)
+            drawn = _symbol(f"Drawing_{item_id}_Symbol", drawing, area)
+            texts += labels_of(item_id, title, node.x + node.width / 2, area[3])
+            segments, ellipses = _outline(drawing, area)
+            xs = [p[0] for seg in segments for p in seg]
+            xs += [c[0] + s * rx for c, rx, _, _ in ellipses for s in (-1, 1)]
+            elements: list[Any] = []
+            for port_id in node.ins + node.outs:
+                key = f"{item_id}.{port_id}"
+                inlet = port_id in node.ins
+                px, py = node.port_point(port_id)
+                edge = _contact(drawing, area, "y", py, "left" if inlet else "right")
+                sx = edge if edge is not None else (min(xs) if inlet else max(xs))
+                stroke = stroke_of(key) if port_of(key) is not None else _THIN
+                elements.append(
+                    _polyline(f"Drawing_{item_id}_Stub_{port_id}", [(px, py), (sx, py)], stroke)
+                )
+                if inlet:
+                    carried.add(key)
+                    head = _arrow(f"Drawing_{item_id}_Arrow_{port_id}", (sx, py), (px, py))
+                    if head is not None:
+                        elements.append(head)
+            groups = [drawn, C.Static(id=f"Drawing_{item_id}_Stubs", elements=elements)]
+        elif drawing == JUNCTION:  # the streams meet on a short header
+            cx = node.x + node.width / 2
+            joins = [(f"{item_id}.{p}", node.port_point(p)) for p in node.ins + node.outs]
+            joins += [
+                (k, p) for k, p in placed.port_points.items() if k.split(".", 1)[0] == item_id
             ]
-            stubs = [
-                C.PolyLine(
-                    id=f"Drawing_{item_id}_Stub_{port_id}",
-                    points=[
-                        C.Point(x=round(px, 3), y=round(py, 3)),
-                        C.Point(
-                            x=round(min(xs) if port_id in node.ins else max(xs), 3), y=round(py, 3)
-                        ),
-                    ],
-                    stroke=_THIN,
+            elements = []
+            for key, (px, py) in joins:
+                carried.add(key)
+                if px != cx:
+                    elements.append(
+                        _polyline(
+                            f"Drawing_{item_id}_Stub_{key.split('.', 1)[1]}",
+                            [(px, py), (cx, py)],
+                            stroke_of(key),
+                        )
+                    )
+            ys = sorted(
+                {round(py, 3) for _, (px, py) in joins if px != cx} | {node.y + node.height / 2}
+            )
+            if len(ys) > 1:
+                elements.append(
+                    _polyline(f"Drawing_{item_id}_Header", [(cx, ys[0]), (cx, ys[-1])], _PROCESS)
                 )
-                for port_id in node.ins + node.outs
-                for px, py in [node.port_point(port_id)]
+            if len(joins) > 2:
+                for n, (_, (px, py)) in enumerate(joins):
+                    if px != cx:
+                        elements.append(
+                            C.Ellipse(
+                                id=f"Drawing_{item_id}_Dot_{n}",
+                                center=C.Point(x=round(cx, 3), y=round(py, 3)),
+                                fillStyle=C.FillStyle.SOLID,
+                                horizontalSemiAxis=0.7,
+                                verticalSemiAxis=0.7,
+                                rotation=0.0,
+                                stroke=_FILL,
+                            )
+                        )
+            texts.append(
+                _label(f"Label_{item_id}_id", item_id, cx, ys[0] - 1.6, 1.8, "CENTERBOTTOM")
+            )
+            groups = [C.Static(id=f"Drawing_{item_id}_Static", elements=elements)]
+        elif kind in ("feed", "product"):  # a terminal: a flag pointing the way the flow goes
+            x0, y0 = node.x, node.y
+            x1, y1 = node.x + node.width, node.y + node.height
+            tip = min(5.0, node.height / 2)
+            mid = (y0 + y1) / 2
+            outline = [(x0, y0), (x1 - tip, y0), (x1, mid), (x1 - tip, y1), (x0, y1), (x0, y0)]
+            elements = [_polyline(f"Drawing_{item_id}_Outline", outline, _LINE)]
+            for port_id in node.outs:  # a feed's ports on its pointed side: stubs to the tip
+                px, py = node.port_point(port_id)
+                half = (y1 - y0) / 2
+                ex = x1 - tip * (abs(py - mid) / half) if half else x1
+                if px - ex > 0.05:
+                    elements.append(
+                        _polyline(
+                            f"Drawing_{item_id}_Stub_{port_id}",
+                            [(ex, py), (px, py)],
+                            stroke_of(f"{item_id}.{port_id}"),
+                        )
+                    )
+            texts.append(
+                _label(f"Label_{item_id}_id", item_id, (x0 + x1 - tip) / 2, mid - 2.6, 2.2)
+            )
+            texts.append(
+                _label(f"Label_{item_id}_title", title, (x0 + x1 - tip) / 2, mid + 1.4, 2.5)
+            )
+            groups = [C.Static(id=f"Drawing_{item_id}_Static", elements=elements)]
+        elif kind == "step" or not inner:  # a box: generic steps, blocks without steps
+            top = node.y + (node.port_top if kind == "step" or view == "pfd" else 0.0)
+            cx, cy = node.x + node.width / 2, (top + node.y + node.height) / 2
+            if kind == "step":
+                lines = wrap(title)
+                y = cy - TITLE_LEADING * len(lines) / 2 + 1.2
+                texts.append(_label(f"Label_{item_id}_id", item_id, cx, y - 1.2, 2.6))
+                for n, line in enumerate(lines):
+                    suffix = "" if n == 0 else f"_{n + 1}"
+                    texts.append(
+                        _label(
+                            f"Label_{item_id}_title{suffix}",
+                            line,
+                            cx,
+                            y + 2.6 + TITLE_LEADING * n,
+                            TITLE_SIZE,
+                        )
+                    )
+            else:
+                texts.append(_label(f"Label_{item_id}_title", title, cx, cy + 1.4, 2.8))
+                texts.append(_label(f"Label_{item_id}_id", item_id, cx, cy - 2.6, 2.2))
+            groups = [
+                _box(
+                    f"Drawing_{item_id}",
+                    node.x,
+                    top,
+                    node.x + node.width,
+                    node.y + node.height,
+                    _LINE,
+                )
             ]
-            outline = C.Static(id=f"Drawing_{item_id}_Stubs", elements=stubs)
-        elif kind == "step" or not inner:
+        else:  # a block holding steps: a process area, its title in the band above them
             texts.append(
-                _label(
-                    f"Label_{item_id}_title",
-                    title,
-                    node.x + node.width / 2,
-                    node.y + node.height / 2 + 1.4,
-                    2.8 if kind != "step" else 2.5,
+                C.Text(
+                    id=f"Label_{item_id}_title",
+                    text=f"{item_id}  {title}",
+                    position=C.Point(x=round(node.x + 2.5, 3), y=round(node.y + 5.0, 3)),
+                    alignment=C.TextAlignment.LEFTCENTER,
+                    color=_AREA_GREY,
+                    font="Arial",
+                    size=2.8,
+                    rotation=0.0,
                 )
             )
-            texts.append(
-                _label(
-                    f"Label_{item_id}_id",
-                    item_id,
-                    node.x + node.width / 2,
-                    node.y + node.height / 2 - 2.6,
-                    2.2,
-                )
-            )
-        else:  # a block holding steps: its title in the band above them
-            texts.append(
-                _label(
-                    f"Label_{item_id}_title",
-                    f"{item_id}  {title}",
-                    node.x + 2.5,
-                    node.y + 5.0,
-                    2.8,
-                    "LEFTCENTER",
-                )
-            )
-        groups = (
-            [drawn, outline]
-            if symbol is not None
-            else [
+            groups = [
                 _box(
                     f"Drawing_{item_id}",
                     node.x,
                     node.y,
                     node.x + node.width,
                     node.y + node.height,
-                    stroke,
+                    _AREA if view == "pfd" else _LINE,
                 )
             ]
-        )
         groups.append(C.Label(id=f"Drawing_{item_id}_Label", elements=texts))
         groups += children or []
         return C.RepresentationGroup(
@@ -1253,12 +1702,19 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
             source=outer_pos if inlet else step_pos,
             target=step_pos if inlet else outer_pos,
             innerPoints=[C.Point(x=x, y=y) for x, y in points[1:-1]],
-            stroke=_THIN,
+            stroke=stroke_of(key),
         )
+        elements = [line]
+        if inlet and final(key):
+            route = [(outer_pos.position.x, outer_pos.position.y), *points[1:-1]]
+            route.append((step_pos.position.x, step_pos.position.y))
+            head = _arrow(f"Arrow_delegation_{key}", route[-1], _before(route))
+            if head is not None:
+                elements.append(head)
         return C.RepresentationGroup(
             id=f"Drawing_delegation_{key}",
             represents=port,
-            groups=[C.Static(id=f"Drawing_delegation_{key}_Static", elements=[line])],
+            groups=[C.Static(id=f"Drawing_delegation_{key}_Static", elements=elements)],
         )
 
     groups: list[Any] = []
@@ -1290,11 +1746,12 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
             holder.groups = [*holder.groups, delegation_group(key)]
     for c in conns:
         points = placed.routes[c.stream.id]
-        src = positions.get(f"{c.src[0]}.{c.src[1]}")
-        dst = positions.get(f"{c.dst[0]}.{c.dst[1]}")
+        src_key, dst_key = f"{c.src[0]}.{c.src[1]}", f"{c.dst[0]}.{c.dst[1]}"
+        src = positions.get(src_key)
+        dst = positions.get(dst_key)
         if src is None or dst is None or len(points) < 2:
             continue
-        stroke = _LINE if c.stream.kind == "material" else _DASH
+        stroke = _PROCESS if c.stream.kind == "material" else _DASH
         line = C.ConnectorLine(
             id=f"Line_{c.stream.id}",
             source=src,
@@ -1302,6 +1759,11 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
             innerPoints=[C.Point(x=x, y=y) for x, y in points[1:-1]],
             stroke=stroke,
         )
+        elements = [line]
+        if final(dst_key):
+            head = _arrow(f"Arrow_{c.stream.id}", points[-1], _before(points))
+            if head is not None:
+                elements.append(head)
         lx, ly = placed.labels[c.stream.id]
         pin = getattr(fs.layout, view).get(c.stream.id)
         if pin is not None and pin.label is not None:
@@ -1317,7 +1779,7 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
                     ],
                 ),
                 groups=[
-                    C.Static(id=f"Drawing_{c.stream.id}_Static", elements=[line]),
+                    C.Static(id=f"Drawing_{c.stream.id}_Static", elements=elements),
                     C.Label(
                         id=f"Drawing_{c.stream.id}_Label",
                         elements=[
@@ -1328,29 +1790,25 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
             )
         )
     title = fs.title or meta.get("plant", "")
-    groups.append(
-        C.Label(
-            id="Drawing_title",
-            elements=[
-                _label(
-                    "Label_title",
-                    f"{VIEW_TITLES[view]}{': ' + title if title else ''}",
-                    20.0,
-                    15.0,
-                    4.0,
-                    "LEFTCENTER",
-                ),
-                _label(
-                    "Label_case",
-                    f"case {meta.get('case', '')}; generated from "
-                    "process/flowsheet.yaml by cheme process build -- do not edit",
-                    20.0,
-                    22.0,
-                    2.2,
-                    "LEFTCENTER",
-                ),
-            ],
-        )
+    groups += pfd_sheet.frame(sheet)
+    if placed.table is not None and placed.table.size(sheet.table_width)[1] > 0:
+        groups += pfd_sheet.draw_table(placed.table, *sheet.table_at, sheet.table_width)
+    groups += pfd_sheet.title_block(
+        sheet,
+        {
+            "title": title or VIEW_TITLES[view],
+            "subtitle": VIEW_TITLES[view]
+            + (
+                f": {meta['sheet_title']}"
+                if meta.get("sheet_title") and meta.get("sheet_title") != VIEW_TITLES[view]
+                else ""
+            ),
+            "project": meta.get("project_name") or meta.get("plant", ""),
+            "drawing": meta.get("sheet_id") or view.upper(),
+            "case": meta.get("case", ""),
+            "sheet": f"{sheet.name}, 1 of 1",
+            "note": "generated from process/flowsheet.yaml by cheme process build -- do not edit",
+        },
     )
     return C.Diagram(
         id=f"Diagram_{view.upper()}",
@@ -1358,8 +1816,17 @@ def _diagram(process, view, model, placed, steps_dexpi, ports, delegates, conns,
         represents=model,
         minX=0.0,
         minY=0.0,
-        maxX=float(width),
-        maxY=float(height),
+        maxX=float(sheet.width),
+        maxY=float(sheet.height),
         backgroundColor=C.Color(r=255, g=255, b=255),
         groups=groups,
     )
+
+
+def _before(points: list[tuple[float, float]]) -> tuple[float, float]:
+    """The last point of *points* before its end that differs from the end."""
+    end = points[-1]
+    for p in reversed(points[:-1]):
+        if abs(p[0] - end[0]) > 1e-6 or abs(p[1] - end[1]) > 1e-6:
+            return p
+    return end

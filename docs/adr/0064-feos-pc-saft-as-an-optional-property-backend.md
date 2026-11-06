@@ -1,4 +1,4 @@
-# 0046. feos (PC-SAFT) as an optional property backend, first for liquid water-methanol density
+# 0064. feos (PC-SAFT) as an optional property backend, first for liquid water-methanol density
 
 - **Status:** Proposed
 - **Date:** 2026-11-06

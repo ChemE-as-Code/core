@@ -686,7 +686,9 @@ class Consumable(Background):
     """A supply of the operation not in the flowsheet: an adsorbent or catalyst replaced every
     few years, a lubricant, a chemical bought per year. Counted per hour of operation from
     ``per_year``, or from ``per_replacement`` every ``every_years``, plus an ``initial_charge``
-    spread over the plant's life (a catalyst's first fill).
+    spread over the plant's life (a catalyst's first fill). A batch plant's per-batch use
+    (cleaning solvent, rinse water, a nitrogen purge) is ``per_batch``: times the batches per
+    year over the hours of ``process/recipe.yaml``, the basis of the flowsheet's year averages.
 
     ``disposal:`` says what leaves the plant of it (spent adsorbent to landfill, waste oil to
     incineration, spent catalyst to metal recovery): the matching output exchange, so that what
@@ -699,6 +701,13 @@ class Consumable(Background):
     unit: str = Field(description="An LCI unit (foundation.units.LCI_UNITS), not tkm.")
     per_year: FiniteFloat | None = Field(default=None, ge=0)
     per_replacement: FiniteFloat | None = Field(default=None, ge=0)
+    per_batch: FiniteFloat | None = Field(
+        default=None,
+        ge=0,
+        description="Per batch of process/recipe.yaml (cheme process recipe): cleaning, rinses, "
+        "purges, the off-spec share's make-up.",
+        exclude_if=lambda value: value is None,
+    )
     every_years: FiniteFloat | None = Field(default=None, gt=0)
     initial_charge: FiniteFloat | None = Field(
         default=None, ge=0, description="The first fill, spread over operation.life_years."
@@ -720,8 +729,13 @@ class Consumable(Background):
             raise ValueError(f"{self.id}: unit {self.unit!r}")
         by_year = self.per_year is not None
         by_replacement = self.per_replacement is not None or self.every_years is not None
-        if by_year and by_replacement or not (by_year or by_replacement or self.initial_charge):
-            raise ValueError(f"{self.id}: give per_year, or per_replacement with every_years")
+        by_batch = self.per_batch is not None
+        if by_year + by_replacement + by_batch > 1 or not (
+            by_year or by_replacement or by_batch or self.initial_charge
+        ):
+            raise ValueError(
+                f"{self.id}: give per_year, or per_replacement with every_years, or per_batch"
+            )
         if by_replacement and (self.per_replacement is None or self.every_years is None):
             raise ValueError(f"{self.id}: per_replacement needs every_years, and back")
         _fractions(self.metals, self.id)

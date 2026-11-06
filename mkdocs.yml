@@ -185,5 +185,23 @@ nav:
       - "0043 Dynamic electrolysis duties and the anolyte model interface": adr/0043-dynamic-electrolysis-duties-and-anolyte-models.md
       - "0044 Stack sizing and skid inputs through the equipment list": adr/0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md
       - "0045 A design case's LCI dataset with its own identity": adr/0045-a-design-case-lci-dataset-with-its-own-identity.md
-      - "0046 feos (PC-SAFT) as an optional property backend": adr/0046-feos-pc-saft-as-an-optional-property-backend.md
+      - "0046 The PFD drawn as an engineering sheet": adr/0046-pfd-drawn-as-an-engineering-sheet.md
+      - "0047 Valve, pipe and slant drawing rules in the gate": adr/0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md
+      - "0048 Generated process sheets written without indentation": adr/0048-generated-process-sheets-written-without-indentation.md
+      - "0049 Off-page connectors on the sheet edge in the gate": adr/0049-off-page-connectors-on-the-sheet-edge-in-the-gate.md
+      - "0050 Semi-batch reactor with dosing accumulation": adr/0050-semi-batch-reactor-with-dosing-accumulation.md
+      - "0051 Batch recipe derives the cycle time": adr/0051-batch-recipe-derives-the-cycle-time.md
+      - "0052 Batch vessel and jacket from the recipe": adr/0052-batch-vessel-and-jacket-from-the-recipe.md
+      - "0053 Per-batch LCA consumables": adr/0053-per-batch-lca-consumables.md
+      - "0054 Gas evolution and gas dosing in a batch": adr/0054-gas-evolution-and-gas-dosing-in-a-batch.md
+      - "0055 Batch still and solvent swap": adr/0055-batch-still-and-solvent-swap.md
+      - "0056 Precipitation from a mixed liquor": adr/0056-precipitation-from-a-mixed-liquor.md
+      - "0057 Filter-dryer and recipe units over several steps": adr/0057-filter-dryer-and-recipe-units-over-several-steps.md
+      - "0058 Semi-batch thermal screening": adr/0058-semi-batch-thermal-screening.md
+      - "0059 Batch models write their energy streams": adr/0059-batch-models-write-their-energy-streams.md
+      - "0060 Recycle convergence with tear streams": adr/0060-recycle-convergence-with-tear-streams.md
+      - "0061 Batch rectification on the shortcut": adr/0061-batch-rectification-on-the-shortcut.md
+      - "0062 Vent vapour, vent condenser and gas solubility": adr/0062-vent-vapour-condenser-and-gas-solubility.md
+      - "0063 Heats of solution, heat-up and vessel metal": adr/0063-heats-of-solution-heat-up-and-vessel-metal.md
+      - "0064 feos (PC-SAFT) as an optional property backend": adr/0064-feos-pc-saft-as-an-optional-property-backend.md
       - Template: adr/template.md

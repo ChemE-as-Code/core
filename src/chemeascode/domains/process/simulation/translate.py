@@ -252,7 +252,7 @@ def reactor_unit(node: Any) -> str | None:
     """The reactor a block or step is (its ``reactor:`` model, else a conversion reactor when
     it names reactions); None when it is none."""
     model = getattr(node, "reactor", None)
-    if model in ("pfr", "cstr", "batch"):
+    if model in ("pfr", "cstr", "batch", "semibatch"):
         return KINETIC  # solved by cheme-as-code, coupled to DWSIM as an external unit
     if model:
         return REACTORS[model]
@@ -1540,6 +1540,22 @@ def _kinetic_spec(process: Process, node: Any, spec: UnitSpec, fail: Any) -> dic
             f"{', '.join(given)}: the {what} model sets the outlet of a kinetic reactor",
             f"remove {', '.join(given)} from specs.{node.id}; the step's {what} decides",
         )
+    if getattr(node, "reactor", None) == "semibatch":
+        fail(
+            "a semi-batch's doses are not coupled to the DWSIM solve (its reactors take one "
+            "inlet stream)",
+            "solve it with cheme process propagate, or model it as reactor: batch with the "
+            "doses mixed into the charge (no accumulation then)",
+        )
+        return {}
+    if getattr(node, "reactor", None) == "batch" and getattr(node.batch, "vent", None):
+        fail(
+            "a vented batch's two outlets (the liquid and the vent) are not coupled to the "
+            "DWSIM solve (its reactors give one outlet)",
+            "solve it with cheme process propagate, or leave out batch.vent and separate the "
+            "gas in a flash after it",
+        )
+        return {}
     if getattr(node, "reactor", None) in ("cstr", "batch"):
         return _tank_spec(process, node, spec, fail)
     try:

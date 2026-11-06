@@ -1,7 +1,7 @@
 # 0041. Measured electrochemical performance from a processed series, and a membrane block
 
-- **Status:** Proposed
-- **Date:** 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-11-06 (proposed 2026-11-04)
 
 ## Context
 
@@ -81,9 +81,9 @@ rather than by water dissociation, without mixing that efficiency into the Farad
 - Negative: the heat counts only the products' reaction enthalpies; pH gradients, the
   neutralisation of crossed-over ions and heats of dilution are left out. The titration method
   counts one charge per crossing ion, as the source paper does.
-- Follow-ups: dynamic duties and reservoir dosing from the hydroxide deficit (core#138), stack
-  sizing from `MeasuredPerformance` (core#139); a temperature or electrolyte dimension of the
-  lookup when a series measures more than one.
+- Follow-ups: dynamic duties and reservoir dosing from the hydroxide deficit (core#138, done: ADR
+  0043), stack sizing from `MeasuredPerformance` (core#139, done: ADR 0044); a temperature or
+  electrolyte dimension of the lookup when a series measures more than one.
 
 ## Evidence
 

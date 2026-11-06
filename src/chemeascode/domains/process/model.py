@@ -20,15 +20,25 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   becomes a solid one, :mod:`.solids`);
 - ``process-crystallizer``, ``process-solid-separation``, ``process-solid``: a crystallizer or
   filter whose components, ports or solubility range do not fit, and solids in a stream said to
-  be vapour (:func:`.crystallization.rules`);
+  be vapour (:func:`.crystallization.rules`); ``process-dryer``: a dryer whose volatiles, ports
+  or energy port do not fit (:func:`.dryer.rules`);
+- ``process-still``: a batch still whose ports, charge, feed or references do not fit, or
+  whose volatile components lack the volatility data (vapour pressures, relative volatilities)
+  or, for a boil-up in kW, heats of vaporization (info: no duty), and (warning) a
+  heat_of_vaporization too small for kJ/kmol (one in kJ/mol) (:func:`.batch_still.rules`);
 - ``process-energy-balance`` (warning), ``process-energy-balance-unsupported`` (info): the
   energy balance of a block or step whose streams carry enthalpies (:mod:`.energy`): enthalpy
   flows against the energy streams crossing it; a reacting node or an inconsistent enthalpy
   reference is reported as unsupported, never as a number;
+- ``process-energy-port``: an ``energy_port`` that names no energy port of its block or step,
+  or (warning) one on a node no model gives a duty (:func:`.duties.rules`, ADR 0059);
 - ``process-terminal``: a terminal gives ``utility:`` without ``category: utility``;
 - ``process-reactor``: a reactor model (``reactor:``) that cannot be solved as declared:
   conversion without a conversion per reaction, equilibrium without reactions, an irreversible
-  reaction at equilibrium (warning), a Gibbs reactor naming reactions;
+  reaction at equilibrium (warning), a Gibbs reactor naming reactions; a vented batch or
+  semi-batch whose ``batch.vent`` stream is no outlet of it or its only one, whose vent
+  components are not declared (or, warning, formed by none of its reactions), or a dose that
+  passes gas through without a vent (ADR 0054);
 - ``process-heat-of-reaction`` (warning): a given heat of reaction more than 2 % (and
   1000 kJ/kmol) from the one of the components' ideal-gas formation data;
 - ``process-catalyst``: a reactor names a catalyst ``process/catalysts.yaml`` does not declare,
@@ -43,7 +53,11 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
 - ``process-calculated-stale``: a calculated value's input fingerprint differs from its
   current inputs (see :mod:`.props`);
 - ``process-link-unresolved``: info until a gate requires links (``kind: process-links``);
-- ``process-aggregate``: a ``bfd.aggregate`` pair names a node that is not on the BFD.
+- ``process-aggregate``: a ``bfd.aggregate`` pair names a node that is not on the BFD;
+- ``process-tear``: a tear stream (``tears:``, ADR 0060) propagate cannot iterate: an unknown
+  or energy stream, one not between two steps, one named twice, a guess in undeclared
+  components or flow units or whose fractions do not sum to 1 (errors), a stream whose flow
+  and composition are both given or assumed (warning).
 """
 
 from __future__ import annotations
@@ -449,6 +463,10 @@ def stream_flows(process: Process, stream: StreamDef, case: str) -> Flows:
             return Flows(total, None, missing)
         weights = {n: fractions[n] * (mw[n] or 0.0) for n in names}
         mix = sum(weights.values())
+        if total == 0:
+            # an empty stream (an empty first guess of a recycle, ADR 0060) carries no
+            # component, whatever its fractions say: a reactor writes zero mole fractions
+            return Flows(0.0, dict.fromkeys(names, 0.0), missing)
         if mix <= 0:
             return Flows(total, None, [f"{stream.id} composition"])
         return Flows(total, {n: total * w / mix for n, w in weights.items()}, missing)
@@ -461,6 +479,8 @@ def stream_flows(process: Process, stream: StreamDef, case: str) -> Flows:
         parts = {n: value * fractions[n] * (mw[n] or 0.0) for n in names}
         return Flows(sum(parts.values()), parts, missing)
     inverse = sum(fractions[n] / mw[n] for n in names if fractions[n] and mw[n])
+    if value == 0:
+        return Flows(0.0, dict.fromkeys(names, 0.0), missing)
     if inverse <= 0:
         return Flows(None, None, [f"{stream.id} composition"])
     total = value / inverse
@@ -625,6 +645,8 @@ def _reactive_balance(
         return
     if not reactions:
         return
+    declared = reactions
+    reactions = [*reactions, *_crystallizations(process, node)]
     unnamed = sorted({n for r in reactions for n in r.stoichiometry if n not in comps})
     if unnamed:
         result.missing += [f"component {n}" for n in unnamed]
@@ -636,9 +658,12 @@ def _reactive_balance(
         result.missing += [f"molar_mass of {n}" for n in lacking]
         return
     change = {n: moles_out.get(n, 0.0) - moles_in.get(n, 0.0) for n in names}
-    result.extents, residual = fit_extents(reactions, change)
+    extents, residual = fit_extents(reactions, change)
+    # the crystallizers' phase changes explain solute becoming crystal; they are no reactions
+    # (not reported as extents)
+    result.extents = {r.id: extents[r.id] for r in declared}
     ids = ", ".join(r.id for r in reactions)
-    for reaction in reactions:
+    for reaction in declared:
         xi = result.extents[reaction.id]
         turnover = -xi * sum(
             -v * (mw[n] or 0.0) for n, v in reaction.stoichiometry.items() if v < 0
@@ -656,6 +681,39 @@ def _reactive_balance(
                 f"{name} {cin:.6g} kg/h in, {cout:.6g} kg/h out: "
                 f"{r * (mw.get(name) or 0.0):+.6g} kg/h not explained by reactions {ids}"
             )
+
+
+def _crystallizations(process: Process, node: str) -> list[Reaction]:
+    """One reversible phase change ``<step>:crystallization`` per crystallizer in *node* (the
+    solute, and the hydrate's solvent, into the crystal), so that a reactive balance explains a
+    crystallization, or the dissolution of a reslurry wash, next to the node's reactions. A
+    crystallizer whose crystal form is not readable adds none (its own rules report it)."""
+    from chemeascode.domains.process.crystallization import CrystallizationError, form_of
+
+    found: list[Reaction] = []
+    for other, item in process.nodes.items():
+        spec = getattr(item, "crystallizer", None)
+        if spec is None or not (
+            other == node
+            or (process.kinds.get(other) in ("block", "step") and process.within(other, node))
+        ):
+            continue
+        try:
+            form = form_of(process, spec)
+        except (CrystallizationError, ValueError):
+            continue
+        stoichiometry = {spec.solute: -1.0, spec.crystal: 1.0}
+        if form.hydrate:
+            stoichiometry[spec.solvent] = -form.hydrate
+        found.append(
+            Reaction(
+                id=f"{other}:crystallization",
+                stoichiometry=stoichiometry,
+                reversible=True,
+                kind="phase-change",
+            )
+        )
+    return found
 
 
 def balances(process: Process, case: str | None = None) -> list[Balance]:
@@ -709,6 +767,9 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _reaction_rules(out)
     _reactor_rules(out)
     _catalyst_rules(out)
+    from chemeascode.domains.process.recipe import rules as recipe_rules
+
+    out.findings += recipe_rules(process)
     _id_rules(out)
     _unit_rules(out)
     _port_rules(out)
@@ -717,11 +778,21 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _energy_rules(out)
     _terminal_rules(out)
     _calculated_rules(out)
+    _tear_rules(out)
     _link_rules(out, lists or {}, set(sheet_ids))
     _bfd_rules(out)
     from chemeascode.domains.process.crystallization import rules as solid_rules
 
     out.findings += solid_rules(process)
+    from chemeascode.domains.process.dryer import rules as dryer_rules
+
+    out.findings += dryer_rules(process)
+    from chemeascode.domains.process.batch_still import rules as still_rules
+
+    out.findings += still_rules(process)
+    from chemeascode.domains.process.duties import rules as duty_rules
+
+    out.findings += duty_rules(process)
     return out.findings
 
 
@@ -877,7 +948,7 @@ def _reactor_rules(out: _Out) -> None:
                     hint="remove reactions: (or use reactor: equilibrium)",
                 )
             elif (
-                model in ("equilibrium", "conversion", "pfr", "cstr", "batch")
+                model in ("equilibrium", "conversion", "pfr", "cstr", "batch", "semibatch")
                 and not item.reactions
             ):
                 out.add(
@@ -1019,9 +1090,13 @@ def _reactor_rules(out: _Out) -> None:
                         hint="selectivity: {key, conversion, products: {id: kmol formed per kmol "
                         "of the key converted}} on a conversion reactor",
                     )
+            if model in ("batch", "semibatch"):
+                _dosing_rules(out, item, [key, i], model, reactions)
+                _vent_rules(out, item, [key, i], reactions)
             for kind, field_name in (("cstr", "tank"), ("batch", "batch")):
                 spec = getattr(item, field_name, None)
-                if model == kind:
+                if model == kind or (kind == "batch" and model == "semibatch"):
+                    kind = model
                     lacking = [r.id for r in reactions if r.rate is None]
                     phases = {r.phase == "liquid" for r in reactions if r.phase != "mixed"}
                     mixed = [r.id for r in reactions if r.phase == "mixed"]
@@ -1070,7 +1145,8 @@ def _reactor_rules(out: _Out) -> None:
                     out.add(
                         "warning",
                         "reactor",
-                        f"{what}: {field_name} is used by reactor: {kind} only",
+                        f"{what}: {field_name} is used by reactor: "
+                        f"{'batch or semibatch' if kind == 'batch' else kind} only",
                         [key, i, field_name],
                         [item.id],
                         hint=f"set reactor: {kind}, or remove {field_name}",
@@ -1148,6 +1224,410 @@ def _reactor_rules(out: _Out) -> None:
                 "formation data",
                 file=REACTIONS_FILE,
             )
+
+
+def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: list[Any]) -> None:
+    """A semi-batch's doses: on ``reactor: semibatch`` only, each an inlet stream of the step,
+    one charge stream besides them, liquid-phase reactions."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    dosing = item.batch.dosing if item.batch is not None else []
+    if model == "batch":
+        if dosing:
+            out.add(
+                "error",
+                "reactor",
+                f"{what}: a batch with dosing",
+                [*at, "batch", "dosing"],
+                [item.id],
+                hint="set reactor: semibatch, or remove batch.dosing",
+            )
+        return
+    if item.batch is None:
+        return  # said by the batch's rules
+    problems = []
+    if not dosing:
+        problems.append("no dosing")
+    inlets = [
+        s.id
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[1]) is not None and end.node == item.id and s.kind == "material"
+    ]
+    if stray := [d.stream for d in dosing if d.stream not in inlets]:
+        problems.append("the dosed stream(s) " + ", ".join(stray) + " are no inlet of it")
+    charges = [s for s in inlets if s not in {d.stream for d in dosing}]
+    if dosing and len(charges) != 1:
+        problems.append(f"{len(charges)} charge streams (one inlet besides the doses)")
+    if gas := [r.id for r in reactions if r.phase != "liquid"]:
+        problems.append("the reaction(s) " + ", ".join(gas) + " not liquid-phase")
+    for problem in problems:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: reactor semibatch with {problem}",
+            [*at, "batch", "dosing"] if dosing else [*at, "reactor"],
+            [item.id],
+            hint="a semibatch: batch.dosing [{stream, time or profile}] naming its dosed inlet "
+            "streams; its other inlet is the charge; liquid-phase reactions",
+        )
+    _solution_rules(out, item, at, dosing)
+
+
+def _solution_rules(out: _Out, item: Any, at: list[Any], dosing: list[Any]) -> None:
+    """A dose's ``heat_of_solution`` (ADR 0063): its components declared (error) and carried
+    by the dosed stream (warning: no heat of the others is counted)."""
+    process = out.process
+    declared = process.components()
+    streams = {s.id: s for s in process.flowsheet.streams}
+    templates = process.templates()
+    for k, dose in enumerate(dosing):
+        heat = dose.heat_of_solution
+        if heat is None:
+            continue
+        where = [*at, "batch", "dosing", k, "heat_of_solution"]
+        if unknown := [n for n in heat.values if n not in declared]:
+            out.add(
+                "error",
+                "reactor",
+                f"{at[0][:-1]} {item.id}: heat_of_solution of the undeclared component(s) "
+                + ", ".join(unknown),
+                where,
+                [item.id],
+                hint="key heat_of_solution.values by the dosed components' ids",
+            )
+        stream = streams.get(dose.stream)
+        if stream is None:
+            continue  # said above
+        carried = {
+            n
+            for state in stream.state.values()
+            if state.composition is not None
+            for n, y in state.composition.values.items()
+            if y > 0
+        }
+        if not carried and (t := templates.get(stream.template or "")) is not None:
+            carried = set(t.components)
+        if carried and (absent := [n for n in heat.values if n in declared and n not in carried]):
+            out.add(
+                "warning",
+                "reactor",
+                f"{at[0][:-1]} {item.id}: heat_of_solution of {', '.join(absent)}, which the "
+                f"dose {dose.stream} does not carry (no heat of it is counted)",
+                where,
+                [item.id, dose.stream],
+                hint="give the heat of solution of the components the dose carries",
+            )
+
+
+def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> None:
+    """A vented batch or semi-batch (ADR 0054): the vent an outlet of the step besides the
+    liquid's, its components declared and formed, liquid-phase reactions; a dose that passes
+    gas through (``absorbed`` below 1) needs the vent."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    batch = item.batch
+    if batch is None:
+        return
+    vent = batch.vent
+    hint = (
+        "batch.vent: {stream: the step's gas outlet, components: [ids formed], fraction: "
+        "{id: share}}; the step's other outlet is the liquid"
+    )
+    if vent is None:
+        if passing := [d.stream for d in batch.dosing if d.absorbed is not None and d.absorbed < 1]:
+            out.add(
+                "error",
+                "reactor",
+                f"{what}: the dose(s) {', '.join(passing)} pass gas through (absorbed below 1) "
+                "but there is no batch.vent",
+                [*at, "batch", "dosing"],
+                [item.id],
+                hint=hint,
+            )
+        return
+    outlets = [
+        s.id
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[0]) is not None and end.node == item.id and s.kind == "material"
+    ]
+    problems = []
+    condenser = vent.condenser
+    condensate = (
+        condenser.returns if condenser is not None and condenser.returns != "vessel" else None
+    )
+    allowed = 3 if condensate is not None else 2
+    if vent.stream not in outlets:
+        problems.append(f"the vent stream {vent.stream} is no outlet of it")
+    elif len(outlets) == 1:
+        problems.append(
+            f"the vent stream {vent.stream} is its only outlet: the liquid needs its own"
+        )
+    elif len(outlets) > allowed:
+        problems.append(
+            f"{len(outlets)} outlets (a vented batch has the liquid's and the vent"
+            + (", and its condenser's condensate)" if condensate else ")")
+        )
+    if condensate is not None and condensate not in outlets:
+        problems.append(f"the condenser's condensate stream {condensate} is no outlet of it")
+    elif condensate is not None and len(outlets) < 3:
+        problems.append("no outlet for the liquid besides the vent and the condensate")
+    declared = process.components()
+    if unknown := [n for n in vent.components if n not in declared]:
+        problems.append("the vent component(s) " + ", ".join(unknown) + " not declared")
+    for problem in problems:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: vent with {problem}",
+            [*at, "batch", "vent"],
+            [item.id],
+            hint=hint,
+        )
+    # a semibatch's own rules already say its reactions are not liquid-phase
+    if item.reactor == "batch" and (gas := [r.id for r in reactions if r.phase != "liquid"]):
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: a vent takes liquid-phase reactions only: {', '.join(gas)} "
+            + ("is" if len(gas) == 1 else "are")
+            + " not",
+            [*at, "batch", "vent"],
+            [item.id],
+            hint=hint,
+        )
+    _vent_template_rule(out, item, at, vent, declared)
+    _vent_vapour_rules(out, item, at, vent, declared, reactions, outlets)
+    unformed = [
+        n
+        for n in vent.components
+        if n in declared and not any(r.stoichiometry.get(n, 0) > 0 for r in reactions)
+    ]
+    if unformed:
+        out.add(
+            "warning",
+            "reactor",
+            f"{what}: vent component(s) {', '.join(unformed)} formed by none of its reactions "
+            "(nothing of it vents)",
+            [*at, "batch", "vent", "components"],
+            [item.id, *unformed],
+            hint="list the gases the reactions form; a dosed gas passes through by dosing.absorbed",
+        )
+
+
+def _vent_condenser_temperature(
+    out: _Out, item: Any, what: str, where: list[Any], condenser: Any
+) -> None:
+    """ADR 0062: a vent condenser below the vessel's temperature in each case: for an
+    isothermal batch the temperature the model holds it at (its liquid outlet's given or
+    assumed temperature, else its charge's: :func:`.stirred_tank.outlet_temperature`), for an
+    adiabatic one its charge's, where it starts. At or above it the condenser condenses nothing
+    and heats the gas: its duty turns negative and the vent leaves hotter than the vessel. An
+    error for an isothermal batch, a warning for an adiabatic one (its content may heat past
+    the condenser)."""
+    from chemeascode.domains.process.stirred_tank import outlet_temperature
+
+    process = out.process
+    fs = process.flowsheet
+    dosed = {d.stream for d in item.batch.dosing}
+    charges = [
+        s
+        for s in fs.streams
+        if (end := process.ends(s)[1]) is not None
+        and end.node == item.id
+        and s.kind == "material"
+        and s.id not in dosed
+    ]
+    if len(charges) != 1:
+        return  # the batch's own rules say what its inlets lack
+    charge = charges[0]
+    isothermal = item.batch.heat == "isothermal"
+    for case, state in charge.state.items():
+        q = getattr(state, "temperature", None)
+        if q is None:
+            continue  # the model has no inlet temperature: the batch's rules say so
+        found = outlet_temperature(process, item, case) if isothermal else None
+        if found is not None:
+            held, source = found
+            whence = f"the outlet {source} held"
+        else:
+            held, source = to_kelvin(q.value, q.unit or fs.units.temperature), charge.id
+            whence = f"the charge {source}" + (
+                "" if isothermal else ", where the adiabatic batch starts"
+            )
+        if condenser.temperature < held:
+            continue
+        out.add(
+            "error" if isothermal else "warning",
+            "reactor",
+            f"{what}: vent condenser at {condenser.temperature:g} K is not below the "
+            f"vessel's {held:g} K ({whence}, case {case}): a vent condenser above the vessel's "
+            "temperature condenses nothing and heats the gas",
+            [*where, "condenser", "temperature"],
+            [item.id, source],
+            hint="give vent.condenser.temperature below the batch's temperature (the coolant's "
+            "outlet plus its approach), or drop the condenser",
+        )
+        return
+
+
+def vent_volatile(process: Any, item: Any, reactions: list[Any]) -> list[str]:
+    """The volatile components a vented batch's gas carries (ADR 0062): ``vent.vapour``'s list,
+    else every component of its inlets' templates and its reactions with a vapour_pressure (a
+    vent component is a gas, never one of them)."""
+    vent = item.batch.vent
+    if vent.vapour.components:
+        return list(vent.vapour.components)
+    declared = process.components()
+    templates = process.templates()
+    names: list[str] = []
+    for s in process.flowsheet.streams:
+        end = process.ends(s)[1]
+        if end is None or end.node != item.id or s.kind != "material":
+            continue
+        if (t := templates.get(s.template or "")) is not None:
+            names += t.components
+    names += [n for r in reactions for n in r.stoichiometry]
+    return [
+        n
+        for n in dict.fromkeys(names)
+        if n not in vent.components and getattr(declared.get(n), "vapour_pressure", None)
+    ]
+
+
+def _vent_vapour_rules(
+    out: _Out,
+    item: Any,
+    at: list[Any],
+    vent: Any,
+    declared: Any,
+    reactions: list[Any],
+    outlets: list[str],
+) -> None:
+    """ADR 0062: the vapour's components declared with a vapour_pressure, in the vent's (and a
+    condensate stream's) template; a Henry component in the liquid's template; the condenser's
+    energy_port an energy port of the step."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    where = [*at, "batch", "vent"]
+    hint = (
+        "vent.vapour: {components: [volatile ids with vapour_pressure]}; vent.condenser: "
+        "{temperature: K, returns: vessel or a stream, energy_port: port}; vent.henry: "
+        "{gas: {points: [[K, kPa]]}}"
+    )
+    errors: list[str] = []
+    streams = {s.id: s for s in process.flowsheet.streams}
+    templates = process.templates()
+
+    def template_of(stream_id: str | None) -> Any:
+        stream = streams.get(stream_id or "")
+        return templates.get(stream.template or "") if stream is not None else None
+
+    if vent.vapour is not None:
+        volatile = vent_volatile(process, item, reactions)
+        if unknown := [n for n in vent.vapour.components if n not in declared]:
+            errors.append("vapour component(s) " + ", ".join(unknown) + " not declared")
+        if lack := [
+            n
+            for n in vent.vapour.components
+            if n in declared and getattr(declared[n], "vapour_pressure", None) is None
+        ]:
+            errors.append(
+                "vapour component(s) " + ", ".join(lack) + " without a vapour_pressure (Antoine)"
+            )
+        if not volatile:
+            out.add(
+                "warning",
+                "reactor",
+                f"{what}: vent.vapour, but no component of it has a vapour_pressure: the gas "
+                "carries no vapour",
+                [*where, "vapour"],
+                [item.id],
+                hint="give the solvent's Antoine vapour_pressure in materials.yaml, or name the "
+                "volatile components in vent.vapour.components",
+            )
+        known = [n for n in volatile if n in declared]
+        condenser = vent.condenser
+        condensate = (
+            condenser.returns if condenser is not None and condenser.returns != "vessel" else None
+        )
+        for stream_id, role in ((vent.stream, "vent"), (condensate, "condensate")):
+            template = template_of(stream_id)
+            if template is None:
+                continue
+            if lacking := [n for n in known if n not in template.components]:
+                errors.append(
+                    f"the {role} stream {stream_id}'s template {template.id} lacks the vapour's "
+                    + ", ".join(lacking)
+                )
+        if condenser is not None and condenser.energy_port is not None:
+            port = next((q for q in item.ports if q.id == condenser.energy_port), None)
+            if port is None or port.kind != "energy":
+                errors.append(
+                    f"the condenser's energy_port {condenser.energy_port} is no energy port of it"
+                )
+            elif condenser.energy_port == getattr(item, "energy_port", None):
+                errors.append(
+                    f"the condenser's energy_port {condenser.energy_port} is the step's own "
+                    "energy_port (the jacket's): give the condenser its own energy stream"
+                )
+        if condenser is not None:
+            _vent_condenser_temperature(out, item, what, where, condenser)
+    if vent.henry:
+        liquid = [
+            s for s in outlets if s != vent.stream and s != getattr(vent.condenser, "returns", None)
+        ]
+        template = template_of(liquid[0]) if len(liquid) == 1 else None
+        if template is not None and (
+            lacking := [n for n in vent.henry if n in declared and n not in template.components]
+        ):
+            errors.append(
+                f"the liquid stream {liquid[0]}'s template {template.id} lacks "
+                + ", ".join(lacking)
+                + " (vent.henry keeps it dissolved)"
+            )
+    for problem in errors:
+        out.add("error", "reactor", f"{what}: vent with {problem}", where, [item.id], hint=hint)
+
+
+def _vent_template_rule(out: _Out, item: Any, at: list[Any], vent: Any, declared: Any) -> None:
+    """The vent stream's template holds what propagate writes into it: the vent's components
+    and what a dose passing gas through (``absorbed`` below 1) carries (its stream's
+    composition where stated, else its template's components)."""
+    process = out.process
+    streams = {s.id: s for s in process.flowsheet.streams}
+    stream = streams.get(vent.stream)
+    templates = process.templates()
+    template = templates.get(stream.template or "") if stream is not None else None
+    if template is None:
+        return  # no such outlet, or no template: said by the stream rules
+    needed: dict[str, str] = {n: "a vent component" for n in vent.components if n in declared}
+    for dose in item.batch.dosing:
+        if dose.absorbed is None or dose.absorbed >= 1 or dose.stream not in streams:
+            continue
+        dosed = streams[dose.stream]
+        carried = {
+            n
+            for state in dosed.state.values()
+            if state.composition is not None
+            for n, y in state.composition.values.items()
+            if y > 0
+        }
+        if not carried and (t := templates.get(dosed.template or "")) is not None:
+            carried = set(t.components)
+        for n in sorted(carried):
+            needed.setdefault(n, f"the dose {dose.stream} passes it through")
+    lacking = [n for n in needed if n not in template.components]
+    if lacking:
+        why = "; ".join(f"{n}: {needed[n]}" for n in lacking)
+        out.add(
+            "error",
+            "reactor",
+            f"{at[0][:-1]} {item.id}: vent stream {vent.stream}'s template {template.id} lacks "
+            f"{', '.join(lacking)} ({why})",
+            [*at, "batch", "vent", "stream"],
+            [item.id, vent.stream],
+            hint="add them to the vent stream's template",
+        )
 
 
 def _catalyst_rules(out: _Out) -> None:
@@ -1330,6 +1810,7 @@ def _id_rules(out: _Out) -> None:
         _known_class(out, block.class_, block.method, ["blocks", i], block.id)
     for i, step in enumerate(fs.steps):
         _known_class(out, step.class_, step.method, ["steps", i], step.id)
+        _known_symbol(out, step.symbol, ["steps", i, "symbol"], step.id)
     ids = [c.id for c in fs.cases]
     defaults = [c.id for c in fs.cases if c.default]
     if not fs.cases:
@@ -1341,6 +1822,22 @@ def _id_rules(out: _Out) -> None:
             "case ids must be unique and at most one case the default",
             ["cases"],
         )
+
+
+def _known_symbol(out: _Out, name: str | None, loc: list[Any], owner: str) -> None:
+    from chemeascode.domains.process.symbols import BOX, JUNCTION, symbols
+
+    if name is None or name in (JUNCTION, BOX) or name in symbols():
+        return
+    out.add(
+        "warning",
+        "symbol",
+        f"{owner}: symbol {name} is not in the symbol library; the PFD draws its class's",
+        loc,
+        [owner],
+        hint=f"{JUNCTION}, {BOX} or a symbol name, e.g. TANK_CONE_ROOF_SHAPE, MIXER_SHAPE "
+        "(the list: src/chemeascode/domains/process/data/iso_shapes.json)",
+    )
 
 
 def _known_class(out: _Out, name: str, method: str | None, loc: list[Any], owner: str) -> None:
@@ -1917,6 +2414,24 @@ def _calculated_rules(out: _Out) -> None:
                     "cheme process props --fill; a state outside the method's range keeps "
                     "the old values and stays stale",
                 )
+
+
+def _tear_rules(out: _Out) -> None:
+    """``cheme.process-tear``: a tear (``tears:``, ADR 0060) propagate cannot iterate."""
+    from chemeascode.domains.process.recycle import tear_problems
+
+    tears = out.process.flowsheet.tears
+    for i, level, message in tear_problems(out.process):
+        out.add(
+            level,
+            "tear",
+            message,
+            ["tears", i],
+            [tears[i].stream],
+            hint="tear a material stream between two steps of the loop (one per loop), its "
+            "initial: in declared components, fractions that sum to 1 and a flow unit; a "
+            "stream whose flow and composition are both design inputs is no tear",
+        )
 
 
 #: Link target -> (parsed list key, attribute of the list, attribute of an item).

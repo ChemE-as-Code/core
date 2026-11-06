@@ -112,7 +112,8 @@ def reactors(
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
     """Each reactor: model, extents, heats of reaction, ln K and ln(Q/K) at the outlet, and the
-    duty H(out) - H(in) on the elements basis (ideal gas)."""
+    duty H(out) - H(in) on the elements basis (ideal gas); a batch's or conversion step's
+    year-average duty from its model and its energy stream (ADR 0059)."""
     from chemeascode.domains.process.reactors import UnknownCase, reactor_report, reactor_text
 
     workspace = _workspace()
@@ -130,9 +131,11 @@ def crystallizers(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
-    """Each crystallizer and filter or centrifuge (crystallizer:, solid_separation:): its basis
-    (solubility-equilibrium, imposed-yield or solid-split), crystals, recovery, the outlets as dry
-    solid and liquid, the balances and the duty. Exit 1 on an error finding."""
+    """Each crystallizer, filter or centrifuge and dryer (crystallizer:, solid_separation:,
+    dryer:): its basis (solubility-equilibrium, imposed-yield, solid-split or residual-moisture),
+    crystals, recovery, the outlets as dry solid and liquid, the balances and the duty (a dryer:
+    sensible, latent and vessel heat, per batch with process/recipe.yaml). Exit 1 on an error
+    finding."""
     from chemeascode.domains.process.crystallization import (
         UnknownCase,
         crystallizer_report,
@@ -149,7 +152,35 @@ def crystallizers(
     typer.echo(report.to_json() if as_json else report_text(report))
     if not as_json:
         for finding in report.findings:
-            if finding.rule.startswith("cheme.process-crystallizer"):
+            if finding.rule.startswith(("cheme.process-crystallizer", "cheme.process-dryer")):
+                typer.echo(finding.format())
+    if any(f.level == "error" for f in report.findings):
+        raise typer.Exit(1)
+
+
+@process_app.command("stills")
+def stills(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """Each batch still, solvent swap and batch column (still:, still.column): its basis
+    (rayleigh, batch-shortcut), the charge, the swap's feed, the distillate cuts and the residue
+    (amounts per batch and compositions; with a column each cut's purity and recovery), the
+    column's reflux, the boil-up time, the duty and the energy per batch (the batch from
+    process/recipe.yaml), the still's temperatures. Exit 1 on an error finding."""
+    from chemeascode.domains.process.batch_still import UnknownCase, report_text, still_report
+
+    workspace = _workspace()
+    try:
+        report = still_report(workspace.root, case)
+    except UnknownCase as failure:
+        typer.echo(str(failure), err=True)
+        raise typer.Exit(2) from failure
+    _refuse_unloaded(report.process, report.findings)
+    typer.echo(report.to_json() if as_json else report_text(report))
+    if not as_json:
+        for finding in report.findings:
+            if finding.rule.startswith("cheme.process-still"):
                 typer.echo(finding.format())
     if any(f.level == "error" for f in report.findings):
         raise typer.Exit(1)
@@ -201,6 +232,32 @@ def reactor_hazards(
     report = screen(workspace.root, case)
     typer.echo(report.to_json() if as_json else hazard_text(report))
     if any(f.level in ("warning", "error") for f in report.findings):
+        raise typer.Exit(1)
+
+
+@process_app.command("recipe")
+def recipe(
+    case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
+    svg: Annotated[
+        Path | None, typer.Option("--svg", help="Write the Gantt chart of one batch here.")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
+) -> None:
+    """The batch cycle of process/recipe.yaml: each unit's occupancy per batch, the cycle time
+    (the bottleneck), the batches per year, one batch's timeline and the batch-size stream's
+    rate against the flowsheet's (domains/process/recipe.py). --svg writes the Gantt chart of
+    one batch. Exit 1 on a warning or error, 2 without a recipe."""
+    from chemeascode.domains.process.recipe import gantt_svg, recipe_report, recipe_text
+
+    workspace = _workspace()
+    result = recipe_report(workspace.root, case)
+    if result is None:
+        typer.echo("no process/recipe.yaml", err=True)
+        raise typer.Exit(2)
+    if svg is not None and result.steps:
+        svg.write_text(gantt_svg(result))
+    typer.echo(json.dumps(result.as_dict(), indent=2) if as_json else recipe_text(result))
+    if any(f.level in ("warning", "error") for f in result.findings):
         raise typer.Exit(1)
 
 
@@ -754,12 +811,16 @@ def propagate(
 ) -> None:
     """Derive missing compositions and flows through steps their streams fully determine:
     pass-through steps (compressors, coolers, heaters, pumps, filters), mixers, splitters
-    (`split:` fractions per outlet port, else the mass balance remainder).
+    (`split:` fractions per outlet port, else the mass balance remainder), and recycle loops
+    torn at the flowsheet's `tears:` (Wegstein or substitution, `convergence:`).
 
-    Separators and reactors are only checked, never solved. Derived values are `calculated`
+    A batch or semi-batch, still, crystallizer or conversion step writes its year-average duty
+    on its energy stream (`energy_port:`, else its one stream to a heating or cooling utility);
+    a given duty is compared (cheme.process-duty, ADR 0059; validate compares it too). Other
+    separators and reactors are only checked, never solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1
-    on a warning (stale propagated values). --json prints the run as an adapter result
-    (cheme/adapter-result/v1) per case, same exit codes."""
+    on a warning (stale propagated values, a duty that differs from its model). --json prints
+    the run as an adapter result (cheme/adapter-result/v1) per case, same exit codes."""
     from chemeascode.domains.process.propagate import failed_result, run
 
     if fill == check:

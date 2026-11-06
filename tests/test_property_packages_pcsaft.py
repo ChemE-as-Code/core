@@ -1,4 +1,4 @@
-"""The benchmark of package ``water-methanol-pcsaft-liquid`` (PC-SAFT through feos, ADR 0046).
+"""The benchmark of package ``water-methanol-pcsaft-liquid`` (PC-SAFT through feos, ADR 0064).
 
 The package as ``cheme process props`` runs it (``props_feos.FeosAdapter``) against:
 

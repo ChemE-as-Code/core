@@ -9,7 +9,7 @@ bases, ports, balances, links) and that each generated sheet still matches what 
 #: The schema every process YAML file declares.
 SCHEMA = "cheme/process/v1"
 #: The version of the generator's output; a change makes every generated sheet outdated.
-GENERATOR_VERSION = "5"
+GENERATOR_VERSION = "7"
 
 MATERIALS_FILE = "process/materials.yaml"
 FLOWSHEET_FILE = "process/flowsheet.yaml"

@@ -1,6 +1,6 @@
 # 0022. An ISO 10628-2 symbol library for the P&ID catalogue and the PFD steps
 
-- **Status:** Accepted
+- **Status:** Accepted (the junction drawing amended by [0046](0046-pfd-drawn-as-an-engineering-sheet.md))
 - **Date:** 2026-10-27
 
 ## Context

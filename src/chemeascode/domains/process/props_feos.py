@@ -1,7 +1,7 @@
 """Stream properties on PC-SAFT through feos (:mod:`chemeascode.integrations.feos`, extra
 ``saft``): the adapter of a property package with ``adapter="feos"`` (``props.adapter_for``
 picks it). The one such package, ``water-methanol-pcsaft-liquid``, claims liquid density only
-(ADR 0046):
+(ADR 0064):
 
 - **phase**: PC-SAFT's bubble pressures miss the measured ones by up to the benchmark's
   ``bubble_pressure_rel`` (*m*), so a state is liquid when its pressure is at least ``(1 + m)``

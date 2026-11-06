@@ -1,0 +1,25 @@
+# The batch recipe of the semi-batch hydrolysis (schema cheme/recipe/v1): one unit, the reactor,
+# its operations in order. The dosing and the post-reaction take their times from R1's model
+# (from: R1); the others are illustrative durations. `cheme process recipe` gives the cycle time
+# (here the reactor's occupancy), the batches per year and the year-average rate of the batch
+# stream, which must match the flowsheet's: 6305.4 kg x 1320 batches / 7920 h = 1050.9 kg/h
+# of S3. `--svg FILE` draws one batch.
+schema: cheme/recipe/v1
+kind: recipe
+title: Semi-batch hydrolysis
+batch_size: {value: 6305.4, unit: kg, stream: S3, provenance: assumed, source: "the reactor's batch: illustrative"}
+hours_per_year: {value: 7920, provenance: assumed, source: "330 days of 24 h"}
+unit_procedures:
+  - id: HYDROLYSE
+    unit: R1
+    title: Hydrolysis in R1
+    operations:
+      - {id: charge, kind: charge, title: Charge the water, duration: {value: 30, unit: min, provenance: assumed}}
+      - {id: dose, kind: dose, title: Dose the anhydride, from: R1}
+      - {id: react, kind: react, title: Post-reaction, from: R1}
+      - {id: cool, kind: cool, title: Cool to transfer, duration: {value: 1, provenance: assumed}}
+      - {id: transfer, kind: transfer, title: Pump to storage, duration: {value: 30, unit: min, provenance: assumed}}
+      - {id: clean, kind: clean, title: Rinse, duration: {value: 1.5, provenance: assumed}}
+    # the reactor sized for the batch: the largest content over 80 % fill, rounded up to a
+    # preferred size (give vessel.jacket {u, coolant_temperature} to check the cooling)
+    vessel: {fill_fraction: 0.8, aspect_ratio: 1.2, provenance: assumed, source: "usual fill of a stirred vessel: illustrative"}

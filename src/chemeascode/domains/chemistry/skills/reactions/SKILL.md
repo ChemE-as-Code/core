@@ -121,7 +121,79 @@ each value taken from the evidence cites its observation in `source`.
      `catalyst_loading`). A target the reactions cannot reach (equilibrium, a reactant used up)
      is reported, not extrapolated. `process reactors` gives the profile, the heat released per
      kmol of charge and the largest heat release per m3.
-   Tanks and batches hold gas-phase or liquid-phase reactions (one phase). A liquid needs
+   - `semibatch`: a liquid batch with feeds dosed into its charge (an exothermic reagent fed to
+     a charge, the usual fine-chemical step): give `batch:` with `dosing: [{stream, time}]` (or
+     `profile: [[s, share], ...]` of constant-rate segments, shares adding up to 1; `start` s
+     delays a dose). Each dosed `stream` is an inlet of the step, its flow the amount dosed per
+     hour of charge; the step's one other inlet is the charge. `time` or `target` is then the
+     post-reaction after the last dose (neither: the batch ends with the dosing). `process
+     reactors` gives the accumulation of the dosed reactant over time and its maximum, the
+     cooling-failure temperature at the worst moment (the MTSR of a semi-batch, the dosing
+     stopped) and, isothermal, the peak cooling duty per m3 of the final content, the reaction's
+     heat and the doses' warming together. A slow reaction accumulates the reagent: dose more
+     slowly, or raise the temperature within the rate law's range, until the accumulation is
+     low. Not coupled to the DWSIM solve (its reactors take one inlet); `process propagate`
+     solves it.
+   - A liquid `batch` or `semibatch` that gives off a gas (HCl from a chlorination or
+     phosgenation, CO2, HBr from a bromination) takes `batch.vent: {stream, components: [ids],
+     fraction: {id: share}}` (ADR 0054): the listed components leave the liquid as they form,
+     by the vent `stream`, an outlet of the step besides the liquid's (two outlets). They do
+     not accumulate in the liquid and count in neither its volume, its concentrations nor its
+     heat capacity, so they need no `liquid_molar_volume` or `liquid_heat_capacity`; a
+     `fraction` below 1 keeps the rest dissolved (then it needs them). The share is of what
+     each reaction forms: a reaction that consumes a vented gas (benzyl alcohol + HCl, Ac2O +
+     HCl) takes it from the liquid (charged, dosed or the dissolved rest), never back from the
+     vent. Write the `heat_of_reaction` with the gas formed as a gas at the vessel's
+     temperature (as reaction calorimetry with off-gas measures it): the vent carries the gas's
+     own enthalpy and no heat of desorption is added. A dosed gas (phosgene, Cl2, methyl
+     nitrite) dissolves on entry like a liquid dose, with its `liquid_molar_volume` and
+     `liquid_heat_capacity`, but no heat of absorption or condensation is added (HCl into water
+     about -75 kJ/mol, phosgene about -24, Cl2 about -20): write the `heat_of_reaction` of the
+     reactions that consume it with the dosed gas as a gas (as calorimetry with gas dosing
+     measures it), so this heat is counted as the dose reacts. That keeps the MTSR
+     conservative, but the cooling duty during dosing leaves out the absorption of the gas not
+     yet reacted; on the dissolved basis both miss it. Where the heat of absorption matters
+     (gas left dissolved, a dosed liquid's heat of dilution), give the dose `heat_of_solution:
+     {values: {ID: kJ/kmol}, provenance, source}` instead (ADR 0063) and write those reactions'
+     heats on the dissolved basis: it is released as the dose mixes in, in the duty, the peak
+     cooling and dT_ad, not in the MTSR; what of it the vent's `vapour` takes off the liquid
+     again takes its heat back. When only part is taken up, give the
+     dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to the vessel's
+     temperature (its ideal-gas cp, else left out and noted). `process propagate` writes both
+     outlets (composition, flow, the liquid's temperature and pressure) and the balance closes
+     over them; `process reactors` gives the vent's kmol/h and its peak rate in kmol/(s m3) of
+     the final content, `cheme process recipe` the peak in kmol/s and m3/h per batch and what
+     one batch gives off: size the off-gas line and scrubber from these. The vent stream's
+     template must hold the vent's components and what a passing dose carries. A reactant
+     listed in `vent.components` vents nothing of itself: only what the reactions form vents; a
+     dosed gas that escapes is `absorbed`. Do not model the gas as a dissolved liquid component
+     plus a degassing split: that overstates the volume and gives no off-gas profile.
+     Where the liquid is volatile (a solvent near its boiling point, a product like acetyl
+     chloride at 69 kPa), give the vent `vapour: {}` (ADR 0062): the gas leaves saturated with
+     the liquid's components that have an Antoine `vapour_pressure` (Raoult, ideal unless
+     `activity: {id: gamma}` from a source), the vapour leaves the liquid and its
+     `heat_of_vaporization` cools the vessel (part of its model duty). Do not type a vapour
+     `fraction` or script the evaporative cooling any more, unless the vent gas is mostly a
+     displaced head space or a sweep gas (a dose pushing out the head space, a nitrogen
+     purge): the model carries vapour only on the gas the reactions form and a passing dose,
+     so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
+     reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
+     energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
+     (an isothermal batch's is its liquid outlet's given temperature, which `heat_up` heats a
+     colder charge to; `validate` flags one at or above it): the gas past it is saturated at its temperature,
+     the condensate returns (or `returns: STREAM`, a third outlet), and its duty goes on the
+     step's energy stream at `PORT` (its own, not the jacket's `energy_port`; a cooling-water
+     or brine terminal). The vent stream's template (and the condensate's) must list the
+     vapour's components. Where the gas's solubility is known, give
+     `henry: {HCL: {points: [[313.15, kPa]], provenance, source}}` instead of a `fraction`: the liquid at the end holds its
+     solubility at the gas's partial pressure, so the dissolved HCl reaches the crude (its
+     component then needs `liquid_molar_volume` and `liquid_heat_capacity`, and the liquid's
+     template lists it). A content that boils at the vessel's pressure is refused: that is a
+     still or a reflux, not a vent. `reactor-hazards` then takes the gas release at the MTSR
+     with its vapour (no condenser credited); `boils` there is a warning to size the relief
+     for the boil-up. Not modelled: a head-space or sweep gas the dose displaces, mass-transfer
+     limits, the heat of absorption.
+   Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A
    gas uses the ideal-gas data. `process simulate` couples them to the DWSIM solve as external
@@ -192,12 +264,33 @@ each value taken from the evidence cites its observation in `source`.
    de Vusse kinetics: a CSTR before a PFR). It is a candidate, not a proven region.
 8. For an exothermic reaction, run `cheme process reactor-hazards`: the adiabatic temperature
    rise, the MTSR after a cooling failure (a batch: all its charge; a CSTR: its unconverted
-   key), the MTT (the reactor's `hazard.mtt`, else the lowest normal boiling point at about
-   atmospheric pressure) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
+   key; a semi-batch: the dosed reactant at its largest accumulation, at the worst moment over
+   the run, so a dosing-controlled step screens lower than its batch; a vented gas leaves as it
+   forms and adds nothing to it), the MTT (the reactor's `hazard.mtt`, else the lowest boiling
+   point of what boils in the liquid at the reactor's pressure: the normal boiling point from
+   90 to 110 kPa(a), else Clausius-Clapeyron with `heat_of_vaporization`, which you give for
+   a pressurised or vacuum reactor; a vent component, a dosed gas and a dissolved gas (under
+   5 % of the liquid, boiling below the process temperature) are left out with a note, and
+   with nothing else left set `hazard.mtt`; a solvent at reflux sets it, at or below the
+   process temperature) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
    sensitivity to the coolant temperature. Never estimate a TD24: without one the class stays
-   open (`cheme.reactor-hazard-missing`). These are screening values for the HAZOP study, not a
-   reaction-hazard assessment.
+   open (`cheme.reactor-hazard-missing`). With several reactions the output gives each one's
+   dT_ad and MTSR; where a slow side reaction sets the MTSR and the main reaction is what you
+   screen, say so with `hazard.reactions: [MAIN]` and give the reason in `source` (the side
+   reaction's value stays in the output). A semi-batch prints its MTSR over the batch (an
+   initiation charge, the end of each dosing segment). A vented batch reports its gas release
+   at the MTSR (`cheme.reactor-hazard-vent`): give `hazard.vent_capacity` (m3/h at the vessel's
+   pressure) from the vent sizing; the blocked-vent pressure is not screened. These are screening values for the HAZOP study, not a
+   reaction-hazard assessment. A phase change is no reaction: a precipitation, dissolution or
+   wash loss belongs in a `crystallizer:` on the step (`spectators:` for the other solutes of
+   the liquor; skill `separation-method-selection`). Where one stays written as a reaction,
+   give it `kind: phase-change` (one component into one other of the same formula, one of them
+   `phase: solid`, is recognised as one unless it declares a `heat_of_reaction`): a step whose
+   reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`,
+   info), and a step with both takes dT_ad and the MTT from its reactions alone (a semi-batch's MTSR is its model's, the phase changes' heat included; a note says so). A recognised phase change
+   with a heat of reaction (a caustic dissolution, an acid dilution) stays screened, its heat
+   in dT_ad.
 9. Where the reaction data are uncertain (a fit's intervals, a literature range), give them:
    `rate.uncertainty: {A: {gsd2: 3}, Ea: {distribution: normal, cv: 0.05}}`, and an
    `uncertainty:` on `heat_of_reaction`, `equilibrium_constant` (of K) or `conversion` (the

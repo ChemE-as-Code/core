@@ -1,7 +1,7 @@
 # PC-SAFT parameters for feos (shipped)
 
 The records the property package `water-methanol-pcsaft-liquid` uses
-(`domains/process/property_packages.py`, ADR 0046), copied unchanged from the feos repository at
+(`domains/process/property_packages.py`, ADR 0064), copied unchanged from the feos repository at
 tag `v0.10.5` (commit `14d295637ebedf4b35d204f1b44d329b1897d14f`,
 https://github.com/feos-org/feos):
 

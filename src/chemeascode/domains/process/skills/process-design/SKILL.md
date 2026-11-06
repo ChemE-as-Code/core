@@ -138,13 +138,148 @@ Type compositions and flows only where they are design inputs; `cheme process pr
 `Mixing` sums the mass flows and mixes the compositions; `SplittingMaterial` keeps the
 composition and splits the flow by `split: {outlet port: fraction}` on the step (else the one
 missing outlet flow is the mass balance remainder); a reactor naming `reactions:` with a
-conversion for each (skill `reactions`) gets its outlet from the conversions. Separators, and
+conversion for each (skill `reactions`) gets its outlet from the conversions. A batch still or
+solvent swap (`still:` on the step, below) gets its cuts and residue. A step with
+`crystallizer:`, `solid_separation:` or `dryer:` (a batch filter-dryer or vacuum dryer: its
+`volatiles` dried to a `residual_moisture`, ADR 0057) gets its outlets from that model, and
+`cheme process crystallizers` reports their balances and duties. A filter-dryer's filter, wash,
+re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
+procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
+dryer. Other separators, and
 reactors without conversions, are never solved (`cheme.process-propagate-not-solved` lists
 their streams lacking values): give those values yourself. Derived values are `calculated` with source `cheme process propagate: ...`
 and a fingerprint; never edit them by hand (give the value as `assumed` instead, which propagate
 never overwrites), and rerun `--fill` when `validate` reports them stale. A component balance
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
 in `DESIGN.md`. Run propagate before `props --fill`.
+
+**Recycles.** Propagate cannot start a loop on its own: the mixer waits for the recycle and the
+recycle for the mixer. Never converge a loop by hand (assumed tear values copied back over
+runs). Name one stream per loop in `tears:` and let propagate iterate it (ADR 0060):
+
+```yaml
+tears:
+  - stream: S11                     # the recycle, between two steps of the loop
+    initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.6, NAOH: 0.4}}
+convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
+```
+
+- Give the loop an exit for every component (a purge `split:`, a reaction, a product). A
+  component that only circulates has no steady state, and the loop does not converge.
+- A tear's flow or composition that is a design input (a charge ratio) stays `assumed`.
+  Propagate iterates only the other. Remove the old hand-converged values so it can.
+- Start from a guess of the right order (`initial:`), usually the hand estimate; its fractions
+  sum to 1 (`cheme.process-tear` otherwise). An empty recycle can leave a splitter remainder
+  negative, or a still, reactor or filter with nothing to work on, and then the loop does not
+  close (`cheme.process-recycle`, warning).
+- Tear each loop once. Two tears in one loop converge only as fast as plain substitution.
+- `cheme.process-recycle` (info) gives the iterations and the worst residual. Tighten
+  `convergence.tolerance` below the flowsheet's when the loop's gain is near 1: the tolerance
+  bounds the residual, so the converged loop is within tolerance / (1 - gain) of its steady
+  state. Record the tears and the tolerance in `DESIGN.md`.
+- Nothing that depends on a loop that does not converge is written. Raise
+  `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`.
+
+**Duties from the models (ADR 0059).** Do not copy a reactor's, still's or crystallizer's duty
+from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
+process propagate --fill` write the year-average duty of an isothermal batch or semi-batch
+(the reaction heat and the doses' warming), a `still:` (its boil-up's latent heat), a
+`crystallizer:` with `energy:` or a conversion step (its declared heats of reaction at their
+`temperature`, the streams' sensible heat, less the power its other energy streams bring in,
+such as an electrolyser's DC feed: give those streams their duty). It goes on the stream at the
+step's `energy_port: PORT`, else on its one energy stream to a heating or cooling utility
+(steam, cooling water, refrigerant...): give `energy_port` when the step has several, such as a
+reactor heated up by steam and cooled by brine, or a still with condensers, and when its heat
+goes to or comes from another block or step (a furnace heating a cracker's coil). Declare a
+liquid step's heat of reaction on the liquid basis. Direction matters: a cooling stream runs from the step to
+the utility, a heating stream from the utility to the step; the duty is positive. A duty you
+keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
+`cheme.process-duty` names both values when they differ: record the difference in
+`DESIGN.md`. Before typing such a stream, use the model's own terms (ADR 0063): a dosed
+liquid's or gas's heat of dilution or absorption goes in the dose's `heat_of_solution: {values:
+{ID: kJ/kmol}, provenance, source}` (negative: released; with it, write the heats of the
+reactions consuming a dissolved gas on the dissolved basis, not as a gas, or the absorption
+counts twice); the charge's heat-up in `batch.heat_up: true` or `still.heat_up: true` (to the
+bubble point, and a swap's feed to the still's temperature); the vessel's steel in the recipe's
+`vessel.metal_heat_capacity` (kJ/K, mass x cp), which also lengthens the jacket's heat and cool
+times and adds `vessel metal` to the duty of each model in that vessel that changes the
+content's temperature (a batch only with `heat_up`: without it the model holds the batch at its
+temperature, and the recipe's heat operation holds the content's and the metal's heat; a still
+at constant volatility models no temperature and gets none). `cheme
+process recipe` reports the heat per batch of each jacket-timed heat-up in a vessel with metal:
+the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, a one-stage still's condensers (unless
+`still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give
+those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
+in, or `energy_port`) and its condenser (its one heat stream out, or `still.condenser_port`):
+never type the reflux's share of the reboiler as a stream of its own. A batch's vent condenser
+(`batch.vent.condenser`, ADR 0062, see the `reactions` skill) is a different condenser from a
+still's: a partial condenser on the vent gas, its duty written on the stream at its own
+`vent.condenser.energy_port` (never the jacket's `energy_port`), and the vent's `vapour` adds a
+`vent vapour` term (and `condensate return` when it returns to the vessel) to the batch's own
+duty, beside a dose's `solution` and the `charge heat-up`.
+
+**Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
+`still:` instead of typing the distillate and the residue:
+
+```yaml
+still:
+  volatility: {model: raoult, provenance: given, source: NIST WebBook}   # or constant + alpha
+  nonvolatile: [PRODUCT]
+  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kg/h, kW, 1/h
+  feed: {stream: S12, mode: constant_level}        # a solvent swap; or portions: 4, down_to: 0.5
+  end: {residue: {key: OLD_SOLVENT, mole_fraction: 0.005}}  # or distilled, time, temperature
+  outlets: {distillate: top, residue: bottom}      # or cuts: [{outlet, end}], outlets: {residue}
+  provenance: assumed
+```
+
+- Raoult needs each volatile component's Antoine `vapour_pressure` in `materials.yaml`, with
+  its source and `temperature_range`. `cheme chemistry props` gives the NIST form, which is the
+  default. A boil-up in kW needs `heat_of_vaporization`, in kJ/kmol: NIST and
+  `cheme chemistry props` give kJ/mol, so multiply by 1000 (benzene 30.72 kJ/mol is 30720).
+- Without these data, `validate` names them (`cheme.process-still`). Look them up (skill
+  `property-retrieval`), or declare the component `nonvolatile` when it really stays in the
+  still. Never invent a relative volatility to make the step pass. An assumed `alpha` states
+  its basis in its source.
+- The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
+- `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
+  batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
+  `from:` the still.
+- Without `column:` the model is one stage: it strips and swaps solvents but does not purify
+  a product. An azeotrope (non-ideal liquid) needs a specified split or `process simulate`;
+  record that in `DESIGN.md`.
+
+**Batch rectification (a column on the still, ADR 0061).** Purify a product in the still with
+its column instead of a specified split of the still's distillate:
+
+```yaml
+still:
+  volatility: {model: raoult, provenance: given, source: NIST WebBook}
+  boilup: {value: 150, unit: kW, provenance: assumed, source: the reboiler}   # the whole reboiler
+  column:
+    stages: 10                       # theoretical stages, the still included
+    reflux: constant                 # with ratio; or constant_distillate:
+    ratio: 2                         #   distillate: {key: PRODUCT, mole_fraction: 0.999}
+                                     #   maximum_ratio: 6
+    provenance: assumed              # or minimum_reflux_factor: 1.3 instead of stages
+    source: packed column, about 10 theoretical stages
+  cuts:
+    - {outlet: product, end: {purity: {key: PRODUCT, fraction: 0.998}, basis: mass}}
+    - {outlet: offcut, end: {residue: {key: PRODUCT, mole_fraction: 0.05}}}
+  outlets: {residue: bottom}
+  provenance: assumed
+```
+
+- The `boilup` is the reboiler's, not the net distillate rate: `(R + 1)` moles boil up per
+  mole distilled, and the time and the duty follow. Give the still an energy stream in from
+  steam (the reboiler) and one out to cooling water (the condenser); propagate writes both.
+  Delete a typed reflux share (a stream for "the boil-up returned as reflux"), a column step
+  with a specified split and its return to the pot.
+- `cheme process stills` gives each cut's purity and recovery, the reflux at the start and
+  the end, the boil-up time and the duties. A note says when a constant distillate reached its
+  `maximum_ratio` (its purity falls from there) or a cut's end was reached at once.
+- The shortcut has no holdup and uses Gilliland's correlation: it gives a leaner distillate
+  than a rigorous column at the same stages and reflux. State the stages and reflux you
+  assumed in `DESIGN.md`, and size the column and condenser elsewhere.
 
 `cheme process simulate --fill` solves the whole flowsheet in DWSIM, separators, exchangers,
 columns and recycles included, from the feeds and the specs in `process/simulation.yaml`; see
