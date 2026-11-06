@@ -780,7 +780,7 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
     candidates = [
         c
         for node in nodes
-        if (c := _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, found))
+        for c in _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, found)
     ]
     _put_duties(work, candidates, put, found)
     for node in nodes:
@@ -844,35 +844,50 @@ def _duty(
     solutions: dict[str, Any],
     solved_inputs: dict[str, Any],
     found: Derivation,
-) -> _Candidate | None:
-    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059): compared
-    where the stream has a given or assumed one, else the candidate :func:`_put_duties`
-    writes; None (and why, in *found*) when there is nothing to write."""
+) -> list[_Candidate]:
+    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059), and a
+    batch still's condenser for its own (ADR 0061): compared where the stream has a given or
+    assumed one, else the candidates :func:`_put_duties` writes; none (and why, in *found*)
+    when there is nothing to write."""
     from chemeascode.domains.process import duties
     from chemeascode.domains.process.stirred_tank import TankError, tank_inlet
     from chemeascode.domains.process.stirred_tank import solve_node as solve_tank
 
     model = duties.duty_model(node)
     if model is None:
-        return None
+        return []
     goal, why = duties.target(work, node)
+    condenser, condenser_why = (
+        duties.condenser_target(work, node) if model == "still" else (None, "")
+    )
     label = f"{node.id} ({model})"
-    if goal is None:
-        if why:
-            found.duties.append(
-                (
-                    node.id,
-                    "info",
-                    f"{label}: its model's duty is not written: {why}",
-                    "set energy_port: to the port of the energy stream that carries it",
-                    "info",
-                )
+    if goal is None and why:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{label}: its model's duty is not written: {why}",
+                "set energy_port: to the port of the energy stream that carries it",
+                "info",
             )
-        return None
+        )
+    if condenser is None and condenser_why:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{node.id} (still condenser): its duty is not written: {condenser_why}",
+                "give the still's condenser an energy stream to cooling, or set "
+                "still.condenser_port",
+                "info",
+            )
+        )
+    if goal is None and condenser is None:
+        return []
     ins = [s for s, _ in ends[0]]
     outs = [s for s, _ in ends[1]]
     used = list(ins)
-    extra: dict[str, Any] = {"duty": model, "into": goal.into}
+    stream_id = (goal or condenser).stream.id  # type: ignore[union-attr]
     try:
         if model in ("batch", "semibatch"):
             result, inputs = beds.get(node.id), solved_inputs.get(node.id)
@@ -881,7 +896,7 @@ def _duty(
             duty = duties.batch_duty(node, result)
         elif model in ("still", "crystallizer"):
             if node.id not in solutions:
-                return None  # not solved: propagate reports the still or crystallizer already
+                return []  # not solved: propagate reports the still or crystallizer already
             result, inputs = solutions[node.id]
             if model == "still":
                 duty = duties.still_duty(node, result)
@@ -902,13 +917,44 @@ def _duty(
             (
                 node.id,
                 "info",
-                f"{label}: no duty for {goal.stream.id}: {failure}",
+                f"{label}: no duty for {stream_id}: {failure}",
                 "correct the model's data; cheme process reactors reports it",
                 "info",
             )
         )
-        return None
+        return []
     found.model_duties[node.id] = duty
+    offers = []
+    if goal is not None:
+        offers.append((goal, duty, label, model))
+    if condenser is not None:
+        cold = duties.condenser_duty(node, result)
+        offers.append((condenser, cold, f"{node.id} (still condenser)", "still condenser"))
+    candidates = []
+    for at, what, name, rule in offers:
+        candidate = _offer(work, node, case, at, what, name, rule, used, inputs, found)
+        if candidate is not None:
+            candidates.append(candidate)
+    return candidates
+
+
+def _offer(
+    work: Process,
+    node: Any,
+    case: str,
+    goal: Any,
+    duty: Any,
+    label: str,
+    model: str,
+    used: list[StreamDef],
+    inputs: dict[str, Any],
+    found: Derivation,
+) -> _Candidate | None:
+    """*duty* (:class:`.duties.ModelDuty`) on *goal*'s stream: compared where it has a given or
+    assumed duty, reported where it is not known or flows against the stream, else the
+    candidate to write."""
+    from chemeascode.domains.process import duties
+
     stream = goal.stream
     if duty.heat_kW is None:
         found.duties.append(
@@ -952,6 +998,9 @@ def _duty(
                 )
             )
         return None
+    extra: dict[str, Any] = {"duty": model.split()[0], "into": goal.into}
+    if model == "still condenser":
+        extra["condenser"] = True
     extra |= inputs
     extra["temperature"] = {
         s.id: t.model_dump(mode="json", exclude=NOT_INPUTS)

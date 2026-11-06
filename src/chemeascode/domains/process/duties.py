@@ -12,7 +12,10 @@ supplied, negative: removed):
   model holds the batch at its temperature from the start);
 - a **batch still** (``still:``, :mod:`.batch_still`): the boil-up's latent heat, ``Q =
   sum_i dHvap_i D_i``, D_i the kmol/h distilled (the energy per batch over the batch's hours
-  of flows);
+  of flows); with a column (``still.column``, ADR 0061) the reboiler boils up ``(R + 1)`` times
+  the distillate, ``Q = integral (R + 1) lambda(x_D) dD``, and the condenser removes as much
+  (total condenser, constant molar overflow) on its own stream (``still.condenser_port``, by
+  default the column's one heat stream out; the reboiler's is then its one heat stream in);
 - a **crystallizer** with ``energy:`` (:mod:`.crystallization`): its lumped duty (the feed's
   sensible heat, the heat of crystallization, the solvent evaporated);
 - a **conversion step** (``reactions:`` with conversions, ``reactor: conversion`` or a
@@ -56,6 +59,10 @@ BATCH_BASIS = (
 STILL_BASIS = (
     "batch still: the latent heat of what boils up (heat_of_vaporization), per hour of the "
     "flowsheet's flows; the heat-up to the bubble point and heat losses not included"
+)
+CONDENSER_BASIS = (
+    "batch still's condenser: the latent heat of the vapour it condenses (the distillate and "
+    "the reflux, total condenser), per hour of the flowsheet's flows; no subcooling"
 )
 CONVERSION_BASIS = (
     "conversion step: the declared heats of reaction at their temperature, each stream "
@@ -140,10 +147,50 @@ def is_heat(process: Any, other: str | None) -> bool:
     return utility is not None and utility.kind in HEAT_UTILITIES
 
 
+def condenser_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream a batch still's condenser duty goes on: the one at
+    ``still.condenser_port``, else (a still with a column) its one heat stream out; None and
+    why ('' for a still without a column or a condenser_port, or no still: nothing to say)."""
+    spec = getattr(node, "still", None)
+    if spec is None:
+        return None, ""
+    ends = _energy_ends(process, node)
+    port = spec.condenser_port
+    if port is not None:
+        at = [e for e in ends if e[1] == port]
+        if not at:
+            return None, f"no energy stream at its condenser_port {port}"
+        stream, _, into, _ = at[0]
+        return Target(stream, port, into, "condenser_port"), ""
+    if spec.column is None:
+        return None, ""
+    out = [e for e in ends if not e[2] and is_heat(process, e[3])]
+    if len(out) == 1:
+        stream, at_port, into, _ = out[0]
+        return Target(stream, at_port, into, "its one heat stream out"), ""
+    if out:
+        return None, (
+            f"{len(out)} heat streams out of it ({', '.join(e[0].id for e in out)}): name the "
+            "condenser's in still.condenser_port"
+        )
+    return None, (
+        "no heat stream out of it to a cooling utility: give the condenser its energy stream "
+        "(from the still to cooling water), or name it in still.condenser_port"
+    )
+
+
 def target(process: Any, node: Any) -> tuple[Target | None, str]:
     """The energy stream *node*'s model duty goes on, or None and why ('' when the node has no
-    heat stream at all: nothing to say)."""
+    heat stream at all: nothing to say). A still's condenser stream (:func:`condenser_target`)
+    is not its reboiler's; with a column, the reboiler's default is its one heat stream in."""
     ends = _energy_ends(process, node)
+    spec = getattr(node, "still", None)
+    if spec is not None and (spec.condenser_port is not None or spec.column is not None):
+        condenser, _ = condenser_target(process, node)
+        if condenser is not None:
+            ends = [e for e in ends if e[0].id != condenser.stream.id]
+        if spec.column is not None and getattr(node, "energy_port", None) is None:
+            ends = [e for e in ends if e[2]]
     port = getattr(node, "energy_port", None)
     if port is not None:
         at = [e for e in ends if e[1] == port]
@@ -215,6 +262,17 @@ def still_duty(node: Any, result: Any) -> ModelDuty:
         return ModelDuty(node.id, "still", None, basis=STILL_BASIS, missing=missing)
     heat = result.energy / (result.hours * 3600.0)
     return ModelDuty(node.id, "still", heat, {"boil-up": heat}, STILL_BASIS)
+
+
+def condenser_duty(node: Any, result: Any) -> ModelDuty:
+    """The duty of batch still *node*'s condenser from its solution: minus its reboiler's
+    (what boils up is condensed, the reflux with the distillate)."""
+    boil = still_duty(node, result)
+    if boil.heat_kW is None:
+        return ModelDuty(node.id, "condenser", None, basis=CONDENSER_BASIS, missing=boil.missing)
+    return ModelDuty(
+        node.id, "condenser", -boil.heat_kW, {"condensation": -boil.heat_kW}, CONDENSER_BASIS
+    )
 
 
 def crystallizer_duty(node: Any, result: Any) -> ModelDuty:
@@ -545,9 +603,9 @@ def duty_rules(process: Any) -> list[Any]:
     goals: dict[str, list[Any]] = {}
     for _, _, node in nodes:
         if duty_model(node) is not None:
-            goal, _ = target(process, node)
-            if goal is not None:
-                goals.setdefault(goal.stream.id, []).append(goal.stream)
+            for goal in (target(process, node)[0], condenser_target(process, node)[0]):
+                if goal is not None:
+                    goals.setdefault(goal.stream.id, []).append(goal.stream)
     cases = [fs.default_case()] if any(len(g) > 1 for g in goals.values()) else []
     for group in goals.values():
         stream = group[0]
