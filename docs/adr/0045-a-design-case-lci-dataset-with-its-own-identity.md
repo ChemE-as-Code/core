@@ -1,7 +1,7 @@
 # 0045. A design case's LCI dataset, generated with an identity that names the case
 
-- **Status:** Proposed
-- **Date:** 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-11-06 (proposed 2026-11-04)
 
 ## Context
 

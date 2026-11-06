@@ -88,11 +88,11 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0038](0038-stated-imbalance-of-specified-splits.md) | A specified split's energy imbalance is stated, and the plant closure takes it | Proposed | 2026-10-30 |
 | [0039](0039-idaes-as-an-optional-second-simulation-backend.md) | IDAES as an optional second simulation backend, chosen in simulation.yaml | Proposed | 2026-10-31 |
 | [0040](0040-pinch-targets-from-the-recorded-simulation-run.md) | Pinch targets from the recorded simulation run, every duty in one class and reconciled | Proposed | 2026-11-04 |
-| [0041](0041-measured-electrochemical-performance-and-membrane-block.md) | Measured electrochemical performance from a processed series, and a membrane block | Proposed | 2026-11-04 |
-| [0042](0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md) | WaterTAP and IDAES are not reused for measured electrochemical cells | Proposed | 2026-11-04 |
-| [0043](0043-dynamic-electrolysis-duties-and-anolyte-models.md) | Dynamic electrolysis duties with an anolyte model interface, on a concentration basis | Proposed | 2026-11-04 |
-| [0044](0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md) | Stack sizing in process/cells.yaml, skid equipment inputs through the equipment list | Proposed | 2026-11-04 |
-| [0045](0045-a-design-case-lci-dataset-with-its-own-identity.md) | A design case's LCI dataset, generated with an identity that names the case | Proposed | 2026-11-04 |
+| [0041](0041-measured-electrochemical-performance-and-membrane-block.md) | Measured electrochemical performance from a processed series, and a membrane block | Accepted | 2026-11-06 |
+| [0042](0042-watertap-and-idaes-not-reused-for-electrochemical-cells.md) | WaterTAP and IDAES are not reused for measured electrochemical cells | Accepted | 2026-11-06 |
+| [0043](0043-dynamic-electrolysis-duties-and-anolyte-models.md) | Dynamic electrolysis duties with an anolyte model interface, on a concentration basis | Accepted | 2026-11-06 |
+| [0044](0044-stack-sizing-and-skid-inputs-through-the-equipment-list.md) | Stack sizing in process/cells.yaml, skid equipment inputs through the equipment list | Accepted | 2026-11-06 |
+| [0045](0045-a-design-case-lci-dataset-with-its-own-identity.md) | A design case's LCI dataset, generated with an identity that names the case | Accepted | 2026-11-06 |
 | [0046](0046-pfd-drawn-as-an-engineering-sheet.md) | The PFD drawn as an engineering sheet: ISO frame, stream table, utility stubs, junctions | Proposed | 2026-11-05 |
 | [0047](0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md) | Lines through valves, along pipes and slanted lines are drawing findings the gate fails on | Proposed | 2026-11-05 |
 | [0048](0048-generated-process-sheets-written-without-indentation.md) | Generated process sheets written without indentation | Proposed | 2026-11-05 |

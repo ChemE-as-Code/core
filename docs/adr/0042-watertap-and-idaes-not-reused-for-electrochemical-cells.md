@@ -1,7 +1,7 @@
 # 0042. WaterTAP and IDAES are not reused for measured electrochemical cells
 
-- **Status:** Proposed
-- **Date:** 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-11-06 (proposed 2026-11-04)
 
 ## Context
 

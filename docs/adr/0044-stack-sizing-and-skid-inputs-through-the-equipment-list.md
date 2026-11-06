@@ -1,7 +1,7 @@
 # 0044. Stack sizing in process/cells.yaml, skid equipment inputs through the equipment list
 
-- **Status:** Proposed
-- **Date:** 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-11-06 (proposed 2026-11-04)
 - **Amended:** 2026-11-04, skid inputs for the CO2 pilot skids (see "Amendment" below)
 
 ## Context
