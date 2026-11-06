@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.11.0 (2026-11-06)
+
+Minor release: lighter generated sheets and off-page connectors on the sheet edge. `cheme process
+build` writes the BFD and PFD without indentation, about half the bytes for the same drawing
+(generator 7, ADR 0048), and `cheme fmt` leaves a generated sheet as built. A new drawing lint,
+`cheme.offpage-not-on-edge`, flags an off-page connector to another sheet or the battery limit
+that is not on an edge of the drawing area, and the `drawing-clean` gate fails on it (ADR 0049).
+Every BFD/PFD needs `cheme process build` once (generator 7). A plant that lists the
+`drawing-clean` rules in `checks/checks.yaml` gets the new rule only once it adds it.
 
 ### Added
 
