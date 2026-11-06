@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A batch's vent carries the liquid's vapour, with a partial vent condenser and a dissolved-gas
+  split (ADR 0062, #179), each a new optional key of `batch.vent`:
+  - `vapour: {components, activity, source}`: the gas leaves the vessel saturated with the
+    liquid's volatile components at its temperature and pressure (Raoult with their Antoine
+    `vapour_pressure`, an ideal liquid unless `activity` gives sourced constants), integrated
+    with the batch: the vapour leaves the liquid, its `heat_of_vaporization` cools the content
+    (adiabatic) or is a `vent vapour` term of the isothermal model duty (ADR 0059); a content
+    at its boiling point is refused.
+  - `condenser: {temperature, returns, energy_port, provenance, source}`: a partial condenser
+    on the vent, one flash at its outlet temperature with the vent's gases as inerts; the gas
+    past it leaves saturated there, at that temperature, the condensate returns to the vessel
+    (`condensate return` term) or leaves by a third outlet stream (`returns: STREAM`); its
+    duty is written `calculated` on the energy stream at its `energy_port` (ADR 0059), never
+    the step's own heat stream.
+  - `henry: {gas: {points: [[K, kPa]]}}`: the share of a vent gas that stays dissolved from its
+    Henry constant (the liquid at the end saturated at the gas's partial pressure), instead of a
+    `fraction`, which stays the fallback for a gas without data.
+  - `process reactors` reports the vapour carried off, the condensate, the vent's temperature,
+    the condenser's duty on its stream and each gas's solubility; `process recipe` gives the
+    vent's m3/h at the condenser's temperature; `process reactor-hazards` takes the gas release
+    at the MTSR with the liquid's vapour (`vapour_share`, `noncondensable_m3_h`), and a content
+    that boils at the MTSR (`boils`) is a `cheme.reactor-hazard-vent` warning;
+    `cheme.process-reactor` checks the vapour's components, templates, the condensate stream
+    and the condenser's energy port.
+  - A vent without these keys solves, reports and fingerprints as in 1.9.0. Every BFD/PFD needs
+    `cheme process build` once (the process generator's code changed; its output did not).
+
 ## 1.9.0 (2026-11-06)
 
 Minor release: screening, energy and recycles for batch plants. A semi-batch's thermal screening

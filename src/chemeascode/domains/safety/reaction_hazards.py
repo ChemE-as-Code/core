@@ -687,12 +687,74 @@ def _gas(
         ),
         "per_batch": bool(hours),
     }
+    _vapour_laden(process, item, entry, gas, moles, temperature, pressure)
     capacity = getattr(getattr(item, "hazard", None), "vent_capacity", None)
     if capacity:
         gas["vent_capacity_m3_h"] = capacity
         if hours:
             gas["capacity_ratio"] = gas["rate_m3_h"] / capacity
     entry.gas_release = gas
+
+
+def _vapour_laden(
+    process: Any,
+    item: Any,
+    entry: HazardEntry,
+    gas: dict[str, Any],
+    moles: dict[str, float],
+    temperature: float,
+    pressure: float,
+) -> None:
+    """A vent with ``vapour`` (ADR 0062): the gas release leaves the vessel saturated with the
+    liquid's volatile components at the MTSR, so its volume is the non-condensables' over
+    ``1 - Y``, ``Y = sum_i gamma_i x_i P_i^sat(MTSR) / P`` over the content *moles* (a vent
+    condenser is not credited: its cooling may fail too). ``Y >= 1``: the content boils at the
+    MTSR, and its boil-up, not the gas, sets the release (``boils``)."""
+    from chemeascode.domains.process.vent_vapour import VentError, phase_of
+
+    vent = item.batch.vent
+    if vent.vapour is None:
+        return
+    try:
+        phase = phase_of(process, vent, list(moles), process.ideal_gas())
+    except VentError as failure:
+        entry.missing.append(f"the vapour in the gas release: {failure}")
+        return
+    total = sum(v for v in moles.values() if v > 0)
+    if not phase.volatile or total <= 0:
+        return
+    share = sum(
+        phase.activity.get(n, 1.0)
+        * max(moles.get(n, 0.0), 0.0)
+        / total
+        * phase.vapour_pressure[n].kpa(temperature)
+        / pressure
+        for n in phase.volatile
+    )
+    gas["vapour_share"] = share
+    gas["noncondensable_m3_h"] = gas["rate_m3_h"]
+    if share >= 1.0:
+        gas["boils"] = True
+        entry.notes.append(
+            f"the content boils at the MTSR ({temperature:.1f} K): its vapour pressure "
+            f"{share * pressure:.4g} kPa reaches the vessel's {pressure:.4g} kPa(a); the gas "
+            "release is the boil-up, which the screening does not size (gas_release.boils)"
+        )
+        return
+    gas["rate_m3_h"] /= 1.0 - share
+    gas["formed_m3"] /= 1.0 - share
+
+
+def _vapour_text(gas: dict[str, Any]) -> str:
+    """The vapour's part of a gas release (ADR 0062), '' without one."""
+    if "vapour_share" not in gas:
+        return ""
+    if gas.get("boils"):
+        return f" (the non-condensables; the content boils, vapour share {gas['vapour_share']:.3g})"
+    return (
+        f" with the liquid's vapour ({gas['vapour_share']:.3g} of the gas; the non-condensables "
+        f"{gas['noncondensable_m3_h']:.4g} m3/h)"
+    )
 
 
 def _vent_note(
@@ -1003,10 +1065,19 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
             release = (
                 f"{e.node}: gas release at the MTSR {gas['rate_kmol_s']:.4g} kmol/s, "
                 f"{gas['rate_m3_h']:.4g} m3/h at {gas['temperature_K']:.1f} K and "
-                f"{gas['pressure_kPa']:.4g} kPa(a), {gas['basis']}"
+                f"{gas['pressure_kPa']:.4g} kPa(a)" + _vapour_text(gas) + f", {gas['basis']}"
             )
             capacity = gas.get("vent_capacity_m3_h")
-            if capacity is None:
+            if gas.get("boils"):
+                add(
+                    "warning",
+                    "vent",
+                    release + ": the content boils at the MTSR (its vapour pressure reaches "
+                    "the vessel's)",
+                    "the boil-up at a cooling failure sets the vent's and relief's load: size "
+                    "them for it (a two-phase relief study), or lower the MTSR",
+                )
+            elif capacity is None:
                 add(
                     "warning",
                     "vent",
@@ -1101,7 +1172,8 @@ def hazard_text(report: HazardReport) -> str:
             lines.append(
                 f"  gas release at the MTSR: {gas['rate_kmol_s']:.4g} kmol/s, "
                 f"{gas['rate_m3_h']:.4g} m3/h at {gas['temperature_K']:.1f} K and "
-                f"{gas['pressure_kPa']:.4g} kPa(a) ({gas['basis']}; {gas['rate_from']}); "
+                f"{gas['pressure_kPa']:.4g} kPa(a){_vapour_text(gas)} ({gas['basis']}; "
+                f"{gas['rate_from']}); "
                 f"{gas['formed_kmol']:.4g} kmol ({gas['formed_m3']:.4g} m3) formed by "
                 f"{gas['formed_by'] or 'no reaction'} run to completion"
                 + (f" ({gas['formed_from']})" if gas.get("formed_from") else "")

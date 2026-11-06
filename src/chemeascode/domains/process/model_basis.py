@@ -250,6 +250,11 @@ def _reactor_basis(
                 "semibatch": "semi-batch (stirred, well mixed, dosed feeds)",
             }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
+            vent = getattr(spec, "vent", None) if model != "cstr" else None
+            if vent is not None and (vent.vapour is not None or vent.henry):
+                from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
+
+                assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled

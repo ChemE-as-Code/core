@@ -61,6 +61,11 @@ CONVERSION_BASIS = (
     "conversion step: the declared heats of reaction at their temperature, each stream "
     "brought to or from it at its heat capacity; heats of mixing not included"
 )
+CONDENSER_BASIS = (
+    "vent condenser: the vapour condensed at the vessel's temperature (heat_of_vaporization), "
+    "the vapour cooled as liquid to the condenser's outlet (liquid_heat_capacity) and the "
+    "non-condensables cooled as ideal gases, per hour of the flowsheet's flows"
+)
 IDEAL_GAS_BASIS = "conversion step: H(out) - H(in) of ideal gases on the elements basis"
 OTHER_BASIS = "; less the energy its other energy streams bring in (their duties)"
 
@@ -140,10 +145,46 @@ def is_heat(process: Any, other: str | None) -> bool:
     return utility is not None and utility.kind in HEAT_UTILITIES
 
 
+def condenser_port(node: Any) -> str | None:
+    """The energy port of *node*'s vent condenser (ADR 0062): its own stream, never the
+    jacket's."""
+    vent = getattr(getattr(node, "batch", None), "vent", None)
+    condenser = getattr(vent, "condenser", None)
+    return getattr(condenser, "energy_port", None)
+
+
+def condenser_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream *node*'s vent condenser's duty goes on (ADR 0062), or None and why
+    ('' without a condenser)."""
+    vent = getattr(getattr(node, "batch", None), "vent", None)
+    if getattr(vent, "condenser", None) is None:
+        return None, ""
+    port = condenser_port(node)
+    if port is None:
+        return None, "the vent condenser names no energy_port"
+    at = [e for e in _energy_ends(process, node) if e[1] == port]
+    if not at:
+        return None, f"no energy stream at the vent condenser's energy_port {port}"
+    stream, _, into, _ = at[0]
+    return Target(stream, port, into, "vent.condenser.energy_port"), ""
+
+
+def condenser_duty(node: Any, result: Any) -> ModelDuty:
+    """The duty of *node*'s vent condenser from its batch's solution (:class:`.TankResult`):
+    the heat it removes, as heat into the node (negative), per hour of the flowsheet's flows."""
+    label = "vent condenser"
+    if result.condenser_heat is None:
+        missing = result.condenser_missing or ["the vent's vapour (nothing condensed)"]
+        return ModelDuty(node.id, label, None, basis=CONDENSER_BASIS, missing=missing)
+    terms = {k: -v / 3600.0 for k, v in result.condenser_terms.items()}
+    return ModelDuty(node.id, label, -result.condenser_heat / 3600.0, terms, CONDENSER_BASIS)
+
+
 def target(process: Any, node: Any) -> tuple[Target | None, str]:
     """The energy stream *node*'s model duty goes on, or None and why ('' when the node has no
-    heat stream at all: nothing to say)."""
-    ends = _energy_ends(process, node)
+    heat stream at all: nothing to say). A vent condenser's stream (ADR 0062) is its own."""
+    own = condenser_port(node)
+    ends = [e for e in _energy_ends(process, node) if own is None or e[1] != own]
     port = getattr(node, "energy_port", None)
     if port is not None:
         at = [e for e in ends if e[1] == port]
@@ -202,7 +243,13 @@ def batch_duty(node: Any, result: Any) -> ModelDuty:
     if result.heat_terms is None:
         return ModelDuty(node.id, model, None, basis=BATCH_BASIS, missing=result.heat_missing)
     terms = {k: v / 3600.0 for k, v in result.heat_terms.items()}
-    return ModelDuty(node.id, model, sum(terms.values()), terms, BATCH_BASIS)
+    basis = BATCH_BASIS
+    if "vent vapour" in terms:
+        basis += (
+            "; with the latent heat of the vapour the vent gas carries off and a returned "
+            "condensate warmed back (ADR 0062)"
+        )
+    return ModelDuty(node.id, model, sum(terms.values()), terms, basis)
 
 
 def still_duty(node: Any, result: Any) -> ModelDuty:
@@ -435,11 +482,14 @@ def duty_text(duty: ModelDuty) -> str:
     return f"{duty.model} duty {duty.heat_kW:.6g} kW into the step, year average ({terms} kW)"
 
 
-def report_entry(process: Any, node: Any, case: str, duty: ModelDuty) -> dict[str, Any]:
+def report_entry(
+    process: Any, node: Any, case: str, duty: ModelDuty, condenser: bool = False
+) -> dict[str, Any]:
     """*duty* as ``cheme process reactors`` reports it: the model's duty and its energy stream
-    (the stream's duty now, and what the model gives it in the stream's direction)."""
+    (the stream's duty now, and what the model gives it in the stream's direction); a vent
+    *condenser*'s on its own stream (ADR 0062)."""
     found = duty.entry()
-    goal, why = target(process, node)
+    goal, why = condenser_target(process, node) if condenser else target(process, node)
     found["stream"] = None
     found["stream_note"] = why
     if goal is not None:
@@ -548,6 +598,9 @@ def duty_rules(process: Any) -> list[Any]:
             goal, _ = target(process, node)
             if goal is not None:
                 goals.setdefault(goal.stream.id, []).append(goal.stream)
+            cooled, _ = condenser_target(process, node)  # a vent condenser's own (ADR 0062)
+            if cooled is not None:
+                goals.setdefault(cooled.stream.id, []).append(cooled.stream)
     cases = [fs.default_case()] if any(len(g) > 1 for g in goals.values()) else []
     for group in goals.values():
         stream = group[0]

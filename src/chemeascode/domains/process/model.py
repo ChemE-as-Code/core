@@ -1304,14 +1304,26 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
         if (end := process.ends(s)[0]) is not None and end.node == item.id and s.kind == "material"
     ]
     problems = []
+    condenser = vent.condenser
+    condensate = (
+        condenser.returns if condenser is not None and condenser.returns != "vessel" else None
+    )
+    allowed = 3 if condensate is not None else 2
     if vent.stream not in outlets:
         problems.append(f"the vent stream {vent.stream} is no outlet of it")
     elif len(outlets) == 1:
         problems.append(
             f"the vent stream {vent.stream} is its only outlet: the liquid needs its own"
         )
-    elif len(outlets) > 2:
-        problems.append(f"{len(outlets)} outlets (a vented batch has the liquid's and the vent)")
+    elif len(outlets) > allowed:
+        problems.append(
+            f"{len(outlets)} outlets (a vented batch has the liquid's and the vent"
+            + (", and its condenser's condensate)" if condensate else ")")
+        )
+    if condensate is not None and condensate not in outlets:
+        problems.append(f"the condenser's condensate stream {condensate} is no outlet of it")
+    elif condensate is not None and len(outlets) < 3:
+        problems.append("no outlet for the liquid besides the vent and the condensate")
     declared = process.components()
     if unknown := [n for n in vent.components if n not in declared]:
         problems.append("the vent component(s) " + ", ".join(unknown) + " not declared")
@@ -1337,6 +1349,7 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
             hint=hint,
         )
     _vent_template_rule(out, item, at, vent, declared)
+    _vent_vapour_rules(out, item, at, vent, declared, reactions, outlets)
     unformed = [
         n
         for n in vent.components
@@ -1352,6 +1365,123 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
             [item.id, *unformed],
             hint="list the gases the reactions form; a dosed gas passes through by dosing.absorbed",
         )
+
+
+def vent_volatile(process: Any, item: Any, reactions: list[Any]) -> list[str]:
+    """The volatile components a vented batch's gas carries (ADR 0062): ``vent.vapour``'s list,
+    else every component of its inlets' templates and its reactions with a vapour_pressure (a
+    vent component is a gas, never one of them)."""
+    vent = item.batch.vent
+    if vent.vapour.components:
+        return list(vent.vapour.components)
+    declared = process.components()
+    templates = process.templates()
+    names: list[str] = []
+    for s in process.flowsheet.streams:
+        end = process.ends(s)[1]
+        if end is None or end.node != item.id or s.kind != "material":
+            continue
+        if (t := templates.get(s.template or "")) is not None:
+            names += t.components
+    names += [n for r in reactions for n in r.stoichiometry]
+    return [
+        n
+        for n in dict.fromkeys(names)
+        if n not in vent.components and getattr(declared.get(n), "vapour_pressure", None)
+    ]
+
+
+def _vent_vapour_rules(
+    out: _Out,
+    item: Any,
+    at: list[Any],
+    vent: Any,
+    declared: Any,
+    reactions: list[Any],
+    outlets: list[str],
+) -> None:
+    """ADR 0062: the vapour's components declared with a vapour_pressure, in the vent's (and a
+    condensate stream's) template; a Henry component in the liquid's template; the condenser's
+    energy_port an energy port of the step."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    where = [*at, "batch", "vent"]
+    hint = (
+        "vent.vapour: {components: [volatile ids with vapour_pressure]}; vent.condenser: "
+        "{temperature: K, returns: vessel or a stream, energy_port: port}; vent.henry: "
+        "{gas: {points: [[K, kPa]]}}"
+    )
+    errors: list[str] = []
+    streams = {s.id: s for s in process.flowsheet.streams}
+    templates = process.templates()
+
+    def template_of(stream_id: str | None) -> Any:
+        stream = streams.get(stream_id or "")
+        return templates.get(stream.template or "") if stream is not None else None
+
+    if vent.vapour is not None:
+        volatile = vent_volatile(process, item, reactions)
+        if unknown := [n for n in vent.vapour.components if n not in declared]:
+            errors.append("vapour component(s) " + ", ".join(unknown) + " not declared")
+        if lack := [
+            n
+            for n in vent.vapour.components
+            if n in declared and getattr(declared[n], "vapour_pressure", None) is None
+        ]:
+            errors.append(
+                "vapour component(s) " + ", ".join(lack) + " without a vapour_pressure (Antoine)"
+            )
+        if not volatile:
+            out.add(
+                "warning",
+                "reactor",
+                f"{what}: vent.vapour, but no component of it has a vapour_pressure: the gas "
+                "carries no vapour",
+                [*where, "vapour"],
+                [item.id],
+                hint="give the solvent's Antoine vapour_pressure in materials.yaml, or name the "
+                "volatile components in vent.vapour.components",
+            )
+        known = [n for n in volatile if n in declared]
+        condenser = vent.condenser
+        condensate = (
+            condenser.returns if condenser is not None and condenser.returns != "vessel" else None
+        )
+        for stream_id, role in ((vent.stream, "vent"), (condensate, "condensate")):
+            template = template_of(stream_id)
+            if template is None:
+                continue
+            if lacking := [n for n in known if n not in template.components]:
+                errors.append(
+                    f"the {role} stream {stream_id}'s template {template.id} lacks the vapour's "
+                    + ", ".join(lacking)
+                )
+        if condenser is not None and condenser.energy_port is not None:
+            port = next((q for q in item.ports if q.id == condenser.energy_port), None)
+            if port is None or port.kind != "energy":
+                errors.append(
+                    f"the condenser's energy_port {condenser.energy_port} is no energy port of it"
+                )
+            elif condenser.energy_port == getattr(item, "energy_port", None):
+                errors.append(
+                    f"the condenser's energy_port {condenser.energy_port} is the step's own "
+                    "energy_port (the jacket's): give the condenser its own energy stream"
+                )
+    if vent.henry:
+        liquid = [
+            s for s in outlets if s != vent.stream and s != getattr(vent.condenser, "returns", None)
+        ]
+        template = template_of(liquid[0]) if len(liquid) == 1 else None
+        if template is not None and (
+            lacking := [n for n in vent.henry if n in declared and n not in template.components]
+        ):
+            errors.append(
+                f"the liquid stream {liquid[0]}'s template {template.id} lacks "
+                + ", ".join(lacking)
+                + " (vent.henry keeps it dissolved)"
+            )
+    for problem in errors:
+        out.add("error", "reactor", f"{what}: vent with {problem}", where, [item.id], hint=hint)
 
 
 def _vent_template_rule(out: _Out, item: Any, at: list[Any], vent: Any, declared: Any) -> None:

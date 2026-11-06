@@ -1134,6 +1134,36 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   a vent stream whose template lacks a vent component or a passing dose's component, (warning)
   one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
   does not couple a vented batch.
+  The vent may say more (ADR 0062; a vent without these keys solves as in 1.9.0):
+  `vapour: {components, activity, source}` saturates the gas with the liquid's volatile
+  components at the vessel's temperature and pressure (Raoult, each component's Antoine
+  `vapour_pressure`; an ideal liquid unless `activity` gives sourced constants; default every
+  component with a `vapour_pressure`, never a vent component): each kmol of gas carries
+  `Y / (1 - Y)` kmol of vapour, `Y = sum gamma_i x_i P_i^sat / P`, taken off the liquid as it
+  leaves, its latent heat (`heat_of_vaporization`) the vessel's evaporative cooling (a `vent
+  vapour` term of the isothermal duty; in an adiabatic batch it cools the content); a content
+  that boils (`Y >= 1`) is refused. `condenser: {temperature, returns: vessel | stream,
+  energy_port, provenance, source}` is a partial vent condenser: one flash at its outlet
+  temperature over an ideal condensate (the vent's gases are inerts), the gas past it saturated
+  there (one condensable over an inert: `G K / (1 - K)`), the condensate back to the vessel
+  (warmed back, a `condensate return` term) or out by a third outlet stream; its duty
+  (condensation at the vessel's temperature, the vapour cooled as liquid, the gases cooled as
+  ideal gases, left out with a note without their `ideal_gas`) is written on the energy stream
+  at its `energy_port` (`calculated`, ADR 0059; never the step's own `energy_port`), and the
+  vent and condensate streams carry its temperature. `henry: {gas: {points: [[K, kPa]],
+  provenance, source}}` keeps a vent gas dissolved up to its solubility instead of a
+  `fraction` (`p = H x`, ln H linear in 1/T): the liquid at the end holds `x = y P / H`, `y` the
+  gas's share over the liquid, by successive substitution over whole runs (what was charged or
+  dosed stays, with a note). `process reactors` adds the vapour carried off, the condensate,
+  the vent's temperature, the condenser's duty on its stream and each gas's solubility;
+  `process recipe` gives the vent's m3/h at the condenser's temperature; `reactor-hazards`
+  takes the gas release at the MTSR vapour-laden (`vapour_share`, `noncondensable_m3_h`, the
+  volume over `1 - Y` at the MTSR; no condenser credited), and a content that boils at the
+  MTSR is `boils`, a `cheme.reactor-hazard-vent` warning. `cheme.process-reactor` adds: a
+  vapour component undeclared or without a `vapour_pressure`, a vent or condensate template
+  lacking the vapour's components, a condensate stream that is no outlet, a condenser
+  `energy_port` that is no energy port (or the step's own), a Henry gas missing from the
+  liquid's template; (warning) a `vapour` with no volatile component.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
