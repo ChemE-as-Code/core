@@ -1284,6 +1284,7 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
             result, _ = solve_node(process, node, inlet, case)
             ports = node_outlets(node.crystallizer, result)
             entry["solution"] = result.entry()
+            _metal_entry(process, node, case, result, entry["solution"])
         else:
             ports, _ = separate_node(process, node, inlet, case)
         volatiles = list(node.dryer.volatiles) if node.dryer is not None else None
@@ -1293,6 +1294,21 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         entry["problem"] = str(failure)
         entry["unsupported"] = isinstance(failure, Unsupported)
     return entry
+
+
+def _metal_entry(process: Any, node: Any, case: str, result: Any, solution: dict[str, Any]) -> None:
+    """In a recipe vessel with ``metal_heat_capacity`` (ADR 0063): the model's year-average
+    duty its energy stream carries, the metal cooled or heated with the feed included
+    (``model_duty``); a crystallizer outside such a vessel reports as before."""
+    from chemeascode.domains.process.duties import crystallizer_duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        if metal_of(process, node.id, case) is None:
+            return
+    except ValueError:
+        pass  # declared, its batch's hours not known: the duty says so
+    solution["model_duty"] = crystallizer_duty(node, result, process, case).entry()
 
 
 def crystallizer_report(root: Path, case: str | None = None) -> CrystallizerReport:
@@ -1448,6 +1464,16 @@ def report_text(report: CrystallizerReport) -> str:
                     )
                 )
             energy = sol["energy"]
+            if model_duty := sol.get("model_duty"):  # with the vessel's metal (ADR 0063)
+                terms = ", ".join(f"{k} {v:.6g}" for k, v in model_duty["terms_kW"].items())
+                lines.append(
+                    "  year-average duty "
+                    + (
+                        f"{model_duty['heat_in_kW']:.6g} kW ({terms} kW)"
+                        if model_duty["heat_in_kW"] is not None
+                        else "? (" + "; ".join(model_duty["missing"]) + ")"
+                    )
+                )
             if energy:
                 if energy["duty_kW"] is None:
                     lines.append("  energy: missing " + "; ".join(energy["missing"]))

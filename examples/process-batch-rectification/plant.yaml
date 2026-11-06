@@ -1,0 +1,6 @@
+name: process-batch-rectification
+description: Crude acetyl chloride purified in a batch still with a column at constant distillate composition, a product cut to its purity specification, an off-cut and the residue (cheme process, still with column)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}
