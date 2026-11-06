@@ -29,7 +29,14 @@ lines, symbols and texts exactly where the sheet puts them, after every ``ShapeU
     to an actuator drawn on it);
 ``cheme.line-not-orthogonal`` (info)
     a signal or measuring line with a slanted stretch, neither horizontal nor vertical (a short
-    hop over another line is fine).
+    hop over another line is fine);
+``cheme.offpage-not-on-edge``
+    an off-page connector that does not sit on an edge of the drawing area (the inside of the
+    border, down to the top of the title block): within ``EDGE_TOLERANCE`` of it, or within
+    ``EDGE_REACH`` with nothing else drawn between it and the edge. An open end drawn where it
+    is (its text says to atmosphere, a vent, a drain, a hose connection, and names no system it
+    goes into, such as a header, flare or closed drain, and no sheet or battery limit; without a
+    text, its id says atm) may sit anywhere.
 
 Text extents are estimated from the font size, the characters (Arial widths, the export's
 fallback font), ``text-anchor`` and ``dominant-baseline``. The sheet's border and title block are
@@ -65,6 +72,7 @@ RULES = (
     "cheme.line-through-valve",
     "cheme.line-on-pipe",
     "cheme.line-not-orthogonal",
+    "cheme.offpage-not-on-edge",
 )
 
 #: How far a line must run inside a text box to go through it (mm): less is a graze, which the
@@ -807,6 +815,7 @@ def lint_drawing(drawing: Drawing, context: Context) -> list[DrawingFinding]:
     findings += _through_valves(lines, symbols, context)
     findings += _on_pipes(lines, context)
     findings += _not_orthogonal(lines, context)
+    findings += _offpage_not_on_edge(drawing, context)
     return findings
 
 
@@ -1160,6 +1169,174 @@ def _not_orthogonal(lines: list[Stroke], context: Context) -> list[DrawingFindin
                 _bounds(p for segment in slanted for p in segment),
                 f"{line.owner}",
                 hint="draw it in horizontal and vertical stretches (a corner point where it turns)",
+            )
+        )
+    return findings
+
+
+#: An off-page connector this close (mm) to an edge of the drawing area sits on it ...
+EDGE_TOLERANCE = 10.0
+#: ... and so does one up to this far in with nothing but its own line and texts drawn between
+#: it and the edge (a header sheet's row of connectors, its texts outside it; the DEXPI
+#: reference P&ID's two connectors, 27 and 31 mm in).
+EDGE_REACH = 35.0
+#: An open end drawn where it is, not a connection to another sheet: its own text says so ("to
+#: atm.", "to drain", "open drain", "tanker hose", "breather", "to atmosphere (vent stack)") ...
+OPEN_END = re.compile(
+    r"\b(?:atm|atmosphere|sky|safe location|breather|hose|funnel|sewer|vent|drain)\b"
+)
+#: ... and names no system it goes into anywhere ("vent to flare", "drain to the closed drain
+#: drum", "to vent/flare header", "vent to thermal oxidiser", "CD header (drain)") ...
+DESTINATION = re.compile(
+    r"\b(?:header|flare|oxidi[sz]er|thermal|blowdown|recovery|closed|drum|ko|knock out|"
+    r"knockout|scrubber|collection|system|station|tank|sump|line|main|network|vessel|"
+    r"bl|b l|battery limit)\b"
+)
+#: ... and no sheet ("from P-03 E-3101", "to C-202, P-05", "sheet P-114"; not a pump tag such
+#: as P-101A, or a P-101 that follows no "from", "to", "on", "see", "sheet" or comma). DEXPI 2.0
+#: draws open ends and connections with the same off-page connector classes, and the sheets
+#: carry no reference to the other sheet's connector, so the words are what tells them apart.
+SHEET_REF = re.compile(r"(?:\b(?:from|to|on|see|sheet)\s+|,\s*)p[\s-]?\d{2,3}(?![\w/-])")
+#: A connector with no text of its own is an open end when its id says atmosphere.
+OPEN_ID = re.compile(r"\b(?:atm|atmosphere|sky)\b")
+
+
+def _words(text: str) -> str:
+    """*text* lower case, every run of characters other than letters and digits one space."""
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def is_open_end(connector: str, texts: list[str]) -> bool:
+    """Whether a connector with id *connector* and its own *texts* is an open end drawn where it
+    is: its texts say so (``OPEN_END``) and name no system (``DESTINATION``) and no sheet
+    (``SHEET_REF``); a connector without text when its id says atmosphere (``OPEN_ID``)."""
+    raw = " ".join(t for t in texts if t.strip()).lower()
+    if not raw:
+        return bool(OPEN_ID.search(_words(connector)))
+    said = _words(raw)
+    return (
+        bool(OPEN_END.search(said)) and not DESTINATION.search(said) and not SHEET_REF.search(raw)
+    )
+
+
+@dataclass
+class Placement:
+    """Where an off-page connector sits on its sheet."""
+
+    connector: str
+    #: ``in``, ``out`` or ``""`` (a connector of no flow direction, such as a signal's).
+    direction: str
+    box: Box
+    #: The nearest edge of the drawing area (``left``, ``right``, ``top``, ``bottom``) and how
+    #: far (mm) the connector's symbol is from it.
+    edge: str
+    distance: float
+    #: Whether it counts as on that edge.
+    on_edge: bool
+    #: Whether it is an open end drawn where it is (``is_open_end``), which may sit anywhere.
+    local: bool
+
+
+def drawing_area(drawing: Drawing) -> Box:
+    """The inside of the sheet's border down to the top of its title block (the notes band
+    beside the title block is below the drawing area)."""
+    frame = drawing.frame or drawing.box
+    if not drawing.title_cells:
+        return frame
+    top = _union(drawing.title_cells)[1]
+    return (frame[0], frame[1], frame[2], top if frame[1] < top < frame[3] else frame[3])
+
+
+def offpage_placements(drawing: Drawing, context: Context) -> list[Placement]:
+    """Every drawn off-page connector of the sheet and the edge it is nearest."""
+    area = drawing_area(drawing)
+    symbols: dict[str, list[Stroke]] = {}
+    for stroke in drawing.strokes:
+        if stroke.kind == "symbol" and context.kinds.get(stroke.owner, "").endswith(
+            "OffPageConnector"
+        ):
+            symbols.setdefault(stroke.owner, []).append(stroke)
+    placements = []
+    for connector, strokes in symbols.items():
+        box = _bounds(p for s in strokes for p in s.points)
+        own = set(strokes[0].owners)
+        gaps = {
+            "left": (box[0] - area[0], (area[0], box[1], box[0], box[3])),
+            "right": (area[2] - box[2], (box[2], box[1], area[2], box[3])),
+            "top": (box[1] - area[1], (box[0], area[1], box[2], box[1])),
+            "bottom": (area[3] - box[3], (box[0], box[3], box[2], area[3])),
+        }
+        edge = min(gaps, key=lambda e: gaps[e][0])
+        distance, strip = max(gaps[edge][0], 0.0), gaps[edge][1]
+        on_edge = distance <= EDGE_TOLERANCE or (
+            distance <= EDGE_REACH and _clear(drawing, _shrink(strip, THROUGH_DEPTH), own)
+        )
+        kind = context.kinds.get(connector, "").rsplit(".", 1)[-1]
+        direction = "in" if kind.startswith("FlowIn") else "out" if "FlowOut" in kind else ""
+        local = is_open_end(connector, [t.text for t in drawing.labels if connector in t.owners])
+        placements.append(Placement(connector, direction, box, edge, distance, on_edge, local))
+    return placements
+
+
+def _clear(drawing: Drawing, strip: Box, own: set[str]) -> bool:
+    """Whether nothing but what belongs to *own* (a connector, its segment and line) is drawn
+    in *strip*."""
+    if strip[0] >= strip[2] or strip[1] >= strip[3]:
+        return True
+    for stroke in drawing.strokes:
+        if own & set(stroke.owners):
+            continue
+        if any(_clip(a, b, strip) is not None for a, b in stroke.segments()):
+            return False
+    return not any(
+        min(_overlap(label.box, strip)) > 0
+        for label in drawing.labels
+        if not own & set(label.owners)
+    )
+
+
+def _offpage_not_on_edge(drawing: Drawing, context: Context) -> list[DrawingFinding]:
+    """Off-page connectors that do not sit on an edge of the drawing area (one finding each);
+    open ends drawn where they are (to atmosphere, a drain, a hose) are left out."""
+    area = drawing_area(drawing)
+    findings = []
+    for place in offpage_placements(drawing, context):
+        if place.on_edge or place.local:
+            continue
+        box = place.box
+        offsets = {
+            "left": (area[0] + EDGE_TOLERANCE / 2 - box[0], 0.0),
+            "right": (area[2] - EDGE_TOLERANCE / 2 - box[2], 0.0),
+            "top": (0.0, area[1] + EDGE_TOLERANCE / 2 - box[1]),
+            "bottom": (0.0, area[3] - EDGE_TOLERANCE / 2 - box[3]),
+        }
+        dx, dy = offsets[place.edge]
+        move = f"`cheme move {place.connector} --offset={dx:.0f},{dy:.0f}`"
+        side = {"in": "left", "out": "right"}.get(place.direction)
+        if side and side != place.edge:
+            sx, sy = offsets[side]
+            move += (
+                f" (an {'incoming' if side == 'left' else 'outgoing'} connector goes on the "
+                f"{side} edge: --offset={sx:.0f},{sy:.0f}; a utility header's connectors may "
+                "share the top or bottom edge)"
+            )
+        findings.append(
+            DrawingFinding(
+                "cheme.offpage-not-on-edge",
+                "warning",
+                f"off-page connector {context.name(place.connector)} sits "
+                f"{place.distance:.0f} mm inside the drawing area's {place.edge} edge: a "
+                "connection to another sheet or the battery limit goes on the edge (within "
+                f"{EDGE_TOLERANCE:g} mm, or {EDGE_REACH:g} mm with nothing else drawn between "
+                "it and the edge); only an open end whose text says atm., vent, drain or hose and "
+                "names no header, flare, closed drain or other system, no sheet and no B/L may "
+                "stay by its valve",
+                [place.connector],
+                box,
+                place.connector,
+                hint=f"move it onto the nearest edge ({place.edge}): {move}; then route its "
+                "line to it in horizontal and vertical stretches. A crossing this adds is "
+                "accepted in the drawing-clean gate with a reason",
             )
         )
     return findings

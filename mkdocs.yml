@@ -188,6 +188,7 @@ nav:
       - "0046 The PFD drawn as an engineering sheet": adr/0046-pfd-drawn-as-an-engineering-sheet.md
       - "0047 Valve, pipe and slant drawing rules in the gate": adr/0047-valve-pipe-and-slant-drawing-rules-in-the-gate.md
       - "0048 Generated process sheets written without indentation": adr/0048-generated-process-sheets-written-without-indentation.md
+      - "0049 Off-page connectors on the sheet edge in the gate": adr/0049-off-page-connectors-on-the-sheet-edge-in-the-gate.md
       - "0050 Semi-batch reactor with dosing accumulation": adr/0050-semi-batch-reactor-with-dosing-accumulation.md
       - "0051 Batch recipe derives the cycle time": adr/0051-batch-recipe-derives-the-cycle-time.md
       - "0052 Batch vessel and jacket from the recipe": adr/0052-batch-vessel-and-jacket-from-the-recipe.md

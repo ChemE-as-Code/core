@@ -452,6 +452,148 @@ def test_context_knows_the_valve_an_actuator_operates():
     assert context.actuated == {"A": "UV1"} and context.is_actuator("A")
 
 
+# -- offpage-not-on-edge ----------------------------------------------------------------------
+
+IN_CONNECTOR = "Plant/Piping.FlowInPipeOffPageConnector"
+OUT_CONNECTOR = "Plant/Piping.FlowOutPipeOffPageConnector"
+#: An A3 sheet's border (inside 4..416, 4..293) and a title block whose top is at y 263.
+_FRAME = (
+    '<g id="Border" class="border">'
+    + _polyline("4,4 416,4 416,293 4,293 4,4")
+    + "</g>"
+    + '<g id="Title" class="label">'
+    + _polyline("296,263 416,263 416,293 296,293 296,263")
+    + "</g>"
+)
+
+
+def _connector(object_id: str, x: float, y: float, note: str = "") -> str:
+    """An 8 x 8 mm off-page connector arrow with its top left corner at x, y and its note."""
+    arrow = f"{x},{y} {x + 5},{y} {x + 8},{y + 4} {x + 5},{y + 8} {x},{y + 8} {x},{y}"
+    text = f'<g class="static">{_text(x, y - 2, note)}</g>' if note else ""
+    return (
+        f'<g id="{object_id}" class="representation-group"><g class="static"><g>'
+        f'<g transform="translate(0,0)">{_polyline(arrow)}</g></g></g>{text}</g>'
+    )
+
+
+def _offpage(*parts: str, **kinds: str) -> list[DrawingFinding]:
+    context = _context(**kinds)
+    found = _lint(_svg(*parts, _FRAME), context)
+    return [f for f in found if f.rule == "cheme.offpage-not-on-edge"]
+
+
+def test_offpage_connector_on_the_edge_passes_mid_sheet_fires():
+    on_edges = _offpage(
+        _connector("IN1", 12, 100, "from P-01"),  # 8 mm in from the left edge
+        _connector("OUT1", 405, 100, "to P-03"),  # 3 mm from the right edge
+        _connector("OUT2", 200, 250, "to P-04"),  # 5 mm above the title block's top
+        IN1=IN_CONNECTOR,
+        OUT1=OUT_CONNECTOR,
+        OUT2=OUT_CONNECTOR,
+    )
+    assert on_edges == []
+    (found,) = _offpage(_connector("OUT1", 200, 120, "to P-03"), OUT1=OUT_CONNECTOR)
+    assert found.level == "warning" and found.ids == ["OUT1"] and found.key == "OUT1"
+    assert "sits 116 mm inside the drawing area's top edge" in found.message
+    assert "within 10 mm, or 35 mm" in found.message
+    assert "`cheme move OUT1 --offset=0,-111`" in found.hint
+    assert "outgoing connector goes on the right edge: --offset=203,0" in found.hint
+
+
+def test_a_header_row_set_in_from_the_edge_needs_a_clear_way_to_it():
+    """24 mm below the top border with only its own text above it is on the edge (a header
+    sheet's row); with a pipe of another line between it and the edge it is not."""
+    row = _connector("OUT1", 200, 28, "to E-101, P-02")
+    assert _offpage(row, OUT1=OUT_CONNECTOR) == []
+    pipe = _line("L1", {"L1_P1": "100,15 300,15"})
+    (found,) = _offpage(row, pipe, OUT1=OUT_CONNECTOR, L1=SYSTEM, L1_P1=PIPE)
+    assert "24 mm inside the drawing area's top edge" in found.message
+
+
+OPEN_ENDS = [
+    "to atm.",
+    "to drain",
+    "open drain",
+    "tanker hose",
+    "from casing (breather)",
+    "to atmosphere (vent stack)",
+    "to drain at P-101A",  # a pump tag, not a sheet
+]
+#: Closed systems and connections elsewhere, whatever their words say about vents and drains.
+NOT_OPEN = [
+    "to vent header",
+    "to drain header",
+    "to closed-drain header",
+    "to closed_drain",
+    "to vent KO drum",
+    "to vent header, P-07",
+    "to flare (B/L)",
+    "vent to flare",
+    "PSV-101 vent to flare",
+    "vent gas to flare header",
+    "vent to the vent header",
+    "drain to closed drain drum",
+    "drain to the closed drain drum",
+    "to vent/flare header",
+    "vent to thermal oxidiser",
+    "to blowdown drum (vent)",
+    "CD header (drain)",
+    "to drain, P-07",
+    "vent, see P-07",
+]
+
+
+def test_open_ends_may_sit_by_their_valve():
+    """A vent to atmosphere, a drain or a hose connection drawn with an off-page connector is no
+    connection to another sheet; a vent or drain header, a closed drain and a connector whose
+    text names a sheet or the battery limit are, and are reported mid-sheet."""
+    exempt = [_connector(f"OUT{i}", 100 + 30 * i, 100, t) for i, t in enumerate(OPEN_ENDS)]
+    kinds = {f"OUT{i}": OUT_CONNECTOR for i in range(len(OPEN_ENDS))}
+    assert (
+        _offpage(*exempt, _connector("OPC_PSV1_atm", 100, 160), OPC_PSV1_atm=OUT_CONNECTOR, **kinds)
+        == []
+    )
+    fired = [
+        _connector(f"OUT{i}", 80 + 30 * (i % 10), 150 + 40 * (i // 10), t)
+        for i, t in enumerate(NOT_OPEN)
+    ]
+    kinds = {f"OUT{i}": OUT_CONNECTOR for i in range(len(NOT_OPEN))}
+    found = _offpage(*fired, **kinds)
+    assert sorted(f.ids[0] for f in found) == sorted(kinds)
+
+
+@pytest.mark.parametrize("note", OPEN_ENDS)
+def test_open_end_words(note: str):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert is_open_end("OPC_1", [note])
+
+
+@pytest.mark.parametrize("note", NOT_OPEN)
+def test_closed_system_words(note: str):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert not is_open_end("OPC_1", [note])
+
+
+@pytest.mark.parametrize(
+    "connector, texts, open_end",
+    [
+        ("OPC_PSV101_atm", [], True),  # no text: the id says atmosphere
+        ("OPC_PSV101_vent", ["to flare header"], False),  # the text wins over the id
+        ("OPC_VENT_1", ["to vent header"], False),
+        ("OPC_drain_01", ["to closed drain header"], False),
+        ("OPC_VENT_1", [], False),  # vent or drain in an id says nothing
+        ("OPC_drain_01", [], False),
+    ],
+)
+def test_the_id_counts_only_without_a_text(connector: str, texts: list[str], open_end: bool):
+    from chemeascode.domains.piping.drawing import is_open_end
+
+    assert is_open_end(connector, texts) is open_end
+
+
 # -- label-far-from-owner ---------------------------------------------------------------------
 
 

@@ -102,7 +102,7 @@ items assigned to it; do not create empty frames to silence it.
          dn=80,
          fluid="Water",
          route=[
-             offpage("in", at=(40, 150), note="from P-01"),
+             offpage("in", at=(20, 150), note="from P-01"),
              valve("HV201", "GateValve", tag="HV-201"),
              pump["N1"],
          ],

@@ -170,6 +170,7 @@ item drawn) and model rules:
 | `cheme.line-through-valve` | warning | a signal or measuring line running through the body of a valve, a pipe of another segment running through a valve, or any line running through an actuator's head (a control valve's signal drawn up through the valve to an actuator on top, an actuator drawn up the pipe on a vertical valve); one finding per line and valve, the actuator's valve named (from its `ActuatingSystem`). The pipes of the segment the valve sits on, the actuator's stem, a line with an end inside the outline (a signal line into the actuator's centre) and a line meeting the outline within 1 mm of its end (a signal line ending on the actuator's top) do not count; the line must run 0.3 mm into the outline's box |
 | `cheme.line-on-pipe` | warning | a signal or measuring line drawn on top of a pipe: a horizontal or vertical stretch within 0.3 mm of a pipe's stretch, along it for more than 1 mm (a signal line run down the pipe to an actuator drawn on it); one finding per line and piping line |
 | `cheme.line-not-orthogonal` | info | a signal or measuring line with a slanted stretch, 2 mm or longer and more than 1 degree off horizontal and vertical (a measuring line drawn straight from its tap to the bubble); the short legs of a hop over another line do not count |
+| `cheme.offpage-not-on-edge` | warning | an off-page connector to another sheet or the battery limit that does not sit on an edge of the drawing area (the inside of the border; the bottom edge is the top of the title block, the notes band beside it counting as the edge): its symbol more than 10 mm from every edge, and more than 35 mm or with anything but its own line and texts drawn between it and the nearest edge (a header sheet's row of connectors set in under their texts is on the edge); one finding per connector, its hint a `cheme move ID --offset=DX,DY` onto the nearest edge (and onto the left edge for an incoming, the right for an outgoing connector). An open end drawn with the same DEXPI classes may sit anywhere: its own text (lower case, punctuation read as spaces) says `atm`, atmosphere, sky, safe location, breather, hose, funnel, sewer, vent or drain and names no system it goes into anywhere (header, flare, oxidiser, thermal, blowdown, recovery, closed, drum, KO, knock-out, scrubber, collection, system, station, tank, sump, line, main, network, vessel, `B/L`, battery limit) and no sheet (`P-nn` or `P-nnn` after from, to, on, see, sheet or a comma: `from P-03 E-3101`, `to C-202, P-05`; a pump tag `P-101A` is no sheet); a connector without text when its id says atm, atmosphere or sky. So `to atm.`, `open drain` and `tanker hose` may stay by their valve, `vent to flare`, `to vent header` and `drain to the closed drain drum` may not. BFD and PFD sheets are not checked |
 | `cheme.drawing-not-checked` | info | the SVG export failed, so the drawing rules did not run |
 
 `cheme.segment-ends` reports what pyDEXPI's Mandatory rules `pydexpi_segment_connectivity`
@@ -831,7 +832,7 @@ line(
     dn=80,
     fluid="Water",
     route=[
-        offpage("in", at=(40, 150), note="from P-01"),
+        offpage("in", at=(20, 150), note="from P-01"),
         valve("HV101", "GateValve"),
         t,
         valve("FV101", tag="FV-101"),
@@ -839,7 +840,7 @@ line(
     ],
 )
 line(
-    sheet, "25-W-103", dn=25, route=[t.branch, (t.branch.xy[0], 180), offpage("out", at=(120, 180))]
+    sheet, "25-W-103", dn=25, route=[t.branch, (t.branch.xy[0], 180), offpage("out", at=(405, 180))]
 )
 instrument(
     sheet,
@@ -849,7 +850,7 @@ instrument(
     sensing_at=(135, 150),
     signal_to="FV101",
 )
-note(sheet, "Trip: LALL-101 stops P-101", at=(60, 180))
+note(sheet, "Trip: LALL-101 stops P-101", at=(60, 210))
 sheet.save()  # writes, then cheme fmt
 ```
 
@@ -1898,14 +1899,18 @@ first finding's id:
 ```yaml
 - id: drawing-clean
   title: No line through a label or valve, along a pipe or slanted, no crossing, overlapping or
-    misplaced label left unaccepted
+    misplaced label, no off-page connector off the sheet's edge left unaccepted
   stage: basic
   kind: validate
   fail_on: info          # cheme.line-not-orthogonal is an info finding
   rules: [cheme.line-through-label, cheme.line-crossing, cheme.label-overlap,
           cheme.label-far-from-owner, cheme.line-through-valve, cheme.line-on-pipe,
-          cheme.line-not-orthogonal]
+          cheme.line-not-orthogonal, cheme.offpage-not-on-edge]
 ```
+
+Off-page connectors go on the sheet's edges even where that costs a line crossing: accept the
+crossing in this gate with a reason, not the connector (a utility stub the plant keeps at its
+user, such as a CW/CWR arrow at an exchanger, is accepted by its `offpage-not-on-edge` id).
 
 `on-sheet` asks the loaded model, not the XML text: a tag is the one the P&ID prints
 (`TagName`, the instrument tag `AIA-3103` built from category, letters and number, a piping

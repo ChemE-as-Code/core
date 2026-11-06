@@ -2,8 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- Drawing lint: `cheme.offpage-not-on-edge` (warning, ADR 0049), an off-page connector to
+  another sheet or the battery limit that does not sit on an edge of the drawing area (the
+  inside of the border down to the title block's top): within 10 mm of it, or 35 mm with nothing
+  else drawn between it and the edge (a header sheet's row of connectors under their notes).
+  An open end drawn with the same DEXPI classes, whose note says atm., vent, drain or hose and
+  names no system it goes into (header, flare, closed drain, drum, ...), no sheet and no B/L,
+  may stay by its valve (without a note: its id says atm). The hint gives the `cheme move ID
+  --offset=DX,DY` onto the nearest edge. On the process library's 26 asu-1, hda-1 and ammonia-1
+  sheets it finds the five connectors still off the edges, all on asu-1 P-04.
+
 ### Changed
 
+- The `drawing-clean` gate also fails on `cheme.offpage-not-on-edge`; add it to an existing
+  plant's `checks/checks.yaml` to get it. The template's example generator draws its off-page
+  connectors on the right edge.
 - `cheme process build` writes the BFD and PFD without indentation (ADR 0048; generator 7:
   every BFD/PFD needs `cheme process build`): the same tree, model and rendering, 44 to 48 %
   fewer bytes (process library methanol-1 PFD 1.72 to 0.90 MB, ammonia-1 7.53 to 3.92 MB).

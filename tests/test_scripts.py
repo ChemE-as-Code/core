@@ -172,6 +172,46 @@ def test_template_example_passes_fmt_and_validate(fresh: Path):
     }, sheet_rules
 
 
+ROOT = Path(__file__).resolve().parents[1]
+PID_DRAFT = Path(str(bundled_skills()["pid-draft"])) / "SKILL.md"
+
+
+def _python_block(text: str, after: str) -> str:
+    """The first fenced Python block of *text* after the line *after*, dedented."""
+    import textwrap
+
+    rest = text.split(after, 1)[1]
+    block = re.search(r"^([ \t]*)```python\n(.*?)^\1```", rest, re.S | re.M)
+    assert block, after
+    return textwrap.dedent(block.group(2))
+
+
+@pytest.mark.parametrize(
+    "source, after",
+    [
+        (ROOT / "REFERENCE.md", "### Authoring API"),
+        (PID_DRAFT, "**Generator script, when fragments cannot express it**"),
+    ],
+    ids=["REFERENCE", "pid-draft"],
+)
+def test_documented_generator_examples_pass_fmt_and_validate(fresh: Path, source: Path, after):
+    """The generator examples of REFERENCE.md and the pid-draft skill draw a sheet that formats
+    and has no drawing finding, as the template's example_draft.py does."""
+    from chemeascode.domains.piping.drawing import RULES
+
+    script = fresh / "scripts" / "doc_example.py"
+    script.write_text(_python_block(source.read_text(encoding="utf-8"), after), encoding="utf-8")
+    assert invoke("sheet", "new", "P-98", "--title", "Example").exit_code == 0
+    result = invoke("run", "scripts/doc_example.py", "pid/P-98.xml")
+    assert result.exit_code == 0, result.output
+    assert invoke("fmt", "--check", "pid/P-98.xml").exit_code == 0
+    report = json.loads(invoke("validate", "--json").output)["findings"]
+    sheet = [f for f in report if f["file"] == "pid/P-98.xml"]
+    assert not [f for f in sheet if f["level"] == "error"], sheet
+    drawing = [(f["rule"], f["message"]) for f in sheet if f["rule"] in RULES]
+    assert drawing == [], drawing
+
+
 def test_example_control_valve_is_found_from_the_instrument(fresh: Path):
     _example(fresh)
     shown = invoke("show", "FV101")
