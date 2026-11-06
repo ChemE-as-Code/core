@@ -73,7 +73,7 @@ Needs Python 3.12+. pyDEXPI comes from PyPI, pinned to one version in `pyproject
 `uv tool install 'cheme-as-code[png] @ git+https://github.com/ChemE-as-Code/core.git'`.
 Stream properties (`cheme process props`) and the phase calculations of
 `chemeascode.domains.process.thermodynamics` need the `props` extra (thermo and chemicals,
-pinned); the viewer API (`cheme serve`) the `serve` extra; unit conversion beyond K, °C and
+pinned), and a PC-SAFT property package the `saft` extra (feos, pinned); the viewer API (`cheme serve`) the `serve` extra; unit conversion beyond K, °C and
 the pressure units of the process YAML (`chemeascode.foundation.units`) the `units` extra (Pint);
 SMILES checks in `chemeascode.domains.chemistry` the `chemistry` extra (RDKit). Extras combine:
 `cheme-as-code[png,props,serve]`.
@@ -1214,7 +1214,15 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   30000 kPa(a), benchmarked by `tests/test_property_packages.py` against CoolProp's reference
   equations of state, GERG-2008 mixtures and the Neumann et al. (2020) ammonia mixture models,
   and against measured densities (density 2 % pure, 3 % mixtures; enthalpy differences 300
-  kJ/kmol). A state outside the range, another component, a pressure that is
+  kJ/kmol). Package `water-methanol-pcsaft-liquid` (extra `saft`: feos, PC-SAFT with the Esper
+  et al. 2023 parameters and the Rehner et al. 2023 `k_ij`, ADR 0046): water and methanol,
+  liquid density only, within 1 % of the reference equations (pure) and of measured densities
+  (Coquelet et al. 2005, Safarov et al. 2004; `tests/test_property_packages_pcsaft.py`):
+  methanol 240 to 420 K, pure water 360 to 550 K, mixtures to 420 K with water up to mole
+  fraction 0.75 (0.64 below 323.15 K), to 60 MPa(a). A state is liquid at 1.2 times PC-SAFT's
+  bubble pressure or above (its bubble pressures miss measured ones by up to 19 %); nearer it,
+  only with the stream's phase given or assumed `liquid`. It writes no enthalpy or exergy and
+  refuses vapour, two-phase, VLE and viscosity. A state outside the range, another component, a pressure that is
   not absolute and positive, solids, or a phase the flash contradicts is refused with a finding,
   and nothing is written. `--fill` never overwrites given or assumed values, records the method,
   its package versions and range in `materials.yaml`, and stores an input fingerprint with each

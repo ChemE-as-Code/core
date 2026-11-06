@@ -1,0 +1,44 @@
+[
+  {
+    "identifier": {
+      "cas": "7732-18-5",
+      "name": "water",
+      "iupac_name": "oxidane",
+      "smiles": "O",
+      "inchi": "InChI=1S/H2O/h1H2"
+    },
+    "molarweight": 18.011,
+    "m": 2.36948,
+    "sigma": 2.15072,
+    "epsilon_k": 230.71557,
+    "association_sites": [
+      {
+        "na": 1.0,
+        "nb": 1.0,
+        "kappa_ab": 0.35319,
+        "epsilon_k_ab": 2195.10176
+      }
+    ]
+  },
+  {
+    "identifier": {
+      "cas": "67-56-1",
+      "name": "methanol",
+      "iupac_name": "methanol",
+      "smiles": "CO",
+      "inchi": "InChI=1S/CH4O/c1-2/h2H,1H3"
+    },
+    "molarweight": 32.026,
+    "m": 2.25965,
+    "sigma": 2.83016,
+    "epsilon_k": 183.58634,
+    "association_sites": [
+      {
+        "na": 1.0,
+        "nb": 1.0,
+        "kappa_ab": 0.08716,
+        "epsilon_k_ab": 2465.13545
+      }
+    ]
+  }
+]

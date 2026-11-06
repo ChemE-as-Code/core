@@ -48,6 +48,8 @@ LAZY_ONLY = {
     "bw2data",
     "bw2calc",
     "cantera",
+    "feos",
+    "si_units",
     # the IDAES worker's (integrations/idaes_worker.py), which runs in its own Python (ADR 0039)
     "idaes",
     "pyomo",
@@ -328,6 +330,8 @@ OPTIONAL = [
     "bw2data",
     "bw2calc",
     "cantera",
+    "feos",
+    "si_units",
 ]
 
 

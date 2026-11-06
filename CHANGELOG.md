@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- feos (PC-SAFT) as an optional property backend, extra `saft` (`feos==0.10.5`, ADR 0046), and
+  its first property package, `water-methanol-pcsaft-liquid`: liquid density of water,
+  methanol and their mixtures (Esper et al. 2023 parameters, Rehner et al. 2023 `k_ij`, the
+  records shipped in `thermodynamics/data/feos/` with feos's licences). It is benchmarked within 1 % against
+  the reference equations of state and measured densities (Coquelet et al. 2005, Safarov et al.
+  2004) in `tests/test_property_packages_pcsaft.py`: methanol 240 to 420 K, pure water 360 to
+  550 K, mixtures to 420 K with water up to mole fraction 0.75 (0.64 below 323.15 K). A state is
+  liquid at 1.2 times PC-SAFT's bubble pressure or above, nearer only with its phase given or
+  assumed `liquid`; enthalpy (whose excess the model gets the wrong sign), exergy, VLE and
+  viscosity are not claimed. Water-methanol liquid streams were refused before.
+- `props.adapter_for(process)`, the adapter of the process's package (thermo or feos), used by
+  `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
+  None for a package that claims no enthalpy (an exchanger duty from it is refused:
+  `cheme.datasheet-fill-property-unsupported`).
+
+### Changed
+
+- The committed example sheets are regenerated: the generator code fingerprint covers
+  `props.py`.
+
 ## 1.5.0 (2026-11-04)
 
 Minor release: electrochemical measurements, measured-performance cells, dynamic electrolysis

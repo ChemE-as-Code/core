@@ -35,7 +35,8 @@ ENTHALPY_MODEL = (
 class Package:
     id: str
     title: str
-    #: what computes it (``props.Adapter`` implements ``thermo``)
+    #: what computes it (``props.Adapter`` implements ``thermo``, ``props_feos.FeosAdapter``
+    #: ``feos``; ``props.adapter_for`` picks it)
     adapter: str
     eos: str
     binary_interaction: str
@@ -47,10 +48,18 @@ class Package:
     #: the liquid density model (None: no liquid claimed)
     liquid_density: str | None = None
     notes: list[str] = field(default_factory=list)
+    #: CAS number -> molar mass, kg/kmol, for an adapter that has none of its own (``feos``)
+    molar_masses: dict[str, float] = field(default_factory=dict)
+    #: whether the package claims enthalpy (False: densities only, nothing energy-based)
+    enthalpy: bool = True
 
     @property
     def vapor_only(self) -> bool:
         return set(self.validated.phases) == {"vapor"}
+
+    @property
+    def liquid_only(self) -> bool:
+        return set(self.validated.phases) == {"liquid"}
 
     def name(self, cas: str) -> str:
         return self.components.get(cas) or NAMES.get(cas, cas)
@@ -264,8 +273,87 @@ SYNGAS = Package(
     ],
 )
 
+# -- water and methanol (liquid), PC-SAFT --------------------------------------------------------
+
+WATER, METHANOL = "7732-18-5", "67-56-1"
+WATER_METHANOL_COMPONENTS = {WATER: "water", METHANOL: "methanol"}
+#: Water in a mixture with methanol: up to this mole fraction (water-rich liquid is too dense in
+#: PC-SAFT below about 350 K, +3 % for pure water at 300 K; the excess volumes of Safarov et al.
+#: 2004, measured at 0.25, 0.5 and 0.75 methanol, stop here).
+WATER_WITH_METHANOL = 0.75
+#: Where tests/test_property_packages_pcsaft.py holds the density within 1 % of the references:
+#: pure methanol and pure water against their reference equations of state; water in mixtures
+#: against the measured densities of Coquelet et al. 2005 (283.15 to 353.15 K, near atmospheric
+#: pressure, so to 1 MPa(a)) and the excess volumes of Safarov et al. 2004 (298.15 to 423.15 K, to
+#: 60 MPa), a cold water-rich mixture only up to the mole fraction that holds. Methanol stops at
+#: 420 K, so no mixture is claimed above it (Safarov et al.: +1.4 % at 448 K and 5 MPa).
+WATER_METHANOL_REGIONS = {
+    WATER: _boxes((360, 420, 60000), (360, 550, 10000))
+    + _boxes((283.15, 420, 1000), max_x=0.64)
+    + _boxes((298.15, 420, 60000), max_x=0.64)
+    + _boxes((323.15, 420, 60000), max_x=WATER_WITH_METHANOL),
+    METHANOL: _boxes((240, 420, 60000)),
+}
+WATER_METHANOL = Package(
+    id="water-methanol-pcsaft-liquid",
+    title="Water and methanol, liquid density only, PC-SAFT (feos), Rehner et al. 2023 k_ij",
+    adapter="feos",
+    eos="PC-SAFT (feos), Esper et al. 2023 pure-component parameters",
+    binary_interaction="Rehner et al. 2023 k_ij (feos rehner2023_binary.json, methanol-water "
+    "-0.01595)",
+    phase_models={
+        "phase": "liquid only: liquid where the pressure is at least (1 + bubble_pressure_rel) "
+        "times PC-SAFT's bubble pressure; a liquid given or assumed down to the bubble pressure "
+        "divided by that factor (the deviation the benchmark found)",
+        "liquid_density": "PC-SAFT (feos), the liquid root",
+        "enthalpy": "not claimed: PC-SAFT gives the excess enthalpy of water and methanol the "
+        "wrong sign below about 420 K (Dettmann et al. 2006)",
+    },
+    components=WATER_METHANOL_COMPONENTS,
+    validated=ApplicationRange(
+        temperature=(240.0, 550.0),
+        pressure=(100.0, 60000.0),
+        phases=["liquid"],
+        components=sorted(WATER_METHANOL_COMPONENTS),
+        component_regions=WATER_METHANOL_REGIONS,
+        pairs=[pair(WATER, METHANOL)],
+        pair_limits={pair(WATER, METHANOL): {WATER: WATER_WITH_METHANOL}},
+    ),
+    benchmark=Benchmark(
+        test="tests/test_property_packages_pcsaft.py",
+        reference="Pure fluids: CoolProp 8.0.0 (HEOS) reference equations of state, "
+        "Wagner-JPCRD-2002 (IAPWS-95, water) and deReuck-BOOK-1993 (methanol), evaluated by the "
+        "test. Mixtures, measured: Coquelet, Valtz, Richon (J. Chem. Eng. Data 50, 412, 2005) "
+        "densities at 283.15-353.15 K; Safarov et al. (J. Chem. Thermodyn. 36, 541, 2004) excess "
+        "volumes at 298.15-523.15 K to 60 MPa, with the reference pure-fluid volumes; for the "
+        "phase margin, the bubble pressures of Jodecke, Perez-Salado Kamps, Maurer (J. Chem. Eng. "
+        "Data 50, 138, 2005) and bubble temperatures of Soujanya, Satyavathi, Vittal Prasad (J. "
+        "Chem. Thermodyn. 42, 621, 2010); for the enthalpy not claimed, the excess enthalpies of "
+        "Dettmann, Ernst, Wirbser (J. Chem. Thermodyn. 38, 56, 2006). Values from the NIST TRC "
+        "ThermoML files, in tests/data/water_methanol_references.yaml",
+        tolerances={
+            "density_rel_pure": 0.01,
+            "density_rel": 0.01,
+            "bubble_pressure_rel": 0.20,
+        },
+    ),
+    liquid_density="PC-SAFT",
+    notes=[
+        "liquid only: vapour, two-phase and VLE results (bubble and dew points, K values) are "
+        "not claimed; PC-SAFT's bubble pressures deviate from measured ones by up to 19 % for "
+        "dilute methanol at 315 K and 8 % at 353-397 K",
+        "density only: no enthalpy, entropy or exergy is written (the excess enthalpy has the "
+        "wrong sign below about 420 K), and no viscosity",
+        f"water in a mixture up to mole fraction {WATER_WITH_METHANOL:g}, and up to 0.64 below "
+        "323.15 K; pure water from 360 K (PC-SAFT puts liquid water 1-5 % too dense below "
+        "350 K); no mixture above 420 K",
+    ],
+    molar_masses={WATER: 18.015, METHANOL: 32.042},
+    enthalpy=False,
+)
+
 #: The registry, in order of preference on a tie.
-PACKAGES: tuple[Package, ...] = (AIR, SYNGAS)
+PACKAGES: tuple[Package, ...] = (AIR, SYNGAS, WATER_METHANOL)
 #: Component names by CAS number, over every package.
 NAMES = {cas: name for p in PACKAGES for cas, name in p.components.items()}
 #: The package of a ``property_method`` recorded before packages existed.
