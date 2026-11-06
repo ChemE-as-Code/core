@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Safety: `cheme safety hazop propagate --coverage` runs two completeness checks besides the
+  walk, also without a failure-mode library (the walk is then skipped): the deviations a node's
+  members call for by DEXPI class that the study does not develop (a default matrix, replaced
+  by `safety/deviation-matrix.yaml`, new kind `hazop-deviation-matrix`), and one prompt per
+  node and cause family (utility, external, boundary, operator, control) listing the plant
+  items from the P&IDs, the design basis and the cause and effect. Both are gap kinds of
+  `coverage.yaml` (`kind: deviation | cause`; status `covered` with `scenarios` for a cause
+  family); existing triage files stay valid (ADR 0036).
 - Safety: a HAZOP rating's likelihood can come from the project's frequency library (new kind
   `frequencies`, `cheme/frequencies/v1`, named by the study's `frequencies:`; project data,
   none shipped). A rating links `frequency: {event_type}` (its screening value: LOPA records

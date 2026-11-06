@@ -2,8 +2,9 @@
 (``cheme/hazop-study/v1``, ``safety/hazop/<study-id>/study.yaml``), the failure-mode library
 scenario propagation walks with (``cheme/failure-modes/v1``, ``safety/failure-modes.yaml``) and
 the triage of the walk's outcomes (``cheme/hazop-coverage/v1``,
-``safety/hazop/<study-id>/coverage.yaml``) and the frequency library ratings may take their
-likelihood from (``cheme/frequencies/v1``, ``safety/frequencies.yaml``).
+``safety/hazop/<study-id>/coverage.yaml``), the frequency library ratings may take their
+likelihood from (``cheme/frequencies/v1``, ``safety/frequencies.yaml``) and the deviation matrix
+of the coverage check (``cheme/hazop-deviation-matrix/v1``, ``safety/deviation-matrix.yaml``).
 
 A study is one nested file in worksheet order: nodes, their deviations (guide word and
 parameter) and the scenarios of each deviation (a cause leading to a consequence), with the
@@ -44,6 +45,7 @@ STUDY_SCHEMA = "cheme/hazop-study/v1"
 FAILURE_MODES_SCHEMA = "cheme/failure-modes/v1"
 COVERAGE_SCHEMA = "cheme/hazop-coverage/v1"
 FREQUENCIES_SCHEMA = "cheme/frequencies/v1"
+DEVIATION_MATRIX_SCHEMA = "cheme/hazop-deviation-matrix/v1"
 
 
 def _stable_id(value: Any) -> Any:
@@ -467,22 +469,53 @@ class HazopStudy(Strict):
 # Coverage triage (safety/hazop/<id>/coverage.yaml)
 # ---------------------------------------------------------------------------
 
-#: ``open``: found by the walk, not looked at yet; ``dismissed``: needs no scenario, with the
-#: reason; ``question``: the files do not settle it, for the team. Covered is never written:
-#: ``--coverage`` derives it from the scenarios' refs.
-TriageStatus = Literal["open", "dismissed", "question"]
+#: ``open``: found by a check, not looked at yet; ``dismissed``: needs no scenario, with the
+#: reason; ``question``: the files do not settle it, for the team; ``covered`` (cause prompts
+#: only): the scenarios named in ``scenarios`` answer it. A walk gap is never written covered:
+#: ``--coverage`` derives that from the scenarios' refs.
+TriageStatus = Literal["open", "dismissed", "question", "covered"]
+#: What an outcome is about: a top event of the walk (``walk``), a deviation the node's
+#: equipment calls for that the study does not develop (``deviation``), or a cause family the
+#: node has to consider (``cause``: utility, external, boundary, operator, control).
+OutcomeKind = Literal["walk", "deviation", "cause"]
+#: The cause families a node is asked about besides the equipment failures the walk follows:
+#: loss of a utility, an external or site cause (fire, weather, earthquake), what comes in from
+#: beyond the study boundary, an operator or maintenance action, a control or trip function
+#: acting wrongly.
+CauseFamily = Literal["utility", "external", "boundary", "operator", "control"]
 
 
 class Outcome(Strict):
-    """A top event the walk brings to a node that no scenario covers, and what was decided."""
+    """A gap of a node's coverage (a top event of the walk, a deviation not developed, a cause
+    family not considered) and what was decided."""
 
+    kind: OutcomeKind = "walk"
     node: StableId
-    guide_word: GuideWord
-    parameter: str = Field(min_length=1)
-    top_event: TopEvent
-    at: str = Field(min_length=1, description="The tag or object id where the walk ends.")
+    guide_word: GuideWord | None = Field(
+        default=None,
+        description="walk: required; deviation: none decides every guide word of the parameter.",
+    )
+    parameter: str | None = Field(
+        default=None, min_length=1, description="Required for walk and deviation."
+    )
+    top_event: TopEvent | None = Field(default=None, description="Required for walk.")
+    at: str | None = Field(
+        default=None, min_length=1, description="walk: the tag or object id where the walk ends."
+    )
+    family: CauseFamily | None = Field(default=None, description="cause: required.")
+    item: str | None = Field(
+        default=None,
+        min_length=1,
+        description="cause: the one utility or site hazard a study-wide prompt is about (at the "
+        "study's node without members); none: the node's family as a whole.",
+    )
     causes: list[str] = Field(
-        default_factory=list, description="The causes (tags) it is about; none: every cause."
+        default_factory=list,
+        description="walk: the causes (tags) it is about, none: every cause; cause: the plant "
+        "items the prompt lists (written by the tool).",
+    )
+    scenarios: list[StableId] = Field(
+        default_factory=list, description="covered: the scenarios of the node that answer it."
     )
     status: TriageStatus = "open"
     reason: str = Field(default="", description="Why dismissed, or what the question is.")
@@ -493,16 +526,37 @@ class Outcome(Strict):
 
     @model_validator(mode="after")
     def _reasoned(self) -> Outcome:
-        if self.status != "open" and not self.reason.strip():
+        if self.kind == "walk" and None in (
+            self.guide_word,
+            self.parameter,
+            self.top_event,
+            self.at,
+        ):
+            raise ValueError("a walk outcome needs guide_word, parameter, top_event and at")
+        if self.kind == "deviation" and self.parameter is None:
+            raise ValueError("a deviation outcome needs its parameter")
+        if self.kind == "cause" and not self.family:
+            raise ValueError("a cause outcome needs its family")
+        if self.status == "covered":
+            if self.kind != "cause":
+                raise ValueError("status covered is for cause outcomes only")
+            if not self.scenarios:
+                raise ValueError("status covered needs the scenarios that cover it")
+        elif self.status != "open" and not self.reason.strip():
             raise ValueError(f"status {self.status} needs its reason")
         return self
 
 
 class Walk(Strict):
-    """The inputs of the walk the outcomes were listed from (written by the tool)."""
+    """The inputs the outcomes were listed from (written by the tool)."""
 
-    library: str = Field(description="sha256 of the failure-mode library.")
+    library: str = Field(description="sha256 of the failure-mode library; empty: none.")
     sheets: dict[str, str] = Field(default_factory=dict, description="Sheet file -> sha256.")
+    inputs: dict[str, str] = Field(
+        default_factory=dict,
+        description="The other files the deviation and cause checks read (design basis, cause "
+        "and effect, deviation matrix) -> sha256.",
+    )
 
 
 class HazopCoverage(Strict):
@@ -520,6 +574,50 @@ class HazopCoverage(Strict):
     def _version(self) -> HazopCoverage:
         if self.schema_ != COVERAGE_SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, COVERAGE_SCHEMA))
+        return self
+
+
+# ---------------------------------------------------------------------------
+# Deviation matrix (safety/deviation-matrix.yaml): the deviations each equipment family calls for
+# ---------------------------------------------------------------------------
+
+
+class EquipmentFamily(Strict):
+    """A family of plant objects, recognised by DEXPI class, and the deviations it calls for."""
+
+    id: StableId
+    title: str = ""
+    classes: list[str] = Field(
+        min_length=1,
+        description="DEXPI class names: an object of the class or of a subclass belongs to the "
+        "family; PipingNetworkSegment stands for a line member of the node.",
+    )
+    deviations: dict[str, list[GuideWord]] = Field(
+        min_length=1, description="Parameter -> the guide words meaningful for it."
+    )
+
+
+class DeviationMatrix(Strict):
+    """The deviations a node's equipment calls for, by family: the expected deviations of
+    ``cheme safety hazop propagate --coverage``. A project file replaces cheme-as-code's default
+    matrix as a whole."""
+
+    schema_: str = Field(alias="schema", description=f"Always {DEVIATION_MATRIX_SCHEMA}.")
+    kind: Literal["hazop-deviation-matrix"]
+    status: Judgement = "proposed"
+    source: str = Field(default="", description="Who wrote it and from what.")
+    families: list[EquipmentFamily] = Field(min_length=1)
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _version(self) -> DeviationMatrix:
+        if self.schema_ != DEVIATION_MATRIX_SCHEMA:
+            raise ValueError(unsupported_schema(self.schema_, DEVIATION_MATRIX_SCHEMA))
+        ids = [f.id for f in self.families]
+        if len(ids) != len(set(ids)):
+            raise ValueError(
+                f"family ids given twice: {sorted({i for i in ids if ids.count(i) > 1})}"
+            )
         return self
 
 

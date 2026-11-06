@@ -256,8 +256,11 @@ def propagate(
         typer.Option(
             "--coverage",
             help="Compare the node's (or every node's) scenarios with the top events the walk "
-            "brings to it: those no scenario covers and no outcome of coverage.yaml decides, "
-            "and the scenarios no walk reaches. Exits 1 while one is open.",
+            "brings to it (with a library; without one the walk is skipped), the deviations its "
+            "equipment calls for (the deviation matrix) and the cause families it has to "
+            "consider (utility, external, boundary, operator, control): those the study does "
+            "not cover and no outcome of coverage.yaml decides, and the scenarios no walk "
+            "reaches. Exits 1 while one is open.",
         ),
     ] = False,
     write: Annotated[
@@ -265,7 +268,15 @@ def propagate(
         typer.Option(
             "--write",
             help="With --coverage: bring safety/hazop/STUDY/coverage.yaml up to date (an open "
-            "outcome per gap; dismissed and question outcomes kept as they are).",
+            "outcome per gap of every kind; decided outcomes kept as they are).",
+        ),
+    ] = False,
+    no_walk: Annotated[
+        bool,
+        typer.Option(
+            "--no-walk",
+            help="With --coverage: only the deviation and cause checks, not the walk (before "
+            "drafting, to see what the node calls for without the walk's candidates).",
         ),
     ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
@@ -279,15 +290,15 @@ def propagate(
     from chemeascode.project.hazop import node_propagation, study_coverage, study_propagation
 
     workspace = _workspace()
-    if write and not coverage:
-        typer.echo("--write needs --coverage", err=True)
+    if (write or no_walk) and not coverage:
+        typer.echo("--write and --no-walk need --coverage", err=True)
         raise typer.Exit(2)
     if coverage:
         if deviation:
             typer.echo("--coverage compares every deviation: drop --deviation", err=True)
             raise typer.Exit(2)
         try:
-            report = study_coverage(workspace, study, node, library, write)
+            report = study_coverage(workspace, study, node, library, write, walk_too=not no_walk)
         except ValueError as failure:
             typer.echo(str(failure), err=True)
             raise typer.Exit(2) from failure
@@ -409,65 +420,121 @@ def propagate(
         typer.echo(finding.format())
 
 
+def _walk_json(f: Any) -> dict[str, Any]:
+    return {
+        "covered": f.coverage.covered,
+        "dismissed": f.coverage.dismissed,
+        "questions": f.coverage.questions,
+        "gaps": [
+            {
+                "deviation": {
+                    "guide_word": g.deviation.guide_word,
+                    "parameter": g.deviation.parameter,
+                },
+                "top_event": g.top_event,
+                "at": g.at,
+                "fluid": g.fluid,
+                "crosses": g.crosses,
+                "uncovered": g.uncovered,
+                "cause_only": g.cause_only,
+            }
+            for g in f.coverage.gaps
+        ],
+        "unreached": f.coverage.unreached,
+    }
+
+
+def _complete_json(c: Any) -> dict[str, Any]:
+    return {
+        "deviations": {
+            "developed": c.developed,
+            "dismissed": c.deviations_dismissed,
+            "questions": c.deviations_questions,
+            "gaps": [
+                {"guide_word": g.guide_word, "parameter": g.parameter, "families": g.families}
+                for g in c.deviations
+            ],
+        },
+        "causes": {
+            "covered": c.covered,
+            "dismissed": c.causes_dismissed,
+            "questions": c.causes_questions,
+            "prompts": [
+                {
+                    "family": p.family,
+                    "item": p.item,
+                    "asks": p.asks,
+                    "items": [asdict(i) for i in p.items],
+                }
+                for p in c.causes
+            ],
+        },
+    }
+
+
+#: Items a text line lists of a cause prompt before it counts the rest (--json lists all).
+SHOWN_ITEMS = 8
+
+
 def _print_coverage(report: Any, as_json: bool) -> int:
-    """Each node's coverage; returns the number of open gaps."""
+    """Each node's walk coverage, deviation gaps and cause prompts; returns the open gaps."""
     found_all = report.found
-    gaps = sum(len(f.coverage.gaps) for f in found_all)
+    walked = {f.node: f for f in found_all}
+    gaps = report.open_gaps()
     if as_json:
         typer.echo(
             json.dumps(
                 {
-                    "study": found_all[0].study if found_all else None,
-                    "library": found_all[0].library if found_all else None,
+                    "study": report.study,
+                    "library": report.library,
+                    "matrix": report.matrix,
                     "triage": report.path,
                     "stale": report.stale,
                     "written": report.written,
+                    "open": gaps,
                     "nodes": [
                         {
-                            "node": f.node,
-                            "covered": f.coverage.covered,
-                            "dismissed": f.coverage.dismissed,
-                            "questions": f.coverage.questions,
-                            "gaps": [
-                                {
-                                    "deviation": {
-                                        "guide_word": g.deviation.guide_word,
-                                        "parameter": g.deviation.parameter,
-                                    },
-                                    "top_event": g.top_event,
-                                    "at": g.at,
-                                    "fluid": g.fluid,
-                                    "crosses": g.crosses,
-                                    "uncovered": g.uncovered,
-                                    "cause_only": g.cause_only,
-                                }
-                                for g in f.coverage.gaps
-                            ],
-                            "unreached": f.coverage.unreached,
+                            "node": node_id,
+                            **(_walk_json(walked[node_id]) if node_id in walked else {}),
+                            **_complete_json(complete),
                         }
-                        for f in found_all
+                        for node_id, complete in report.complete
                     ],
                 },
                 indent=2,
             )
         )
         return gaps
-    covered = sum(f.coverage.covered for f in found_all)
-    dismissed = sum(f.coverage.dismissed for f in found_all)
-    questions = sum(f.coverage.questions for f in found_all)
-    unreached = sum(len(f.coverage.unreached) for f in found_all)
-    if found_all:
-        typer.echo(
-            f"{found_all[0].study} coverage over {len(found_all)} node(s): {gaps} open top "
-            f"event(s); cause and top event pairs: {covered} covered, {dismissed} dismissed, "
-            f"{questions} question(s); {unreached} scenario(s) no walk reaches. Close each open "
-            f"one with a scenario, or as dismissed or question (with the reason) in {report.path}"
-            + (" (written)" if report.written else " (--write lists them there)")
-        )
+    walk_gaps = sum(len(f.coverage.gaps) for f in found_all)
+    deviation_gaps = sum(len(c.deviations) for _, c in report.complete)
+    cause_gaps = sum(len(c.causes) for _, c in report.complete)
+    typer.echo(
+        f"{report.study} coverage over {len(report.complete)} node(s): {gaps} open "
+        f"({walk_gaps} top event(s), {deviation_gaps} deviation(s), {cause_gaps} cause "
+        f"family(ies)). Close each with a scenario, a deviation in the study, or a decision "
+        f"(dismissed or question with the reason; covered with the scenarios, cause families "
+        f"only) in {report.path}"
+        + (" (written)" if report.written else " (--write lists them there)")
+    )
     if report.stale:
         typer.echo(
-            f"{report.path}: the library or an analysed sheet changed since it was written: "
-            "check its decisions, then --write"
+            f"{report.path}: the library, an analysed sheet or another input changed since it "
+            "was written: check its decisions, then --write"
+        )
+    if report.library is None:
+        typer.echo(
+            "walk: skipped (--no-walk, or no failure-mode library safety/failure-modes.yaml); "
+            "the deviation and cause checks ran"
+        )
+    else:
+        covered = sum(f.coverage.covered for f in found_all)
+        dismissed = sum(f.coverage.dismissed for f in found_all)
+        questions = sum(f.coverage.questions for f in found_all)
+        unreached = sum(len(f.coverage.unreached) for f in found_all)
+        typer.echo(
+            f"walk: {walk_gaps} open top event(s); cause and top event pairs: {covered} "
+            f"covered, {dismissed} dismissed, {questions} question(s); {unreached} scenario(s) "
+            "no walk reaches"
         )
     for f in found_all:
         for g in f.coverage.gaps:
@@ -484,6 +551,27 @@ def _print_coverage(report: Any, as_json: bool) -> int:
         if f.coverage.unreached:
             typer.echo(
                 f"{f.node}: no walk reaches {', '.join(f.coverage.unreached)} (outside the library)"
+            )
+    complete = report.complete
+    developed = sum(c.developed for _, c in complete)
+    decided = sum(c.deviations_dismissed + c.deviations_questions for _, c in complete)
+    typer.echo(
+        f"deviations ({report.matrix} matrix): {deviation_gaps} open; {developed} developed, "
+        f"{decided} decided"
+    )
+    for node_id, c in complete:
+        for g in c.deviations:
+            typer.echo(f"{node_id}: {g.text()} [{', '.join(g.families)}]")
+    covered = sum(c.covered for _, c in complete)
+    decided = sum(c.causes_dismissed + c.causes_questions for _, c in complete)
+    typer.echo(f"cause families: {cause_gaps} open; {covered} covered, {decided} decided")
+    for node_id, c in complete:
+        for p in c.causes:
+            shown = ", ".join(i.text() for i in p.items[:SHOWN_ITEMS]) or "none listed"
+            more = len(p.items) - SHOWN_ITEMS
+            typer.echo(
+                f"{node_id} {p.family}{f' {p.item}' if p.item else ''}: {p.asks}: {shown}"
+                + (f" and {more} more" if more > 0 else "")
             )
     return gaps
 

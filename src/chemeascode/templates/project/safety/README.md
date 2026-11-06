@@ -83,6 +83,10 @@ actions:
    --coverage` then lists the top events the walk brings to a node that no scenario names (by
    its `refs`); `--write` lists them in `safety/hazop/H-01/coverage.yaml` beside the study, each
    `open` until a scenario covers it or it is marked `dismissed` or `question` with the reason.
+   With or without a library, `--coverage` also lists the deviations each node's equipment
+   calls for that the study does not develop (`safety/deviation-matrix.yaml` replaces the
+   default matrix) and one prompt per cause family to consider (utility, external, boundary,
+   operator, control), each closed by a scenario, a deviation or a decision in the same file.
 5. **Safeguards.** The ones the P&IDs and the cause and effect actually have, by tag or
    interlock id.
 6. **Assessment and recommendations.** The team rates severity and likelihood per category,

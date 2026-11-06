@@ -345,6 +345,84 @@ def test_a_row_under_another_deviation_covers_the_walk(model):
     assert not at_vessel(prop.coverage(node, candidates))  # the no flow walk ends at V-101
 
 
+def top_event(cause: tuple[str, str, str], end: tuple[str, str, str]) -> prop.Candidate:
+    """A walk from *cause* to an overpressure at *end*, each (label, object id, train)."""
+    over = Deviation("pressure", "more")
+    steps = [
+        prop.Step("P-01", obj, label, "GateValve", over, effect, key)
+        for key, (label, obj, _train), effect in ((1, cause, "cause"), (2, end, "stops"))
+    ]
+    return prop.Candidate(
+        over,
+        cause[0],
+        cause[0],
+        "M",
+        "test",
+        "local",
+        steps,
+        0,
+        "top-event",
+        "overpressure",
+        None,
+        [],
+        [],
+        [],
+        cause_names=tuple(dict.fromkeys(cause[:2])),
+        cause_train=cause[2],
+        end_names=tuple(dict.fromkeys(end[:2])),
+        end_train=end[2],
+    )
+
+
+def node_with(refs: list):
+    from chemeascode.domains.safety.schemas import Node
+
+    scenario = {"id": "S1", "cause": "the valve", "refs": refs}
+    return Node.model_validate(
+        {
+            "id": "N2",
+            "members": ["V-1"],
+            "deviations": [
+                {"guide_word": "more", "parameter": "pressure", "scenarios": [scenario]}
+            ],
+        }
+    )
+
+
+def test_a_row_may_name_an_object_by_its_id_or_its_tag():
+    # The walk names the kicker valve by its tag; the study names the same object by its id.
+    kicker = ("Pig receiver kicker MOV", "PC_SG_KICKER_101", "Pig receiver kicker MOV")
+    walk = [top_event(kicker, ("F-401A", "F401A", "F-401A"))]
+    by_id = node_with([{"sheet": "P-01", "object": "PC_SG_KICKER_101"}, "F-401A"])
+    assert prop.coverage(by_id, walk).gaps == [] and prop.coverage(by_id, walk).covered == 1
+    elsewhere = node_with([{"sheet": "P-01", "object": "PC_OTHER"}, "F-401A"])
+    assert prop.coverage(elsewhere, walk).gaps
+
+
+def test_an_untagged_object_takes_the_train_of_its_neighbour():
+    index = prop._Index()
+    for key, (tag, cls) in enumerate(
+        [
+            ("MOV-412A", "GateValve"),
+            (None, "SwingCheckValve"),
+            ("MOV-412B", "GateValve"),
+            (None, "SwingCheckValve"),
+            (None, "SwingCheckValve"),
+        ],
+        start=1,
+    ):
+        index.objects[key] = prop._Object("P-01", f"PC_{key}", tag, cls, (cls, "CheckValve"))
+    index.down[2], index.down[4] = [(1, 10)], [(3, 11)]  # PC_2 -> MOV-412A, PC_4 -> MOV-412B
+    assert prop._train(index, 2) == "MOV-412A|SwingCheckValve"
+    assert prop._alike(prop._train(index, 4), prop._train(index, 2))
+    assert prop._train(index, 5) == "PC_5"  # no tagged neighbour: only itself
+    # A row for train A's check valve covers train B's.
+    walk = [top_event(("PC_4", "PC_4", prop._train(index, 4)), ("SB-301", "SB301", "SB-301"))]
+    row = node_with([{"sheet": "P-01", "object": "PC_2"}, "SB-301"])
+    walk.append(top_event(("PC_2", "PC_2", prop._train(index, 2)), ("SB-301", "SB301", "SB-301")))
+    assert prop.coverage(row, walk).gaps == []
+
+
 def test_a_candidate_names_the_other_nodes_its_path_enters(model):
     others = {"N1": [PlantRef(tag="V-101")], "N3": [PlantRef(tag="FV-104")]}
     refs = [PlantRef(tag="P-101")]

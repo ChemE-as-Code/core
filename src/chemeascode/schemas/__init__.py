@@ -60,6 +60,7 @@ from chemeascode.domains.process.simulation.schema import Simulation
 from chemeascode.domains.process.thermodynamics.assay import Assays
 from chemeascode.domains.requirements.schemas import DesignBasis
 from chemeascode.domains.safety.schemas import (
+    DeviationMatrix,
     FailureModeLibrary,
     FrequencyLibrary,
     HazopCoverage,
@@ -133,6 +134,7 @@ OTHER_SCHEMAS = {
     "hazop-study": (HazopStudy, "safety/hazop/<id>/study.yaml"),
     "failure-modes": (FailureModeLibrary, "safety/failure-modes.yaml"),
     "hazop-coverage": (HazopCoverage, "safety/hazop/<id>/coverage.yaml"),
+    "hazop-deviation-matrix": (DeviationMatrix, "safety/deviation-matrix.yaml"),
     "frequencies": (FrequencyLibrary, "safety/frequencies.yaml"),
     "narrative": (Narrative, "process/narrative.md (front matter)"),
     "control_philosophy": (Philosophy, "control/philosophy.md (front matter)"),
@@ -159,6 +161,7 @@ __all__ = [
     "HazopCoverage",
     "HazopStudy",
     "DesignBasis",
+    "DeviationMatrix",
     "EquipmentItem",
     "EquipmentList",
     "Generator",
