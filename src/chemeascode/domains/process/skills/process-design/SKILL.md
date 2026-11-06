@@ -210,7 +210,12 @@ the basis for a heater step without a model; do not also count it in a model wit
 `still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give
 those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
 in, or `energy_port`) and its condenser (its one heat stream out, or `still.condenser_port`):
-never type the reflux's share of the reboiler as a stream of its own.
+never type the reflux's share of the reboiler as a stream of its own. A batch's vent condenser
+(`batch.vent.condenser`, ADR 0062, see the `reactions` skill) is a different condenser from a
+still's: a partial condenser on the vent gas, its duty written on the stream at its own
+`vent.condenser.energy_port` (never the jacket's `energy_port`), and the vent's `vapour` adds a
+`vent vapour` term (and `condensate return` when it returns to the vessel) to the batch's own
+duty, beside a dose's `solution` and the `charge heat-up`.
 
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:

@@ -253,6 +253,11 @@ def _reactor_basis(
             }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
             assumptions += _heat_assumptions(spec) if model != "cstr" else []
+            vent = getattr(spec, "vent", None) if model != "cstr" else None
+            if vent is not None and (vent.vapour is not None or vent.henry):
+                from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
+
+                assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled
@@ -504,17 +509,17 @@ SWAP_HEAT_UP = (
 
 
 def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:
-    """A still's *assumptions* (:data:`.batch_still.ASSUMPTIONS`), with ``heat_up`` or a recipe
-    vessel's metal (ADR 0063) the heat-up's and the duty's replaced by what the duty holds; as
-    they are without either, so such a still reports as before."""
+    """A still's *assumptions* (:data:`.batch_still.ASSUMPTIONS`, or ``COLUMN_ASSUMPTIONS`` with
+    a column), with ``heat_up`` or a recipe vessel's metal (ADR 0063) the heat-up's and the
+    duty's (with a column the reboiler's) replaced by what the duty holds; as they are without
+    either, so such a still reports as before."""
     from chemeascode.domains.process.recipe import vessel_metal
 
     spec = node.still
     metal = vessel_metal(process, node.id)
     if not spec.heat_up and metal is None:
         return list(assumptions)
-    duty = "the duty is the vapour's latent heat (heat_of_vaporization near the still's "
-    duty += "temperature)"
+    duty = _LATENT
     if spec.heat_up:
         duty += " and the heat-up"
     if metal is not None:
@@ -523,14 +528,24 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
             f", with the vessel's metal ({metal[1]}, {metal[0]:g} kJ/K) heated with the content "
             f"from {start} to its end temperature"
         )
+    # with a column (ADR 0061): the reboiler's duty holds what the still's does, the
+    # condenser's stays the latent heat condensed (the heat-up and the metal stay in the pot)
+    reboiler = "the reboiler's duty is the latent heat of the vapour boiled up "
+    reboiler += "(heat_of_vaporization of the distillate's composition)" + duty[len(_LATENT) :]
+    reboiler += "; the condenser's the latent heat of the vapour condensed only"
     found = []
     for text in assumptions:
         if text.startswith("constant boil-up from the start") and spec.heat_up:
             text = SWAP_HEAT_UP if spec.feed is not None else STILL_HEAT_UP
         elif text.startswith("the duty is the vapour's latent heat"):
             text = duty
+        elif text.startswith("the reboiler's and the condenser's duty"):
+            text = reboiler
         found.append(text)
     return found
+
+
+_LATENT = "the duty is the vapour's latent heat (heat_of_vaporization near the still's temperature)"
 
 
 def _heat_assumptions(batch: Any) -> list[str]:
@@ -623,7 +638,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
             not lacking,
             detail=detail,
             sources=sources,
-            assumptions=list(COLUMN_ASSUMPTIONS),
+            assumptions=_still_assumptions(process, node, COLUMN_ASSUMPTIONS),
             limitations=[
                 "not part of a converged simulation: solved by cheme process propagate",
                 "shortcut column: Gilliland's correlation, no holdup, constant molar overflow; "

@@ -183,6 +183,8 @@ class Derivation:
     duties: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     #: node id -> the model's duty (:class:`.duties.ModelDuty`), where it has a target stream.
     model_duties: dict[str, Any] = field(default_factory=dict)
+    #: node id -> its vent condenser's duty (ADR 0062), where it has its own stream.
+    vent_condenser_duties: dict[str, Any] = field(default_factory=dict)
     #: Sweeps through the nodes until nothing more could be derived (the last changed nothing).
     passes: int = 0
     #: The loops torn at ``tears:`` and how they converged (:mod:`.recycle`); None without.
@@ -624,11 +626,21 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         vent = getattr(batch, "vent", None) if model in ("batch", "semibatch") else None
         if vent is None:
             return (outs[0], None) if len(outs) == 1 else None
+        condensate = _condensate_stream(vent)
         gas = [s for s in outs if s.id == vent.stream]
-        liquid = [s for s in outs if s.id != vent.stream]
+        liquid = [s for s in outs if s.id not in (vent.stream, condensate)]
         if len(gas) != 1 or len(liquid) != 1:
             return None
+        if condensate is not None and not any(s.id == condensate for s in outs):
+            return None
         return liquid[0], gas[0]
+
+    def condensate_of(node: Any) -> StreamDef | None:
+        """A vented batch's condensate stream: its vent condenser's (ADR 0062), when the
+        condensate leaves by a stream of the step rather than running back into the vessel."""
+        vent = getattr(getattr(node, "batch", None), "vent", None)
+        name = _condensate_stream(vent) if vent is not None else None
+        return next((s for s, _ in at[node.id][1] if s.id == name), None)
 
     def step(node: Any) -> bool:
         kind = kinds[node.id]
@@ -694,15 +706,23 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
                         out, "composition", _mix(work, result), kind, node.id, ins, extra
                     )
                     solved = beds.get(node.id)
+                    condensate = condensate_of(node) if vent is not None else None
                     if vent is not None and solved is not None:
                         gas = {n: v * (mw.get(n) or 1.0) for n, v in solved.vent.items()}
-                        for s, mass in ((out, result), (vent, gas)):
+                        pairs = [(out, result), (vent, gas)]
+                        if condensate is not None:  # a vent condenser's own outlet (ADR 0062)
+                            liquor = {
+                                n: v * (mw.get(n) or 1.0) for n, v in solved.condensate.items()
+                            }
+                            pairs.append((condensate, liquor))
+                        for s, mass in pairs:
                             total = sum(mass.values())
                             changed |= put(s, "flow", kg_h(total), kind, node.id, ins, extra)
-                        if gas:
-                            changed |= put(
-                                vent, "composition", _mix(work, gas), kind, node.id, ins, extra
-                            )
+                        for s, mass in pairs[1:]:
+                            if mass:
+                                changed |= put(
+                                    s, "composition", _mix(work, mass), kind, node.id, ins, extra
+                                )
                     if solved is not None:
                         for name, value, tol in (
                             ("temperature", solved.temperature, 1.0),
@@ -725,12 +745,22 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
                                     found.problems.append((node.id, text))
                         t_unit = None if fs.units.temperature == "K" else "K"
                         p_unit = None if fs.units.pressure == "kPa(a)" else "kPa(a)"
+                        cooled = None
+                        if getattr(getattr(node.batch, "vent", None), "condenser", None):
+                            cooled = solved.vent_temperature
                         for name, value, unit in (
                             ("temperature", solved.temperature, t_unit),
                             ("pressure", solved.pressure, p_unit),
                         ):
                             q = Quantity(value=_sig(value), unit=unit, provenance="calculated")
-                            for s in (out, vent) if vent is not None else (out,):
+                            for s in (out, vent, condensate) if vent is not None else (out,):
+                                if s is None:
+                                    continue
+                                if name == "temperature" and s is not out and cooled is not None:
+                                    # past a vent condenser: its outlet temperature (ADR 0062)
+                                    q = Quantity(
+                                        value=_sig(cooled), unit=t_unit, provenance="calculated"
+                                    )
                                 changed |= put(s, name, q, kind, node.id, ins, extra)
         elif kind == "splitter" and len(ins) == 1 and outs:
             src = ins[0]
@@ -822,6 +852,15 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
     return found
 
 
+def _condensate_stream(vent: Any) -> str | None:
+    """The stream a vent condenser's condensate leaves by (ADR 0062); None without a condenser
+    or when it returns to the vessel."""
+    condenser = getattr(vent, "condenser", None)
+    if condenser is None or condenser.returns == "vessel":
+        return None
+    return condenser.returns
+
+
 @dataclass
 class _Candidate:
     """A model's duty for its energy stream, not yet written (:func:`_put_duties`)."""
@@ -845,8 +884,9 @@ def _duty(
     solved_inputs: dict[str, Any],
     found: Derivation,
 ) -> list[_Candidate]:
-    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059), and a
-    batch still's condenser for its own (ADR 0061): compared where the stream has a given or
+    """The duty of *node*'s model for its energy stream (:mod:`.duties`, ADR 0059), a batch
+    still's condenser for its own (ADR 0061) and a batch's vent condenser for its own (ADR
+    0062): compared where the stream has a given or
     assumed one, else the candidates :func:`_put_duties` writes; none (and why, in *found*)
     when there is nothing to write."""
     from chemeascode.domains.process import duties
@@ -857,8 +897,11 @@ def _duty(
     if model is None:
         return []
     goal, why = duties.target(work, node)
-    condenser, condenser_why = (
-        duties.condenser_target(work, node) if model == "still" else (None, "")
+    still_cold, still_why = (
+        duties.still_condenser_target(work, node) if model == "still" else (None, "")
+    )
+    vent_cold, vent_why = (
+        duties.vent_condenser_target(work, node) if model in ("batch", "semibatch") else (None, "")
     )
     label = f"{node.id} ({model})"
     if goal is None and why:
@@ -871,23 +914,33 @@ def _duty(
                 "info",
             )
         )
-    if condenser is None and condenser_why:
+    if still_cold is None and still_why:
         found.duties.append(
             (
                 node.id,
                 "info",
-                f"{node.id} (still condenser): its duty is not written: {condenser_why}",
+                f"{node.id} (still condenser): its duty is not written: {still_why}",
                 "give the still's condenser an energy stream to cooling, or set "
                 "still.condenser_port",
                 "info",
             )
         )
-    if goal is None and condenser is None:
+    if vent_cold is None and vent_why:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{node.id} (vent condenser): its duty is not written: {vent_why}",
+                "set vent.condenser.energy_port: to the port of its energy stream",
+                "info",
+            )
+        )
+    if goal is None and still_cold is None and vent_cold is None:
         return []
     ins = [s for s, _ in ends[0]]
     outs = [s for s, _ in ends[1]]
     used = list(ins)
-    stream_id = (goal or condenser).stream.id  # type: ignore[union-attr]
+    stream_id = (goal or still_cold or vent_cold).stream.id  # type: ignore[union-attr]
     try:
         if model in ("batch", "semibatch"):
             result, inputs = beds.get(node.id), solved_inputs.get(node.id)
@@ -924,21 +977,25 @@ def _duty(
         )
         return []
     found.model_duties[node.id] = duty
-    offers = []
+    offers = []  # (the stream's target, the duty, the label, the rule): each once
     if goal is not None:
         offers.append((goal, duty, label, model))
-    if condenser is not None:
-        cold = duties.condenser_duty(node, result)
-        offers.append((condenser, cold, f"{node.id} (still condenser)", "still condenser"))
+    if still_cold is not None:  # a batch still's condenser (ADR 0061)
+        cold = duties.still_condenser_duty(node, result)
+        offers.append((still_cold, cold, f"{node.id} (still condenser)", "still condenser"))
+    if vent_cold is not None:  # a batch's vent condenser (ADR 0062)
+        cold = duties.vent_condenser_duty(node, result)
+        found.vent_condenser_duties[node.id] = cold
+        offers.append((vent_cold, cold, f"{node.id} (vent condenser)", "vent condenser"))
     candidates = []
-    for at, what, name, rule in offers:
-        candidate = _offer(work, node, case, at, what, name, rule, used, inputs, found)
+    for to, what, name, rule in offers:
+        candidate = _candidate(work, node, case, to, what, name, rule, used, inputs, found)
         if candidate is not None:
             candidates.append(candidate)
     return candidates
 
 
-def _offer(
+def _candidate(
     work: Process,
     node: Any,
     case: str,
@@ -950,9 +1007,10 @@ def _offer(
     inputs: dict[str, Any],
     found: Derivation,
 ) -> _Candidate | None:
-    """*duty* (:class:`.duties.ModelDuty`) on *goal*'s stream: compared where it has a given or
-    assumed duty, reported where it is not known or flows against the stream, else the
-    candidate to write."""
+    """*duty* (:class:`.duties.ModelDuty`) of *node*'s *model* (its own, a still's condenser
+    or a vent condenser) on *goal*'s stream: compared where it has a given or assumed duty,
+    reported where it is not known or flows against the stream, else the candidate to
+    write."""
     from chemeascode.domains.process import duties
 
     stream = goal.stream
@@ -998,7 +1056,10 @@ def _offer(
                 )
             )
         return None
-    extra: dict[str, Any] = {"duty": model.split()[0], "into": goal.into}
+    # the fingerprint's model: a still's condenser is the still's (ADR 0061), a vent
+    # condenser its own (ADR 0062)
+    extra: dict[str, Any] = {"duty": "still" if model == "still condenser" else model}
+    extra["into"] = goal.into
     if model == "still condenser":
         extra["condenser"] = True
     extra |= inputs

@@ -391,7 +391,7 @@ class VentResult:
     unit: str
     stream: str
     peak_rate: float  # kmol/s at the peak, one batch
-    peak_volume_flow: float  # m3/h of that gas at the vessel's temperature and pressure
+    peak_volume_flow: float  # m3/h at the vessel's (or vent condenser's) temperature, pressure
     peak_time: float | None  # s from the batch's start (the step's model)
     kmol: dict[str, float]  # given off per batch, by component
     kg: float  # given off per batch
@@ -489,19 +489,21 @@ def _vent(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> VentRes
         return None
     comps = process.components()
     peak = (solved.peak_vent_flow or 0.0) * hours  # kmol/s of one batch
+    # the gas leaves at the vessel's temperature, or a vent condenser's outlet (ADR 0062)
+    leaving = solved.vent_temperature or solved.temperature
     return VentResult(
         up.id,
         unit,
         vent.stream,
         peak,
-        peak * R * solved.temperature / solved.pressure * 3600.0,
+        peak * R * leaving / solved.pressure * 3600.0,
         solved.peak_vent_time,
         {n: v * hours for n, v in solved.vent.items()},
         sum(
             v * hours * (getattr(comps.get(n), "molar_mass", None) or 0.0)
             for n, v in solved.vent.items()
         ),
-        solved.temperature,
+        leaving,
         solved.pressure,
     )
 

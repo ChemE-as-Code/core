@@ -186,8 +186,8 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
 - `src/chemeascode/domains/process/batch_still.py` (`_Column`, `hengstebeck`,
   `underwood_root`, `underwood_min_reflux`, `gilliland_stages`, `gilliland_reflux`, the purity
   end), `schema.py` (`Column`, `ColumnDistillate`, `PurityEnd`, `Still.column`,
-  `Still.condenser_port`), `duties.py` (`condenser_target`, `condenser_duty`), `propagate.py`
-  (`_duty`, `_offer`), `model_basis.py` (`batch-shortcut`).
+  `Still.condenser_port`), `duties.py` (`still_condenser_target`, `still_condenser_duty`),
+  `propagate.py` (`_duty`, `_candidate`), `model_basis.py` (`batch-shortcut`).
 - `tests/test_batch_rectification.py`, `examples/process-batch-rectification`.
 - U. M. Diwekar, K. P. Madhavan (1991) Multicomponent batch distillation column design, Ind.
   Eng. Chem. Res. 30, 713-721; U. M. Diwekar (2012) Batch Distillation: Simulation, Optimal

@@ -512,7 +512,13 @@
               }
             ],
             "default": null,
-            "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
+            "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054), with henry, vapour and a condenser (ADR 0062)."
+          },
+          "heat_up": {
+            "default": false,
+            "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
+            "title": "Heat Up",
+            "type": "boolean"
           },
           "provenance": {
             "enum": [
@@ -1789,6 +1795,18 @@
             "default": null,
             "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
             "title": "Absorbed"
+          },
+          "heat_of_solution": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfSolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The heat its components release (or take up) as they mix into the liquid, released at the dose's rate: in the semi-batch's heat, duty, peak cooling duty and dT_ad, not in the MTSR (ADR 0063)."
           }
         },
         "required": [
@@ -2214,6 +2232,92 @@
           "provenance"
         ],
         "title": "Filtration",
+        "type": "object"
+      },
+      "HeatOfSolution": {
+        "additionalProperties": false,
+        "description": "The integral heat of solution, dilution or mixing of a dose's components as they mix into\nthe batch's liquid (ADR 0063): per kmol of the component dosed (kJ/kmol = J/mol), at the\nbatch's dilution and temperature, negative when mixing releases heat (as a heat of\nreaction). A dosed gas's heat of absorption (its dissolved share, ``absorbed``) goes here\ntoo; the heats of the reactions that consume it are then on the dissolved basis.",
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component of the dose -> kJ/kmol (J/mol) of it dosed.",
+            "minProperties": 1,
+            "title": "Values",
+            "type": "object"
+          },
+          "unit": {
+            "const": "kJ/kmol",
+            "default": "kJ/kmol",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "values",
+          "provenance"
+        ],
+        "title": "HeatOfSolution",
+        "type": "object"
+      },
+      "HenryConstant": {
+        "additionalProperties": false,
+        "description": "A vent gas's solubility in the batch's liquid, Henry's law ``p_g = H x_g`` (kPa per mole\nfraction): ``points`` of (K, kPa); ln H is interpolated linearly in 1/T between them (one\npoint: H at every temperature).",
+        "properties": {
+          "points": {
+            "description": "(temperature K, H kPa per mole fraction) pairs.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Points",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "points",
+          "provenance"
+        ],
+        "title": "HenryConstant",
         "type": "object"
       },
       "ImposedYield": {
@@ -3451,6 +3555,12 @@
             "title": "Outlets",
             "type": "object"
           },
+          "heat_up": {
+            "default": false,
+            "description": "Count the charge's heat-up from its inlet temperature to its bubble point (volatility raoult), and a swap's feed warmed to the still's temperature as it mixes in, in the still's duty and its whole energy per batch (ADR 0063); default: the boil-up's latent heat alone.",
+            "title": "Heat Up",
+            "type": "boolean"
+          },
           "column": {
             "anyOf": [
               {
@@ -4214,7 +4324,7 @@
       },
       "Vent": {
         "additionalProperties": false,
-        "description": "The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the\nliquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They\ndo not accumulate in the liquid and count in neither its volume nor its concentrations; a\n``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.",
+        "description": "The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the\nliquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They\ndo not accumulate in the liquid and count in neither its volume nor its concentrations; a\n``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.\n\nADR 0062: ``henry`` gives a component's dissolved share from its solubility instead (the\nliquid at the end saturated at the gas's partial pressure; ``fraction`` stays for a\ncomponent without one); ``vapour`` saturates the gas with the liquid's volatile components;\na ``condenser`` cools it and returns the condensate.",
         "properties": {
           "stream": {
             "description": "The outlet stream of the step the gas leaves by.",
@@ -4237,6 +4347,38 @@
             "description": "Component -> the share of what forms that leaves (default 1).",
             "title": "Fraction",
             "type": "object"
+          },
+          "henry": {
+            "additionalProperties": {
+              "$ref": "#/$defs/HenryConstant"
+            },
+            "description": "Component -> its Henry's-law constant in the liquid (ADR 0062): the share that stays dissolved follows from it, instead of a fraction.",
+            "title": "Henry",
+            "type": "object"
+          },
+          "vapour": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/VentVapour"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The gas leaves saturated with the liquid's volatile components (ADR 0062)."
+          },
+          "condenser": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/VentCondenser"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A partial vent condenser: {temperature K, returns: vessel or a stream, energy_port} (ADR 0062; needs vapour)."
           }
         },
         "required": [
@@ -4244,6 +4386,86 @@
           "components"
         ],
         "title": "Vent",
+        "type": "object"
+      },
+      "VentCondenser": {
+        "additionalProperties": false,
+        "description": "A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to\n``temperature``, the non-condensables leave it saturated there over an ideal condensate\n(a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel\n(reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy\nstream at ``energy_port`` (ADR 0059).",
+        "properties": {
+          "temperature": {
+            "description": "K: the gas and condensate leave at it.",
+            "exclusiveMinimum": 0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "returns": {
+            "default": "vessel",
+            "description": "vessel (the condensate runs back into the liquid), or the outlet stream of the step the condensate leaves by.",
+            "title": "Returns",
+            "type": "string"
+          },
+          "energy_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The step's energy port whose stream takes the condenser's duty (the heat it removes); none: the duty is reported, not written.",
+            "title": "Energy Port"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "temperature",
+          "provenance"
+        ],
+        "title": "VentCondenser",
+        "type": "object"
+      },
+      "VentVapour": {
+        "additionalProperties": false,
+        "description": "The vent gas leaves the vessel saturated with the liquid's volatile components at its\ntemperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each\ncomponent's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless\n``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``\nkmol of vapour, ``Y = sum_i y_i``.",
+        "properties": {
+          "components": {
+            "description": "The volatile components the gas carries; default every component in the liquid with a vapour_pressure (a vent component is a gas, never one of them).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "activity": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Component -> a constant activity coefficient in the vessel's liquid, from a source (default 1: an ideal liquid).",
+            "title": "Activity",
+            "type": "object"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "VentVapour",
         "type": "object"
       },
       "ViewItem": {

@@ -490,11 +490,108 @@ class Dosing(Strict):
         return found
 
 
+class VentVapour(Strict):
+    """The vent gas leaves the vessel saturated with the liquid's volatile components at its
+    temperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each
+    component's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless
+    ``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``
+    kmol of vapour, ``Y = sum_i y_i``."""
+
+    components: list[str] = Field(
+        default_factory=list,
+        description="The volatile components the gas carries; default every component in the "
+        "liquid with a vapour_pressure (a vent component is a gas, never one of them).",
+        exclude_if=lambda value: not value,
+    )
+    activity: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> a constant activity coefficient in the vessel's liquid, from "
+        "a source (default 1: an ideal liquid).",
+        exclude_if=lambda value: not value,
+    )
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> VentVapour:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.vapour.components: each component once")
+        if any(g <= 0 for g in self.activity.values()):
+            raise ValueError("vent.vapour.activity: a coefficient above 0")
+        if self.components and (stray := sorted(set(self.activity) - set(self.components))):
+            raise ValueError(
+                "vent.vapour.activity of a component not in its components: " + ", ".join(stray)
+            )
+        return self
+
+
+class VentCondenser(Strict):
+    """A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to
+    ``temperature``, the non-condensables leave it saturated there over an ideal condensate
+    (a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel
+    (reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy
+    stream at ``energy_port`` (ADR 0059)."""
+
+    temperature: float = Field(gt=0, description="K: the gas and condensate leave at it.")
+    returns: str = Field(
+        default="vessel",
+        description="vessel (the condensate runs back into the liquid), or the outlet stream "
+        "of the step the condensate leaves by.",
+    )
+    energy_port: str | None = Field(
+        default=None,
+        description="The step's energy port whose stream takes the condenser's duty (the heat "
+        "it removes); none: the duty is reported, not written.",
+        exclude_if=lambda value: value is None,
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class HenryConstant(Strict):
+    """A vent gas's solubility in the batch's liquid, Henry's law ``p_g = H x_g`` (kPa per mole
+    fraction): ``points`` of (K, kPa); ln H is interpolated linearly in 1/T between them (one
+    point: H at every temperature)."""
+
+    points: list[tuple[float, float]] = Field(
+        min_length=1, description="(temperature K, H kPa per mole fraction) pairs."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> HenryConstant:
+        if any(t <= 0 or h <= 0 for t, h in self.points):
+            raise ValueError("henry.points: temperatures and constants above 0")
+        if len({t for t, _ in self.points}) != len(self.points):
+            raise ValueError("henry.points: each temperature once")
+        return self
+
+    def kpa(self, kelvin: float) -> tuple[float, bool]:
+        """kPa per mole fraction at *kelvin* K, and whether it is extrapolated (outside the
+        points' temperatures; the end segment, or the one point, is carried on)."""
+        points = sorted(self.points)
+        if len(points) == 1:
+            return points[0][1], abs(kelvin - points[0][0]) > 1e-9
+        low, high = points[0][0], points[-1][0]
+        k = 1
+        while k < len(points) - 1 and kelvin > points[k][0]:
+            k += 1
+        (t1, h1), (t2, h2) = points[k - 1], points[k]
+        share = (1 / kelvin - 1 / t1) / (1 / t2 - 1 / t1)
+        value = math.exp(math.log(h1) + share * (math.log(h2) - math.log(h1)))
+        return value, not low - 1e-9 <= kelvin <= high + 1e-9
+
+
 class Vent(Strict):
     """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
     liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
     do not accumulate in the liquid and count in neither its volume nor its concentrations; a
-    ``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved."""
+    ``fraction`` below 1 leaves that share of what forms and keeps the rest dissolved.
+
+    ADR 0062: ``henry`` gives a component's dissolved share from its solubility instead (the
+    liquid at the end saturated at the gas's partial pressure; ``fraction`` stays for a
+    component without one); ``vapour`` saturates the gas with the liquid's volatile components;
+    a ``condenser`` cools it and returns the condensate."""
 
     stream: str = Field(description="The outlet stream of the step the gas leaves by.")
     components: list[str] = Field(
@@ -505,6 +602,23 @@ class Vent(Strict):
         description="Component -> the share of what forms that leaves (default 1).",
         exclude_if=lambda value: not value,
     )
+    henry: dict[str, HenryConstant] = Field(
+        default_factory=dict,
+        description="Component -> its Henry's-law constant in the liquid (ADR 0062): the share "
+        "that stays dissolved follows from it, instead of a fraction.",
+        exclude_if=lambda value: not value,  # a vent's fingerprint stays as in 1.9.0
+    )
+    vapour: VentVapour | None = Field(
+        default=None,
+        description="The gas leaves saturated with the liquid's volatile components (ADR 0062).",
+        exclude_if=lambda value: value is None,
+    )
+    condenser: VentCondenser | None = Field(
+        default=None,
+        description="A partial vent condenser: {temperature K, returns: vessel or a stream, "
+        "energy_port} (ADR 0062; needs vapour).",
+        exclude_if=lambda value: value is None,
+    )
 
     @model_validator(mode="after")
     def _shares(self) -> Vent:
@@ -514,6 +628,22 @@ class Vent(Strict):
             raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
         if any(not 0 < f <= 1 for f in self.fraction.values()):
             raise ValueError("vent.fraction: a share above 0, at most 1")
+        if stray := sorted(set(self.henry) - set(self.components)):
+            raise ValueError("vent.henry of a component not in components: " + ", ".join(stray))
+        if both := sorted(set(self.henry) & set(self.fraction)):
+            raise ValueError(
+                "vent: henry or fraction for a component, not both: " + ", ".join(both)
+            )
+        if self.vapour is not None and (
+            both := sorted(set(self.vapour.components) & set(self.components))
+        ):
+            raise ValueError(
+                "vent.vapour.components: a vent component is a gas: " + ", ".join(both)
+            )
+        if self.condenser is not None and self.vapour is None:
+            raise ValueError("vent.condenser condenses the vapour: give vent.vapour too")
+        if self.condenser is not None and self.condenser.returns == self.stream:
+            raise ValueError("vent.condenser.returns: the condensate's stream is not the vent's")
         return self
 
     def shares(self) -> dict[str, float]:
@@ -546,7 +676,7 @@ class Batch(Strict):
     vent: Vent | None = Field(
         default=None,
         description="A liquid batch or semi-batch that gives off gas: {stream, components, "
-        "fraction} (ADR 0054).",
+        "fraction} (ADR 0054), with henry, vapour and a condenser (ADR 0062).",
         exclude_if=lambda value: value is None,  # an unvented batch's fingerprint stays
     )
     heat_up: bool = Field(

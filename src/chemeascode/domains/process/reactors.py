@@ -41,6 +41,7 @@ from chemeascode.domains.process.duties import (
     duty_model,
     report_entry,
     report_lines,
+    vent_condenser_duty,
 )
 from chemeascode.domains.process.model import Process, balance_of, stream_flows
 from chemeascode.foundation.findings import Finding
@@ -158,9 +159,14 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     lacking: list[str] = []
     t_in = [_state_value(process, s, case, "temperature") for s in ins]
     t_out = [_state_value(process, s, case, "temperature") for s in outs]
-    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other
+    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other;
+    # a vent condenser's condensate to a stream of its own (ADR 0062) is no liquid outlet either
     vent = getattr(getattr(item, "batch", None), "vent", None)
-    liquid_outs = [s for s in outs if vent is None or s.id != vent.stream]
+    condenser = getattr(vent, "condenser", None)
+    skip = set() if vent is None else {vent.stream}
+    if condenser is not None and condenser.returns != "vessel":
+        skip.add(condenser.returns)
+    liquid_outs = [s for s in outs if s.id not in skip]
     t_liquid = [_state_value(process, s, case, "temperature") for s in liquid_outs]
     p_liquid = [_state_value(process, s, case, "pressure") for s in liquid_outs]
     t = t_liquid[0] if len(t_liquid) == 1 else None
@@ -365,6 +371,15 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 model_duty = report_entry(
                     process, item, case, batch_duty(item, solved_tank, process, case)
                 )
+                if vent is not None and vent.condenser is not None:
+                    # the vent condenser's duty on its own stream (ADR 0062)
+                    tank_entry["vent"]["condenser_duty"] = report_entry(
+                        process,
+                        item,
+                        case,
+                        vent_condenser_duty(item, solved_tank),
+                        vent_condenser=True,
+                    )
         except TankError as failure:
             lacking.append(f"the {item.reactor}: {failure}")
     if with_bed and duty_model(item) == "conversion" and not process.inside(node):
@@ -497,6 +512,7 @@ def reactor_text(report: ReactorReport) -> str:
                     + num(gas["peak_rate_kmol_s_m3"], " kmol/(s m3)", ".4g")
                     + (f" at {gas['peak_time_s']:.6g} s" if gas["peak_time_s"] is not None else "")
                 )
+                lines += _vent_lines(gas)
             if semi:
                 worst = tank["cooling_failure"]
                 x = tank["max_accumulation"]
@@ -525,6 +541,35 @@ def reactor_text(report: ReactorReport) -> str:
     return "\n".join(lines)
 
 
+def _vent_lines(gas: dict[str, Any]) -> list[str]:
+    """The lines of a vent's vapour, condenser and Henry split (ADR 0062)."""
+    lines = []
+    if gas.get("vapour_kmol_h"):
+        share = gas.get("vapour_share")
+        lines.append(
+            "      vapour carried off the liquid: "
+            + ", ".join(f"{n} {v:.4g}" for n, v in gas["vapour_kmol_h"].items())
+            + " kmol/h"
+            + (f" (the vapour {share:.3g} of the gas over the liquid at the end)" if share else "")
+        )
+    if gas.get("condensate_kmol_h"):
+        lines.append(
+            f"      condenser at {gas['temperature_K']:.6g} K condenses "
+            + ", ".join(f"{n} {v:.4g}" for n, v in gas["condensate_kmol_h"].items())
+            + " kmol/h"
+        )
+    if gas.get("condenser_duty"):
+        lines += ["    " + line for line in report_lines(gas["condenser_duty"])]
+    for n, h in (gas.get("henry") or {}).items():
+        lines.append(
+            f"      {n} dissolved {h['dissolved_kmol_h']:.4g} kmol/h "
+            f"(x {h['solubility_mole_fraction']:.4g} "
+            f"at {h['partial_pressure_kPa']:.4g} kPa, H {h['henry_kPa']:.4g} kPa), "
+            f"{h['share_vented']:.4g} of what formed vented; {h['state']}"
+        )
+    return lines
+
+
 def _duty_shown(r: dict[str, Any], num: Any) -> str:
     """The header's duty: the ideal-gas H(out) - H(in), else the model's year-average duty
     (ADR 0059), else ?."""
@@ -537,15 +582,24 @@ def _duty_shown(r: dict[str, Any], num: Any) -> str:
 def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
     """What ``process reactors`` adds for a vented batch or semi-batch (ADR 0054): what left by
     the vent (kmol/h, the flowsheet's basis) and its peak rate per m3 of the content at the end,
-    for sizing the off-gas line and its scrubber (per batch: ``cheme process recipe``)."""
-    return {
-        "vent": {
-            "stream": stream,
-            "kmol_h": dict(solved.vent),
-            "peak_rate_kmol_s_m3": solved.peak_vent_rate,
-            "peak_time_s": solved.peak_vent_time,
-        }
+    for sizing the off-gas line and its scrubber (per batch: ``cheme process recipe``). With
+    the vent's vapour, condenser or Henry split (ADR 0062) also what the gas carried off the
+    liquid, what the condenser condensed, the vent's temperature and each gas's solubility."""
+    found: dict[str, Any] = {
+        "stream": stream,
+        "kmol_h": dict(solved.vent),
+        "peak_rate_kmol_s_m3": solved.peak_vent_rate,
+        "peak_time_s": solved.peak_vent_time,
     }
+    if solved.vapour:
+        found["vapour_kmol_h"] = dict(solved.vapour)
+        found["vapour_share"] = solved.vapour_share
+        found["temperature_K"] = solved.vent_temperature
+    if solved.condensate:
+        found["condensate_kmol_h"] = dict(solved.condensate)
+    if solved.henry:
+        found["henry"] = {n: dict(v) for n, v in solved.henry.items()}
+    return {"vent": found}
 
 
 def semibatch_entry(solved: Any) -> dict[str, Any]:
