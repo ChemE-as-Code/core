@@ -96,13 +96,17 @@ Options considered:
 - **Screening** (ADR 0058): with `vapour`, the gas release at the MTSR is vapour-laden: its
   volume is the non-condensables' over `1 - Y`, `Y` over the worst moment's content at the
   MTSR (`vapour_share`, `noncondensable_m3_h`; a condenser is not credited, its cooling may fail
-  too). A content whose vapour pressure reaches the vessel's at the MTSR `boils`: a warning of
+  too). `formed_kmol` and `formed_m3` stay the gas formed, the non-condensables on one basis;
+  the volume it leaves with, vapour included, is `formed_m3_with_vapour`. A content whose vapour pressure reaches the vessel's at the MTSR `boils`: a warning of
   its own (`cheme.reactor-hazard-vent`) to size the relief for the boil-up.
 - **Rules** (`cheme.process-reactor`): errors for a vapour component undeclared or without a
   `vapour_pressure`; a vent or condensate stream whose template lacks the vapour's components;
   a condensate stream that is no outlet of the step (three outlets are then allowed); a
   condenser `energy_port` that is no energy port of the step, or the step's own; a Henry gas
-  missing from the liquid's template. A warning for `vapour` with no volatile component.
+  missing from the liquid's template; a condenser `temperature` at or above the vessel's (the
+  charge's temperature in a case, which an isothermal batch holds), which would condense
+  nothing and heat the gas. Warnings for `vapour` with no volatile component, and for such a
+  condenser on an adiabatic batch (it only starts at the charge's temperature).
 - **Unchanged behaviour**: a vent without `vapour`, `condenser` and `henry` integrates,
   propagates, fingerprints, reports and screens as in 1.9.0 (the vented and fractional
   semi-batch of `tests/test_semibatch_vent.py` write 1.9.0's fingerprints; the process
@@ -121,9 +125,14 @@ Options considered:
 - Positive, on scratch copies of the process library (not committed):
   - acetyl-chloride-1 (`vapour: {components: [ACCL, ACOH, H2O]}`, condenser at 268.15 K back to
     R-101, its duty on a new stream to brine): the vent past E-103 is 99.4 mol% HCl; R-101's own
-    gas loads E-103 with 0.0048 kW and its evaporative cooling is 0.0052 kW (the script's 0.17
-    and 0.19 kW are upper bounds that also count the head space the dose displaces, which the
-    model has none of; D-009 itself notes that the HCl forms over nearly pure acetic acid).
+    gas loads E-103 with 0.0048 kW and its evaporative cooling is 0.0052 kW. This does **not**
+    resolve its L-3: R-101 forms almost no HCl (0.008 kmol/h), and the gas that carries most of
+    the vapour is the head space the PCl3 dose displaces and the nitrogen, which the model does
+    not represent. It passes 2.06e-5 kmol/h of acetyl chloride past E-103, 0.0019 % of the
+    1.098 kmol/h formed, against the entry's own per-source estimate of about 0.099 % and its
+    typed upper bound of 0.213 % (`fraction` 0.00213); the script's 0.17 and 0.19 kW are of
+    that carrier gas too. The entry keeps its hand fraction and script until a head space and
+    sweep gas are modelled.
   - benzyl-bromide-1 (`vapour: {}`, condenser at 303.15 K back to R-101): 0.734 mol of vapour
     per mol of HBr over the batch (the script's linear mean 0.803), 0.049 mol of toluene per mol
     past E-102 (script 0.051), E-102's duty 6.97 kW (script Q4 8.16 kW on the 0.803), the vessel's
@@ -151,9 +160,12 @@ Options considered:
     of absorption or desorption;
   - one condenser per vent, one stage; the screening credits none;
   - `process simulate` still refuses a vented batch.
-- Follow-ups: a head-space and inert sweep (the gas a dose displaces, a nitrogen purge); the
-  degassing of a dosed or charged excess by its solubility; a heat of absorption of a dosed gas
-  (core#179 item 4); a reflux at the boiling point.
+- Follow-ups: a head-space and inert sweep (the gas a dose displaces, a nitrogen purge;
+  acetyl-chloride-1 L-3); the degassing of a dosed or charged excess by its solubility (core#179
+  item 2: sodium-azide-1 L-2's dissolved methyl nitrite, methyltriphenylphosphonium-bromide-1
+  L-3); a heat of absorption of a dosed gas (core#179 item 4); a reflux at the boiling point.
+  This ADR covers core#179 items 1 (solubility-based venting, at the vessel's stream pressure)
+  and 3 (solvent vapour and a reflux or vent condenser); items 2, 4 and 5 stay open.
 
 ## Evidence
 
@@ -171,5 +183,7 @@ Options considered:
   terms, Henry, the boiling refusal, the schema; propagate's vent, condensate and condenser
   duty, the rules, the reports, the screening and the recipe; the 1.9.0 fingerprints of a vent
   without the new fields.
-- process-library `acetyl-chloride-1`, `benzyl-bromide-1` and `benzoyl-chloride-1` DESIGN.md
-  core limits (L-3, L-3, L-2) on scratch copies, not committed.
+- process-library `benzyl-bromide-1` L-3 and `benzoyl-chloride-1` L-2, the DESIGN.md core
+  limits this covers, on scratch copies, not committed. `acetyl-chloride-1` L-3 was run the same
+  way and stays open: its vent vapour is carried by the displaced head space and the nitrogen,
+  which are not modelled (Consequences).

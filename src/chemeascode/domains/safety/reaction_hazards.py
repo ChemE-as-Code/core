@@ -742,7 +742,9 @@ def _vapour_laden(
         )
         return
     gas["rate_m3_h"] /= 1.0 - share
-    gas["formed_m3"] /= 1.0 - share
+    # formed_kmol and formed_m3 stay the gas formed (the non-condensables, one basis); the
+    # volume it leaves with, the liquid's vapour included, is a key of its own
+    gas["formed_m3_with_vapour"] = gas["formed_m3"] / (1.0 - share)
 
 
 def _vapour_text(gas: dict[str, Any]) -> str:
@@ -1174,8 +1176,13 @@ def hazard_text(report: HazardReport) -> str:
                 f"{gas['rate_m3_h']:.4g} m3/h at {gas['temperature_K']:.1f} K and "
                 f"{gas['pressure_kPa']:.4g} kPa(a){_vapour_text(gas)} ({gas['basis']}; "
                 f"{gas['rate_from']}); "
-                f"{gas['formed_kmol']:.4g} kmol ({gas['formed_m3']:.4g} m3) formed by "
-                f"{gas['formed_by'] or 'no reaction'} run to completion"
+                f"{gas['formed_kmol']:.4g} kmol ({gas['formed_m3']:.4g} m3"
+                + (
+                    f"; {gas['formed_m3_with_vapour']:.4g} m3 with the liquid's vapour"
+                    if "formed_m3_with_vapour" in gas
+                    else ""
+                )
+                + f") formed by {gas['formed_by'] or 'no reaction'} run to completion"
                 + (f" ({gas['formed_from']})" if gas.get("formed_from") else "")
                 + (
                     f"; vent capacity {gas['vent_capacity_m3_h']:.4g} m3/h"

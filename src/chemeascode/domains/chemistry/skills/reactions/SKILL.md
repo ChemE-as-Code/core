@@ -168,14 +168,18 @@ each value taken from the evidence cites its observation in `source`.
      the liquid's components that have an Antoine `vapour_pressure` (Raoult, ideal unless
      `activity: {id: gamma}` from a source), the vapour leaves the liquid and its
      `heat_of_vaporization` cools the vessel (part of its model duty). Do not type a vapour
-     `fraction` or script the evaporative cooling any more. A reflux or vent condenser on the
-     line is `condenser: {temperature: K, returns: vessel, energy_port: PORT, provenance,
-     source}` on the vent: the gas past it is saturated at its temperature, the condensate
-     returns (or `returns: STREAM`, a third outlet), and its duty goes on the step's energy
-     stream at `PORT` (its own, not the jacket's `energy_port`; a cooling-water or brine
-     terminal). The vent stream's template (and the condensate's) must list the vapour's
-     components. Where the gas's solubility is known, give `henry: {HCL: {points: [[313.15,
-     kPa]], provenance, source}}` instead of a `fraction`: the liquid at the end holds its
+     `fraction` or script the evaporative cooling any more, unless the vent gas is mostly a
+     displaced head space or a sweep gas (a dose pushing out the head space, a nitrogen
+     purge): the model carries vapour only on the gas the reactions form and a passing dose,
+     so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
+     reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
+     energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
+     (`validate` flags one at or above it): the gas past it is saturated at its temperature,
+     the condensate returns (or `returns: STREAM`, a third outlet), and its duty goes on the
+     step's energy stream at `PORT` (its own, not the jacket's `energy_port`; a cooling-water
+     or brine terminal). The vent stream's template (and the condensate's) must list the
+     vapour's components. Where the gas's solubility is known, give
+     `henry: {HCL: {points: [[313.15, kPa]], provenance, source}}` instead of a `fraction`: the liquid at the end holds its
      solubility at the gas's partial pressure, so the dissolved HCl reaches the crude (its
      component then needs `liquid_molar_volume` and `liquid_heat_capacity`, and the liquid's
      template lists it). A content that boils at the vessel's pressure is refused: that is a

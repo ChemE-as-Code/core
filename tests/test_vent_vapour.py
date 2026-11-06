@@ -20,7 +20,7 @@ from chemeascode.domains.process.recipe import Recipe, evaluate
 from chemeascode.domains.process.schema import Batch, HenryConstant, VapourPressure, Vent
 from chemeascode.domains.process.stirred_tank import Dose, TankError, solve_batch
 from chemeascode.domains.process.vent_vapour import VentPhase, condense, henry_phase
-from chemeascode.domains.safety.reaction_hazards import screen
+from chemeascode.domains.safety.reaction_hazards import hazard_text, screen
 from tests.test_semibatch_vent import CP, DOSING, HEAT, MATERIALS, V, _batch, _reactions
 from tests.test_semibatch_vent import FLOWSHEET as VENTED
 from tests.test_semibatch_vent import _plant as _vented_plant
@@ -379,6 +379,12 @@ def test_the_condensate_to_a_stream(tmp_path):
     process, _ = load(ws.root)
     balance = balance_of(process, "R", "design")
     assert balance.status == "ok" and sorted(balance.streams_out) == ["S3", "S4", "S5"]
+    # the condensate is no second liquid outlet: the reactor's outlet is the liquid's S3
+    (row,) = reactor_report(ws.root).reactors
+    assert row["temperature_out_K"] == pytest.approx(300.0)
+    assert row["pressure_out_kPa"] == pytest.approx(P)
+    assert "one outlet with a temperature" not in row["missing"]
+    assert "T out 300 K" in reactor_text(reactor_report(ws.root))
 
 
 def test_vent_vapour_rules(tmp_path):
@@ -404,6 +410,21 @@ def test_vent_vapour_rules(tmp_path):
         "B without a vapour_pressure" in m
         for m in _errors(_plant(tmp_path / "d", _vapour_flowsheet(named)))
     )
+    # a condenser at or above the vessel's 300 K condenses nothing and heats the gas
+    hot = CONDENSER.replace("temperature: 270", "temperature: 310")
+    assert any(
+        "vent condenser at 310 K is not below the vessel's 300 K" in m
+        for m in _errors(_plant(tmp_path / "e", _vapour_flowsheet(hot)))
+    )
+    assert not any("is not below the vessel's" in m for m in _errors(_plant(tmp_path / "f")))
+    # an adiabatic batch only starts at the charge's temperature: a warning
+    adiabatic = _plant(
+        tmp_path / "g",
+        _vapour_flowsheet(hot).replace("batch: {dosing:", "batch: {heat: adiabatic, dosing:"),
+    )
+    process, _ = load(adiabatic.root)
+    (found,) = [f for f in rules(process) if "is not below the vessel's" in f.message]
+    assert found.level == "warning" and "where the adiabatic batch starts" in found.message
 
 
 def test_henry_in_a_plant(tmp_path):
@@ -431,7 +452,8 @@ def test_the_screening_takes_the_vapour_laden_gas(tmp_path):
     """The gas release at the MTSR carries the liquid's vapour there: its volume is the
     non-condensables' over 1 - Y; a content whose vapour pressure reaches P at the MTSR
     boils, which is a warning of its own."""
-    (entry,) = screen(_plant(tmp_path / "a").root).entries
+    report = screen(_plant(tmp_path / "a").root)
+    (entry,) = report.entries
     gas = entry.gas_release
     assert 0 < gas["vapour_share"] < 1
     assert gas["rate_m3_h"] == pytest.approx(
@@ -440,6 +462,16 @@ def test_the_screening_takes_the_vapour_laden_gas(tmp_path):
     assert gas["noncondensable_m3_h"] == pytest.approx(
         gas["rate_kmol_s"] * R * gas["temperature_K"] / gas["pressure_kPa"] * 3600, rel=1e-12
     )
+    # what formed stays on one basis, the non-condensables; the vapour-laden volume apart
+    volume = R * gas["temperature_K"] / gas["pressure_kPa"]
+    assert gas["formed_m3"] == pytest.approx(gas["formed_kmol"] * volume, rel=1e-12)
+    assert gas["formed_m3_with_vapour"] == pytest.approx(
+        gas["formed_m3"] / (1 - gas["vapour_share"]), rel=1e-12
+    )
+    assert (
+        f"({gas['formed_m3']:.4g} m3; {gas['formed_m3_with_vapour']:.4g} m3 with the liquid's "
+        "vapour) formed by"
+    ) in hazard_text(report)
     hot = VAPOUR_MATERIALS.replace(
         "a: %r, b: 4000" % (math.log(50.0) + 4000 / 300.0),
         "a: %r, b: 12000" % (math.log(90.0) + 12000 / 300.0),
@@ -451,6 +483,7 @@ def test_the_screening_takes_the_vapour_laden_gas(tmp_path):
     # without vent.vapour the release is as in 1.9.0
     (plain,) = screen(_vented_plant(tmp_path / "c").root).entries
     assert "vapour_share" not in plain.gas_release
+    assert "formed_m3_with_vapour" not in plain.gas_release
 
 
 def test_the_recipe_gives_the_vent_at_the_condensers_temperature(tmp_path):

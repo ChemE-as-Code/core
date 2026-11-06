@@ -24,10 +24,15 @@
   - `process reactors` reports the vapour carried off, the condensate, the vent's temperature,
     the condenser's duty on its stream and each gas's solubility; `process recipe` gives the
     vent's m3/h at the condenser's temperature; `process reactor-hazards` takes the gas release
-    at the MTSR with the liquid's vapour (`vapour_share`, `noncondensable_m3_h`), and a content
-    that boils at the MTSR (`boils`) is a `cheme.reactor-hazard-vent` warning;
-    `cheme.process-reactor` checks the vapour's components, templates, the condensate stream
-    and the condenser's energy port.
+    at the MTSR with the liquid's vapour (`vapour_share`, `noncondensable_m3_h`,
+    `formed_m3_with_vapour`; `formed_kmol` and `formed_m3` stay the non-condensables), and a
+    content that boils at the MTSR (`boils`) is a `cheme.reactor-hazard-vent` warning;
+    `cheme.process-reactor` checks the vapour's components, templates, the condensate stream,
+    the condenser's energy port and that the condenser is below the vessel's temperature.
+  - Addresses #179 items 1 and 3. Item 2 (degassing a dissolved dose or charge, sodium-azide-1
+    L-2, methyltriphenylphosphonium-bromide-1 L-3), item 4 (heat of absorption) and item 5 stay
+    open, as does a displaced head space or sweep gas as the vapour's carrier
+    (acetyl-chloride-1 L-3 keeps its hand estimate).
   - A vent without these keys solves, reports and fingerprints as in 1.9.0. Every BFD/PFD needs
     `cheme process build` once (the process generator's code changed; its output did not).
 

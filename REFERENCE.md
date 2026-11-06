@@ -1158,12 +1158,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   the vent's temperature, the condenser's duty on its stream and each gas's solubility;
   `process recipe` gives the vent's m3/h at the condenser's temperature; `reactor-hazards`
   takes the gas release at the MTSR vapour-laden (`vapour_share`, `noncondensable_m3_h`, the
-  volume over `1 - Y` at the MTSR; no condenser credited), and a content that boils at the
-  MTSR is `boils`, a `cheme.reactor-hazard-vent` warning. `cheme.process-reactor` adds: a
-  vapour component undeclared or without a `vapour_pressure`, a vent or condensate template
-  lacking the vapour's components, a condensate stream that is no outlet, a condenser
-  `energy_port` that is no energy port (or the step's own), a Henry gas missing from the
-  liquid's template; (warning) a `vapour` with no volatile component.
+  volume over `1 - Y` at the MTSR; no condenser credited; `formed_kmol` and `formed_m3` stay
+  the non-condensables formed, `formed_m3_with_vapour` their volume with the vapour), and a
+  content that boils at the MTSR is `boils`, a `cheme.reactor-hazard-vent` warning.
+  `cheme.process-reactor` adds: a vapour component undeclared or without a `vapour_pressure`,
+  a vent or condensate template lacking the vapour's components, a condensate stream that is
+  no outlet, a condenser `energy_port` that is no energy port (or the step's own), a Henry gas
+  missing from the liquid's template, a condenser `temperature` at or above the charge's
+  (an isothermal batch; a warning for an adiabatic one); (warning) a `vapour` with no volatile
+  component. The vent carries vapour only on the gas the reactions form and a passing dose: a
+  displaced head space or a sweep gas is not modelled.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or

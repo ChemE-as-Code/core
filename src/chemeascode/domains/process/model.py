@@ -1367,6 +1367,52 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
         )
 
 
+def _vent_condenser_temperature(
+    out: _Out, item: Any, what: str, where: list[Any], condenser: Any
+) -> None:
+    """ADR 0062: a vent condenser below the vessel's temperature, the charge's in each case
+    (an isothermal batch holds it; an adiabatic one starts at it). At or above it the condenser
+    condenses nothing and heats the gas: its duty turns negative and the vent leaves hotter
+    than the vessel. An error for an isothermal batch, a warning for an adiabatic one (its
+    content may heat past the condenser)."""
+    process = out.process
+    fs = process.flowsheet
+    dosed = {d.stream for d in item.batch.dosing}
+    charges = [
+        s
+        for s in fs.streams
+        if (end := process.ends(s)[1]) is not None
+        and end.node == item.id
+        and s.kind == "material"
+        and s.id not in dosed
+    ]
+    if len(charges) != 1:
+        return  # the batch's own rules say what its inlets lack
+    charge = charges[0]
+    isothermal = item.batch.heat == "isothermal"
+    for case, state in charge.state.items():
+        q = getattr(state, "temperature", None)
+        if q is None:
+            continue
+        held = to_kelvin(q.value, q.unit or fs.units.temperature)
+        if condenser.temperature < held:
+            continue
+        out.add(
+            "error" if isothermal else "warning",
+            "reactor",
+            f"{what}: vent condenser at {condenser.temperature:g} K is not below the "
+            f"vessel's {held:g} K (the charge {charge.id}, case {case}"
+            + ("" if isothermal else ", where the adiabatic batch starts")
+            + "): a vent condenser above the vessel's temperature condenses nothing and heats "
+            "the gas",
+            [*where, "condenser", "temperature"],
+            [item.id, charge.id],
+            hint="give vent.condenser.temperature below the batch's temperature (the coolant's "
+            "outlet plus its approach), or drop the condenser",
+        )
+        return
+
+
 def vent_volatile(process: Any, item: Any, reactions: list[Any]) -> list[str]:
     """The volatile components a vented batch's gas carries (ADR 0062): ``vent.vapour``'s list,
     else every component of its inlets' templates and its reactions with a vapour_pressure (a
@@ -1467,6 +1513,8 @@ def _vent_vapour_rules(
                     f"the condenser's energy_port {condenser.energy_port} is the step's own "
                     "energy_port (the jacket's): give the condenser its own energy stream"
                 )
+        if condenser is not None:
+            _vent_condenser_temperature(out, item, what, where, condenser)
     if vent.henry:
         liquid = [
             s for s in outlets if s != vent.stream and s != getattr(vent.condenser, "returns", None)

@@ -159,9 +159,14 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     lacking: list[str] = []
     t_in = [_state_value(process, s, case, "temperature") for s in ins]
     t_out = [_state_value(process, s, case, "temperature") for s in outs]
-    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other
+    # a vented batch (ADR 0054): its liquid outlet is the reactor's outlet, the vent the other;
+    # a vent condenser's condensate to a stream of its own (ADR 0062) is no liquid outlet either
     vent = getattr(getattr(item, "batch", None), "vent", None)
-    liquid_outs = [s for s in outs if vent is None or s.id != vent.stream]
+    condenser = getattr(vent, "condenser", None)
+    skip = set() if vent is None else {vent.stream}
+    if condenser is not None and condenser.returns != "vessel":
+        skip.add(condenser.returns)
+    liquid_outs = [s for s in outs if s.id not in skip]
     t_liquid = [_state_value(process, s, case, "temperature") for s in liquid_outs]
     p_liquid = [_state_value(process, s, case, "pressure") for s in liquid_outs]
     t = t_liquid[0] if len(t_liquid) == 1 else None
