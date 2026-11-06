@@ -574,6 +574,9 @@ class Dose:
     #: kJ the whole dose releases as it mixes into the liquid (its ``heat_of_solution``,
     #: ADR 0063; positive: exothermic), released at its rate; None: none declared
     solution: float | None = None
+    #: kJ/kmol by component of its ``heat_of_solution`` (negative: exothermic); a component
+    #: the vent's vapour takes off the liquid takes it back in (ADR 0063, ADR 0062)
+    solution_by: Mapping[str, float] = field(default_factory=dict)
 
     def rate(self, t: float) -> float:
         """The share of the feed per second at time *t* s."""
@@ -831,6 +834,16 @@ def _solve_batch(
     base = size + len(vented)  # the vapour's totals: carried off, past the condenser, heats
     dhvap = [phase.heat_of_vaporization.get(names[i]) or 0.0 for i in volatile] if nv else []
     cp_vap = [phase.liquid_heat_capacity.get(names[i]) or 0.0 for i in volatile] if nv else []
+    # kJ/kmol each volatile component takes in as it leaves the solution again (ADR 0063): minus
+    # its doses' heat of solution, the mean over all of it that enters the liquid (the charged
+    # share released none), so only what the doses brought in gives back its heat
+    demix = []
+    for i in volatile:
+        entered = n0[i] + dosed[i]
+        bound = sum(
+            a[i] * d.solution_by.get(names[i], 0.0) for d, a in zip(doses, dose_moles, strict=True)
+        )
+        demix.append(-bound / entered if entered > 0 else 0.0)
 
     def vapour_rates(
         moles: Sequence[float], t: float, gas_flows: Mapping[str, float]
@@ -848,7 +861,7 @@ def _solve_batch(
         s = [gas_now * carry[names[i]] for i in volatile]
         qv = sum(a * h for a, h in zip(s, dhvap, strict=True))
         if not condensing:
-            return s, s, qv, 0.0
+            return s, s, qv + sum(a * h for a, h in zip(s, demix, strict=True)), 0.0
         through = condense(
             gas_now, {names[i]: a for i, a in zip(volatile, s, strict=True)}, k_condenser
         )
@@ -857,6 +870,8 @@ def _solve_batch(
         warm = sum(a * cp * (t - tc) for a, cp in zip(c, cp_vap, strict=True))
         if returns:
             qv += warm
+        # what leaves the liquid for good takes its heat of solution back (ADR 0063)
+        qv += sum(a * h for a, h in zip(v if returns else s, demix, strict=True))
         qc = sum(a * h for a, h in zip(c, dhvap, strict=True))
         qc += sum(a * cp * (t - tc) for a, cp in zip(s, cp_vap, strict=True))
         qc += sum(
@@ -1263,8 +1278,11 @@ def _solve_batch(
             if gas:
                 result.heat_terms["vent gas"] = gas
             if any(d.solution is not None for d in doses):
-                # every dose has mixed in by the end: its whole heat of solution (ADR 0063)
-                result.heat_terms["solution"] = -sum(d.solution or 0.0 for d in doses)
+                # every dose has mixed in by the end: its whole heat of solution (ADR 0063),
+                # less that of what the vent's vapour took off the liquid again (ADR 0062)
+                result.heat_terms["solution"] = -sum(d.solution or 0.0 for d in doses) + sum(
+                    a * h for a, h in zip(gone_by_gas, demix, strict=True)
+                )
             if getattr(batch, "heat_up", False):
                 _heat_up(result, mix, charge, charge_temperature, temperature)
         if nv:
@@ -1519,9 +1537,6 @@ def _solve_node(
     semibatch``, *inlet* its inlet streams) *node* fed by stream *inlet* in *case*, and what it
     was solved from (the inputs of the outlet's fingerprint). Raises :class:`TankError` naming
     what is missing. One function for ``cheme process propagate`` and ``process reactors``."""
-    from chemeascode.foundation.units import to_kelvin
-
-    fs = process.flowsheet
     doses: list[Dose] = []
     if node.reactor == "semibatch":
         inlet, pairs = split_inlets(node, inlet if isinstance(inlet, list) else [inlet])
@@ -1531,23 +1546,45 @@ def _solve_node(
             through = {n: v * (1.0 - share) for n, v in moles.items()} if share < 1 else {}
             if share < 1:
                 moles = {n: v * share for n, v in moles.items()}
-            doses.append(Dose(moles, kelvin, dosing.segments(), through, _solution(dosing, moles)))
+            heat = getattr(dosing, "heat_of_solution", None)
+            doses.append(
+                Dose(
+                    moles,
+                    kelvin,
+                    dosing.segments(),
+                    through,
+                    _solution(dosing, moles),
+                    dict(heat.values) if heat is not None else {},
+                )
+            )
     moles, kelvin, kpa = stream_moles(process, inlet, case)
-    outlet_t = None
+    held = outlet_temperature(process, node, case)
+    return solve_moles(process, node, moles, kelvin, kpa, held[0] if held else None, doses)
+
+
+def outlet_temperature(process: Any, node: Any, case: str) -> tuple[float, str] | None:
+    """K and stream id of the given or assumed (not calculated) temperature of tank or batch
+    *node*'s liquid outlet in *case*, which an isothermal one is held at; None without one. The
+    vent's stream and a vent condenser's condensate stream are no liquid outlet (ADR 0062).
+    One lookup for the model (:func:`solve_node`) and the vent condenser's rule."""
+    from chemeascode.foundation.units import to_kelvin
+
+    fs = process.flowsheet
+    found = None
     vent = getattr(node.batch, "vent", None) if node.reactor != "cstr" else None
+    condenser = getattr(vent, "condenser", None)
     for stream in fs.streams:
-        ends = process.ends(stream)
-        condenser = getattr(vent, "condenser", None)
         if vent is not None and stream.id == vent.stream:
             continue  # the liquid's outlet gives the batch's temperature, not the vent
         if condenser is not None and stream.id == condenser.returns:
             continue  # nor a vent condenser's condensate (ADR 0062)
+        ends = process.ends(stream)
         if ends and ends[0] is not None and ends[0].node == node.id:
             q = stream.state.get(case)
             given = getattr(q, "temperature", None)
             if given is not None and given.provenance != "calculated":
-                outlet_t = to_kelvin(given.value, given.unit or fs.units.temperature)
-    return solve_moles(process, node, moles, kelvin, kpa, outlet_t, doses)
+                found = (to_kelvin(given.value, given.unit or fs.units.temperature), stream.id)
+    return found
 
 
 def _solution(dosing: Any, moles: Mapping[str, float]) -> float | None:
@@ -1605,10 +1642,13 @@ def duty_only(spec: Any) -> dict[str, Any]:
     """What of batch or tank *spec* changes its duty and not its outlets, as a ``model_dump``
     exclude (ADR 0063): the charge's heat-up, and an isothermal batch's heats of solution
     (held at its temperature: an adiabatic batch's outlet temperature takes them). They are in
-    the duty's fingerprint (:func:`.duties.batch_duty`)."""
+    the duty's fingerprint (:func:`.duties.batch_duty`). A vent condenser's ``energy_port``
+    (ADR 0062) only picks the stream its duty is written on."""
     found: dict[str, Any] = {"heat_up": True}
     if getattr(spec, "heat", None) == "isothermal" and getattr(spec, "dosing", None):
         found["dosing"] = {"__all__": {"heat_of_solution": True}}
+    if getattr(getattr(spec, "vent", None), "condenser", None) is not None:
+        found["vent"] = {"condenser": {"energy_port": True}}
     return found
 
 
@@ -1678,10 +1718,13 @@ def solve_moles(
             phase = vent_vapour.henry_phase(vent)
     if doses:
         mixing = "dosing" not in duty_only(spec)  # the heat of solution: an outlet's input
+        vapour = phase is not None and bool(getattr(phase, "volatile", None))
         inputs["doses"] = [
             {"moles": dict(d.moles), "T": d.temperature, "segments": d.segments}
             | ({"passing": dict(d.passing)} if d.passing else {})
             | ({"solution": d.solution} if mixing and d.solution is not None else {})
+            # a vapour takes each component's own heat of solution back (ADR 0063)
+            | ({"solution_by": dict(d.solution_by)} if mixing and vapour and d.solution_by else {})
             for d in doses
         ]
     if kind == "cstr":

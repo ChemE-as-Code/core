@@ -129,6 +129,91 @@ def test_an_adiabatic_semibatch_takes_the_heat_of_solution_and_the_vapour_into_i
     assert dry.temperature == pytest.approx(expected, rel=1e-6)
 
 
+@pytest.mark.parametrize("returns", [True, False])
+def test_a_volatile_dosed_component_takes_its_heat_of_solution_back_as_it_leaves(returns):
+    """A dosed at 320 K with heat_of_solution -20000 kJ/kmol, A and S volatile, a vent
+    condenser at 270 K returning its condensate or drawing it off, held at 300 K: the A the
+    liquid loses (what passes the condenser, or all the gas carried) takes its heat of
+    solution back, so the term ``solution`` is that of the A still dissolved or reacted and
+    jacket plus condenser is H(out) - H(in) over the vessel and the condenser."""
+    t_dose = 320.0
+    phase = vapour._phase("AS", vapour._clausius(50.0, 4000.0), condenser=T_C, returns=returns)
+    condenser = {"temperature": T_C, "provenance": "assumed"} | (
+        {} if returns else {"returns": "C"}
+    )
+    batch = Batch.model_validate(
+        {
+            "provenance": "assumed",
+            "heat": "isothermal",
+            "dosing": [{"stream": "D", "time": DOSING}],
+            "vent": vapour.VAPOUR | {"condenser": condenser},
+            "time": 600,
+        }
+    )
+    dose = Dose({"A": 1.0}, t_dose, [(0.0, DOSING, 1.0)], {}, SOLUTION, {"A": -SOLUTION})
+    result = solve_batch(
+        _reactions(1e-4),
+        {"S": 5.0},
+        300.0,
+        P,
+        batch,
+        {"G": vapour.GAS},
+        Liquid(V),
+        CP,
+        isothermal_at=300.0,
+        doses=[dose],
+        vent_phase=phase,
+    )
+    terms = result.heat_terms
+    extent = result.extents["R1"]
+    dissolved = result.outlet["A"] + extent  # the A still mixed in, or reacted from solution
+    lost = 1.0 - dissolved
+    assert lost > (0.02 if not returns else 0.002)
+    assert terms["solution"] == pytest.approx(-SOLUTION * dissolved, rel=1e-9)
+    past = {n: result.vent.get(n, 0.0) for n in "AS"}
+    drawn = {} if returns else result.condensate
+    h = HEAT * extent + 150.0 * (300.0 - t_dose) - SOLUTION * dissolved
+    h += sum(v * (150.0 * (T_C - 300.0) + DHVAP) for v in past.values())
+    h += sum(v * 150.0 * (T_C - 300.0) for v in drawn.values())
+    h += result.vent["G"] * 3.5 * R * (T_C - 300.0)
+    assert sum(terms.values()) - result.condenser_heat == pytest.approx(h, rel=1e-6)
+
+
+def test_an_adiabatic_semibatch_cools_by_the_heat_of_solution_its_vapour_takes_back():
+    """Adiabatic, A and S volatile, no condenser: the A the gas carries off takes its heat of
+    solution back, so the batch ends colder than with the same heat of solution bound to a
+    component that does not evaporate, by about that heat over the content's capacity."""
+    phase = vapour._phase("AS", vapour._constant(30.0))
+
+    def adiabatic(by):
+        return solve_batch(
+            _reactions(1e-4),
+            {"S": 5.0},
+            300.0,
+            P,
+            Batch.model_validate(
+                {
+                    "provenance": "assumed",
+                    "heat": "adiabatic",
+                    "dosing": [{"stream": "D", "time": DOSING}],
+                    "vent": vapour.VAPOUR,
+                }
+            ),
+            {"G": vapour.GAS},
+            Liquid(V),
+            CP,
+            doses=[Dose({"A": 1.0}, 300.0, [(0.0, DOSING, 1.0)], {}, SOLUTION, by)],
+            vent_phase=phase,
+        )
+
+    taken = adiabatic({"A": -SOLUTION})
+    bound = adiabatic({})
+    carried = taken.vapour["A"]
+    assert carried > 0.005
+    drop = carried * SOLUTION / (6.0 * 150.0)
+    assert bound.temperature - taken.temperature == pytest.approx(drop, rel=0.1)
+
+
 JACKET = (
     "  - id: CW2\n    category: utility\n    utility: {kind: cooling_water}\n"
     "    ports: [{id: r, direction: in, kind: energy}]\n"

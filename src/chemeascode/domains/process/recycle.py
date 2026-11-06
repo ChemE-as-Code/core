@@ -326,14 +326,16 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
 def _not_swept(node: Any) -> dict[str, Any]:
     """What of *node* no sweep reads, as a ``model_dump`` exclude: :data:`NOT_SWEPT`, and what
     changes only its duty (ADR 0063: a batch's or still's ``heat_up``, an isothermal batch's
-    heats of solution), which is in the duty's own fingerprint."""
+    heats of solution; the energy ports a duty is written on: a still's ``condenser_port``,
+    ADR 0061, and a vent condenser's ``energy_port``, ADR 0062), which is in the duty's own
+    fingerprint."""
     from chemeascode.domains.process.stirred_tank import duty_only
 
     found: dict[str, Any] = dict.fromkeys(NOT_SWEPT, True)
     if getattr(node, "batch", None) is not None:
         found["batch"] = duty_only(node.batch)
     if getattr(node, "still", None) is not None:
-        found["still"] = {"heat_up": True}
+        found["still"] = {"heat_up": True, "condenser_port": True}  # as batch_still.solve_node
     return found
 
 

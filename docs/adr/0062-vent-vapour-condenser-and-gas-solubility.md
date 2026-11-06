@@ -103,10 +103,12 @@ Options considered:
   `vapour_pressure`; a vent or condensate stream whose template lacks the vapour's components;
   a condensate stream that is no outlet of the step (three outlets are then allowed); a
   condenser `energy_port` that is no energy port of the step, or the step's own; a Henry gas
-  missing from the liquid's template; a condenser `temperature` at or above the vessel's (the
-  charge's temperature in a case, which an isothermal batch holds), which would condense
-  nothing and heat the gas. Warnings for `vapour` with no volatile component, and for such a
-  condenser on an adiabatic batch (it only starts at the charge's temperature).
+  missing from the liquid's template; a condenser `temperature` at or above the vessel's in a
+  case (an isothermal batch's: the temperature the model holds it at, its liquid outlet's
+  given or assumed temperature, else its charge's; `stirred_tank.outlet_temperature`, one
+  lookup for the rule and the model), which would condense nothing and heat the gas. Warnings
+  for `vapour` with no volatile component, and for such a condenser on an adiabatic batch (it
+  only starts at the charge's temperature).
 - **Unchanged behaviour**: a vent without `vapour`, `condenser` and `henry` integrates,
   propagates, fingerprints, reports and screens as in 1.9.0 (the vented and fractional
   semi-batch of `tests/test_semibatch_vent.py` write 1.9.0's fingerprints; the process

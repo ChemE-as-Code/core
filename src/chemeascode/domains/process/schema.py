@@ -1268,7 +1268,8 @@ class Volatility(Strict):
 class Boilup(Strict):
     """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
     its heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol
-    of vapour per hour per kmol of the charge)."""
+    of vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)
+    times the distillate (ADR 0061)."""
 
     value: float = Field(gt=0)
     unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h"]
@@ -1428,10 +1429,13 @@ class Column(Strict):
 class Still(Strict):
     """A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge
     (the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed
-    totally (one equilibrium stage, no reflux); ``outlets`` maps ``distillate`` and
-    ``residue`` to the step's outlet ports, or ``cuts`` collect the distillate in turn (then
-    ``outlets`` names the residue only). With a ``feed`` it is a solvent swap: the ends apply
-    once all of the feed is in (no end: it stops then; portions: down to the level)."""
+    totally: one equilibrium stage without reflux, or with ``column`` a rectifying column on
+    the batch shortcut (ADR 0061; ``boilup`` is then the reboiler's, (R + 1) times the
+    distillate, and the condenser's duty goes on ``condenser_port``); ``outlets`` maps
+    ``distillate`` and ``residue`` to the step's outlet ports, or ``cuts`` collect the
+    distillate in turn (then ``outlets`` names the residue only). With a ``feed`` it is a
+    solvent swap: the ends apply once all of the feed is in (no end: it stops then; portions:
+    down to the level)."""
 
     pressure: float | None = Field(
         default=None, gt=0, description="kPa(a) of the still; default: the charge's"
@@ -1502,7 +1506,7 @@ class Distilling(Strict):
 
     still: Still | None = Field(
         default=None,
-        description="A batch (Rayleigh) still or solvent swap.",
+        description="A batch (Rayleigh) still, solvent swap or batch column (still.column).",
         exclude_if=lambda value: value is None,  # a node's dump stays as it was
     )
 

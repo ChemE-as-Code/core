@@ -522,8 +522,18 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
     duty = _LATENT
     if spec.heat_up:
         duty += " and the heat-up"
-    if metal is not None:
-        start = "its charge's temperature" if spec.heat_up else "the bubble point at the start"
+    if metal is not None and spec.volatility.model == "constant":
+        # no temperature modelled: the metal is left out of the duty (ADR 0063)
+        duty += (
+            f"; the vessel's metal ({metal[1]}) is left out: a still at constant volatility "
+            "models no temperature"
+        )
+    elif metal is not None:
+        start = (
+            "its charge's temperature (the bubble point when the charge enters at or above it)"
+            if spec.heat_up
+            else "the bubble point at the start"
+        )
         duty += (
             f", with the vessel's metal ({metal[1]}, {metal[0]:g} kJ/K) heated with the content "
             f"from {start} to its end temperature"

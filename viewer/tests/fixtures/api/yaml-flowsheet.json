@@ -790,7 +790,7 @@
               }
             ],
             "default": null,
-            "description": "A batch (Rayleigh) still or solvent swap."
+            "description": "A batch (Rayleigh) still, solvent swap or batch column (still.column)."
           },
           "crystallizer": {
             "anyOf": [
@@ -1048,7 +1048,7 @@
       },
       "Boilup": {
         "additionalProperties": false,
-        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge).",
+        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)\ntimes the distillate (ADR 0061).",
         "properties": {
           "value": {
             "exclusiveMinimum": 0,
@@ -3240,7 +3240,7 @@
               }
             ],
             "default": null,
-            "description": "A batch (Rayleigh) still or solvent swap."
+            "description": "A batch (Rayleigh) still, solvent swap or batch column (still.column)."
           },
           "crystallizer": {
             "anyOf": [
@@ -3482,7 +3482,7 @@
       },
       "Still": {
         "additionalProperties": false,
-        "description": "A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge\n(the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed\ntotally (one equilibrium stage, no reflux); ``outlets`` maps ``distillate`` and\n``residue`` to the step's outlet ports, or ``cuts`` collect the distillate in turn (then\n``outlets`` names the residue only). With a ``feed`` it is a solvent swap: the ends apply\nonce all of the feed is in (no end: it stops then; portions: down to the level).",
+        "description": "A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge\n(the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed\ntotally: one equilibrium stage without reflux, or with ``column`` a rectifying column on\nthe batch shortcut (ADR 0061; ``boilup`` is then the reboiler's, (R + 1) times the\ndistillate, and the condenser's duty goes on ``condenser_port``); ``outlets`` maps\n``distillate`` and ``residue`` to the step's outlet ports, or ``cuts`` collect the\ndistillate in turn (then ``outlets`` names the residue only). With a ``feed`` it is a\nsolvent swap: the ends apply once all of the feed is in (no end: it stops then; portions:\ndown to the level).",
         "properties": {
           "pressure": {
             "anyOf": [

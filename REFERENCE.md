@@ -1111,7 +1111,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   metal`, `C_m (T_1 - T_0)` per batch, to the duty of each model in the vessel that changes the
   content's temperature: the metal follows the content (a batch with `heat_up` from its
   charge's temperature, none without it; a still from its bubble point to its end temperature,
-  from its charge's with `heat_up`; a crystallizer from its feed's). `process recipe` reports
+  from its charge's with `heat_up`, or from its bubble point when the charge enters at or above
+  it; a crystallizer from its feed's; a still at constant volatility models no temperature and
+  gets none, its basis saying so). `process recipe` reports
   the heat of each heat-up or cool-down with `temperatures` in a vessel with metal (`heats`:
   content and metal kJ per batch, mean and year-average kW; a recipe without metal reports as in
   1.9.0). A unit
@@ -1141,12 +1143,15 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   released) of a liquid or of a gas's absorbed share: released at the dose's rate, it counts in
   the adiabatic balance, the peak cooling duty and the recipe's jacket check, the duty's term
   `solution`, and in `reactor-hazards`' dT_ad (`heat_of_solution`), not in the MTSR (released on
-  mixing, nothing of it is accumulated when the cooling fails and the dosing stops).
+  mixing, nothing of it is accumulated when the cooling fails and the dosing stops). A dosed
+  component the vent's vapour takes off the liquid again takes its heat of solution back (what
+  passes the condenser when its condensate returns, else all the gas carries): `solution` is
+  then the heat of what stays dissolved or reacts.
   `batch.heat_up: true` adds the charge heated from its inlet temperature to the batch's to the
   duty (`charge heat-up`), and the vessel's metal with it; without it the model holds the batch
   at its temperature from the start and leaves both to the recipe's heat operation. `heat_up`
   and an isothermal batch's `heat_of_solution` change only the duty: the outlets and a recycle's
-  tears do not go stale on them. `process propagate` writes both outlets and the balance
+  tears do not go stale on them, nor on a vent condenser's `energy_port`. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
   `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
@@ -1186,8 +1191,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `cheme.process-reactor` adds: a vapour component undeclared or without a `vapour_pressure`,
   a vent or condensate template lacking the vapour's components, a condensate stream that is
   no outlet, a condenser `energy_port` that is no energy port (or the step's own), a Henry gas
-  missing from the liquid's template, a condenser `temperature` at or above the charge's
-  (an isothermal batch; a warning for an adiabatic one); (warning) a `vapour` with no volatile
+  missing from the liquid's template, a condenser `temperature` at or above the batch's
+  temperature (an isothermal batch: its liquid outlet's given temperature, which the model
+  holds it at, else the charge's; a warning for an adiabatic one, at its charge's); (warning) a
+  `vapour` with no volatile
   component. The vent carries vapour only on the gas the reactions form and a passing dose: a
   displaced head space or a sweep gas is not modelled.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
@@ -1353,7 +1360,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   --fill` writes it as the `duty` of their energy stream, `calculated` with a fingerprint.
   - The heat: a batch's is minus the heat its reactions release over the batch plus each dose
     warmed to the batch's temperature (and a dosed gas passing to the vent; the doses' heat of
-    solution, the charge's heat-up with `heat_up` and the vessel's metal, ADR 0063; the latent
+    solution, less what the vent's vapour takes back, the charge's heat-up with `heat_up` and
+    the vessel's metal, ADR 0063; the latent
     heat of the vent's vapour and a returned condensate warmed back, ADR 0062), and its vent
     condenser's heat out on that condenser's own stream (`batch.vent.condenser.energy_port`,
     never the jacket's); a still's the latent heat of its distillate, `sum dHvap_i D_i` (with

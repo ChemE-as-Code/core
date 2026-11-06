@@ -49,6 +49,16 @@ Options considered:
     `q_d(t) sum_i n_d,i (-dH_sol,i)`, since a dose mixes in at once: in the adiabatic balance,
     in the isothermal peak cooling duty (so in the recipe's jacket check, ADR 0052) and, over the
     batch, as the heat term `solution` (`sum n dH_sol`) of the ADR 0059 duty.
+  - A dosed component that the vent's vapour (ADR 0062) takes off the liquid again leaves the
+    solution and takes its heat of solution back: the vapour's heat (`qv`) adds `sum_k L_k
+    (-dH_sol,k)`, with `L_k` what the liquid loses (what passes the condenser when its
+    condensate returns, else all the gas carries), in the adiabatic balance, and the term
+    `solution` is then `sum n dH_sol - sum_k L_k dH_sol,k`, the heat of what stays dissolved or
+    reacts, so the energy over the vessel and its condenser closes. A component also charged
+    (which released none) takes back the mean over all of it that entered the liquid, its
+    doses' `sum n dH_sol` over the charged and dosed kmol (well mixed: the liquid loses its
+    charged and dosed shares alike). The peak cooling duty leaves it out, as it leaves out the
+    vapour's latent heat (conservative).
   - **Screening**: it counts in `dT_ad` (the batch's potential with all of it dosed at once, a
     dosing error), with its own value in `heat_of_solution` and a note, and not in the MTSR.
     The reasoning: the MTSR of a semi-batch is the content's temperature when the cooling fails
@@ -89,8 +99,13 @@ Options considered:
     from its charge's temperature to its own (without `heat_up` the model holds the batch at its
     temperature from the start, its duty holds neither heat-up and its basis says the metal is
     left out: the recipe's `heat` operation holds both); a still from its bubble point at the
-    start to its end temperature (with `heat_up` from its charge's); a crystallizer from its
-    feed's to its own. A model at its charge's temperature gets none.
+    start to its end temperature (with `heat_up` from its charge's, or from the bubble point
+    when the charge enters at or above it: it takes no heat-up, so neither does the metal); a
+    crystallizer from its feed's to its own. A model at its charge's temperature gets none. A
+    still at constant volatility models no temperature: it gets no term, its duty stays the
+    boil-up's and its basis says the metal is left out (as a batch without `heat_up`).
+  - With a column (ADR 0061) the still's heat-up and its metal are the reboiler's, never the
+    condenser's: the condenser takes the latent heat of the vapour boiled up only.
   - A unit procedure holding a still (and no batch step) may now give a `vessel`: it is sized
     from what its steps take in (or its given `volume`), with no jacket check (the still's pot,
     MTPPB L-1); 1.9.0 refused it as `cheme.recipe-reference`.
@@ -98,10 +113,12 @@ Options considered:
   heats of solution (in the batch's inputs), `heat_up`, the charge's heat capacities, the metal's
   kJ/K, the batch's hours and the temperatures. `heat_up`, and an isothermal batch's heats of
   solution, are left out of the outlets' and the tears' fingerprints (`stirred_tank.duty_only`,
-  `recycle.loop_inputs`): they change no outlet, only the duty, which holds them. An adiabatic
-  batch's heats of solution stay in its outlets' (its temperature takes them). Every new field
-  is left out of the dump when not given (`exclude_if`), so a plant without them solves,
-  reports and fingerprints as in 1.9.0.
+  `recycle.loop_inputs`): they change no outlet, only the duty, which holds them. So are the
+  ports that only pick the stream a duty is written on, a still's `condenser_port` (ADR 0061)
+  and a vent condenser's `energy_port` (ADR 0062). An adiabatic batch's heats of solution stay
+  in its outlets' (its temperature takes them; with the vent's vapour each component's too,
+  `solution_by`). Every new field is left out of the dump when not given (`exclude_if`), so a
+  plant without them solves, reports and fingerprints as in 1.9.0.
 - **Rules** (`cheme.process-reactor`): a heat of solution of an undeclared component (error) or
   of one the dose does not carry (warning). `heat_up` on an adiabatic batch, or on a still at
   constant volatility, is a schema error.
@@ -135,7 +152,7 @@ Options considered:
 
 - core#191; this ADR's PR.
 - `src/chemeascode/domains/process/schema.py` (`HeatOfSolution`, `Dosing.heat_of_solution`,
-  `Batch.heat_up`, `Still.heat_up`), `stirred_tank.py` (`Dose.solution`, `_heat_up`),
+  `Batch.heat_up`, `Still.heat_up`), `stirred_tank.py` (`Dose.solution` and `solution_by`, `_heat_up`),
   `batch_still.py` (`_heat_up`, `_heat_entry`), `recipe.py` (`Vessel.metal_heat_capacity`,
   `HeatResult`, `metal_of`), `duties.py` (`with_metal`), `crystallization.py`
   (`_metal_entry`), `domains/safety/reaction_hazards.py` (`_solution_rise`), `model.py`

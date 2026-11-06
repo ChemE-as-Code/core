@@ -204,7 +204,8 @@ bubble point, and a swap's feed to the still's temperature); the vessel's steel 
 `vessel.metal_heat_capacity` (kJ/K, mass x cp), which also lengthens the jacket's heat and cool
 times and adds `vessel metal` to the duty of each model in that vessel that changes the
 content's temperature (a batch only with `heat_up`: without it the model holds the batch at its
-temperature, and the recipe's heat operation holds the content's and the metal's heat). `cheme
+temperature, and the recipe's heat operation holds the content's and the metal's heat; a still
+at constant volatility models no temperature and gets none). `cheme
 process recipe` reports the heat per batch of each jacket-timed heat-up in a vessel with metal:
 the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, a one-stage still's condensers (unless
 `still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give

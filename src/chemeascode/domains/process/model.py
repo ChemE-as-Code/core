@@ -1417,11 +1417,15 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
 def _vent_condenser_temperature(
     out: _Out, item: Any, what: str, where: list[Any], condenser: Any
 ) -> None:
-    """ADR 0062: a vent condenser below the vessel's temperature, the charge's in each case
-    (an isothermal batch holds it; an adiabatic one starts at it). At or above it the condenser
-    condenses nothing and heats the gas: its duty turns negative and the vent leaves hotter
-    than the vessel. An error for an isothermal batch, a warning for an adiabatic one (its
-    content may heat past the condenser)."""
+    """ADR 0062: a vent condenser below the vessel's temperature in each case: for an
+    isothermal batch the temperature the model holds it at (its liquid outlet's given or
+    assumed temperature, else its charge's: :func:`.stirred_tank.outlet_temperature`), for an
+    adiabatic one its charge's, where it starts. At or above it the condenser condenses nothing
+    and heats the gas: its duty turns negative and the vent leaves hotter than the vessel. An
+    error for an isothermal batch, a warning for an adiabatic one (its content may heat past
+    the condenser)."""
+    from chemeascode.domains.process.stirred_tank import outlet_temperature
+
     process = out.process
     fs = process.flowsheet
     dosed = {d.stream for d in item.batch.dosing}
@@ -1440,20 +1444,26 @@ def _vent_condenser_temperature(
     for case, state in charge.state.items():
         q = getattr(state, "temperature", None)
         if q is None:
-            continue
-        held = to_kelvin(q.value, q.unit or fs.units.temperature)
+            continue  # the model has no inlet temperature: the batch's rules say so
+        found = outlet_temperature(process, item, case) if isothermal else None
+        if found is not None:
+            held, source = found
+            whence = f"the outlet {source} held"
+        else:
+            held, source = to_kelvin(q.value, q.unit or fs.units.temperature), charge.id
+            whence = f"the charge {source}" + (
+                "" if isothermal else ", where the adiabatic batch starts"
+            )
         if condenser.temperature < held:
             continue
         out.add(
             "error" if isothermal else "warning",
             "reactor",
             f"{what}: vent condenser at {condenser.temperature:g} K is not below the "
-            f"vessel's {held:g} K (the charge {charge.id}, case {case}"
-            + ("" if isothermal else ", where the adiabatic batch starts")
-            + "): a vent condenser above the vessel's temperature condenses nothing and heats "
-            "the gas",
+            f"vessel's {held:g} K ({whence}, case {case}): a vent condenser above the vessel's "
+            "temperature condenses nothing and heats the gas",
             [*where, "condenser", "temperature"],
-            [item.id, charge.id],
+            [item.id, source],
             hint="give vent.condenser.temperature below the batch's temperature (the coolant's "
             "outlet plus its approach), or drop the condenser",
         )

@@ -87,10 +87,13 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
     `(R + 1)` moles boil up per mole distilled: `dt/dD = (R + 1)/V`, `dE/dD = (R + 1)
     lambda(x_D)` (heat_of_vaporization of the distillate's composition; constant molar
     overflow). The `boilup` is the reboiler's: a vapour rate or its heat input.
-- **Duties (ADR 0059 extended).** The reboiler's duty is the still's (now `(R + 1) D lambda`) on
-  its `energy_port`, or, with a column, its one heat stream in. The condenser's is the same
-  heat out (total condenser, no subcooling) on `still.condenser_port`, or, with a column, its
-  one heat stream out (to a cooling utility). Both are written `calculated` (source `still
+- **Duties (ADR 0059 extended).** The reboiler's duty is the still's (now `(R + 1) D lambda`,
+  plus ADR 0063's `charge heat-up` and `vessel metal` where `still.heat_up` or the recipe
+  vessel's `metal_heat_capacity` is given) on its `energy_port`, or, with a column, its one
+  heat stream in. The condenser's is the latent heat of the vapour boiled up, `(R + 1) D
+  lambda`, out (total condenser, no subcooling; the heat-up and the metal stay in the pot and
+  are never the condenser's) on `still.condenser_port`, or, with a column, its one heat stream
+  out (to a cooling utility). Both are written `calculated` (source `still
   duty` and `still condenser duty`), compared where given, and go stale like any propagated
   value. A one-stage still gets its condenser's duty only where `condenser_port` names it, so
   a 1.9.0 plant with two heat streams on a still is unchanged. A column without a stream out
@@ -176,7 +179,8 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
   separate still step). A constant distillate's key should be the column's most volatile
   component while it is held; when it is not, the solve says so in a note.
 - Limitations: the column, its condenser and the vacuum system are not sized; no reflux drum
-  or decanter; no heat-up or total-reflux start-up time (a `heat` operation of the recipe); the
+  or decanter; no total-reflux start-up time (the charge's heat-up is `still.heat_up`, ADR
+  0063, or a `heat` operation of the recipe); the
   condenser's duty has no subcooling; `process simulate` does not couple it.
 
 ## Evidence

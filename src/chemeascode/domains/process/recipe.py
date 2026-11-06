@@ -202,8 +202,8 @@ class Jacket(Strict):
 
 
 class Vessel(Strict):
-    """A unit's vessel, sized from its batch volume (the unit's batch or semi-batch model):
-    the working volume over the fill fraction, rounded up to a preferred size."""
+    """A unit's vessel, sized from its batch volume (the unit's batch, semi-batch or still
+    model): the working volume over the fill fraction, rounded up to a preferred size."""
 
     fill_fraction: float = Field(
         default=0.8, gt=0, le=1, description="Largest working volume over the vessel's."
@@ -263,8 +263,9 @@ class UnitProcedure(Strict):
     vessel: Vessel | None = Field(
         default=None,
         description="Size the unit's vessel and check its jacket (the unit: a batch or "
-        "semibatch step, or a block or units holding exactly one), or a dryer's vessel (its "
-        "heated area, the filter's plate).",
+        "semibatch step, or a block or units holding exactly one), or a still's pot (sized from "
+        "what its steps take in, or its volume; no jacket check; ADR 0063), or a dryer's vessel "
+        "(its heated area, the filter's plate).",
     )
 
     @model_validator(mode="after")

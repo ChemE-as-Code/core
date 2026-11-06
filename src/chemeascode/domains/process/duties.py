@@ -357,9 +357,16 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     return with_metal(process, node, case, duty, temperatures)
 
 
-def _metal_left_out(process: Any, node: Any, case: str | None, duty: ModelDuty) -> ModelDuty:
-    """*duty* of a batch without ``heat_up`` in a recipe vessel with ``metal_heat_capacity``:
-    its basis says the metal is not in it (ADR 0063); unchanged otherwise."""
+def _metal_left_out(
+    process: Any,
+    node: Any,
+    case: str | None,
+    duty: ModelDuty,
+    why: str = "the batch is at its temperature from the start (heat_up)",
+) -> ModelDuty:
+    """*duty* of a batch without ``heat_up``, or of a still at constant volatility, in a recipe
+    vessel with ``metal_heat_capacity``: its basis says the metal is not in it and *why*
+    (ADR 0063); unchanged otherwise."""
     if process is None or case is None:
         return duty
     from chemeascode.domains.process.recipe import metal_of
@@ -369,10 +376,7 @@ def _metal_left_out(process: Any, node: Any, case: str | None, duty: ModelDuty) 
     except ValueError:
         return duty
     if found is not None:
-        duty.basis += (
-            f"; the vessel's metal ({found[2]}) not included: the batch is at its temperature "
-            "from the start (heat_up)"
-        )
+        duty.basis += f"; the vessel's metal ({found[2]}) not included: {why}"
     return duty
 
 
@@ -422,11 +426,18 @@ def still_duty(node: Any, result: Any, process: Any = None, case: str | None = N
                 n: getattr(comps.get(n), "liquid_heat_capacity", None)
                 for n in sorted({*result.charge, *result.fed})
             }
+    if getattr(getattr(node.still, "volatility", None), "model", None) == "constant":
+        # no temperature modelled (ADR 0063): the boil-up's duty, the metal left out
+        return _metal_left_out(
+            process, node, case, duty, "a still at constant volatility models no temperature"
+        )
     # the metal follows the content: from the charge's temperature with its heat-up, else
-    # from the bubble point the model starts at
+    # from the bubble point the model starts at; a charge at or above its bubble point takes
+    # no heat-up (its flash is not modelled), so neither does the metal
     start, end = result.temperatures or (None, None)
     if heat_up:
-        start = result.charge_temperature
+        charged = result.charge_temperature
+        start = charged if charged is None or start is None else min(charged, start)
     return with_metal(process, node, case, duty, (start, end))
 
 

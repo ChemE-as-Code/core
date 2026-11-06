@@ -553,6 +553,78 @@ def test_the_metal_is_a_term_of_the_stills_duty_and_its_pot_is_sized(tmp_path):
     assert any("no volume of what its still takes in" in m for m in messages)
 
 
+def _solved_still(charge_temperature, temperatures, volatility="raoult", heat_up=True):
+    """A still node and its solution (:class:`.StillResult`'s fields still_duty reads): 4 h of
+    flows, 36000 kJ boiled up per batch (2.5 kW), no heat-up of the charge."""
+    from types import SimpleNamespace
+
+    node = SimpleNamespace(
+        id="ST",
+        still=SimpleNamespace(
+            heat_up=heat_up, feed=None, volatility=SimpleNamespace(model=volatility)
+        ),
+    )
+    result = SimpleNamespace(
+        energy=36000.0,
+        hours=4.0,
+        notes=[],
+        heat_up=0.0,
+        heat_up_missing="",
+        feed_heat_up=None,
+        temperatures=temperatures,
+        charge_temperature=charge_temperature,
+        charge={},
+        fed={},
+    )
+    return node, result, SimpleNamespace(components=dict)
+
+
+def test_a_charge_above_its_bubble_point_heats_the_metal_from_the_bubble_point(monkeypatch):
+    """benzoyl-chloride-1's crude enters its 5 kPa still at 413.15 K, above its 376.47 K bubble
+    point: it takes no heat-up (its flash is not modelled), and the metal follows the content
+    from the bubble point to the 396.94 K end, C_m (T_end - T_bubble), never from the charge's
+    413.15 K down (a negative term that would make heat_up lower the duty)."""
+    from chemeascode.domains.process.duties import still_duty
+
+    monkeypatch.setattr(recipe_module, "metal_of", lambda process, node, case: (1500.0, 4.0, "UP"))
+    node, result, process = _solved_still(413.15, (376.47, 396.94))
+    duty = still_duty(node, result, process, "design")
+    metal = 1500.0 * (396.94 - 376.47) / 4.0 / 3600.0
+    assert duty.terms_kW["vessel metal"] == pytest.approx(metal, rel=1e-12)
+    assert duty.terms_kW["charge heat-up"] == 0.0
+    # the same as without heat_up, which starts at the bubble point
+    node, result, process = _solved_still(413.15, (376.47, 396.94), heat_up=False)
+    assert still_duty(node, result, process, "design").heat_kW == pytest.approx(duty.heat_kW)
+    # a charge below its bubble point still heats the metal from its own temperature
+    node, result, process = _solved_still(300.0, (376.47, 396.94))
+    duty = still_duty(node, result, process, "design")
+    assert duty.terms_kW["vessel metal"] == pytest.approx(
+        1500.0 * (396.94 - 300.0) / 4.0 / 3600.0, rel=1e-12
+    )
+
+
+def test_a_still_at_constant_volatility_keeps_its_duty_in_a_vessel_with_metal(monkeypatch):
+    """benzyl-chloroformate-1's degassing still T101 (constant alpha, no temperature modelled)
+    shares the R-101 vessel with a semi-batch: the vessel's metal_heat_capacity leaves the
+    still's boil-up duty as it is, with the metal left out and its basis saying why."""
+    from chemeascode.domains.process.duties import still_duty
+
+    monkeypatch.setattr(
+        recipe_module, "metal_of", lambda process, node, case: (700.0, 4.0, "R-101")
+    )
+    node, result, process = _solved_still(None, None, volatility="constant", heat_up=False)
+    duty = still_duty(node, result, process, "design")
+    assert duty.heat_kW == pytest.approx(2.5) and not duty.missing
+    assert duty.terms_kW == {"boil-up": pytest.approx(2.5)}
+    assert (
+        "the vessel's metal (R-101) not included: a still at constant volatility models no "
+        "temperature" in duty.basis
+    )
+    # a raoult still without its temperatures is not known, as before
+    node, result, process = _solved_still(None, None, heat_up=False)
+    assert still_duty(node, result, process, "design").heat_kW is None
+
+
 def test_the_metal_is_a_term_of_the_crystallizers_duty(monkeypatch):
     """The feed cooled from 333.15 to 313.15 K cools the vessel's 3000 kJ/K with it, each batch
     of 10 h of flows: 3000 x -20 / 10 kJ/h."""
@@ -644,8 +716,9 @@ def test_the_vessels_metal_makes_only_the_duty_stale(tmp_path):
 
 
 def test_a_tear_downstream_of_a_duty_only_input_keeps_its_fingerprint(tmp_path):
-    """The tear fingerprint (loop_inputs) leaves out still.heat_up, batch.heat_up and an
-    isothermal batch's heats of solution; an adiabatic batch's heat of solution is in it."""
+    """The tear fingerprint (loop_inputs) leaves out still.heat_up, still.condenser_port (the
+    stream the condenser's duty is written on, ADR 0061), batch.heat_up and an isothermal
+    batch's heats of solution; an adiabatic batch's heat of solution is in it."""
     from chemeascode.domains.process.recycle import loop_inputs
 
     def fingerprint(ws, tear):
@@ -654,6 +727,17 @@ def test_a_tear_downstream_of_a_duty_only_input_keeps_its_fingerprint(tmp_path):
 
     assert fingerprint(_still_plant(tmp_path / "a", heat_up=False), "S4") == fingerprint(
         _still_plant(tmp_path / "b"), "S4"
+    )
+    ported = still._plant(
+        tmp_path / "p",
+        flowsheet=still.FLOWSHEET.replace(
+            "    still:\n", "    still:\n      condenser_port: top\n"
+        ),
+        recipe=still.RECIPE,
+    )
+    assert "condenser_port: top" in (ported.root / "process/flowsheet.yaml").read_text()
+    assert fingerprint(ported, "S4") == fingerprint(
+        still._plant(tmp_path / "q", flowsheet=still.FLOWSHEET, recipe=still.RECIPE), "S4"
     )
     plain = semi._plant(tmp_path / "c")
     heated = semi._plant(

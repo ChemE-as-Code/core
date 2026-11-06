@@ -66,7 +66,9 @@
     `formed_m3_with_vapour`; `formed_kmol` and `formed_m3` stay the non-condensables), and a
     content that boils at the MTSR (`boils`) is a `cheme.reactor-hazard-vent` warning;
     `cheme.process-reactor` checks the vapour's components, templates, the condensate stream,
-    the condenser's energy port and that the condenser is below the vessel's temperature.
+    the condenser's energy port and that the condenser is below the vessel's temperature
+    (an isothermal batch's: its liquid outlet's given temperature, which the model holds it at,
+    else its charge's; an adiabatic batch's charge's, where it starts).
   - Addresses #179 items 1 and 3. Item 2 (degassing a dissolved dose or charge, sodium-azide-1
     L-2, methyltriphenylphosphonium-bromide-1 L-3), item 4 (heat of absorption) and item 5 stay
     open, as does a displaced head space or sweep gas as the vapour's carrier
@@ -82,7 +84,11 @@
     (`heat_of_solution`, a note) and not in the MTSR: it is released as the dose mixes in, so
     nothing of it is accumulated when a cooling failure stops the dosing. The heats of the
     reactions consuming a dissolved gas are then on the dissolved basis. `cheme.process-reactor`:
-    an undeclared component (error), one the dose does not carry (warning).
+    an undeclared component (error), one the dose does not carry (warning). A dosed component
+    the vent's vapour (ADR 0062) takes off the liquid takes its heat of solution back as it
+    leaves (what passes the condenser when its condensate returns, else all the gas carries),
+    in the adiabatic balance and in `solution`, which is then the heat of what stays dissolved
+    or reacts; a component also charged takes back the mean over all of it that entered.
   - `batch.heat_up: true` (isothermal batch or semi-batch) and `still.heat_up: true`
     (volatility raoult): the charge heated from its inlet temperature to the batch's, or to its
     bubble point, as the duty's term `charge heat-up`, and a solvent swap's feed warmed to the
@@ -92,19 +98,22 @@
     (ADR 0061) the heat-up and the vessel's metal are the reboiler's, never the condenser's,
     which stays the boil-up's latent heat (the column's assumptions say so). `heat_up` and
     an isothermal batch's heats of solution change only the duty: no outlet or recycle tear
-    goes stale on them.
+    goes stale on them, nor on a still's `condenser_port` or a vent condenser's `energy_port`
+    (they pick only the stream a duty is written on).
   - `vessel.metal_heat_capacity: kJ/K` on a recipe unit procedure's vessel: in the `heat` and
     `cool` jacket times (`C + C_m`), and as the term `vessel metal` of each model in the vessel
     that changes the content's temperature; the metal follows the content (a batch with
     `heat_up` from its charge's temperature, none without it; a still from its bubble point to
-    its end temperature, from its charge's with `heat_up`; a crystallizer from its feed's;
-    `process crystallizers` shows it).
+    its end temperature, from its charge's with `heat_up`, or from its bubble point when the
+    charge enters at or above it; a crystallizer from its feed's; `process crystallizers` shows
+    it). A still at constant volatility models no temperature: its duty stays the boil-up's,
+    the metal left out and its basis saying so.
   - `process recipe` reports the heat of each `heat` or `cool` operation with `temperatures` in
     a vessel with metal (`heats`: the content's and the metal's kJ per batch, the mean and the
     year-average kW). A recipe without metal has no `heats` in its JSON.
   - A unit procedure holding a still may give a `vessel`, sized from what its steps take in or
     its `volume` (no jacket check); 1.9.0 refused it as `cheme.recipe-reference`.
-  - `stirred_tank.Dose.solution` and `duty_only`, `TankResult.charge_temperature`,
+  - `stirred_tank.Dose.solution`, `solution_by`, `duty_only` and `outlet_temperature`, `TankResult.charge_temperature`,
     `StillResult.heat_up`, `feed_heat_up` and `fed_temperature`, `recipe.HeatResult`,
     `metal_of` and `vessel_metal`, `duties.with_metal` and `ModelDuty.inputs`; the duty
     functions take the process and case for the metal.
@@ -112,7 +121,8 @@
   `still.condenser_port`), ADR 0062 (`batch.vent.vapour`, `condenser`, `henry`) and ADR 0063
   (`heat_of_solution`, `heat_up`, `metal_heat_capacity`) solves, reports and fingerprints as in
   1.9.0; each key changes only the models that use it (the library's six stills on scratch
-  copies: `process stills --json`, `propagate --check` and `validate` print the same). A
+  copies: `process stills --json` and `propagate --check` print the same, and `validate`
+  does too apart from the `cheme.generated-version` warning of the next point). A
   vented semi-batch may use a dose's `heat_of_solution` and the vent's vapour and condenser
   together: its duty holds both terms, the vent condenser's duty is on its own stream.
 - Every BFD/PFD needs `cheme process build` once (the process generator's code changed; the

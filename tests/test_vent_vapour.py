@@ -427,6 +427,60 @@ def test_vent_vapour_rules(tmp_path):
     assert found.level == "warning" and "where the adiabatic batch starts" in found.message
 
 
+def _held(t_charge, t_condenser):
+    """The condenser plant with batch.heat_up, its charge S1 at *t_charge* K and its liquid
+    outlet S3 given at 300 K, which the isothermal batch is held at."""
+    text = _vapour_flowsheet(
+        CONDENSER.replace("temperature: 270", f"temperature: {t_condenser}")
+    ).replace("vent: {stream: S4", "heat_up: true, vent: {stream: S4")
+    s1 = text.index("  - id: S1")
+    text = text[:s1] + text[s1:].replace(
+        "temperature: {value: 300", f"temperature: {{value: {t_charge}", 1
+    )
+    liquid = "  - id: S3\n    from: R.out\n    to: P.in\n    template: liquid\n"
+    assert liquid in text and "heat_up: true" in text
+    return text.replace(
+        liquid,
+        liquid
+        + "    state:\n      design:\n        temperature: {value: 300, provenance: given}\n",
+    )
+
+
+def test_the_condenser_rule_takes_the_temperature_an_isothermal_batch_is_held_at(tmp_path):
+    """An isothermal batch is held at its liquid outlet's given temperature, not its charge's
+    (batch.heat_up heats a colder charge to it): a condenser at 290 K over a batch held at
+    300 K with its charge at 285 K condenses and is no error; one at 310 K over a batch held at
+    300 K with its charge at 320 K heats the gas and is."""
+    cold = _plant(tmp_path / "cold", _held(285, 290))
+    assert not _errors(cold), _errors(cold)
+    process, _ = load(cold.root)
+    run(cold, process, "design", write=True)
+    (row,) = reactor_report(cold.root).reactors
+    assert row["tank"]["vent"]["condensate_kmol_h"]["S"] > 0
+    hot = _errors(_plant(tmp_path / "hot", _held(320, 310)))
+    assert any(
+        "vent condenser at 310 K is not below the vessel's 300 K (the outlet S3 held" in m
+        for m in hot
+    ), hot
+
+
+def test_the_vent_condensers_energy_port_is_in_no_outlets_or_tears_fingerprint(tmp_path):
+    """The condenser's energy_port only picks the stream its duty is written on: naming it
+    changes neither the batch's outlets' inputs nor a tear's fingerprint."""
+    from chemeascode.domains.process.recycle import loop_inputs
+    from chemeascode.domains.process.stirred_tank import solve_node, tank_inlet
+
+    def fingerprints(name, vent):
+        process, _ = load(_plant(tmp_path / name, _vapour_flowsheet(vent)).root)
+        node = process.nodes["R"]
+        inlets = [s for s in process.flowsheet.streams if process.ends(s)[1].node == "R"]
+        _, inputs = solve_node(process, node, tank_inlet(node, inlets), "design")
+        return inputs, loop_inputs(process, "design", ["S3"])
+
+    named = fingerprints("a", CONDENSER)
+    assert named == fingerprints("b", CONDENSER.replace("energy_port: qc, ", ""))
+
+
 def test_henry_in_a_plant(tmp_path):
     vent = (
         "vent: {stream: S4, components: [G], "

@@ -156,7 +156,8 @@ each value taken from the evidence cites its observation in `source`.
      (gas left dissolved, a dosed liquid's heat of dilution), give the dose `heat_of_solution:
      {values: {ID: kJ/kmol}, provenance, source}` instead (ADR 0063) and write those reactions'
      heats on the dissolved basis: it is released as the dose mixes in, in the duty, the peak
-     cooling and dT_ad, not in the MTSR. When only part is taken up, give the
+     cooling and dT_ad, not in the MTSR; what of it the vent's `vapour` takes off the liquid
+     again takes its heat back. When only part is taken up, give the
      dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to the vessel's
      temperature (its ideal-gas cp, else left out and noted). `process propagate` writes both
      outlets (composition, flow, the liquid's temperature and pressure) and the balance closes
@@ -178,7 +179,8 @@ each value taken from the evidence cites its observation in `source`.
      so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
      reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
      energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
-     (`validate` flags one at or above it): the gas past it is saturated at its temperature,
+     (an isothermal batch's is its liquid outlet's given temperature, which `heat_up` heats a
+     colder charge to; `validate` flags one at or above it): the gas past it is saturated at its temperature,
      the condensate returns (or `returns: STREAM`, a third outlet), and its duty goes on the
      step's energy stream at `PORT` (its own, not the jacket's `energy_port`; a cooling-water
      or brine terminal). The vent stream's template (and the condensate's) must list the
