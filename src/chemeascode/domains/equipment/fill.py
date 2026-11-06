@@ -2891,13 +2891,12 @@ def _reactor(sheet: _Sheet, context: _Context) -> None:
 
 def _recipe_vessel(process: Any, node_id: str, case: str) -> Any:
     """The vessel process/recipe.yaml sizes for batch step *node_id*, or None."""
-    from chemeascode.domains.process.recipe import evaluate, load_recipe
+    from chemeascode.domains.process.recipe import batch_vessel, evaluate, load_recipe
 
     recipe, doc, _ = load_recipe(process.root)
     if recipe is None:
         return None
-    result = evaluate(process, recipe, doc, case)
-    return next((v for v in result.vessels if v.unit == node_id), None)
+    return batch_vessel(process, recipe, evaluate(process, recipe, doc, case), node_id)
 
 
 def _stirred_reactor(

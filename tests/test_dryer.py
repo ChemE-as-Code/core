@@ -572,3 +572,99 @@ def test_the_crystallizers_command_shows_the_dryer(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     units = json.loads(result.output)["units"]
     assert [u["model"] for u in units] == ["solid_separation", "dryer"]
+    # Q1 (100 kW) is not the model's duty: the warning shows in the text too, with its rule
+    text = CliRunner().invoke(app, ["process", "crystallizers"])
+    assert text.exit_code == 0, text.output
+    assert "warning cheme.process-dryer-duty [D1]" in text.output
+
+
+#: A precipitating reaction RX ahead of F1 and D1 in the same vessel (a reactor-filter-dryer).
+REACTOR_MATERIALS = (
+    MATERIALS.replace(
+        "molar_mass: 177.98, phase: solid}",
+        "molar_mass: 177.98, phase: solid, liquid_molar_volume: 0.1}\n"
+        "  - {id: Y, name: precursor, formula: C4H4BrNO2, molar_mass: 177.98,"
+        " liquid_molar_volume: 0.1}",
+    )
+    .replace(
+        "formula: NaBr, molar_mass: 102.89}",
+        "formula: NaBr, molar_mass: 102.89, liquid_molar_volume: 0.03}",
+    )
+    .replace(
+        "formula: C4H4BrNO2, molar_mass: 177.98}",
+        "formula: C4H4BrNO2, molar_mass: 177.98, liquid_molar_volume: 0.1}",
+        1,
+    )
+    .replace("components: [X_s, X, NaBr, H2O]", "components: [X_s, X, NaBr, H2O, Y]")
+)
+
+REACTOR_REACTIONS = """\
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - {id: R1, stoichiometry: {Y: -1, X_s: 1}, phase: liquid,
+     heat_of_reaction: {value: -50000, provenance: assumed},
+     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.01},
+            orders: {Y: 1}, provenance: assumed}}
+"""
+
+REACTOR_FLOWSHEET = (
+    FLOWSHEET.replace(
+        "steps:\n",
+        "steps:\n  - id: RX\n    block: ISO\n    class: ReactingChemicals\n    reactions: [R1]\n"
+        "    reactor: batch\n    batch: {time: 600, provenance: assumed}\n    ports:\n"
+        "      - {id: in, direction: in, delegates: in}\n      - {id: out, direction: out}\n",
+        1,
+    )
+    .replace(
+        "    ports:\n      - {id: in, direction: in, delegates: in}\n      - {id: cake,",
+        "    ports:\n      - {id: in, direction: in}\n      - {id: cake,",
+    )
+    .replace("    from: F.out\n    to: F1.in\n", "    from: F.out\n    to: RX.in\n")
+    .replace("values: {X_s: 0.40, X: 0.01,", "values: {X_s: 0.35, Y: 0.05, X: 0.01,")
+    .replace(
+        "        flow: {value: 1000",
+        "        pressure: {value: 101.325, provenance: given, source: test}\n"
+        "        flow: {value: 1000",
+        1,
+    )
+    + "  - id: S0\n    from: RX.out\n    to: F1.in\n    template: slurry\n"
+)
+
+
+def _reactor_plant(tmp_path, heated_area):
+    recipe = copy.deepcopy(RECIPE)
+    up = recipe["unit_procedures"][0]
+    up["units"] = ["RX", "F1", "D1"]
+    up["vessel"] = {"fill_fraction": 0.5, "heated_area": heated_area, "provenance": "assumed"}
+    up["operations"].insert(0, {"id": "react", "kind": "react", "from": "RX"})
+    root = tmp_path / "plant"
+    (root / "process").mkdir(parents=True)
+    (root / "plant.yaml").write_text("name: dryer-test\nstage: concept\nsheets: []\n")
+    (root / "process/materials.yaml").write_text(REACTOR_MATERIALS)
+    (root / "process/flowsheet.yaml").write_text(REACTOR_FLOWSHEET)
+    (root / "process/reactions.yaml").write_text(REACTOR_REACTIONS)
+    (root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    ws = Workspace(root)
+    process, found = load(root)
+    assert process is not None, [f.format() for f in found]
+    run(ws, process, "design", write=True)
+    return ws
+
+
+def test_a_filter_dryer_after_a_batch_step_in_one_vessel_takes_its_vessel(tmp_path):
+    """units: [RX (batch), F1, D1]: the vessel is sized from RX's batch (ADR 0057), and the dry
+    and filter times take its heated area and plate."""
+    times = {}
+    for area in (4.0, 8.0):
+        result = recipe_report(_reactor_plant(tmp_path / str(area), area).root)
+        assert {f.rule for f in result.findings} == {"cheme.recipe-basis"}, [
+            f.format() for f in result.findings
+        ]
+        (vessel,) = result.vessels
+        assert vessel.unit == "RX+F1+D1"
+        times[area] = {s.operation: s.end - s.start for s in result.steps}
+        assert {s.basis for s in result.steps if s.kind in ("dry", "filter")} == {"calculated"}
+    # the drying time goes with one over the heated area; the filter's plate is the vessel's
+    assert times[4.0]["dry"] == pytest.approx(2 * times[8.0]["dry"], rel=1e-9)
+    assert times[4.0]["filter"] == pytest.approx(times[8.0]["filter"], rel=1e-9)

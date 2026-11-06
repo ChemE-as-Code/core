@@ -667,6 +667,20 @@ def test_a_template_component_no_inlet_carries_is_not_the_stills(tmp_path):
     assert any("W lack a vapour_pressure" in m for m in messages), messages
 
 
+def test_an_assumed_ideal_liquid_is_not_sourced(tmp_path):
+    # Raoult's law with sourced vapour pressures is still an ideal liquid: a pair outside it
+    # (an azeotrope) declares the volatility assumed, and the basis says so.
+    flowsheet = FLOWSHEET.replace(
+        "volatility: {model: raoult, provenance: given, source: NIST WebBook}",
+        'volatility: {model: raoult, provenance: assumed, source: "ideal liquid: illustrative"}',
+    )
+    assert flowsheet != FLOWSHEET
+    ws = _plant(tmp_path, flowsheet)
+    process, _ = load(ws.root)
+    (basis,) = [b for b in model_bases(process) if b.id == "S"]
+    assert not basis.sourced and "ideal liquid (volatility assumed)" in basis.detail
+
+
 def _stale(ws):
     process, _ = load(ws.root)
     return [f.ids for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
@@ -872,10 +886,66 @@ def test_the_solvent_swap_example_is_current():
     assert not [f.format() for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
     (unit,) = still_report(example).units
     sol = unit["solution"]
-    assert unit["model"] == "solvent swap" and unit["sourced"] and not unit["differences"]
+    # methanol-toluene has a minimum azeotrope: the ideal liquid is assumed, not sourced
+    assert unit["model"] == "solvent swap" and not unit["sourced"] and not unit["differences"]
     assert sol["residue"]["mole_fractions"]["MEOH"] == pytest.approx(0.005, rel=1e-6)
     assert not sol["notes"]
     recipe = recipe_report(example)
     swap = next(s for s in recipe.steps if s.operation == "swap")
     assert swap.basis == "calculated"
     assert swap.end - swap.start == pytest.approx(sol["boilup_time_h"], rel=1e-9)
+
+
+def test_a_still_is_not_also_a_dryer(tmp_path):
+    """A dryer: beside a still: (separate mixins, so the schema takes both) is an error, not a
+    still in propagate and a dryer in process crystallizers."""
+    both = FLOWSHEET.replace(
+        "      outlets: {distillate: top, residue: bottom}\n      provenance: assumed\n",
+        "      outlets: {distillate: top, residue: bottom}\n      provenance: assumed\n"
+        "    dryer:\n      volatiles: [A]\n"
+        "      residual_moisture: {value: 0.01, basis: mass_fraction, provenance: assumed}\n"
+        "      temperature: 330\n      outlets: {product: bottom, vapour: top}\n",
+    )
+    assert "dryer:" in both
+    messages = [
+        f.message for f in _findings(_plant(tmp_path, flowsheet=both)) if f.level == "error"
+    ]
+    assert "S: a still is not also a dryer" in messages
+
+
+def test_the_adrs_example_of_one_stages_purity():
+    """ADR 0055: at alpha 4 from x0 = 0.5 the distillate's mean mole fraction at 84 % and 99 %
+    recovery of the light key, from solve_still, is what the ADR quotes (two figures)."""
+    from pathlib import Path
+
+    adr = (
+        Path(__file__).resolve().parents[1] / "docs/adr/0055-batch-still-and-solvent-swap.md"
+    ).read_text()
+    text = " ".join(adr.split())
+    quoted = []
+    for recovery in (0.84, 0.99):
+        lo, hi = 1e-9, 0.5  # the residue's x_A for that recovery (closed form)
+        for _ in range(200):
+            x = (lo + hi) / 2
+            w = 100 / math.exp(_rayleigh(0.5, x, alpha=4.0))
+            lo, hi = (x, hi) if (50 - x * w) / 50 > recovery else (lo, x)
+        result = solve_still(
+            _still(
+                volatility={
+                    "model": "constant",
+                    "alpha": {"A": 4.0, "B": 1.0},
+                    "provenance": "assumed",
+                },
+                end={"residue": {"key": "A", "mole_fraction": x}},
+            ),
+            {"A": 50, "B": 50},
+            None,
+            {},
+            None,
+        )
+        (cut,) = result.cuts
+        assert cut.moles["A"] / 50 == pytest.approx(recovery, rel=1e-6)
+        quoted.append(f"{cut.moles['A'] / sum(cut.moles.values()):.2f}")
+    assert quoted == ["0.70", "0.59"]
+    assert f"distillate of {quoted[0]} mole fraction at 84 %" in text
+    assert f"{quoted[1]} at 99 %" in text

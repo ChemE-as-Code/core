@@ -1,0 +1,6 @@
+name: process-purge-loop
+description: A loop reactor with a recycle split, converged by cheme process propagate at a tear stream (ADR 0060)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

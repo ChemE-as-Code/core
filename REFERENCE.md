@@ -116,10 +116,9 @@ cheme check                                   # engineering-step gates (checks/c
 cheme cause-effect                            # build/cause-effect.html + .csv
 cheme process build                           # BFD and PFD from process/materials.yaml + flowsheet.yaml
 cheme process streams [--md]                  # stream table with provenance, block balances
-cheme process propagate --fill                # compositions/flows through compressors, mixers, splitters, reactors
+cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors; recycles at tears:
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
-cheme process crystallizers                   # per crystallizer/filter: basis, crystals, recovery, dry solid and moisture
 cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
@@ -910,8 +909,9 @@ Their source is two YAML files, schema `cheme/process/v1`:
   `normal_conditions`), cases, the balance tolerance, `feeds` and `products` (DEXPI `Source` and
   `Sink`), `blocks` and `steps` with explicit `ports` (in/out, material/energy/information),
   `streams` from port to port with a per-case `state` (pressure, temperature, flow, duty,
-  composition, phase), `links` to the lists and sheets, and `layout.bfd` / `layout.pfd` pins.
-  Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
+  composition, phase), `links` to the lists and sheets, `layout.bfd` / `layout.pfd` pins, and
+  optionally `tears` and `convergence` (the recycle loops `process propagate` converges, ADR
+  0060). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
   A value or composition may give an `uncertainty` (the LCA's shape, e.g. `{gsd2: 1.2}` or
   `{distribution: triangular, low: 0.9, high: 1.1}`); `cheme assess lca` samples a feed's or
   product's flow with it, and no calculated value's fingerprint includes it. An optional
@@ -1039,7 +1039,31 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reaction with `kind: phase-change` (or one component into one other of the same formula, one
   of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
   reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;
-  JSON `phase_changes`), a step with both is screened on its reactions alone (ADR 0056).
+  JSON `phase_changes`), a step with both takes dT_ad and the MTT from its reactions alone, a
+  semi-batch's MTSR from its whole model, the phase changes included, with a note (ADR 0056).
+  The default MTT is the lowest boiling point of what boils in the liquid at the reactor's
+  pressure (ADR 0058): a batch's vent components, a dosed gas (a dose with `absorbed`) and
+  dissolved gases (under 5 % of the liquid, boiling below `T_p`) are left out with a note
+  (JSON `mtt_left_out`; with nothing else left the MTT needs `hazard.mtt`; a larger share
+  boiling below `T_p`, a solvent at reflux, sets the MTT at or below `T_p`, with a note); from 90 to 110 kPa(a) the normal boiling point,
+  else Clausius-Clapeyron with the component's `heat_of_vaporization` (without it a note, and
+  above atmospheric no MTT where that component could set it). `hazard.reactions: [ids]` names
+  the reactions whose heat sets dT_ad and the MTSR (default: every reaction, the largest); with
+  more than one reaction the output gives each one's dT_ad and MTSR (an endothermic one's MTSR
+  is `T_p`; JSON `per_reaction`,
+  `counted_reactions`, `counted_basis`; `cheme.reactor-hazard-reactions`, warning: a name the
+  step does not hold). A semi-batch gives its MTSR profile, time, `X_ac`, temperature and
+  MTSR at about 21 moments and the worst (JSON `mtsr_profile`, a text line). A vented batch or
+  semi-batch gives its gas release at the MTSR (JSON `gas_release`): the vent components forming
+  at the rate laws at the MTSR, the larger with the worst moment's content and with the content
+  once the reaction setting the MTSR ran to completion (gas from its products; `rate_from`; a
+  longer chain is not covered), in kmol/s and m3/h at the MTSR and the vessel's pressure, per
+  batch of `process/recipe.yaml` (else per hour of flows), and the most gas one reaction forms
+  run to completion (`formed_by`, `formed_from`: of the counted reactions from the worst
+  moment's content, or of a reaction consuming a product of the one setting the MTSR);
+  `cheme.reactor-hazard-vent`
+  warns without `hazard.vent_capacity` (m3/h) or above it, and is info within it. The pressure
+  of a blocked vent is not screened.
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1062,13 +1086,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **Batch recipe**: **`cheme process recipe [--case C] [--svg FILE] [--json]`** reads
   `process/recipe.yaml` (`cheme/recipe/v1`, ADR 0051): the `batch_size` (kg, t or m3 of one
   stream per batch), the `hours_per_year`, and the `unit_procedures` (ISA-88 names: a unit, its
-  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, filter,
-  dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a batch or
-  semi-batch step's model; for dry and filter, `from:` a dryer or a filter with `filtration:`,
-  ADR 0057; a unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's occupancy, the cycle time (the bottleneck), the
-  distil, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
-  batch or semi-batch step's model, for distil `from:` a still step's boil-up time). It gives each unit's occupancy, the cycle time (the bottleneck), the
-  batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
+  `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, distil,
+  filter, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
+  batch or semi-batch step's model; for distil, `from:` a still step's boil-up time (ADR 0055);
+  for dry and filter, `from:` a dryer or a filter with `filtration:` (ADR 0057); a unit
+  procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's
+  occupancy, the cycle time (the bottleneck), the batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
   `-duration` and `-basis` (warning: the flowsheet's rate of that stream differs from batch size
@@ -1078,7 +1101,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   sizes) and check its `jacket` (U, area or wetted shell, coolant and heating temperatures)
   against the model's peak duty (`cheme.recipe-jacket`, `-vessel`); a `heat` or `cool`
   operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
-  writes a batch reactor's volume and peak duty from it (ADR 0052).
+  writes a batch reactor's volume and peak duty from it (ADR 0052). A `unit:` that is a block,
+  or `units:`, holding one batch or semi-batch step sizes the vessel from that step (ADR 0057;
+  1.7.0 gave `cheme.recipe-reference` for a block); several such steps are
+  `cheme.recipe-reference` (name one as `unit:`). A filter or dryer in the same vessel takes
+  its plate and heated area (`vessel.heated_area`, else the jacket's area, else the shell and
+  bottom the dryer's wet cake wets) from it.
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1099,8 +1127,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `heat_of_reaction` of its reactions with the dosed gas as a gas. `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
-  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (a note gives its
-  peak rate). `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
+  `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
+  components, a dosed gas and dissolved gases do not set it, ADR 0058; a note gives the vent's
+  peak rate) and reports the gas release at the MTSR against `hazard.vent_capacity`. `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
   more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
   a vent stream whose template lacks a vent component or a passing dose's component, (warning)
   one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
@@ -1205,9 +1234,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     time and the energy per batch scale with it; a 1/h boil-up does not.
   - `process propagate --fill` writes the cuts and the residue. A recipe `distil` operation
     takes the boil-up time `from:` the still.
-  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive),
-    the charge, feed, cuts and residue (per batch and per hour, mole fractions), the boil-up
-    time, the mean and peak duty, the energy per batch and the still's temperatures
+  - **`cheme process stills [--case C] [--json]`** reports the basis (`rayleigh`, predictive;
+    sourced when the relative volatilities, or for Raoult's law the volatility itself and every
+    volatile component's vapour pressure, are `given` with a source: an ideal liquid declared
+    `assumed`, as for a pair with an azeotrope, is not sourced), the charge, feed, cuts and
+    residue (per batch and per hour, mole fractions), the boil-up time, the mean and peak duty,
+    the energy per batch and the still's temperatures
     (`cheme.process-still-unsolved`, `-outlet`, `-note`).
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
@@ -1222,6 +1254,39 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     sensible heat and losses, constant level by volume. `process simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
     and the constant-level swap's closed form (`tests/test_batch_still.py`).
+- **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal
+  `reactor: batch` or `semibatch`, a `still:`, a `crystallizer:` with `energy:` and a
+  conversion step (`reactions:` with conversions or a `selectivity:`) give the heat they
+  exchange per hour of the flowsheet's flows (the year average), and `process propagate
+  --fill` writes it as the `duty` of their energy stream, `calculated` with a fingerprint.
+  - The heat: a batch's is minus the heat its reactions release over the batch plus each dose
+    warmed to the batch's temperature (and a dosed gas passing to the vent; the charge's
+    heat-up is the recipe's, not included); a still's the latent heat of its distillate, `sum
+    dHvap_i D_i`; a crystallizer's its lumped duty; a conversion step's (batch or continuous)
+    `sum xi dHr` at the heats' own `heat_of_reaction.temperature` with every inlet brought to
+    it and every outlet from it (`liquid_heat_capacity`, or the ideal-gas enthalpy for a stream
+    said to be vapour), or `H(out) - H(in)` of ideal gases for a gas-phase step (no stream said
+    to be liquid or two-phase, no liquid or mixed reaction) whose components all have
+    `ideal_gas` data; less the work `W` its other energy streams bring in (their duties, signed
+    by direction: an electrolyser's DC power, a pump's work; one without a duty leaves it
+    unknown). Heats at different temperatures, or a component vapour on one side of the step
+    and liquid on the other, leave it unknown; without the data nothing.
+  - The stream: the one at the node's `energy_port: PORT`, else its one heat stream (an energy
+    stream to or from a steam, hot-oil, fired-heat, cooling-water, air-cooling or refrigerant
+    utility; electricity, fuel and terminals without `utility:` are not heat, and a stream to or
+    from another block or step is heat only where `energy_port` names it). A duty is positive in its stream's direction: a stream out of the step carries
+    the heat removed. A model whose heat flows against the stream is a warning, never a
+    negative duty. A flow-style stream (`{id: Q1, ...}` on one line) is written in place.
+  - A given or assumed duty is never overwritten: it is compared, and one beyond the
+    flowsheet's relative tolerance is `cheme.process-duty` (warning, naming both values) in
+    `process propagate --fill` and `--check` and in `validate`; two models giving one stream
+    different duties are a warning naming both (neither written); several heat streams,
+    missing data or an adiabatic batch are `cheme.process-duty` (info, propagate only). `validate` reports
+    `cheme.process-energy-port`: a port that is no energy port of the node (error), or one on
+    a node no model gives a duty (warning). `process reactors` shows a batch's or conversion
+    step's duty, its terms and its stream where the ideal-gas duty is `?`, `process stills`
+    the year-average duty. A dryer keeps its own `energy.port` check
+    (`cheme.process-dryer-duty`).
 - **Reaction evidence**: `process/reaction-evidence.yaml` (schema `cheme/reaction-evidence/v1`,
   `cheme schema reaction-evidence`, skills `reaction-evidence-search` and `route-selection`)
   records the searches, sources, observations, candidate routes, conflicts and the model basis
@@ -1341,14 +1406,55 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   split by `split: {outlet port: fraction}` (else the one missing outlet flow is the mass
   balance remainder), and a conversion reactor (a step naming `reactions:`, each with a
   conversion) converts its fraction of each key component's inlet flow; a crystallizer or a
-  filter (`crystallizer:`, `solid_separation:`, below) fills its outlets. Other separators, and
-  reactors without conversions, are only checked, never solved. Values are
+  filter (`crystallizer:`, `solid_separation:`, below) fills its outlets; a batch,
+  semi-batch, still, crystallizer or conversion step writes its duty on its energy stream
+  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`). Other
+  separators, and reactors without conversions, are only checked, never solved. Values are
   `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
   are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
   prints the run as an adapter result (`cheme/adapter-result/v1`, `cheme schema
-  adapter-result`): `converged` when every node is solved, else `not-converged` with the
-  unsolved nodes in `messages` and `units`; `iterations` the sweeps through the flowsheet; per
-  stream the derived values and those written (`filled`). It writes no file of its own.
+  adapter-result`): `converged` when every node is solved (and every torn loop converged), else
+  `not-converged` with the unsolved nodes in `messages` and `units`; `iterations` the sweeps
+  through the flowsheet (with tears: the loop's iterations); per stream the derived values and
+  those written (`filled`). It writes no file of its own.
+  - **Recycles** (ADR 0060). A loop is torn at a stream named in the flowsheet's `tears:`, one
+    per loop, with an optional first guess (default an empty stream):
+
+    ```yaml
+    tears:
+      - stream: S11
+        initial: {flow: 140, unit: kg/h, basis: mass_fraction, composition: {H2O: 0.6, NAOH: 0.4}}
+    convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel: 1.0e-5}}
+    ```
+
+    Propagate sets each tear to its guess, sweeps the flowsheet, and compares what the loop
+    gives back with the guess, per component in kg/h. It repeats by successive substitution
+    (`method: substitution`, optional `damping` below 1) or Wegstein's method (the default; q
+    per component bounded to [-5, 0]) until every component and the total are within
+    `convergence.tolerance` (default: the flowsheet's), at most `max_iterations` times (default
+    100). The iterations round nothing; the values written come from one more sweep from the
+    converged guess, rounded to six digits as every propagated value. A tear
+    value is `calculated`, with source `recycle <node> from <inlets> (tear, <method>)`, and is
+    fingerprinted on the loop's inputs, not on the iterate. The iterations always start from
+    `initial`, so a converged plant derives the same values again and is not stale. A given or
+    assumed flow or composition of a tear stays fixed (a design specification), and only the
+    other is iterated. `cheme.process-recycle` is info for a converged loop (iterations, worst
+    residual against its tolerance). It is a warning for a loop that does not converge (with
+    its residual), or that does not close because the guess leaves the tear's source without
+    values: an empty guess can leave a splitter remainder negative, or a still, reactor or
+    filter with nothing to work on (give a closer `initial`). An open tear never moves, so the
+    iterations stop as soon as the other tears converge. Nothing that depends on an unconverged
+    loop is written, and `--json` is then `not-converged`; a tear left out of the iterations
+    (below) does not change the status. `cheme validate` reports a tear that cannot be iterated
+    as `cheme.process-tear`: an unknown, energy, feed or product stream, one named twice, or a
+    guess in undeclared components or flow units or whose fractions do not sum to 1 (within
+    0.001) are errors; a tear whose flow and composition are both given is a warning. The
+    tolerance applies to the residual: a loop whose gain is near 1 stops up to
+    tolerance / (1 - gain) from its fixed point, so tighten it there. Tear each loop once: two
+    tears in one loop converge, but only as fast as plain substitution (each tear's slope is 0
+    for Wegstein). Tears are declared, never chosen.
+    `examples/process-purge-loop` is a loop reactor with a recycle split whose steady state is
+    analytic (`tests/test_recycle.py`).
 - **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
   vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
   process's property package (`property_method.package` in `materials.yaml`, else the package

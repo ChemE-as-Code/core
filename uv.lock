@@ -442,7 +442,7 @@ wheels = [
 
 [[package]]
 name = "cheme-as-code"
-version = "1.7.0"
+version = "1.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "lxml" },

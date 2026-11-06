@@ -93,7 +93,10 @@ cheme-as-code takes option 3. It is implemented natively; no PharmaPy code is us
     changes. Instead it reports `cheme.reactor-hazard-phase-change` (info, stable id
     `process/flowsheet.yaml#reactor-hazard-phase-change:<step>`) and lists the step under
     `phase_changes` in the JSON.
-  - A step with both kinds is screened on its chemical reactions alone, with a note.
+  - A step with both kinds takes its `dT_ad` and MTT from its chemical reactions alone, with a
+    note. A semi-batch's MTSR is the cooling-failure temperature of its model, which integrates
+    every reaction of the step: the phase changes' kinetics and heat count in it, and a second
+    note says so.
 
 ## Consequences
 
