@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 1.9.0 (2026-11-06)
+
+Minor release: screening, energy and recycles for batch plants. A semi-batch's thermal screening
+takes its default MTT from what boils in the liquid, at the vessel's pressure (vent gases, dosed
+gases and minor dissolved gases left out); `hazard.reactions` names the reactions that set the
+MTSR; the screening reports each reaction's potential, the MTSR over the batch and the gas a vented
+reactor releases at the MTSR against `hazard.vent_capacity` (ADR 0058). Isothermal batch and
+semi-batch reactors, stills, crystallizers with `energy:` and conversion steps write the
+year-average duty of their energy stream (`energy_port:`), and a hand-typed duty that differs
+from the model is a `cheme.process-duty` warning (ADR 0059). `cheme process propagate` converges
+recycles at declared `tears:` by Wegstein or damped substitution (ADR 0060). Plants that use none
+of them solve as in 1.8.0, apart from the model duties: `propagate --check` and `validate` newly
+warn where a typed duty differs from the model, and a vented batch's `reactor-hazards` exits 1
+until it states `hazard.vent_capacity`. Every BFD/PFD needs `cheme process build` once (the
+process generator's code changed).
 
 ### Added
 
