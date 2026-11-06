@@ -28,9 +28,15 @@
   - `examples/process-batch-rectification`: crude acetyl chloride through 10 stages at constant
     distillate, a 99.8 wt% product cut at 99.4 % recovery, an off-cut and the residue, with the
     boil-up time the recipe takes and the reboiler's and condenser's duties.
+  - Without a named key the column takes its keys at each point (the most volatile component
+    above 1 % of the still's vapour and the next less volatile one), and a lighter trace takes
+    at most `(R + 1)` times its share of the still's vapour: a main cut after a forerun is
+    predicted on its own pair.
   - Qualified against Rayleigh (one stage), the Fenske limit, Underwood's binary closed form,
-    the constant-distillate balance and a rigorous plate-to-plate binary column, which the
-    shortcut never exceeds in purity (`tests/test_batch_rectification.py`).
+    the constant-distillate balance and rigorous plate-to-plate binary and ternary columns
+    (a forerun then a main cut), which the shortcut never exceeds in purity
+    (`tests/test_batch_rectification.py`). Diwekar's published examples and a DWSIM bound are
+    deferred (#195).
 - Unchanged: a still without `column:`, `purity` or `condenser_port` solves, reports and
   fingerprints as in 1.9.0 (the library's six stills on scratch copies: `process stills
   --json`, `propagate --check` and `validate` print the same). Every BFD/PFD needs `cheme

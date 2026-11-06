@@ -9,6 +9,7 @@ import math
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -214,6 +215,204 @@ def test_a_rigorous_binary_column_bounds_the_shortcut(stages, reflux):
     assert purity > 0.94 * rigorous_purity
 
 
+def _rigorous_top(xb, alpha, reflux, stages):
+    """The distillate of a multicomponent column of *stages* equilibrium stages (the still the
+    last), total condenser, constant molar overflow, whose still holds *xb*: stepped down from
+    the top, the distillate found by Newton on the still's composition (log ratios)."""
+    alpha, xb = np.array(alpha, float), np.maximum(np.array(xb, float), 1e-300)
+
+    def still(xd):
+        y = xd
+        for j in range(stages):
+            x = y / alpha
+            x /= x.sum()
+            if j == stages - 1:
+                return x
+            y = (reflux * x + xd) / (reflux + 1)
+
+    def residual(u):
+        xd = np.exp(u - u.max())
+        x = still(xd / xd.sum())
+        return np.log(x[:-1] / x[-1]) - np.log(xb[:-1] / xb[-1])
+
+    u = np.log(alpha ** (0.7 * stages) * xb)
+    for _ in range(200):
+        r = residual(u)
+        if np.max(np.abs(r)) < 1e-12:
+            break
+        jac = np.empty((len(u) - 1, len(u) - 1))
+        for i in range(len(u) - 1):
+            du = np.zeros(len(u))
+            du[i] = 1e-7
+            jac[:, i] = (residual(u + du) - r) / 1e-7
+        step = np.linalg.solve(jac, -r)
+        lam = 1.0
+        while lam > 1e-6:
+            trial = u.copy()
+            trial[:-1] += lam * step
+            if np.max(np.abs(residual(trial))) < np.max(np.abs(r)):
+                break
+            lam /= 2
+        u = trial
+    xd = np.exp(u - u.max())
+    return xd / xd.sum()
+
+
+TERNARY = {"A": 4.0, "B": 2.0, "C": 1.0}
+
+
+def _ternary(column, **kw):
+    return _still(
+        column,
+        volatility={"model": "constant", "alpha": TERNARY, "provenance": "assumed"},
+        **kw,
+    )
+
+
+@pytest.mark.parametrize("xa", [3e-3, 1e-3, 3e-4, 1e-4, 0.0])
+def test_a_rigorous_ternary_column_bounds_the_shortcut_once_the_light_end_is_traces(xa):
+    """Once a forerun has taken A down to traces, the column separates B from C (core#193):
+    the shortcut's keys move to B/C, and A takes no more of the distillate than the still's
+    vapour brings up. Against plate to plate (alpha 4/2/1, 10 stages, R 3) the distillate's B
+    is never purer and within 0.01 (0.0005 at 1e-4 of A, where A/B keys gave 0.916)."""
+    spec = _ternary({"stages": 10, "reflux": "constant", "ratio": 3})
+    names = ["A", "B", "C"]
+    phase = _Phase(names, [True] * 3, "constant", list(TERNARY.values()), [None] * 3, None, [0] * 3)
+    xb = [xa, 0.7 * (1 - xa), 0.3 * (1 - xa)]
+    column = _Column(spec.column, phase, names, [5.0, 65.0, 30.0])
+    top = column.top([100 * v for v in xb])
+    rigorous = _rigorous_top(xb, list(TERNARY.values()), 3.0, 10)
+    assert top.distillate[1] <= rigorous[1] + 5e-4
+    assert rigorous[1] - top.distillate[1] < 0.01
+    assert top.distillate[2] == pytest.approx(rigorous[2], abs=1e-3)
+    if xa > 0:
+        # the column's balance: no more A than the still's vapour brings up
+        vapour = hengstebeck(list(TERNARY.values()), xb, 1.0)
+        assert top.distillate[0] <= 4 * vapour[0] * (1 + 1e-12)
+        assert top.distillate[0] >= rigorous[0]
+
+
+def test_a_forerun_then_a_main_cut_against_a_rigorous_ternary_batch():
+    """The standard campaign at constant reflux: a forerun until A is 0.1 mol% of the still,
+    then a main cut of B until B is 30 mol%. The main cut's B against a batch integrated on the
+    rigorous column (RK4 over the moles distilled): never purer, within 0.005 (B/A keys for the
+    whole batch gave 0.746 against 0.947)."""
+    spec = _ternary(
+        {"stages": 10, "reflux": "constant", "ratio": 3},
+        end=None,
+        cuts=[
+            {"outlet": "fore", "end": {"residue": {"key": "A", "mole_fraction": 1e-3}}},
+            {"outlet": "main", "end": {"residue": {"key": "B", "mole_fraction": 0.3}}},
+        ],
+        outlets={"residue": "bottom"},
+    )
+    result = solve_still(spec, {"A": 5.0, "B": 65.0, "C": 30.0}, None, {}, None)
+    fore, main = result.cuts
+    short = main.moles["B"] / sum(main.moles.values())
+    assert any("light key moved from A to B" in n for n in result.notes)
+
+    alpha = list(TERNARY.values())
+
+    def xd(n):
+        return _rigorous_top(n / n.sum(), alpha, 3.0, 10)
+
+    n, h, start, cuts = np.array([5.0, 65.0, 30.0]), 0.05, np.array([5.0, 65.0, 30.0]), []
+    while len(cuts) < 2:
+        x = n / n.sum()
+        if (not cuts and x[0] <= 1e-3) or (cuts and x[1] <= 0.3):
+            cuts.append(start - n)
+            start = n.copy()
+            continue
+        k1 = xd(n)
+        k2 = xd(n - h / 2 * k1)
+        k3 = xd(n - h / 2 * k2)
+        k4 = xd(n - h * k3)
+        n = n - h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+    rigorous = cuts[1][1] / cuts[1].sum()
+    assert short <= rigorous + 1e-3
+    assert rigorous - short < 0.005
+    # the forerun's C is overpredicted (A/B keys: Hengstebeck's one index for all), never under
+    assert fore.moles["C"] / sum(fore.moles.values()) > cuts[0][2] / cuts[0].sum()
+
+
+def test_gilliland_just_above_the_minimum_reflux_is_infinite_stages_not_a_division():
+    """Molokanov's Y is 1 to double precision for X below about 5e-6 (core#193): the stages
+    are then infinite (as at the minimum), not a ZeroDivisionError."""
+    assert gilliland_stages(3.0, 3.0 - 5e-6 * 4, 2.0) > 1e10
+    assert gilliland_stages(3.0, 3.0 - 1e-9, 2.0) == math.inf
+    # a still stripped deep: the Fenske index's bisection lands on such points
+    spec = _still(
+        {"stages": 10, "reflux": "constant", "ratio": 3},
+        end={"residue": {"key": "B", "mole_fraction": 0.9995}},
+    )
+    result = solve_still(spec, CHARGE, None, {}, None)
+    w = sum(result.residue.values())
+    assert result.residue["B"] / w == pytest.approx(0.9995, rel=1e-9)
+    ternary = _ternary(
+        {"stages": 10, "reflux": "constant", "ratio": 3},
+        end={"residue": {"key": "A", "mole_fraction": 1e-4}},
+    )
+    result = solve_still(ternary, {"A": 5.0, "B": 65.0, "C": 30.0}, None, {}, None)
+    assert result.residue["A"] / sum(result.residue.values()) == pytest.approx(1e-4, rel=1e-6)
+
+
+def test_a_constant_distillate_not_held_anywhere_is_noted_with_where():
+    """The note that the column reached its maximum reflux looks at every point, not only the
+    last (core#193): a forerun at the maximum whose reflux then falls again is noted, and so is
+    a distillate key that is not the most volatile."""
+    spec = _ternary(
+        {
+            "stages": 10,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "B", "mole_fraction": 0.95},
+            "maximum_ratio": 10,
+        },
+        end=None,
+        cuts=[
+            {"outlet": "fore", "end": {"distilled": 0.05}},
+            {"outlet": "prod", "end": {"residue": {"key": "B", "mole_fraction": 0.3}}},
+        ],
+        outlets={"residue": "bottom"},
+    )
+    result = solve_still(spec, {"A": 2.0, "B": 90.0, "C": 8.0}, None, {}, None)
+    fore = result.cuts[0]
+    assert fore.moles["B"] / sum(fore.moles.values()) < 0.9
+    assert result.column["reflux_ratio"][1] < 10
+    (note,) = [n for n in result.notes if "maximum reflux ratio 10" in n]
+    assert "from 0 % to " in note and "of the charge distilled" in note
+    assert any("distillate key B is not the most volatile" in n for n in result.notes)
+    # an A/B binary holding B: the spec is not met at the start, the reflux ends at 0
+    binary = _still(
+        {
+            "stages": 10,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "B", "mole_fraction": 0.6},
+            "maximum_ratio": 5,
+        },
+        end={"residue": {"key": "A", "mole_fraction": 0.1}},
+    )
+    result = solve_still(binary, CHARGE, None, {}, None)
+    assert result.column["reflux_ratio"] == [5.0, 0.0]
+    assert any("maximum reflux ratio 5" in n for n in result.notes)
+    assert any("distillate key B is not the most volatile" in n for n in result.notes)
+    # the most volatile key, held throughout: no notes
+    held = solve_still(
+        _still(
+            {
+                "stages": 8,
+                "reflux": "constant_distillate",
+                "distillate": {"key": "A", "mole_fraction": 0.95},
+                "maximum_ratio": 1000,
+            }
+        ),
+        CHARGE,
+        None,
+        {},
+        None,
+    )
+    assert not [n for n in held.notes if "maximum reflux" in n or "most volatile" in n]
+
+
 def test_a_purity_end_collects_a_cut_to_its_specification():
     spec = _still(
         {"stages": 8, "reflux": "constant", "ratio": 4},
@@ -368,7 +567,7 @@ def test_the_batch_rectification_example_is_current():
     assert unit["model"] == "batch rectification" and unit["basis"] == "batch-shortcut"
     assert unit["predictive"] and not unit["sourced"] and not unit["differences"]
     product, offcut = sol["cuts"]
-    # the product reaches its 99.5 wt% specification, with a calculated recovery
+    # the product reaches its 99.8 wt% specification, with a calculated recovery
     assert product["mass_fractions"]["ACCL"] == pytest.approx(0.998, rel=1e-9)
     assert product["recovery"]["ACCL"] > 0.99
     assert sol["residue"]["mole_fractions"]["ACCL"] == pytest.approx(0.05, rel=1e-6)
@@ -450,6 +649,34 @@ def test_the_condenser_port_and_the_default_streams(tmp_path):
     messages = [f.message for f in _findings(ws) if f.level == "error"]
     assert "ST1: the column's distillate NOPE is not a component" in messages
     assert "ST1: the column's heavy_key H3PO3 is non-volatile" in messages
+
+
+def test_the_purity_key_and_a_condenser_port_that_is_the_energy_port(tmp_path):
+    # a purity end whose key is no component
+    ws = _copy(
+        tmp_path / "a",
+        lambda t: t.replace(
+            "{purity: {key: ACCL, fraction: 0.998}", "{purity: {key: NOPE, fraction: 0.998}"
+        ),
+    )
+    found = [f for f in _findings(ws) if f.level == "error"]
+    (purity,) = [f for f in found if "purity key" in f.message]
+    assert purity.message == "ST1: the end's purity key NOPE is not a component"
+    assert purity.hint and purity.file
+    # condenser_port and energy_port name the same energy port out
+    ws = _copy(
+        tmp_path / "b",
+        lambda t: t.replace(
+            "    title: Still with its column\n",
+            "    title: Still with its column\n    energy_port: condenser\n",
+        ).replace(
+            "      outlets: {residue: bottom}\n",
+            "      outlets: {residue: bottom}\n      condenser_port: condenser\n",
+        ),
+    )
+    messages = [f.message for f in _findings(ws) if f.level == "error"]
+    assert "ST1: condenser_port and energy_port are both condenser" in messages
+    assert not any("no energy port out of it" in m for m in messages)
 
 
 def test_a_rayleigh_still_with_a_condenser_port_writes_its_condenser(tmp_path):

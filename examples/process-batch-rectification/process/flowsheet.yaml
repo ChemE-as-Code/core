@@ -2,10 +2,10 @@
 # one-stage still gave only 97.3 wt%). The crude (S1: acetyl chloride with 2.9 wt% PCl3, a
 # little acetic acid and phosphorous acid) is charged to the still ST1 at 101.325 kPa(a), which
 # carries a column of 10 theoretical stages (the still included). The column holds its
-# distillate at 0.998 mole fraction acetyl chloride by raising the reflux ratio, up to 4; past
+# distillate at 0.999 mole fraction acetyl chloride by raising the reflux ratio, up to 4; past
 # it the reflux stays at 4 and the distillate's purity falls. The product cut S2 is collected
-# until its mean purity falls to the 99.5 wt% specification, the off-cut S3 until acetyl
-# chloride is 30 mol% of the residue, which is left (S4).
+# until its mean purity falls to the 99.8 wt% specification, the off-cut S3 until acetyl
+# chloride is 5 mol% of the residue, which is left (S4).
 # The flows are the year averages of the recipe (process/recipe.yaml, `cheme process recipe`:
 # a batch of 1530 kg). `cheme process propagate --fill` integrates the still and its column
 # (Diwekar's batch shortcut on Fenske-Underwood-Gilliland, Raoult's law; core ADR 0061) and
@@ -31,7 +31,7 @@ feeds:
     utility: {kind: steam, level: LP}
     ports: [{id: q, direction: out, kind: energy}]
 products:
-  - {id: PRODUCT, title: Acetyl chloride (99.5 wt%), ports: [{id: in, direction: in}]}
+  - {id: PRODUCT, title: Acetyl chloride (99.8 wt%), ports: [{id: in, direction: in}]}
   - {id: SLOP, title: Off-cut to the next batch's crude, ports: [{id: in, direction: in}]}
   - {id: RESIDUE, title: Still residue to incineration, ports: [{id: in, direction: in}]}
   - id: CW

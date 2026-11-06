@@ -63,10 +63,23 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
   - Gilliland in Molokanov's form between them: at constant reflux, C1 such that Gilliland's
     stages equal the column's (bisection: Gilliland's stages rise with C1); at constant
     distillate, the C1 that gives the key's mole fraction and the reflux Gilliland needs for it.
+    Just above the minimum reflux (X below about 5e-6) Molokanov's `1 - Y` underflows: the
+    stages are then infinite, as at the minimum.
   - C1 is never below 1: the distillate is never leaner than the still's own vapour (Gilliland
     underpredicts at low reflux). One stage is the still itself: C1 = 1 at any reflux.
-  - The heavy key defaults to the next less volatile component of the charge after the
-    distillate's key (else after the most volatile); `heavy_key` overrides it.
+  - The keys. A named `heavy_key` (with the next more volatile component of the charge for
+    the light key), or the distillate's key with the next less volatile component of the
+    charge, are fixed for the batch. Without either (`reflux: constant`) the keys are taken at
+    each point: the light key is the most volatile component that is at least 1 % of the
+    still's vapour (`TRACE`; never the least volatile, so a binary keeps its pair), and the
+    heavy key is the next less volatile one. After a forerun has taken the lightest component
+    down to traces, the column separates the next pair; a note says where the light key moved.
+  - A component more volatile than the light key takes no more of the distillate than the
+    still's vapour brings up: `x_D,i <= (R + 1) y_i`. This is the column's balance, `D x_D,i =
+    V y_i - L x_i` with `L x_i >= 0`. The other components share the rest as Hengstebeck-Geddes
+    gives them. One index C1 for all components would gather a light trace at the top, as at
+    total reflux: at x_A = 1e-3 (alpha 4/2/1, 10 stages, R 3) it gives 0.139 of A in the
+    distillate, where the rigorous column gives 0.006 and the bound 0.009.
   - The relative volatilities are the K-values `P_i(T)/P` at the still's bubble point (raoult),
     or the constant ones, for the whole column.
   - The still's balance is ADR 0055's with the distillate for the vapour, `dN_i/dD = -x_D,i`,
@@ -118,7 +131,22 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
   0.2 is 0.743 against 0.784 (5 stages, R 2), 0.921 against 0.946 (8, R 4), 0.993 against 0.995
   (10, R 10) and 0.951 against 0.954 (20, R 3): Gilliland's correlation is conservative, most at
   few stages and low reflux. A DWSIM column at the same reflux would be the same bound for a
-  non-ideal pair; it was not run (the qualification's pair is ideal by construction).
+  non-ideal pair; it was not run (deferred, core#195).
+- Positive: against a rigorous ternary column (plate to plate, alpha 4/2/1, 10 stages, R 3,
+  Newton on the still's composition), once A is a trace of the still (x_A 3e-3 to 0) the
+  shortcut's B is never purer than the rigorous one and lies within 0.01 of it. Its C lies within 1e-3:
+  B 0.9946 against 0.9948 at x_A = 1e-4, where one A/B key pair for the batch gave 0.916.
+  A forerun until x_A = 1e-3, then a main cut until x_B = 0.3 (charge A 5, B 65, C 30), against
+  a batch integrated on the rigorous column: the main cut's B is 0.9465 against 0.9476
+  (the A/B keys gave 0.746).
+- Positive: a constant distillate that is not held anywhere along the path is noted, with
+  where (the share of the charge distilled), not only where it ends at the maximum reflux. So
+  is a distillate key that is not the most volatile component of the charge (the search for
+  C1 assumes the key's share of the distillate rises with it).
+- Negative: the issue's qualification against Diwekar's published worked examples and against
+  a DWSIM steady-state column is deferred to core#195. No published example's numbers were at
+  hand to check, and they are not quoted from memory. The rigorous plate-to-plate columns above
+  stand in for both, for ideal mixtures only.
 - Positive: on scratch copies (not committed) of the library:
   - acetyl-chloride-1 (ST101 with 10 stages at reflux ratio 1, the 150 kW reboiler, its end
     unchanged at 50 mol% acetyl chloride in the residue, K101 and Q7 removed, Q4 on the still):
@@ -138,19 +166,22 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
     as 1.9.0; the rebuilt sheets differ only in the generator's code hash.
 - Negative: a shortcut. No holdup on the stages or in the condenser (no start-up at total
   reflux, no holdup's flywheel effect on the cut's purity), the error of Gilliland's correlation,
-  one Underwood root and one heavy key for the whole batch, the relative volatilities of the
-  still's temperature for the whole column, constant molar overflow, an ideal liquid (ADR 0055:
-  no azeotropes).
+  one Underwood root at each point. The keys change at a threshold, so the distillate steps
+  where a light component falls below 1 % of the still's vapour. While the light key is
+  above the threshold, one C1 overpredicts the heavier components: the forerun above carries
+  0.080 of C, where the rigorous batch carries 0.008, which is conservative. Further
+  limitations: the relative volatilities of the still's temperature for the whole column,
+  constant molar overflow, and an ideal liquid (ADR 0055: no azeotropes).
 - Negative: one reflux policy for all cuts of a still (a forerun at a higher reflux is a
-  separate still step); a constant distillate's key is the column's most volatile component
-  while it is held.
+  separate still step). A constant distillate's key should be the column's most volatile
+  component while it is held; when it is not, the solve says so in a note.
 - Limitations: the column, its condenser and the vacuum system are not sized; no reflux drum
   or decanter; no heat-up or total-reflux start-up time (a `heat` operation of the recipe); the
   condenser's duty has no subcooling; `process simulate` does not couple it.
 
 ## Evidence
 
-- core#173; this ADR's PR. Follow-up of ADR 0055 (its Limitations) and ADR 0059 (its
+- core#173; this ADR's PR (core#193); the deferred qualification core#195. Follow-up of ADR 0055 (its Limitations) and ADR 0059 (its
   follow-up "per-cut condenser duties of a still").
 - `src/chemeascode/domains/process/batch_still.py` (`_Column`, `hengstebeck`,
   `underwood_root`, `underwood_min_reflux`, `gilliland_stages`, `gilliland_reflux`, the purity

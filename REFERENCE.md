@@ -1261,10 +1261,14 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     on Diwekar's batch shortcut: at each point of the path the distillate follows from
     Hengstebeck-Geddes at the Fenske index, Underwood's minimum reflux (the still's liquid as a
     saturated-liquid feed, the root between `heavy_key`, by default the next less volatile
-    component of the charge after the light key, and the next lighter one) and Gilliland's
-    correlation (Molokanov); no holdup, constant molar overflow, the relative volatilities at the
-    still's bubble point. `reflux: constant_distillate, distillate: {key, mole_fraction},
-    maximum_ratio` raises the reflux to hold the distillate, then stays at the maximum (a note).
+    component of the charge after the distillate's key, and the next lighter one; without a
+    key, the keys at each point: the most volatile component above 1 % of the still's vapour
+    and the next less volatile one, so a main cut after a forerun separates the next pair; a
+    lighter trace takes at most `(R + 1)` times its share of the still's vapour) and
+    Gilliland's correlation (Molokanov); no holdup, constant molar overflow, the relative
+    volatilities at the still's bubble point. `reflux: constant_distillate, distillate: {key, mole_fraction},
+    maximum_ratio` raises the reflux to hold the distillate, then stays at the maximum (a note
+    with where; another note when the key is not the charge's most volatile component).
     `minimum_reflux_factor: f` with a `distillate` designs the column at the start instead of
     `stages` (R = f Rmin, the stages from Gilliland). `(R + 1)` moles boil up per mole distilled:
     the boil-up time and the reboiler's energy are `(R + 1)` times a one-stage still's for the
@@ -1273,8 +1277,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     the profile), each cut's mass fractions and recovery, and the condenser's duty. Rules: a
     column's `distillate` or `heavy_key` that is no or a non-volatile component, a purity key
     that is no component (errors). Qualified against Rayleigh (N = 1), the Fenske limit,
-    Underwood's binary closed form, the constant-distillate balance and a rigorous
-    plate-to-plate binary column as a bound (`tests/test_batch_rectification.py`); worked
+    Underwood's binary closed form, the constant-distillate balance and rigorous
+    plate-to-plate binary and ternary columns (a forerun and a main cut) as a bound
+    (`tests/test_batch_rectification.py`; Diwekar's published examples and DWSIM: core#195); worked
     example `examples/process-batch-rectification`. One reflux policy for all cuts; the column
     and its condenser are not sized.
 - **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal

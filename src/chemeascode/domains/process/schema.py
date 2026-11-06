@@ -1229,9 +1229,10 @@ class Column(Strict):
     )
     heavy_key: str | None = Field(
         default=None,
-        description="The heavy key of Underwood's minimum reflux; default: the next less "
-        "volatile component of the charge after the distillate's key (else after the most "
-        "volatile).",
+        description="The heavy key of Underwood's minimum reflux (named: for the whole "
+        "batch). Default: the next less volatile component of the charge after the "
+        "distillate's key; without one, at each point the next less volatile one after the most "
+        "volatile component that is not a trace (below 1 % of the still's vapour).",
     )
     provenance: Provenance
     source: str = ""
