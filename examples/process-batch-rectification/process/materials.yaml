@@ -1,0 +1,33 @@
+# Data for the batch rectification of crude acetyl chloride (after process-library
+# acetyl-chloride-1). The Antoine vapour pressures are the NIST WebBook's (log10 bar, K, as
+# `cheme chemistry props` gives them); the heats of vaporization are in kJ/kmol (NIST gives
+# kJ/mol: times 1000). Phosphorous acid stays in the still (nonvolatile). Acetyl chloride's
+# NIST fit ends at 324.2 K, so the still's later part extrapolates it (cheme process stills
+# says so, info).
+schema: cheme/process/v1
+kind: materials
+components:
+  - id: ACCL
+    name: Acetyl chloride
+    formula: C2H3ClO
+    cas: 75-36-5
+    molar_mass: 78.495
+    heat_of_vaporization: 30100
+    vapour_pressure: {a: 3.96568, b: 1062.86, c: -55.531, temperature_range: [266.86, 324.2], provenance: given, source: "NIST WebBook (C75365), coefficients fitted by NIST to McDonald, Shrader et al. (1959)"}
+  - id: PCL3
+    name: Phosphorus trichloride
+    formula: PCl3
+    cas: 7719-12-2
+    molar_mass: 137.324
+    heat_of_vaporization: 30500
+    vapour_pressure: {a: 4.19505, b: 1304.47, c: -36.965, temperature_range: [221.6, 347.3], provenance: given, source: "NIST WebBook (C7719122), coefficients calculated by NIST from Stull (1947)"}
+  - id: ACOH
+    name: Acetic acid
+    formula: C2H4O2
+    cas: 64-19-7
+    molar_mass: 60.052
+    heat_of_vaporization: 40300
+    vapour_pressure: {a: 4.68206, b: 1642.54, c: -39.764, temperature_range: [290.26, 391.01], provenance: given, source: "NIST WebBook (C64197), coefficients fitted by NIST to McDonald, Shrader et al. (1959)"}
+  - {id: H3PO3, name: Phosphorous acid, formula: H3O3P, cas: 13598-36-2, molar_mass: 81.995}
+templates:
+  - {id: crude, components: [ACCL, PCL3, ACOH, H3PO3]}

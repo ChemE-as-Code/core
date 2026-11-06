@@ -29,7 +29,14 @@ Mostly engineering guidance. Core's calculations for this are:
 - a batch still without reflux, its cuts and a solvent swap: `still:` on the flowsheet step
   (skill `process-design`). It is a Rayleigh balance with Raoult's law or a constant relative
   volatility, solved by `cheme process propagate` and reported by `cheme process stills`
-  (boil-up time and duty per batch).
+  (boil-up time and duty per batch);
+- a batch column (rectification with reflux, a product's purification): `still.column` on the
+  same step, at a constant reflux ratio or holding the distillate's purity up to a maximum
+  reflux, on Diwekar's shortcut (Fenske-Underwood-Gilliland at each point of the batch). Collect
+  the product cut with an `end: {purity: ...}`; `cheme process stills` gives its purity,
+  recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. The
+  shortcut is conservative: a rigorous column at the same stages and reflux gives a purer
+  distillate.
 
 Arrangement:
 

@@ -1,0 +1,19 @@
+# The batch recipe of the batch rectification (schema cheme/recipe/v1): one unit, the still
+# with its column. The distillation takes its boil-up time from ST1's model (distil, from:
+# ST1); the other durations are illustrative. `cheme process recipe` gives the cycle time, the
+# batches per year and the year-average rate of the batch stream, which matches S1.
+schema: cheme/recipe/v1
+kind: recipe
+title: Batch rectification of crude acetyl chloride
+batch_size: {value: 1530, unit: kg, stream: S1, provenance: assumed, source: "the still's charge: illustrative (the upper phase of process-library acetyl-chloride-1)"}
+hours_per_year: {value: 7920, provenance: assumed, source: "330 days of 24 h"}
+unit_procedures:
+  - id: DISTIL
+    unit: ST1
+    title: Batch rectification in the still ST1 with its column
+    operations:
+      - {id: charge, kind: charge, title: Charge the crude, duration: {value: 0.5, provenance: assumed}}
+      - {id: heat, kind: heat, title: Heat to the boil and to total reflux, duration: {value: 0.5, provenance: assumed}}
+      - {id: distil, kind: distil, title: Distil the product cut and the off-cut, from: ST1}
+      - {id: cool, kind: cool, title: Cool the residue, duration: {value: 0.5, provenance: assumed}}
+      - {id: drain, kind: transfer, title: Drain the residue, duration: {value: 0.5, provenance: assumed}}

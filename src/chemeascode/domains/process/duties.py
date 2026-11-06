@@ -12,7 +12,10 @@ supplied, negative: removed):
   model holds the batch at its temperature from the start);
 - a **batch still** (``still:``, :mod:`.batch_still`): the boil-up's latent heat, ``Q =
   sum_i dHvap_i D_i``, D_i the kmol/h distilled (the energy per batch over the batch's hours
-  of flows);
+  of flows); with a column (``still.column``, ADR 0061) the reboiler boils up ``(R + 1)`` times
+  the distillate, ``Q = integral (R + 1) lambda(x_D) dD``, and the condenser removes as much
+  (total condenser, constant molar overflow) on its own stream (``still.condenser_port``, by
+  default the column's one heat stream out; the reboiler's is then its one heat stream in);
 - a **crystallizer** with ``energy:`` (:mod:`.crystallization`): its lumped duty (the feed's
   sensible heat, the heat of crystallization, the solvent evaporated);
 - a **conversion step** (``reactions:`` with conversions, ``reactor: conversion`` or a
@@ -27,6 +30,16 @@ supplied, negative: removed):
   is ``Q = H(out) - H(in) - W``, W the energy its other energy streams bring in (their
   duties, signed by their direction: an electrolyser's DC power, a shaft's work); an other
   energy stream without a duty leaves Q unknown.
+
+ADR 0063 adds terms: a dose's heat of solution (``solution``), the charge's heat-up of a batch
+or still with ``heat_up`` (``charge heat-up``), and ``vessel metal`` where the step runs in a
+recipe vessel with ``metal_heat_capacity`` (:func:`with_metal`).
+
+ADR 0062 adds, for a batch or semi-batch whose vent carries the liquid's vapour, the term
+``vent vapour`` of its duty and its vent condenser's duty (:func:`vent_condenser_duty`) on the
+condenser's own stream (``batch.vent.condenser.energy_port``). Two different condensers have
+their own streams: a batch still's (ADR 0061, :func:`still_condenser_duty`, the boil-up's latent
+heat) and a batch's vent condenser (ADR 0062); neither is the reboiler's or jacket's.
 
 The duty goes on the energy stream at the node's ``energy_port``, else on its one heat stream:
 an energy stream whose other end is a heating or cooling utility (steam, hot oil, fired heat,
@@ -44,6 +57,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from chemeascode.foundation.provenance import NOT_INPUTS
+
 #: The utilities whose energy streams are heat (the others: electricity, fuel, other).
 HEAT_UTILITIES = frozenset(
     {"steam", "hot_oil", "fired_heat", "cooling_water", "air_cooling", "refrigerant"}
@@ -57,9 +72,18 @@ STILL_BASIS = (
     "batch still: the latent heat of what boils up (heat_of_vaporization), per hour of the "
     "flowsheet's flows; the heat-up to the bubble point and heat losses not included"
 )
+STILL_CONDENSER_BASIS = (
+    "batch still's condenser: the latent heat of the vapour it condenses (the distillate and "
+    "the reflux, total condenser), per hour of the flowsheet's flows; no subcooling"
+)
 CONVERSION_BASIS = (
     "conversion step: the declared heats of reaction at their temperature, each stream "
     "brought to or from it at its heat capacity; heats of mixing not included"
+)
+VENT_CONDENSER_BASIS = (
+    "vent condenser: the vapour condensed at the vessel's temperature (heat_of_vaporization), "
+    "the vapour cooled as liquid to the condenser's outlet (liquid_heat_capacity) and the "
+    "non-condensables cooled as ideal gases, per hour of the flowsheet's flows"
 )
 IDEAL_GAS_BASIS = "conversion step: H(out) - H(in) of ideal gases on the elements basis"
 OTHER_BASIS = "; less the energy its other energy streams bring in (their duties)"
@@ -76,6 +100,9 @@ class ModelDuty:
     terms_kW: dict[str, float] = field(default_factory=dict)
     basis: str = ""
     missing: list[str] = field(default_factory=list)
+    #: what the terms of ADR 0063 depend on besides the model's inputs (the heat-up, the
+    #: vessel's metal): the duty's fingerprint; empty without them
+    inputs: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def entry(self) -> dict[str, Any]:
         return {
@@ -140,10 +167,90 @@ def is_heat(process: Any, other: str | None) -> bool:
     return utility is not None and utility.kind in HEAT_UTILITIES
 
 
+def still_condenser_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream a batch still's condenser duty goes on: the one at
+    ``still.condenser_port``, else (a still with a column) its one heat stream out; None and
+    why ('' for a still without a column or a condenser_port, or no still: nothing to say)."""
+    spec = getattr(node, "still", None)
+    if spec is None:
+        return None, ""
+    ends = _energy_ends(process, node)
+    port = spec.condenser_port
+    if port is not None:
+        at = [e for e in ends if e[1] == port]
+        if not at:
+            return None, f"no energy stream at its condenser_port {port}"
+        stream, _, into, _ = at[0]
+        return Target(stream, port, into, "condenser_port"), ""
+    if spec.column is None:
+        return None, ""
+    out = [e for e in ends if not e[2] and is_heat(process, e[3])]
+    if len(out) == 1:
+        stream, at_port, into, _ = out[0]
+        return Target(stream, at_port, into, "its one heat stream out"), ""
+    if out:
+        return None, (
+            f"{len(out)} heat streams out of it ({', '.join(e[0].id for e in out)}): name the "
+            "condenser's in still.condenser_port"
+        )
+    return None, (
+        "no heat stream out of it to a cooling utility: give the condenser its energy stream "
+        "(from the still to cooling water), or name it in still.condenser_port"
+    )
+
+
+def vent_condenser_port(node: Any) -> str | None:
+    """The energy port of *node*'s vent condenser (ADR 0062): its own stream, never the
+    jacket's."""
+    vent = getattr(getattr(node, "batch", None), "vent", None)
+    condenser = getattr(vent, "condenser", None)
+    return getattr(condenser, "energy_port", None)
+
+
+def vent_condenser_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream *node*'s vent condenser's duty goes on (ADR 0062), or None and why
+    ('' without a condenser)."""
+    vent = getattr(getattr(node, "batch", None), "vent", None)
+    if getattr(vent, "condenser", None) is None:
+        return None, ""
+    port = vent_condenser_port(node)
+    if port is None:
+        return None, "the vent condenser names no energy_port"
+    at = [e for e in _energy_ends(process, node) if e[1] == port]
+    if not at:
+        return None, f"no energy stream at the vent condenser's energy_port {port}"
+    stream, _, into, _ = at[0]
+    return Target(stream, port, into, "vent.condenser.energy_port"), ""
+
+
+def vent_condenser_duty(node: Any, result: Any) -> ModelDuty:
+    """The duty of *node*'s vent condenser from its batch's solution (:class:`.TankResult`):
+    the heat it removes, as heat into the node (negative), per hour of the flowsheet's flows."""
+    label = "vent condenser"
+    if result.condenser_heat is None:
+        missing = result.condenser_missing or ["the vent's vapour (nothing condensed)"]
+        return ModelDuty(node.id, label, None, basis=VENT_CONDENSER_BASIS, missing=missing)
+    terms = {k: -v / 3600.0 for k, v in result.condenser_terms.items()}
+    return ModelDuty(node.id, label, -result.condenser_heat / 3600.0, terms, VENT_CONDENSER_BASIS)
+
+
 def target(process: Any, node: Any) -> tuple[Target | None, str]:
     """The energy stream *node*'s model duty goes on, or None and why ('' when the node has no
-    heat stream at all: nothing to say)."""
+    heat stream at all: nothing to say). A batch still's condenser stream
+    (:func:`still_condenser_target`, ADR 0061) is not its reboiler's; with a column, the
+    reboiler's default is its one heat stream in. A batch's vent condenser stream
+    (:func:`vent_condenser_target`, ADR 0062) is the condenser's own, not the jacket's."""
     ends = _energy_ends(process, node)
+    vent_port = vent_condenser_port(node)
+    if vent_port is not None:
+        ends = [e for e in ends if e[1] != vent_port]
+    spec = getattr(node, "still", None)
+    if spec is not None and (spec.condenser_port is not None or spec.column is not None):
+        condenser, _ = still_condenser_target(process, node)
+        if condenser is not None:
+            ends = [e for e in ends if e[0].id != condenser.stream.id]
+        if spec.column is not None and getattr(node, "energy_port", None) is None:
+            ends = [e for e in ends if e[2]]
     port = getattr(node, "energy_port", None)
     if port is not None:
         at = [e for e in ends if e[1] == port]
@@ -194,31 +301,164 @@ def other_energy(process: Any, node: Any, case: str) -> tuple[float, dict[str, A
 # -- the models' duties -------------------------------------------------------------------------
 
 
-def batch_duty(node: Any, result: Any) -> ModelDuty:
-    """The duty of batch or semi-batch *node* from its solution (:class:`.TankResult`)."""
+def _batch_basis(terms: dict[str, float]) -> str:
+    """The basis of a batch's duty: :data:`BATCH_BASIS`, or with the terms of ADR 0063 it
+    holds (a heat of solution, the charge's heat-up); with the vent's vapour (ADR 0062)
+    :data:`VENT_VAPOUR_BASIS` after it."""
+    solution, heat_up = "solution" in terms, "charge heat-up" in terms
+    vent = VENT_VAPOUR_BASIS if "vent vapour" in terms else ""
+    if not (solution or heat_up):
+        return BATCH_BASIS + vent
+    held = "the heat its reactions release over the batch, the doses warmed to the batch's "
+    held += "temperature"
+    if solution:
+        held += " and their heat of solution as they mix in"
+    if heat_up:
+        held += ", the charge heated from its inlet temperature to the batch's"
+    left = ("" if heat_up else "the charge's heat-up, ") + (
+        "" if solution else "the heats of absorption and solution, "
+    )
+    return (
+        f"isothermal batch: {held}, per hour of the flowsheet's flows; {left}agitation and heat "
+        "losses not included"
+    ) + vent
+
+
+#: What a batch's duty adds with its vent's vapour (ADR 0062).
+VENT_VAPOUR_BASIS = (
+    "; with the latent heat of the vapour the vent gas carries off and a returned "
+    "condensate warmed back (ADR 0062)"
+)
+
+
+def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = None) -> ModelDuty:
+    """The duty of batch or semi-batch *node* from its solution (:class:`.TankResult`); with
+    *process* and *case*, the vessel's metal too (ADR 0063, :func:`with_metal`)."""
     model = node.reactor
     if getattr(node.batch, "heat", "isothermal") == "adiabatic":
         return ModelDuty(node.id, model, None, missing=["an adiabatic batch exchanges no heat"])
     if result.heat_terms is None:
         return ModelDuty(node.id, model, None, basis=BATCH_BASIS, missing=result.heat_missing)
     terms = {k: v / 3600.0 for k, v in result.heat_terms.items()}
-    return ModelDuty(node.id, model, sum(terms.values()), terms, BATCH_BASIS)
+    duty = ModelDuty(node.id, model, sum(terms.values()), terms, _batch_basis(terms))
+    solutions = [
+        d.heat_of_solution.model_dump(mode="json", exclude=NOT_INPUTS)
+        for d in getattr(node.batch, "dosing", ())
+        if d.heat_of_solution is not None
+    ]
+    if solutions:  # the duty's, not an isothermal batch's outlets (their fingerprint)
+        duty.inputs["heat_of_solution"] = solutions
+    if not getattr(node.batch, "heat_up", False):
+        # the model holds the batch at its temperature from the start: neither the content's
+        # heat-up nor the metal's is in its duty (the recipe's heat operation holds both)
+        return _metal_left_out(process, node, case, duty)
+    duty.inputs["heat_up"] = True
+    temperatures = (getattr(result, "charge_temperature", None), result.temperature)
+    return with_metal(process, node, case, duty, temperatures)
 
 
-def still_duty(node: Any, result: Any) -> ModelDuty:
+def _metal_left_out(
+    process: Any,
+    node: Any,
+    case: str | None,
+    duty: ModelDuty,
+    why: str = "the batch is at its temperature from the start (heat_up)",
+) -> ModelDuty:
+    """*duty* of a batch without ``heat_up``, or of a still at constant volatility, in a recipe
+    vessel with ``metal_heat_capacity``: its basis says the metal is not in it and *why*
+    (ADR 0063); unchanged otherwise."""
+    if process is None or case is None:
+        return duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        found = metal_of(process, node.id, case)
+    except ValueError:
+        return duty
+    if found is not None:
+        duty.basis += f"; the vessel's metal ({found[2]}) not included: {why}"
+    return duty
+
+
+#: What a still's duty holds with ``heat_up`` (ADR 0063).
+STILL_HEAT_UP_BASIS = (
+    "batch still: the latent heat of what boils up (heat_of_vaporization) and the charge heated "
+    "from its inlet temperature to its bubble point (liquid_heat_capacity), per hour of the "
+    "flowsheet's flows; the content's sensible rise while it boils and heat losses not included"
+)
+#: What a solvent swap's duty holds with ``heat_up`` (ADR 0063).
+SWAP_HEAT_UP_BASIS = (
+    "solvent swap: the latent heat of what boils up (heat_of_vaporization), the charge heated "
+    "from its inlet temperature to its bubble point and the feed from its inlet temperature to "
+    "the still's as it mixes in (liquid_heat_capacity), per hour of the flowsheet's flows; the "
+    "content's sensible rise while it boils and heat losses not included"
+)
+
+
+def still_duty(node: Any, result: Any, process: Any = None, case: str | None = None) -> ModelDuty:
     """The duty of batch still *node* from its solution (:class:`.StillResult`): the energy of
-    a batch over its hours of flows."""
+    a batch over its hours of flows; with ``still.heat_up`` the charge's heat-up to its bubble
+    point, and with *process* and *case* the vessel's metal (ADR 0063)."""
+    heat_up = getattr(node.still, "heat_up", False)
+    swap = getattr(node.still, "feed", None) is not None
+    basis = (SWAP_HEAT_UP_BASIS if swap else STILL_HEAT_UP_BASIS) if heat_up else STILL_BASIS
     if result.energy is None or not result.hours:
         missing = [n for n in result.notes if n.startswith("no duty")] or [
             "the heat_of_vaporization of the volatile components"
         ]
-        return ModelDuty(node.id, "still", None, basis=STILL_BASIS, missing=missing)
+        return ModelDuty(node.id, "still", None, basis=basis, missing=missing)
     heat = result.energy / (result.hours * 3600.0)
-    return ModelDuty(node.id, "still", heat, {"boil-up": heat}, STILL_BASIS)
+    duty = ModelDuty(node.id, "still", heat, {"boil-up": heat}, basis)
+    if heat_up:
+        feed_heat = getattr(result, "feed_heat_up", None)
+        if result.heat_up is None or (swap and feed_heat is None):
+            what = "the charge's and the feed's heat-up" if swap else "the charge's heat-up"
+            missing = [f"{what} (still.heat_up): {result.heat_up_missing}"]
+            return ModelDuty(node.id, "still", None, basis=basis, missing=missing)
+        duty.terms_kW["charge heat-up"] = result.heat_up / (result.hours * 3600.0)
+        if swap:
+            duty.terms_kW["feed heat-up"] = feed_heat / (result.hours * 3600.0)
+        duty.heat_kW = sum(duty.terms_kW.values())
+        duty.inputs["heat_up"] = True
+        if process is not None:
+            comps = process.components()
+            duty.inputs["liquid_heat_capacity"] = {
+                n: getattr(comps.get(n), "liquid_heat_capacity", None)
+                for n in sorted({*result.charge, *result.fed})
+            }
+    if getattr(getattr(node.still, "volatility", None), "model", None) == "constant":
+        # no temperature modelled (ADR 0063): the boil-up's duty, the metal left out
+        return _metal_left_out(
+            process, node, case, duty, "a still at constant volatility models no temperature"
+        )
+    # the metal follows the content: from the charge's temperature with its heat-up, else
+    # from the bubble point the model starts at; a charge at or above its bubble point takes
+    # no heat-up (its flash is not modelled), so neither does the metal
+    start, end = result.temperatures or (None, None)
+    if heat_up:
+        charged = result.charge_temperature
+        start = charged if charged is None or start is None else min(charged, start)
+    return with_metal(process, node, case, duty, (start, end))
 
 
-def crystallizer_duty(node: Any, result: Any) -> ModelDuty:
-    """The duty of crystallizer *node* from its solution (:class:`.TrainResult`)."""
+def still_condenser_duty(node: Any, result: Any) -> ModelDuty:
+    """The duty of batch still *node*'s condenser from its solution: minus its boil-up's latent
+    heat (what boils up is condensed, the reflux with the distillate); the charge's heat-up
+    and the vessel's metal (ADR 0063) stay in the pot and are not condensed."""
+    if result.energy is None or not result.hours:
+        boil = still_duty(node, result)
+        return ModelDuty(
+            node.id, "condenser", None, basis=STILL_CONDENSER_BASIS, missing=boil.missing
+        )
+    heat = result.energy / (result.hours * 3600.0)
+    return ModelDuty(node.id, "condenser", -heat, {"condensation": -heat}, STILL_CONDENSER_BASIS)
+
+
+def crystallizer_duty(
+    node: Any, result: Any, process: Any = None, case: str | None = None
+) -> ModelDuty:
+    """The duty of crystallizer *node* from its solution (:class:`.TrainResult`); with
+    *process* and *case*, the vessel's metal too (ADR 0063)."""
     energy = result.energy
     if energy is None:
         return ModelDuty(node.id, "crystallizer", None, missing=["crystallizer.energy"])
@@ -230,7 +470,62 @@ def crystallizer_duty(node: Any, result: Any) -> ModelDuty:
         name: energy[f"{name}_kJ_h"] / 3600.0
         for name in ("sensible", "crystallization", "evaporation")
     }
-    return ModelDuty(node.id, "crystallizer", energy["duty_kW"], terms, energy["basis"])
+    duty = ModelDuty(node.id, "crystallizer", energy["duty_kW"], terms, energy["basis"])
+    temperatures = (energy.get("feed_temperature_K"), energy.get("temperature_K"))
+    return with_metal(process, node, case, duty, temperatures)
+
+
+def with_metal(
+    process: Any,
+    node: Any,
+    case: str | None,
+    duty: ModelDuty,
+    temperatures: tuple[float | None, float | None],
+) -> ModelDuty:
+    """*duty* with the term ``vessel metal`` (ADR 0063) where *node* runs in a recipe vessel
+    that gives ``metal_heat_capacity``: the metal follows the content over the model, from
+    the first to the second of *temperatures* (K) each batch, ``C_m (T_1 - T_0)`` over the
+    batch's hours of flows. Unchanged without *process*, without such a vessel, or with no
+    change of temperature; not known (``missing``) when the temperatures or the batch's hours
+    are not."""
+    if process is None or case is None or duty.heat_kW is None:
+        return duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        found = metal_of(process, node.id, case)
+    except ValueError as failure:
+        return _unknown(duty, f"the batch's hours for the vessel's metal: {failure}")
+    if found is None:
+        return duty
+    metal, hours, procedure = found
+    start, end = temperatures
+    if start is None or end is None:
+        return _unknown(
+            duty,
+            f"the {duty.model}'s temperatures for the vessel's metal ({procedure}): its inlet's "
+            "and its own" + (" (volatility raoult)" if duty.model == "still" else ""),
+        )
+    if abs(end - start) <= 1e-9:
+        return duty
+    term = metal * (end - start) / (hours * 3600.0)
+    duty.terms_kW["vessel metal"] = term
+    duty.heat_kW += term
+    duty.basis += (
+        f"; the vessel's metal ({procedure}, {metal:g} kJ/K) from {start:.5g} to {end:.5g} K "
+        "each batch"
+    )
+    duty.inputs["vessel_metal"] = {
+        "heat_capacity": metal,
+        "hours": hours,
+        "temperatures": [start, end],
+    }
+    return duty
+
+
+def _unknown(duty: ModelDuty, missing: str) -> ModelDuty:
+    duty.heat_kW, duty.terms_kW, duty.missing = None, {}, [missing]
+    return duty
 
 
 def _stream_temperature(process: Any, stream: Any, case: str) -> float | None:
@@ -435,11 +730,17 @@ def duty_text(duty: ModelDuty) -> str:
     return f"{duty.model} duty {duty.heat_kW:.6g} kW into the step, year average ({terms} kW)"
 
 
-def report_entry(process: Any, node: Any, case: str, duty: ModelDuty) -> dict[str, Any]:
+def report_entry(
+    process: Any, node: Any, case: str, duty: ModelDuty, vent_condenser: bool = False
+) -> dict[str, Any]:
     """*duty* as ``cheme process reactors`` reports it: the model's duty and its energy stream
-    (the stream's duty now, and what the model gives it in the stream's direction)."""
+    (the stream's duty now, and what the model gives it in the stream's direction); with
+    *vent_condenser*, a batch's vent condenser's on its own stream (ADR 0062)."""
     found = duty.entry()
-    goal, why = target(process, node)
+    if vent_condenser:
+        goal, why = vent_condenser_target(process, node)
+    else:
+        goal, why = target(process, node)
     found["stream"] = None
     found["stream_note"] = why
     if goal is not None:
@@ -545,9 +846,12 @@ def duty_rules(process: Any) -> list[Any]:
     goals: dict[str, list[Any]] = {}
     for _, _, node in nodes:
         if duty_model(node) is not None:
-            goal, _ = target(process, node)
-            if goal is not None:
-                goals.setdefault(goal.stream.id, []).append(goal.stream)
+            # the jacket's or reboiler's, a still's condenser's (ADR 0061) and a vent
+            # condenser's (ADR 0062): each on its own stream
+            for find in (target, still_condenser_target, vent_condenser_target):
+                goal, _ = find(process, node)
+                if goal is not None:
+                    goals.setdefault(goal.stream.id, []).append(goal.stream)
     cases = [fs.default_case()] if any(len(g) > 1 for g in goals.values()) else []
     for group in goals.values():
         stream = group[0]
