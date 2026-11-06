@@ -39,7 +39,43 @@
     `StillResult.heat_up`, `feed_heat_up` and `fed_temperature`, `recipe.HeatResult`,
     `metal_of` and `vessel_metal`, `duties.with_metal` and `ModelDuty.inputs`; the duty
     functions take the process and case for the metal.
-- Every BFD/PFD needs `cheme process build` once (the process schema changed).
+- Batch rectification (ADR 0061, #173): a column on the batch still, on Diwekar's shortcut
+  batch column over core's Fenske-Underwood-Gilliland.
+  - `still.column: {stages | minimum_reflux_factor, reflux: constant | constant_distillate,
+    ratio, distillate: {key, mole_fraction}, maximum_ratio, heavy_key}`: at each point of the
+    still's path the distillate from Hengstebeck-Geddes at the Fenske index, Underwood's minimum
+    reflux with the still's liquid as the feed and Gilliland (Molokanov) between them; a
+    constant reflux ratio, or a reflux that rises to hold the distillate up to `maximum_ratio`;
+    `minimum_reflux_factor` designs the stages at the start. `(R + 1)` moles boil up per mole
+    distilled, so the boil-up time and the reboiler's energy follow the reflux. One stage is
+    Rayleigh's still, an infinite reflux the Fenske limit.
+  - A `purity: {key, fraction}` end (with `basis: mole | mass`), for any still: a cut collected
+    until its mean share of the key falls to its specification.
+  - The condenser's duty on its own energy stream (`still.condenser_port`, by default a
+    column's one heat stream out), written by `cheme process propagate` beside the reboiler's
+    (a column's one heat stream in, or `energy_port`), `calculated`, compared where given. A
+    library entry's typed reflux share of the reboiler (acetyl-chloride-1 Q7,
+    benzoyl-chloride-1 Q6) and its column's specified split go.
+  - `cheme process stills`: model `batch rectification`, basis `batch-shortcut` (predictive),
+    the column's stages and reflux (start, end, profile, the design at the start), each cut's
+    mass fractions and recovery, the condenser's duty. `cheme.process-still` checks the column's
+    keys, the purity key and the condenser port.
+  - `examples/process-batch-rectification`: crude acetyl chloride through 10 stages at constant
+    distillate, a 99.8 wt% product cut at 99.4 % recovery, an off-cut and the residue, with the
+    boil-up time the recipe takes and the reboiler's and condenser's duties.
+  - Without a named key the column takes its keys at each point (the most volatile component
+    above 1 % of the still's vapour and the next less volatile one), and a lighter trace takes
+    at most `(R + 1)` times its share of the still's vapour: a main cut after a forerun is
+    predicted on its own pair.
+  - Qualified against Rayleigh (one stage), the Fenske limit, Underwood's binary closed form,
+    the constant-distillate balance and rigorous plate-to-plate binary and ternary columns
+    (a forerun then a main cut), which the shortcut never exceeds in purity
+    (`tests/test_batch_rectification.py`). Diwekar's published examples and a DWSIM bound are
+    deferred (#195).
+- Unchanged: a still without `column:`, `purity` or `condenser_port` solves, reports and
+  fingerprints as in 1.9.0 (the library's six stills on scratch copies: `process stills
+  --json`, `propagate --check` and `validate` print the same). Every BFD/PFD needs `cheme
+  process build` once (the process generator's code changed; the drawn sheets do not).
 
 ## 1.9.0 (2026-11-06)
 

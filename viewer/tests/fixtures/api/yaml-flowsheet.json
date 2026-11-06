@@ -514,12 +514,6 @@
             "default": null,
             "description": "A liquid batch or semi-batch that gives off gas: {stream, components, fraction} (ADR 0054)."
           },
-          "heat_up": {
-            "default": false,
-            "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
-            "title": "Heat Up",
-            "type": "boolean"
-          },
           "provenance": {
             "enum": [
               "given",
@@ -1224,6 +1218,143 @@
         "title": "CaseApplicability",
         "type": "object"
       },
+      "Column": {
+        "additionalProperties": false,
+        "description": "A batch still's rectifying column on the Fenske-Underwood-Gilliland shortcut (Diwekar's\nbatch shortcut: :mod:`.batch_still`): ``stages`` theoretical stages, the still included (or\n``minimum_reflux_factor``: the stages from Gilliland at the start, at that factor times\nUnderwood's minimum reflux for ``distillate``), total condenser, no holdup. ``reflux:\nconstant`` at ``ratio`` (L/D; with the factor: the factor times the minimum at the start),\nor ``constant_distillate``: the reflux ratio rises to hold the ``distillate``'s mole\nfraction of its key, up to ``maximum_ratio``, and stays there after.",
+        "properties": {
+          "stages": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Theoretical stages, the still (reboiler) included.",
+            "title": "Stages"
+          },
+          "minimum_reflux_factor": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Instead of stages: R = factor x Rmin at the start for the distillate, the stages from Gilliland there.",
+            "title": "Minimum Reflux Factor"
+          },
+          "reflux": {
+            "enum": [
+              "constant",
+              "constant_distillate"
+            ],
+            "title": "Reflux",
+            "type": "string"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "reflux constant with stages: the reflux ratio L/D.",
+            "title": "Ratio"
+          },
+          "distillate": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ColumnDistillate"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "constant_distillate: the distillate held; with minimum_reflux_factor: the distillate at the start the column is designed for."
+          },
+          "maximum_ratio": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "constant_distillate: the largest reflux ratio; past it the reflux stays there and the distillate's purity falls.",
+            "title": "Maximum Ratio"
+          },
+          "heavy_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The heavy key of Underwood's minimum reflux (named: for the whole batch). Default: the next less volatile component of the charge after the distillate's key; without one, at each point the next less volatile one after the most volatile component that is not a trace (below 1 % of the still's vapour).",
+            "title": "Heavy Key"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reflux",
+          "provenance"
+        ],
+        "title": "Column",
+        "type": "object"
+      },
+      "ColumnDistillate": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "The light key, the component the distillate is held in.",
+            "title": "Key",
+            "type": "string"
+          },
+          "mole_fraction": {
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Mole Fraction",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "mole_fraction"
+        ],
+        "title": "ColumnDistillate",
+        "type": "object"
+      },
       "CompositionValue": {
         "additionalProperties": false,
         "properties": {
@@ -1658,18 +1789,6 @@
             "default": null,
             "description": "A dosed gas: the share of the dose the liquid takes up (it dissolves on entry); the rest passes through to batch.vent's stream. None: all of it dissolves.",
             "title": "Absorbed"
-          },
-          "heat_of_solution": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/HeatOfSolution"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The heat its components release (or take up) as they mix into the liquid, released at the dose's rate: in the semi-batch's heat, duty, peak cooling duty and dT_ad, not in the MTSR (ADR 0063)."
           }
         },
         "required": [
@@ -2097,47 +2216,6 @@
         "title": "Filtration",
         "type": "object"
       },
-      "HeatOfSolution": {
-        "additionalProperties": false,
-        "description": "The integral heat of solution, dilution or mixing of a dose's components as they mix into\nthe batch's liquid (ADR 0063): per kmol of the component dosed (kJ/kmol = J/mol), at the\nbatch's dilution and temperature, negative when mixing releases heat (as a heat of\nreaction). A dosed gas's heat of absorption (its dissolved share, ``absorbed``) goes here\ntoo; the heats of the reactions that consume it are then on the dissolved basis.",
-        "properties": {
-          "values": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "description": "Component of the dose -> kJ/kmol (J/mol) of it dosed.",
-            "minProperties": 1,
-            "title": "Values",
-            "type": "object"
-          },
-          "unit": {
-            "const": "kJ/kmol",
-            "default": "kJ/kmol",
-            "title": "Unit",
-            "type": "string"
-          },
-          "provenance": {
-            "enum": [
-              "given",
-              "assumed",
-              "calculated"
-            ],
-            "title": "Provenance",
-            "type": "string"
-          },
-          "source": {
-            "default": "",
-            "title": "Source",
-            "type": "string"
-          }
-        },
-        "required": [
-          "values",
-          "provenance"
-        ],
-        "title": "HeatOfSolution",
-        "type": "object"
-      },
       "ImposedYield": {
         "additionalProperties": false,
         "description": "The fraction of the anhydrous solute entering the crystallizer that crystallizes,\nspecified (an empirical or vendor yield), not predicted.",
@@ -2399,6 +2477,29 @@
           "direction"
         ],
         "title": "Port",
+        "type": "object"
+      },
+      "PurityEnd": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "The component whose share in the cut collected ends it.",
+            "title": "Key",
+            "type": "string"
+          },
+          "fraction": {
+            "description": "The cut's mean share of the key (on the end's basis).",
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Fraction",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "fraction"
+        ],
+        "title": "PurityEnd",
         "type": "object"
       },
       "Quantity": {
@@ -3350,11 +3451,30 @@
             "title": "Outlets",
             "type": "object"
           },
-          "heat_up": {
-            "default": false,
-            "description": "Count the charge's heat-up from its inlet temperature to its bubble point (volatility raoult), and a swap's feed warmed to the still's temperature as it mixes in, in the still's duty and its whole energy per batch (ADR 0063); default: the boil-up's latent heat alone.",
-            "title": "Heat Up",
-            "type": "boolean"
+          "column": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Column"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A rectifying column on the still (batch rectification, ADR 0061)."
+          },
+          "condenser_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The energy port (out, to cooling) whose stream carries the condenser's duty; default with a column: its one heat stream out.",
+            "title": "Condenser Port"
           },
           "provenance": {
             "enum": [
@@ -3402,7 +3522,7 @@
       },
       "StillEnd": {
         "additionalProperties": false,
-        "description": "When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all\ncharged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole\nfraction in the still reaches the value), ``time`` (s of boil-up from the start) or\n``temperature`` (K of the still, at its bubble point: volatility raoult).",
+        "description": "When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all\ncharged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole\nfraction in the still reaches the value), ``time`` (s of boil-up from the start),\n``temperature`` (K of the still, at its bubble point: volatility raoult) or ``purity`` (the\ncut's mean share of its key, on ``basis`` mole or mass, falls to the value: a product cut\ncollected to its specification).",
         "properties": {
           "distilled": {
             "anyOf": [
@@ -3465,6 +3585,18 @@
             "default": null,
             "description": "K of the still",
             "title": "Temperature"
+          },
+          "purity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PurityEnd"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The cut's mean share of the key falls to the fraction (basis mole or mass)."
           }
         },
         "title": "StillEnd",

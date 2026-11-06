@@ -206,8 +206,11 @@ times and adds `vessel metal` to the duty of each model in that vessel that chan
 content's temperature (a batch only with `heat_up`: without it the model holds the batch at its
 temperature, and the recipe's heat operation holds the content's and the metal's heat). `cheme
 process recipe` reports the heat per batch of each jacket-timed heat-up in a vessel with metal:
-the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, condensers and the dryer (its own
-`energy.port`) are not written: give those streams yourself.
+the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, a one-stage still's condensers (unless
+`still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give
+those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
+in, or `energy_port`) and its condenser (its one heat stream out, or `still.condenser_port`):
+never type the reflux's share of the reboiler as a stream of its own.
 
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:
@@ -235,8 +238,42 @@ still:
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
   `from:` the still.
-- The model is one stage, ideal liquid. A column with reflux, or an azeotrope, needs a
-  specified split or `process simulate`. Record that in `DESIGN.md`.
+- Without `column:` the model is one stage: it strips and swaps solvents but does not purify
+  a product. An azeotrope (non-ideal liquid) needs a specified split or `process simulate`;
+  record that in `DESIGN.md`.
+
+**Batch rectification (a column on the still, ADR 0061).** Purify a product in the still with
+its column instead of a specified split of the still's distillate:
+
+```yaml
+still:
+  volatility: {model: raoult, provenance: given, source: NIST WebBook}
+  boilup: {value: 150, unit: kW, provenance: assumed, source: the reboiler}   # the whole reboiler
+  column:
+    stages: 10                       # theoretical stages, the still included
+    reflux: constant                 # with ratio; or constant_distillate:
+    ratio: 2                         #   distillate: {key: PRODUCT, mole_fraction: 0.999}
+                                     #   maximum_ratio: 6
+    provenance: assumed              # or minimum_reflux_factor: 1.3 instead of stages
+    source: packed column, about 10 theoretical stages
+  cuts:
+    - {outlet: product, end: {purity: {key: PRODUCT, fraction: 0.998}, basis: mass}}
+    - {outlet: offcut, end: {residue: {key: PRODUCT, mole_fraction: 0.05}}}
+  outlets: {residue: bottom}
+  provenance: assumed
+```
+
+- The `boilup` is the reboiler's, not the net distillate rate: `(R + 1)` moles boil up per
+  mole distilled, and the time and the duty follow. Give the still an energy stream in from
+  steam (the reboiler) and one out to cooling water (the condenser); propagate writes both.
+  Delete a typed reflux share (a stream for "the boil-up returned as reflux"), a column step
+  with a specified split and its return to the pot.
+- `cheme process stills` gives each cut's purity and recovery, the reflux at the start and
+  the end, the boil-up time and the duties. A note says when a constant distillate reached its
+  `maximum_ratio` (its purity falls from there) or a cut's end was reached at once.
+- The shortcut has no holdup and uses Gilliland's correlation: it gives a leaner distillate
+  than a rigorous column at the same stages and reflux. State the stages and reflux you
+  assumed in `DESIGN.md`, and size the column and condenser elsewhere.
 
 `cheme process simulate --fill` solves the whole flowsheet in DWSIM, separators, exchangers,
 columns and recycles included, from the feeds and the specs in `process/simulation.yaml`; see

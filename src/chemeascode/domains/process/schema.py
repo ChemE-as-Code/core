@@ -1151,23 +1151,38 @@ class ResidueEnd(Strict):
     mole_fraction: float = Field(ge=0, lt=1)
 
 
+class PurityEnd(Strict):
+    key: str = Field(description="The component whose share in the cut collected ends it.")
+    fraction: float = Field(
+        gt=0, lt=1, description="The cut's mean share of the key (on the end's basis)."
+    )
+
+
 class StillEnd(Strict):
     """When a batch still (or one of its cuts) stops, one of: ``distilled`` (the share of all
     charged and fed distilled so far, on ``basis`` mole or mass), ``residue`` (the key's mole
-    fraction in the still reaches the value), ``time`` (s of boil-up from the start) or
-    ``temperature`` (K of the still, at its bubble point: volatility raoult)."""
+    fraction in the still reaches the value), ``time`` (s of boil-up from the start),
+    ``temperature`` (K of the still, at its bubble point: volatility raoult) or ``purity`` (the
+    cut's mean share of its key, on ``basis`` mole or mass, falls to the value: a product cut
+    collected to its specification)."""
 
     distilled: float | None = Field(default=None, gt=0, lt=1)
     basis: Literal["mole", "mass"] = "mole"
     residue: ResidueEnd | None = None
     time: float | None = Field(default=None, gt=0, description="s of boil-up from the start")
     temperature: float | None = Field(default=None, gt=0, description="K of the still")
+    purity: PurityEnd | None = Field(
+        default=None,
+        description="The cut's mean share of the key falls to the fraction (basis mole or mass).",
+        exclude_if=lambda value: value is None,  # a still's fingerprint stays as it was
+    )
 
     @model_validator(mode="after")
     def _one(self) -> StillEnd:
-        given = [n for n in ("distilled", "residue", "time", "temperature") if getattr(self, n)]
+        names = ("distilled", "residue", "time", "temperature", "purity")
+        given = [n for n in names if getattr(self, n)]
         if len(given) != 1:
-            raise ValueError("give one of distilled, residue, time or temperature")
+            raise ValueError("give one of distilled, residue, time, temperature or purity")
         return self
 
 
@@ -1205,6 +1220,81 @@ class StillFeed(Strict):
         return self
 
 
+class ColumnDistillate(Strict):
+    key: str = Field(description="The light key, the component the distillate is held in.")
+    mole_fraction: float = Field(gt=0, lt=1)
+
+
+class Column(Strict):
+    """A batch still's rectifying column on the Fenske-Underwood-Gilliland shortcut (Diwekar's
+    batch shortcut: :mod:`.batch_still`): ``stages`` theoretical stages, the still included (or
+    ``minimum_reflux_factor``: the stages from Gilliland at the start, at that factor times
+    Underwood's minimum reflux for ``distillate``), total condenser, no holdup. ``reflux:
+    constant`` at ``ratio`` (L/D; with the factor: the factor times the minimum at the start),
+    or ``constant_distillate``: the reflux ratio rises to hold the ``distillate``'s mole
+    fraction of its key, up to ``maximum_ratio``, and stays there after."""
+
+    stages: float | None = Field(
+        default=None, ge=1, description="Theoretical stages, the still (reboiler) included."
+    )
+    minimum_reflux_factor: float | None = Field(
+        default=None,
+        gt=1,
+        description="Instead of stages: R = factor x Rmin at the start for the distillate, the "
+        "stages from Gilliland there.",
+    )
+    reflux: Literal["constant", "constant_distillate"]
+    ratio: float | None = Field(
+        default=None, ge=0, description="reflux constant with stages: the reflux ratio L/D."
+    )
+    distillate: ColumnDistillate | None = Field(
+        default=None,
+        description="constant_distillate: the distillate held; with minimum_reflux_factor: the "
+        "distillate at the start the column is designed for.",
+    )
+    maximum_ratio: float | None = Field(
+        default=None,
+        gt=0,
+        description="constant_distillate: the largest reflux ratio; past it the reflux stays "
+        "there and the distillate's purity falls.",
+    )
+    heavy_key: str | None = Field(
+        default=None,
+        description="The heavy key of Underwood's minimum reflux (named: for the whole "
+        "batch). Default: the next less volatile component of the charge after the "
+        "distillate's key; without one, at each point the next less volatile one after the most "
+        "volatile component that is not a trace (below 1 % of the still's vapour).",
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _form(self) -> Column:
+        if (self.stages is None) == (self.minimum_reflux_factor is None):
+            raise ValueError("column: give stages or minimum_reflux_factor")
+        if self.reflux == "constant":
+            if self.stages is not None and self.ratio is None:
+                raise ValueError("column: reflux constant with stages needs ratio")
+            if self.minimum_reflux_factor is not None and self.ratio is not None:
+                raise ValueError("column: give ratio or minimum_reflux_factor, not both")
+            if self.maximum_ratio is not None:
+                raise ValueError("column: maximum_ratio is for reflux constant_distillate")
+        else:
+            if self.ratio is not None:
+                raise ValueError("column: reflux constant_distillate takes no ratio")
+            if self.maximum_ratio is None:
+                raise ValueError("column: reflux constant_distillate needs maximum_ratio")
+        if self.distillate is None and (
+            self.reflux == "constant_distillate" or self.minimum_reflux_factor is not None
+        ):
+            raise ValueError("column: give distillate {key, mole_fraction}")
+        if self.distillate is not None and self.reflux == "constant" and self.stages is not None:
+            raise ValueError("column: distillate is for constant_distillate or the factor")
+        if self.distillate is not None and self.heavy_key == self.distillate.key:
+            raise ValueError("column: the heavy key is not the distillate's key")
+        return self
+
+
 class Still(Strict):
     """A batch (Rayleigh) still, shortcut level (the model: :mod:`.batch_still`): one charge
     (the step's material inlet besides a ``feed``), boiled up at ``boilup`` and condensed
@@ -1235,6 +1325,17 @@ class Still(Strict):
         "in, in the still's duty and its whole energy per batch (ADR 0063); default: the "
         "boil-up's latent heat alone.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
+    )
+    column: Column | None = Field(
+        default=None,
+        description="A rectifying column on the still (batch rectification, ADR 0061).",
+        exclude_if=lambda value: value is None,  # a still's fingerprint stays as it was
+    )
+    condenser_port: str | None = Field(
+        default=None,
+        description="The energy port (out, to cooling) whose stream carries the condenser's "
+        "duty; default with a column: its one heat stream out.",
+        exclude_if=lambda value: value is None,
     )
     provenance: Provenance
     source: str = ""

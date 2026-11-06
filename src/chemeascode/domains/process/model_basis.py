@@ -25,8 +25,9 @@ ones and never promote either on convergence alone:
   (specified), solved the same way;
 - batch stills and solvent swaps (``still:``; :mod:`.batch_still`): ``rayleigh`` (predictive:
   one equilibrium stage, Raoult's law with Antoine vapour pressures or a constant relative
-  volatility); sourced when its volatility data carry a source; solved by ``cheme process
-  propagate``, never simulated;
+  volatility), ``batch-shortcut`` with a column (``still.column``: Diwekar's batch shortcut on
+  Fenske-Underwood-Gilliland, predictive); sourced when its volatility data carry a source;
+  solved by ``cheme process propagate``, never simulated;
 - an adsorber with an entry in ``process/adsorption.yaml`` (:mod:`.separations.adsorption`):
   ``adsorption-equilibrium`` (predictive, not simulated: core's equilibrium TSA cycle gives the
   recoveries, inside every isotherm's range, meeting the specification, and the simulator's
@@ -72,6 +73,7 @@ PREDICTIVE = (
     "solubility-equilibrium",
     "adsorption-equilibrium",
     "rayleigh",
+    "batch-shortcut",
 )
 #: The propagate tool's source: its values follow from others and decide nothing here.
 _PROPAGATE = "cheme process propagate"
@@ -555,7 +557,12 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
     relative volatilities, or, for Raoult's law, the ideal liquid itself (the volatility's own
     provenance: an assumed ideal liquid, as for a pair with an azeotrope, is not sourced) and the
     vapour pressure of every volatile component it holds."""
-    from chemeascode.domains.process.batch_still import ASSUMPTIONS, _present, inlets_of
+    from chemeascode.domains.process.batch_still import (
+        ASSUMPTIONS,
+        COLUMN_ASSUMPTIONS,
+        _present,
+        inlets_of,
+    )
     from chemeascode.domains.process.solids import solid_components
 
     spec = node.still
@@ -584,12 +591,45 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
             else:
                 lacking.append(f"vapour pressure of {name}")
     detail += f"; boil-up {spec.boilup.value:g} {spec.boilup.unit}"
+    column = spec.column
+    if column is not None:
+        stages = (
+            f"{column.stages:g} stages"
+            if column.stages is not None
+            else f"stages at {column.minimum_reflux_factor:g} x Rmin"
+        )
+        if column.reflux == "constant":
+            held = (
+                f"reflux ratio {column.ratio:g}" if column.ratio is not None else "constant reflux"
+            )
+        else:
+            held = (
+                f"distillate held at {column.distillate.mole_fraction:g} "  # type: ignore[union-attr]
+                f"{column.distillate.key} to reflux {column.maximum_ratio:g}"  # type: ignore[union-attr]
+            )
+        detail += f"; column {stages}, {held}"
     if spec.feed is not None:
         detail += f"; solvent swap ({spec.feed.mode.replace('_', ' ')})"
     if spec.cuts:
         detail += f"; {len(spec.cuts)} cuts"
     if lacking:
         detail += "; not sourced: " + ", ".join(lacking)
+    if column is not None:
+        return UnitBasis(
+            node.id,
+            "separator",
+            "batch-shortcut",
+            True,
+            not lacking,
+            detail=detail,
+            sources=sources,
+            assumptions=list(COLUMN_ASSUMPTIONS),
+            limitations=[
+                "not part of a converged simulation: solved by cheme process propagate",
+                "shortcut column: Gilliland's correlation, no holdup, constant molar overflow; "
+                "a rigorous column gives a purer distillate at the same reflux",
+            ],
+        )
     return UnitBasis(
         node.id,
         "separator",

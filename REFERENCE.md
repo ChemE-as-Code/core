@@ -119,7 +119,7 @@ cheme process streams [--md]                  # stream table with provenance, bl
 cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors; recycles at tears:
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
-cheme process stills                          # per batch still/solvent swap: cuts, residue, boil-up time, duty per batch
+cheme process stills                          # per batch still/solvent swap/column: cuts, residue, purity, recovery, reflux, boil-up time, duty per batch
 cheme process energy                          # energy balances, simulation energy audit, boundary gaps
 cheme process pinch --dt-min 10               # pinch targets of the recorded simulation run
 cheme process furnace [K-101]                 # lime kiln: elements, off-gas, furnace energy closure (extra cantera)
@@ -1244,7 +1244,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol) or 1/h (kmol of vapour
     per hour per kmol of charge).
   - The still stops at `end:` (one of `distilled` with `basis: mole | mass`, `residue: {key,
-    mole_fraction}`, `time` s of boil-up, `temperature` K), or `cuts: [{outlet, end}]` collect
+    mole_fraction}`, `time` s of boil-up, `temperature` K, `purity: {key, fraction}` with
+    `basis: mole | mass`: the cut's mean share of the key falls to the fraction, a product cut
+    collected to its specification), or `cuts: [{outlet, end}]` collect
     the distillate in turn. `outlets: {distillate, residue}` (with cuts: `residue` only) maps
     the roles to the step's ports.
   - `feed: {stream, mode: constant_level | portions, portions, down_to}` makes it a solvent
@@ -1279,10 +1281,37 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     whole energy per batch on the duty's basis (`total_energy_kWh_per_batch`, beside the year
     average; `energy_kWh_per_batch` stays the latent heat) and assumptions that say what the
     duty holds.
-  - Not modelled: rectification with reflux, activity coefficients (azeotropes), the
-    content's sensible rise while it boils (and the heat-up without `heat_up`), losses, constant level by volume. `process simulate` does not couple it.
+  - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
+    boils (and the heat-up without `heat_up`), losses, constant level by volume. `process
+    simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
     and the constant-level swap's closed form (`tests/test_batch_still.py`).
+  - **Batch rectification** (ADR 0061): `column: {stages: N, reflux: constant, ratio: R}` puts
+    a column of N theoretical stages (the still included) with a total condenser on the still,
+    on Diwekar's batch shortcut: at each point of the path the distillate follows from
+    Hengstebeck-Geddes at the Fenske index, Underwood's minimum reflux (the still's liquid as a
+    saturated-liquid feed, the root between `heavy_key`, by default the next less volatile
+    component of the charge after the distillate's key, and the next lighter one; without a
+    key, the keys at each point: the most volatile component above 1 % of the still's vapour
+    and the next less volatile one, so a main cut after a forerun separates the next pair; a
+    lighter trace takes at most `(R + 1)` times its share of the still's vapour) and
+    Gilliland's correlation (Molokanov); no holdup, constant molar overflow, the relative
+    volatilities at the still's bubble point. `reflux: constant_distillate, distillate: {key, mole_fraction},
+    maximum_ratio` raises the reflux to hold the distillate, then stays at the maximum (a note
+    with where; another note when the key is not the charge's most volatile component).
+    `minimum_reflux_factor: f` with a `distillate` designs the column at the start instead of
+    `stages` (R = f Rmin, the stages from Gilliland). `(R + 1)` moles boil up per mole distilled:
+    the boil-up time and the reboiler's energy are `(R + 1)` times a one-stage still's for the
+    same distillate. N = 1 is Rayleigh's still; R -> infinity the Fenske limit. The basis is
+    `batch-shortcut` (predictive); `process stills` adds the column's reflux (start, end, along
+    the profile), each cut's mass fractions and recovery, and the condenser's duty. Rules: a
+    column's `distillate` or `heavy_key` that is no or a non-volatile component, a purity key
+    that is no component (errors). Qualified against Rayleigh (N = 1), the Fenske limit,
+    Underwood's binary closed form, the constant-distillate balance and rigorous
+    plate-to-plate binary and ternary columns (a forerun and a main cut) as a bound
+    (`tests/test_batch_rectification.py`; Diwekar's published examples and DWSIM: core#195); worked
+    example `examples/process-batch-rectification`. One reflux policy for all cuts; the column
+    and its condenser are not sized.
 - **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal
   `reactor: batch` or `semibatch`, a `still:`, a `crystallizer:` with `energy:` and a
   conversion step (`reactions:` with conversions or a `selectivity:`) give the heat they
@@ -1290,8 +1319,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   --fill` writes it as the `duty` of their energy stream, `calculated` with a fingerprint.
   - The heat: a batch's is minus the heat its reactions release over the batch plus each dose
     warmed to the batch's temperature (and a dosed gas passing to the vent; the doses' heat of
-    solution, the charge's heat-up with `heat_up` and the vessel's metal, ADR 0063); a still's the latent heat of its distillate, `sum
-    dHvap_i D_i`; a crystallizer's its lumped duty; a conversion step's (batch or continuous)
+    solution, the charge's heat-up with `heat_up` and the vessel's metal, ADR 0063); a still's
+    the latent heat of its distillate, `sum dHvap_i D_i` (with a column the reboiler's
+    `(R + 1) D lambda`, and its condenser the same latent heat out on its own stream:
+    `still.condenser_port`, else, with a column, the still's one heat stream out, the
+    reboiler's then its one heat stream in; ADR 0061; the condenser takes no heat-up or metal);
+    a crystallizer's its lumped duty; a conversion step's (batch or continuous)
     `sum xi dHr` at the heats' own `heat_of_reaction.temperature` with every inlet brought to
     it and every outlet from it (`liquid_heat_capacity`, or the ideal-gas enthalpy for a stream
     said to be vapour), or `H(out) - H(in)` of ideal gases for a gas-phase step (no stream said

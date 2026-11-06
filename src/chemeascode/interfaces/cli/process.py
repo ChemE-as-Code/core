@@ -163,10 +163,11 @@ def stills(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,
     as_json: Annotated[bool, typer.Option("--json", help="As JSON.")] = False,
 ) -> None:
-    """Each batch still and solvent swap (still:): its basis (rayleigh), the charge, the swap's
-    feed, the distillate cuts and the residue (amounts per batch and compositions), the boil-up
-    time, the duty and the energy per batch (the batch from process/recipe.yaml), the still's
-    temperatures. Exit 1 on an error finding."""
+    """Each batch still, solvent swap and batch column (still:, still.column): its basis
+    (rayleigh, batch-shortcut), the charge, the swap's feed, the distillate cuts and the residue
+    (amounts per batch and compositions; with a column each cut's purity and recovery), the
+    column's reflux, the boil-up time, the duty and the energy per batch (the batch from
+    process/recipe.yaml), the still's temperatures. Exit 1 on an error finding."""
     from chemeascode.domains.process.batch_still import UnknownCase, report_text, still_report
 
     workspace = _workspace()
