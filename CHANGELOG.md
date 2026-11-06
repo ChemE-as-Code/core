@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.10.0 (2026-11-06)
+
+Minor release: batch distillation, vent vapour and the heats a batch model left out. A batch
+still takes a rectifying column on Diwekar's shortcut over Fenske-Underwood-Gilliland
+(`still.column`, constant reflux or constant distillate, a `purity` end), and writes its
+condenser's duty on its own stream (ADR 0061). A batch vent carries the liquid's volatile
+components (`vent.vapour`), through an optional partial vent condenser on its own energy stream
+that returns the condensate, with a Henry split of a formed gas (ADR 0062). A dose's heat of
+solution or mixing (`heat_of_solution`), the charge's heat-up (`batch.heat_up`,
+`still.heat_up`) and a recipe vessel's metal (`vessel.metal_heat_capacity`) enter the models'
+duties, the jacket times and the screening's dT_ad (ADR 0063). A plant that uses none of the new
+fields solves, reports and fingerprints as in 1.9.0; every BFD/PFD needs `cheme process build`
+once (the process generator's code changed; the drawn sheets do not).
 
 ### Added
 
