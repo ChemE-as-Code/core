@@ -1,6 +1,6 @@
 [project]
 name = "cheme-as-code"
-version = "1.10.0"
+version = "1.11.0"
 description = "Plant design as code: validate, format, render and diff DEXPI P&IDs, BFD/PFD and engineering YAML kept in git."
 readme = "README.md"
 requires-python = ">=3.12"

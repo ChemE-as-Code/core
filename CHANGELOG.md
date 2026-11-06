@@ -18,6 +18,24 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+
+### Changed
+
+- The committed example sheets are regenerated: the generator code fingerprint covers
+  `props.py`.
+
+## 1.11.0 (2026-11-06)
+
+Minor release: lighter generated sheets and off-page connectors on the sheet edge. `cheme process
+build` writes the BFD and PFD without indentation, about half the bytes for the same drawing
+(generator 7, ADR 0048), and `cheme fmt` leaves a generated sheet as built. A new drawing lint,
+`cheme.offpage-not-on-edge`, flags an off-page connector to another sheet or the battery limit
+that is not on an edge of the drawing area, and the `drawing-clean` gate fails on it (ADR 0049).
+Every BFD/PFD needs `cheme process build` once (generator 7). A plant that lists the
+`drawing-clean` rules in `checks/checks.yaml` gets the new rule only once it adds it.
+
+### Added
+
 - Drawing lint: `cheme.offpage-not-on-edge` (warning, ADR 0049), an off-page connector to
   another sheet or the battery limit that does not sit on an edge of the drawing area (the
   inside of the border down to the title block's top): within 10 mm of it, or 35 mm with nothing
@@ -30,8 +48,6 @@
 
 ### Changed
 
-- The committed example sheets are regenerated: the generator code fingerprint covers
-  `props.py`.
 - The `drawing-clean` gate also fails on `cheme.offpage-not-on-edge`; add it to an existing
   plant's `checks/checks.yaml` to get it. The template's example generator draws its off-page
   connectors on the right edge.
