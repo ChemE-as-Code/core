@@ -261,3 +261,44 @@ def test_sheet_meta_reports_the_comments_it_drops(plant: Path, monkeypatch):
     out = CliRunner().invoke(app, ["sheet", "meta", "pid/P-01.xml", "Revision=B"])
     assert out.exit_code == 0, out.output
     assert "dropped 1 XML comment(s)" in out.output and "KEEP: vendor datasheet" in out.output
+
+
+def test_fmt_leaves_generated_process_sheets_as_built(tmp_path: Path, monkeypatch):
+    """A BFD/PFD from ``cheme process build`` (unindented, ADR 0048) is not reformatted by
+    ``cheme fmt``, ``cheme fmt --check`` or ``cheme run --fmt``: it stays as built and validates
+    clean, so "``cheme fmt <sheet>``, then ``cheme validate``" works on it."""
+    import shutil
+
+    from typer.testing import CliRunner
+
+    from chemeascode.domains.piping.fmt import is_process_sheet
+    from chemeascode.domains.process.sheets import build, edited
+    from chemeascode.foundation.workspace import Workspace
+    from chemeascode.interfaces.cli import app
+
+    root = tmp_path / "plant"
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    shutil.copytree(examples / "process-recycle", root, ignore=shutil.ignore_patterns("build"))
+    assert not build(Workspace(root), force=True).failed
+    monkeypatch.chdir(root)
+    (root / "scripts").mkdir(exist_ok=True)
+    (root / "scripts/noop.py").write_text("print('nothing to draw')\n", encoding="utf-8")
+    runner = CliRunner()
+    for sheet in ("process/BFD.xml", "process/PFD.xml"):
+        built = (root / sheet).read_bytes()
+        assert is_process_sheet(built)
+        for args in (
+            ["fmt", "--check", sheet],
+            ["fmt", sheet],
+            ["run", "--fmt", sheet, "scripts/noop.py"],
+        ):
+            out = runner.invoke(app, args)
+            assert out.exit_code == 0, (args, out.output)
+            assert "generated, not formatted (cheme process build)" in out.output, args
+            assert (root / sheet).read_bytes() == built, args
+        assert not format_file(root / sheet).changed
+        assert not edited(built)
+    report = runner.invoke(app, ["validate", "process/BFD.xml", "process/PFD.xml"])
+    assert report.exit_code == 0 and "generated-edited" not in report.output, report.output
+    # a P&ID is still formatted
+    assert not is_process_sheet(REFERENCE.read_bytes())

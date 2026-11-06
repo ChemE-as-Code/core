@@ -35,16 +35,20 @@ from chemeascode.domains.process import GENERATOR_VERSION, SCHEMA
 _COMMENT = re.compile(rb"<!-- cheme-process (\{.*?\}) -->\n?")
 
 
-# The modules that turn process/*.yaml into BFD/PFD sheets. Reports, checks and YAML-writing
-# commands (streams, summary, sheets, fill, propagate) are left out: editing them changes no sheet.
+# The modules that turn process/*.yaml into BFD/PFD sheets, and the symbol shapes they draw.
+# Reports, checks and YAML-writing commands (streams, summary, sheets, fill, propagate) are left
+# out: editing them changes no sheet.
 GENERATOR_MODULES = (
     "__init__.py",
     "build.py",
     "layout.py",
     "model.py",
+    "pfd_sheet.py",
     "props.py",
     "provenance.py",
     "schema.py",
+    "symbols.py",
+    "data/iso_shapes.json",
 )
 
 

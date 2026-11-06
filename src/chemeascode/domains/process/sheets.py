@@ -372,12 +372,12 @@ def produce(workspace: Workspace, entry: Any, process: Any) -> bytes:
     """The sheet *entry* as ``cheme process build`` writes it."""
     from pydexpi.loaders.xml_serializer import DexpiXmlSerializer
 
-    from chemeascode.domains.process.build import build_model
+    from chemeascode.domains.process.build import XML_INDENT, build_model
 
     meta = meta_for(workspace, entry, process)
     source = provenance.source_fingerprint(process, entry.kind, meta)
     model, _ = build_model(process, entry.kind, {**meta, "source": source})
-    content = DexpiXmlSerializer().export_to_bytes(model)
+    content = DexpiXmlSerializer(indent=XML_INDENT).export_to_bytes(model)
     return provenance.stamp(content, entry.kind, meta["case"], source)
 
 
