@@ -198,4 +198,7 @@ nav:
       - "0058 Semi-batch thermal screening": adr/0058-semi-batch-thermal-screening.md
       - "0059 Batch models write their energy streams": adr/0059-batch-models-write-their-energy-streams.md
       - "0060 Recycle convergence with tear streams": adr/0060-recycle-convergence-with-tear-streams.md
+      - "0061 Batch rectification on the shortcut": adr/0061-batch-rectification-on-the-shortcut.md
+      - "0062 Vent vapour, vent condenser and gas solubility": adr/0062-vent-vapour-condenser-and-gas-solubility.md
+      - "0063 Heats of solution, heat-up and vessel metal": adr/0063-heats-of-solution-heat-up-and-vessel-metal.md
       - Template: adr/template.md

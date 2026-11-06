@@ -1,0 +1,126 @@
+# Batch rectification of crude acetyl chloride (after process-library acetyl-chloride-1, whose
+# one-stage still gave only 97.3 wt%). The crude (S1: acetyl chloride with 2.9 wt% PCl3, a
+# little acetic acid and phosphorous acid) is charged to the still ST1 at 101.325 kPa(a), which
+# carries a column of 10 theoretical stages (the still included). The column holds its
+# distillate at 0.999 mole fraction acetyl chloride by raising the reflux ratio, up to 4; past
+# it the reflux stays at 4 and the distillate's purity falls. The product cut S2 is collected
+# until its mean purity falls to the 99.8 wt% specification, the off-cut S3 until acetyl
+# chloride is 5 mol% of the residue, which is left (S4).
+# The flows are the year averages of the recipe (process/recipe.yaml, `cheme process recipe`:
+# a batch of 1530 kg). `cheme process propagate --fill` integrates the still and its column
+# (Diwekar's batch shortcut on Fenske-Underwood-Gilliland, Raoult's law; core ADR 0061) and
+# writes the cuts, the residue, the reboiler's duty Q1 ((R + 1) times the distillate's latent
+# heat) and the condenser's Q2; `cheme process stills` gives the purity, the recovery, the
+# reflux, the boil-up time (the recipe's distil) and the duty per batch. Regenerate the sheets
+# with `cheme process build`.
+# Raoult's law is an ideal liquid: no VLE data of acetyl chloride with PCl3 were found, so the
+# volatility is `assumed` and `cheme process stills` reports the basis not sourced.
+schema: cheme/process/v1
+kind: flowsheet
+title: Batch rectification of crude acetyl chloride
+units: {pressure: kPa(a), temperature: K, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 0.05, rel: 0.002}
+
+feeds:
+  - {id: CRUDE, title: Crude acetyl chloride, ports: [{id: out, direction: out}]}
+  - id: LPS
+    title: LP steam
+    category: utility
+    utility: {kind: steam, level: LP}
+    ports: [{id: q, direction: out, kind: energy}]
+products:
+  - {id: PRODUCT, title: Acetyl chloride (99.8 wt%), ports: [{id: in, direction: in}]}
+  - {id: SLOP, title: Off-cut to the next batch's crude, ports: [{id: in, direction: in}]}
+  - {id: RESIDUE, title: Still residue to incineration, ports: [{id: in, direction: in}]}
+  - id: CW
+    title: Cooling water return
+    category: utility
+    utility: {kind: cooling_water}
+    ports: [{id: q, direction: in, kind: energy}]
+
+blocks:
+  - id: PURIFY
+    title: Batch rectification
+    class: Distilling
+    ports:
+      - {id: in, direction: in}
+      - {id: steam, direction: in, kind: energy}
+      - {id: condenser, direction: out, kind: energy}
+      - {id: product, direction: out}
+      - {id: offcut, direction: out}
+      - {id: bottom, direction: out}
+
+steps:
+  - id: ST1
+    block: PURIFY
+    title: Still with its column
+    class: Distilling
+    still:
+      pressure: 101.325
+      volatility: {model: raoult, provenance: assumed, source: "ideal liquid, NIST WebBook Antoine (materials.yaml); no VLE data of the pairs found: illustrative"}
+      nonvolatile: [H3PO3]
+      boilup: {value: 150, unit: kW, provenance: assumed, source: "the reboiler's heat input: illustrative"}
+      column:
+        stages: 10
+        reflux: constant_distillate
+        distillate: {key: ACCL, mole_fraction: 0.999}
+        maximum_ratio: 4
+        provenance: assumed
+        source: "a packed column of about 10 theoretical stages on the still: illustrative"
+      cuts:
+        - {outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}
+        - {outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}}
+      outlets: {residue: bottom}
+      provenance: assumed
+      source: "the product cut to its specification, an off-cut, the rest left in the still: illustrative"
+    ports:
+      - {id: in, direction: in, delegates: in}
+      - {id: steam, direction: in, kind: energy, delegates: steam}
+      - {id: condenser, direction: out, kind: energy, delegates: condenser}
+      - {id: product, direction: out, delegates: product}
+      - {id: offcut, direction: out, delegates: offcut}
+      - {id: bottom, direction: out, delegates: bottom}
+
+streams:
+  - id: S1
+    title: Crude acetyl chloride
+    from: CRUDE.out
+    to: ST1.in
+    template: crude
+    state:
+      design:
+        pressure: {value: 101.325, provenance: given, source: basis of design}
+        temperature: {value: 313.15, provenance: given, source: basis of design}
+        flow: {value: 347.417, provenance: given, source: "basis of design: the recipe's 1530 kg a batch over its 4.404 h cycle"}
+        composition: {basis: mole_fraction, values: {ACCL: 0.979087, PCL3: 0.01653, ACOH: 0.00273, H3PO3: 0.001653}, provenance: given, source: "basis of design (the upper phase of process-library acetyl-chloride-1)"}
+  - id: S2
+    title: Acetyl chloride
+    from: ST1.product
+    to: PRODUCT.in
+    template: crude
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {ACCL: 0.998856, PCL3: 0.00114412, ACOH: 1.55317e-07, H3PO3: 0.0}, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+        flow: {value: 334.84, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+  - id: S3
+    title: Off-cut
+    from: ST1.offcut
+    to: SLOP.in
+    template: crude
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {ACCL: 0.715091, PCL3: 0.284398, ACOH: 0.00051066, H3PO3: 0.0}, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+        flow: {value: 2.8571, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+  - id: S4
+    title: Still residue
+    from: ST1.bottom
+    to: RESIDUE.in
+    template: crude
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {ACCL: 0.05, PCL3: 0.716843, ACOH: 0.145151, H3PO3: 0.088006}, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+        flow: {value: 9.71942, provenance: calculated, source: 'cheme process propagate: still ST1 from S1', fingerprint: b136e7aa2d262c35}
+  - {id: Q1, title: Still reboiler, kind: energy, from: LPS.q, to: ST1.steam, state: {design: {duty: {value: 81.8793, provenance: calculated, source: 'cheme process propagate: still duty ST1 from S1', fingerprint: 3a962b2f9143084e}}}}
+  - {id: Q2, title: Column condenser, kind: energy, from: ST1.condenser, to: CW.q, state: {design: {duty: {value: 81.8793, provenance: calculated, source: 'cheme process propagate: still condenser duty ST1 from S1', fingerprint: daee3c8fa1d17f1a}}}}

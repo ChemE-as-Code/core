@@ -152,7 +152,12 @@ each value taken from the evidence cites its observation in `source`.
      reactions that consume it with the dosed gas as a gas (as calorimetry with gas dosing
      measures it), so this heat is counted as the dose reacts. That keeps the MTSR
      conservative, but the cooling duty during dosing leaves out the absorption of the gas not
-     yet reacted; on the dissolved basis both miss it. When only part is taken up, give the
+     yet reacted; on the dissolved basis both miss it. Where the heat of absorption matters
+     (gas left dissolved, a dosed liquid's heat of dilution), give the dose `heat_of_solution:
+     {values: {ID: kJ/kmol}, provenance, source}` instead (ADR 0063) and write those reactions'
+     heats on the dissolved basis: it is released as the dose mixes in, in the duty, the peak
+     cooling and dT_ad, not in the MTSR; what of it the vent's `vapour` takes off the liquid
+     again takes its heat back. When only part is taken up, give the
      dose `absorbed: 0.9`: the rest passes straight through to the vent, warmed to the vessel's
      temperature (its ideal-gas cp, else left out and noted). `process propagate` writes both
      outlets (composition, flow, the liquid's temperature and pressure) and the balance closes
@@ -163,6 +168,31 @@ each value taken from the evidence cites its observation in `source`.
      listed in `vent.components` vents nothing of itself: only what the reactions form vents; a
      dosed gas that escapes is `absorbed`. Do not model the gas as a dissolved liquid component
      plus a degassing split: that overstates the volume and gives no off-gas profile.
+     Where the liquid is volatile (a solvent near its boiling point, a product like acetyl
+     chloride at 69 kPa), give the vent `vapour: {}` (ADR 0062): the gas leaves saturated with
+     the liquid's components that have an Antoine `vapour_pressure` (Raoult, ideal unless
+     `activity: {id: gamma}` from a source), the vapour leaves the liquid and its
+     `heat_of_vaporization` cools the vessel (part of its model duty). Do not type a vapour
+     `fraction` or script the evaporative cooling any more, unless the vent gas is mostly a
+     displaced head space or a sweep gas (a dose pushing out the head space, a nitrogen
+     purge): the model carries vapour only on the gas the reactions form and a passing dose,
+     so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
+     reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
+     energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
+     (an isothermal batch's is its liquid outlet's given temperature, which `heat_up` heats a
+     colder charge to; `validate` flags one at or above it): the gas past it is saturated at its temperature,
+     the condensate returns (or `returns: STREAM`, a third outlet), and its duty goes on the
+     step's energy stream at `PORT` (its own, not the jacket's `energy_port`; a cooling-water
+     or brine terminal). The vent stream's template (and the condensate's) must list the
+     vapour's components. Where the gas's solubility is known, give
+     `henry: {HCL: {points: [[313.15, kPa]], provenance, source}}` instead of a `fraction`: the liquid at the end holds its
+     solubility at the gas's partial pressure, so the dissolved HCl reaches the crude (its
+     component then needs `liquid_molar_volume` and `liquid_heat_capacity`, and the liquid's
+     template lists it). A content that boils at the vessel's pressure is refused: that is a
+     still or a reflux, not a vent. `reactor-hazards` then takes the gas release at the MTSR
+     with its vapour (no condenser credited); `boils` there is a warning to size the relief
+     for the boil-up. Not modelled: a head-space or sweep gas the dose displaces, mass-transfer
+     limits, the heat of absorption.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A

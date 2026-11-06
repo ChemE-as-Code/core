@@ -16,6 +16,9 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
   its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
   then and ``dT_ad`` of the whole batch, charge and doses;
+- a semi-batch's doses with ``heat_of_solution`` (ADR 0063): their heat over the batch's heat
+  capacity counts in ``dT_ad`` (``heat_of_solution``), not in the MTSR: it is released as each
+  dose mixes in, so a cooling failure that stops the dosing finds none of it accumulated;
 - a vented batch or semi-batch (``batch.vent``, ADR 0054): the vented gas leaves as it forms,
   so it adds nothing to the content's heat capacity nor to the MTSR, and a dosed gas counts
   only with its absorbed share. The notes give the vent's peak gas rate over the run;
@@ -129,6 +132,10 @@ class HazardEntry:
     gas_release: dict[str, Any] | None = None
     #: component -> why the default MTT leaves it out
     mtt_left_out: dict[str, str] = field(default_factory=dict)
+    #: a semi-batch whose doses give heat_of_solution (ADR 0063): the heat they release as they
+    #: mix in (kJ per hour of flows, the batch's basis) and its adiabatic rise, in dT_ad and not
+    #: in the MTSR (released on mixing, not accumulated)
+    heat_of_solution: dict[str, Any] | None = None
 
 
 #: HazardEntry's fields the JSON gives only when they hold something (ADR 0058): a reactor
@@ -141,6 +148,7 @@ OPTIONAL = (
     "mtsr_profile",
     "gas_release",
     "mtt_left_out",
+    "heat_of_solution",
 )
 
 
@@ -462,7 +470,9 @@ def _screen_semibatch(
     p_in = None
     # a dosed gas counts with the share the liquid takes up; the rest passes to the vent
     absorbed = {d.stream: d.absorbed for d in item.batch.dosing if d.absorbed is not None}
+    solutions = {d.stream: d.heat_of_solution for d in item.batch.dosing if d.heat_of_solution}
     gases: list[str] = []  # the components of a dosed gas
+    mixing = 0.0  # kJ the doses release as they mix in (ADR 0063)
     try:
         for stream in inlets:
             found, t_in, kpa = stream_moles(process, stream, case)
@@ -472,6 +482,8 @@ def _screen_semibatch(
                     moles[n] = moles.get(n, 0.0) + v * share
                     if stream.id in absorbed:
                         gases.append(n)
+            if (heat := solutions.get(stream.id)) is not None:
+                mixing -= sum(found.get(n, 0.0) * share * h for n, h in heat.values.items())
             p_in = kpa if p_in is None else min(p_in, kpa)
         solved, _ = solve_node(process, item, inlets, case)
     except TankError as failure:
@@ -486,6 +498,8 @@ def _screen_semibatch(
     )
     entry.missing += lacking
     entry.adiabatic_rise = rise
+    if solutions:
+        _solution_rise(entry, moles, comps, mixing)
     entry.accumulation = solved.max_accumulation
     if worst is not None:
         entry.mtsr = worst.mtsr(counted)
@@ -530,6 +544,39 @@ def _screen_semibatch(
             counted,
         )
     return entry
+
+
+def _solution_rise(
+    entry: HazardEntry, moles: dict[str, float], comps: dict[str, Any], mixing: float
+) -> None:
+    """The doses' heat of solution in dT_ad (ADR 0063): *mixing* kJ (per hour of flows) over the
+    heat capacity of the whole batch, charge and doses (as the reactions' dT_ad). It is
+    released as each dose mixes in, so a cooling failure with the dosing stopped finds none of
+    it left: it counts in dT_ad (all of it dosed at once, a dosing error) and not in the
+    MTSR."""
+    lacking = sorted(
+        n
+        for n, v in moles.items()
+        if v > 0 and not getattr(comps.get(n), "liquid_heat_capacity", 0)
+    )
+    if lacking:
+        entry.missing.append(
+            "the heat of solution's rise: liquid_heat_capacity of " + ", ".join(lacking)
+        )
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in moles.items() if v > 0)
+    rise = mixing / capacity if capacity > 0 else 0.0
+    entry.heat_of_solution = {
+        "kJ_per_hour_of_flows": mixing,
+        "adiabatic_rise_K": rise,
+        "in_mtsr": False,
+    }
+    if entry.adiabatic_rise is not None:
+        entry.adiabatic_rise += rise
+    entry.notes.append(
+        f"dT_ad includes the doses' heat of solution, {rise:.3g} K (released as they mix in, "
+        "not accumulated: not in the MTSR)"
+    )
 
 
 def _profile(points: list[Any], counted: list[str] | None) -> list[dict[str, float | None]]:
@@ -687,12 +734,76 @@ def _gas(
         ),
         "per_batch": bool(hours),
     }
+    _vapour_laden(process, item, entry, gas, moles, temperature, pressure)
     capacity = getattr(getattr(item, "hazard", None), "vent_capacity", None)
     if capacity:
         gas["vent_capacity_m3_h"] = capacity
         if hours:
             gas["capacity_ratio"] = gas["rate_m3_h"] / capacity
     entry.gas_release = gas
+
+
+def _vapour_laden(
+    process: Any,
+    item: Any,
+    entry: HazardEntry,
+    gas: dict[str, Any],
+    moles: dict[str, float],
+    temperature: float,
+    pressure: float,
+) -> None:
+    """A vent with ``vapour`` (ADR 0062): the gas release leaves the vessel saturated with the
+    liquid's volatile components at the MTSR, so its volume is the non-condensables' over
+    ``1 - Y``, ``Y = sum_i gamma_i x_i P_i^sat(MTSR) / P`` over the content *moles* (a vent
+    condenser is not credited: its cooling may fail too). ``Y >= 1``: the content boils at the
+    MTSR, and its boil-up, not the gas, sets the release (``boils``)."""
+    from chemeascode.domains.process.vent_vapour import VentError, phase_of
+
+    vent = item.batch.vent
+    if vent.vapour is None:
+        return
+    try:
+        phase = phase_of(process, vent, list(moles), process.ideal_gas())
+    except VentError as failure:
+        entry.missing.append(f"the vapour in the gas release: {failure}")
+        return
+    total = sum(v for v in moles.values() if v > 0)
+    if not phase.volatile or total <= 0:
+        return
+    share = sum(
+        phase.activity.get(n, 1.0)
+        * max(moles.get(n, 0.0), 0.0)
+        / total
+        * phase.vapour_pressure[n].kpa(temperature)
+        / pressure
+        for n in phase.volatile
+    )
+    gas["vapour_share"] = share
+    gas["noncondensable_m3_h"] = gas["rate_m3_h"]
+    if share >= 1.0:
+        gas["boils"] = True
+        entry.notes.append(
+            f"the content boils at the MTSR ({temperature:.1f} K): its vapour pressure "
+            f"{share * pressure:.4g} kPa reaches the vessel's {pressure:.4g} kPa(a); the gas "
+            "release is the boil-up, which the screening does not size (gas_release.boils)"
+        )
+        return
+    gas["rate_m3_h"] /= 1.0 - share
+    # formed_kmol and formed_m3 stay the gas formed (the non-condensables, one basis); the
+    # volume it leaves with, the liquid's vapour included, is a key of its own
+    gas["formed_m3_with_vapour"] = gas["formed_m3"] / (1.0 - share)
+
+
+def _vapour_text(gas: dict[str, Any]) -> str:
+    """The vapour's part of a gas release (ADR 0062), '' without one."""
+    if "vapour_share" not in gas:
+        return ""
+    if gas.get("boils"):
+        return f" (the non-condensables; the content boils, vapour share {gas['vapour_share']:.3g})"
+    return (
+        f" with the liquid's vapour ({gas['vapour_share']:.3g} of the gas; the non-condensables "
+        f"{gas['noncondensable_m3_h']:.4g} m3/h)"
+    )
 
 
 def _vent_note(
@@ -1003,10 +1114,19 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
             release = (
                 f"{e.node}: gas release at the MTSR {gas['rate_kmol_s']:.4g} kmol/s, "
                 f"{gas['rate_m3_h']:.4g} m3/h at {gas['temperature_K']:.1f} K and "
-                f"{gas['pressure_kPa']:.4g} kPa(a), {gas['basis']}"
+                f"{gas['pressure_kPa']:.4g} kPa(a)" + _vapour_text(gas) + f", {gas['basis']}"
             )
             capacity = gas.get("vent_capacity_m3_h")
-            if capacity is None:
+            if gas.get("boils"):
+                add(
+                    "warning",
+                    "vent",
+                    release + ": the content boils at the MTSR (its vapour pressure reaches "
+                    "the vessel's)",
+                    "the boil-up at a cooling failure sets the vent's and relief's load: size "
+                    "them for it (a two-phase relief study), or lower the MTSR",
+                )
+            elif capacity is None:
                 add(
                     "warning",
                     "vent",
@@ -1101,9 +1221,15 @@ def hazard_text(report: HazardReport) -> str:
             lines.append(
                 f"  gas release at the MTSR: {gas['rate_kmol_s']:.4g} kmol/s, "
                 f"{gas['rate_m3_h']:.4g} m3/h at {gas['temperature_K']:.1f} K and "
-                f"{gas['pressure_kPa']:.4g} kPa(a) ({gas['basis']}; {gas['rate_from']}); "
-                f"{gas['formed_kmol']:.4g} kmol ({gas['formed_m3']:.4g} m3) formed by "
-                f"{gas['formed_by'] or 'no reaction'} run to completion"
+                f"{gas['pressure_kPa']:.4g} kPa(a){_vapour_text(gas)} ({gas['basis']}; "
+                f"{gas['rate_from']}); "
+                f"{gas['formed_kmol']:.4g} kmol ({gas['formed_m3']:.4g} m3"
+                + (
+                    f"; {gas['formed_m3_with_vapour']:.4g} m3 with the liquid's vapour"
+                    if "formed_m3_with_vapour" in gas
+                    else ""
+                )
+                + f") formed by {gas['formed_by'] or 'no reaction'} run to completion"
                 + (f" ({gas['formed_from']})" if gas.get("formed_from") else "")
                 + (
                     f"; vent capacity {gas['vent_capacity_m3_h']:.4g} m3/h"

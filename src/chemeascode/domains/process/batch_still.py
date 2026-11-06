@@ -1,5 +1,6 @@
 """Batch (Rayleigh) distillation and solvent swap (``still:`` on a block or step), shortcut
-level: one equilibrium stage, total condenser, no reflux.
+level: one equilibrium stage, total condenser, no reflux; or batch rectification with a column
+above the still (``still.column``, ADR 0061).
 
 The still's content ``N_i`` (kmol) boils up at ``V`` (kmol/s) and the vapour leaves in
 equilibrium with it::
@@ -30,6 +31,32 @@ volatility the old solvent ``A`` (``alpha`` to the new one) in a content of ``N`
 non-volatile share ``x_P`` falls as::
 
     ((1 - x_P) / alpha) ln(x_A0 / x_A) + ((alpha - 1) / alpha) (x_A0 - x_A) = fed / N
+
+Batch rectification (``column:``) is Diwekar's shortcut batch column on core's
+Fenske-Underwood-Gilliland (:mod:`.separations.shortcut`). At each point of the still's path
+the column is a continuous one fed with the still's liquid ``x_B`` as a saturated liquid, in
+quasi-steady state (no holdup), at constant molar overflow:
+
+- the distillate from Hengstebeck-Geddes at the Fenske index ``C1``, ``x_D,i = alpha_i^C1
+  x_B,i / sum_j alpha_j^C1 x_B,j``;
+- Underwood's minimum reflux, ``sum_i alpha_i x_B,i / (alpha_i - theta) = 0`` for the root
+  between the heavy key and the next lighter component, ``R_min = sum_i alpha_i x_D,i /
+  (alpha_i - theta) - 1``. The keys are named (``heavy_key``, the distillate's key) or taken at
+  each point: the light key the most volatile component that is not a trace of the still's
+  vapour (``TRACE``), the heavy key the next less volatile one; a component more volatile than
+  the light key takes no more of the distillate than the still's vapour brings up, ``x_D,i <=
+  (R + 1) y_i`` (the column's balance);
+- Gilliland's correlation (Molokanov) between them: at a constant reflux ratio ``R`` and ``N``
+  stages it gives ``C1``; holding the distillate's key (``constant_distillate``) it gives the
+  ``R`` that does, up to ``maximum_ratio``.
+
+The still's balance is the one above with the distillate for the vapour, ``dN_i/dD = -x_D,i``
+over the moles distilled ``D``; ``(R + 1)`` moles boil up per mole distilled, so ``dt/dD = (R +
+1)/V`` and the reboiler's ``dE/dD = (R + 1) lambda(x_D)``, which the total condenser removes
+again. ``N = 1`` is Rayleigh's still (whatever the reflux, which then only slows it), ``R ->
+inf`` the Fenske limit, Rayleigh's equation at ``alpha^N``. The relative volatilities are the
+K-values at the still's bubble point (raoult) or the constant ones. The Fenske index is never
+below 1: the distillate is never leaner than the still's own vapour.
 
 The basis: the flowsheet's flows are amounts per hour of flows, as a semi-batch's charge and
 doses (ADR 0050, 0051). One batch is the hours of flows the recipe's batch size makes
@@ -69,6 +96,26 @@ ASSUMPTIONS = (
     "a swap's feed mixes in at once; constant level holds the content's moles, not its volume",
 )
 
+#: What the model takes for granted with a column (``still.column``, ADR 0061).
+COLUMN_ASSUMPTIONS = (
+    "Diwekar's batch shortcut: at each point the column is a continuous one fed with the "
+    "still's liquid (a saturated liquid), the distillate from Hengstebeck-Geddes at the Fenske "
+    "index, Underwood's minimum reflux (one root, between the heavy key and the next lighter "
+    "component) and Gilliland's correlation (Molokanov) between them",
+    "the keys named, or at each point the most volatile component above 1 % of the still's "
+    "vapour and the next less volatile one; a lighter trace takes at most (R + 1) times its "
+    "share of the still's vapour (the column's balance)",
+    "the relative volatilities of the still at its bubble point (raoult) or constant, for the "
+    "whole column; constant molar overflow",
+    "no holdup on the stages or in the condenser (the column is in quasi-steady state)",
+    "total condenser: the reflux returns as saturated liquid; the vapour rate is (R + 1) "
+    "times the distillate's",
+    "the distillate is never leaner than the still's own vapour (the Fenske index at least 1)",
+    "constant boil-up from the start: no heat-up, no sensible heat, no heat losses",
+    "the reboiler's and the condenser's duty are the latent heat of the vapour boiled up and "
+    "condensed (heat_of_vaporization of the distillate's composition)",
+)
+
 #: Points of a still's profile (beside the integrator's own).
 PROFILE_POINTS = 50
 #: Relative error per step of the integration.
@@ -78,6 +125,9 @@ HOTTEST = 2000.0
 #: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
 #: cryogens such as hydrogen and helium are below).
 LEAST_LATENT = 2000.0
+#: A component below this share of the still's vapour is a trace to the column: with no key
+#: named, the light key is the most volatile component above it (ADR 0061).
+TRACE = 1e-2
 
 
 class StillError(ValueError):
@@ -115,6 +165,19 @@ class StillResult:
     peak_duty: float | None = None  # kW
     temperatures: tuple[float, float] | None = None  # K of the still at the start and end
     key: str = ""
+    #: K of the charge as it enters; with ``heat_up`` (ADR 0063) the kJ per batch that heat
+    #: the charge to its bubble point (None: not known, ``heat_up_missing`` why)
+    charge_temperature: float | None = None
+    heat_up: float | None = None
+    heat_up_missing: str = ""
+    #: a swap's feed: K of the still as the feed mixes in (its mean, by the kmol fed: None
+    #: without a temperature), and with ``heat_up`` the kJ per batch that warm the feed to it
+    fed_temperature: float | None = None
+    feed_heat_up: float | None = None
+    #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
+    column: dict[str, Any] | None = None
+    #: the reflux ratio at each profile point (a column; else empty)
+    refluxes: list[float | None] = field(default_factory=list)
     #: (share of all charged and fed distilled, s, K or None, mole fraction of the key)
     profile: list[tuple[float, float, float | None, float]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -216,6 +279,22 @@ class _Phase:
         s = sum(p)
         return [pi / s for pi in p], t
 
+    def volatilities(self, moles: list[float]) -> tuple[list[float], float | None]:
+        """Each component's volatility over the still holding *moles* (0 for a non-volatile
+        one), to any common reference: the relative volatilities (constant), or the K-values
+        ``P_i(T) / P`` at the still's bubble point T (raoult); and T (None: constant)."""
+        if self.model == "constant":
+            return [a if v else 0.0 for a, v in zip(self.alpha, self.volatile, strict=True)], None
+        total = sum(moles)
+        if total <= 0:
+            raise StillError("the still is empty")
+        x = [n / total for n in moles]
+        t = self.bubble(x)
+        return [
+            vp.kpa(t) / self.pressure if vp is not None and self.volatile[i] else 0.0
+            for i, vp in enumerate(self.pressures)
+        ], t
+
     def latent_heat(self, y: list[float]) -> float | None:
         """kJ/kmol of vapour *y*; None when a component in it has no heat of vaporization."""
         total = 0.0
@@ -225,6 +304,334 @@ class _Phase:
                     return None
                 total += yi * h
         return total
+
+
+# -- the column: Diwekar's batch shortcut on Fenske-Underwood-Gilliland ------------------------
+
+
+def hengstebeck(alpha: list[float], x: list[float], c1: float) -> list[float]:
+    """The distillate of a column whose still holds *x* (mole fractions) at the Fenske index
+    *c1* (Hengstebeck-Geddes, the sum of the distillate's mole fractions one): ``x_D,i =
+    alpha_i^C1 x_i / sum_j alpha_j^C1 x_j``. ``c1`` is the Fenske number of stages at total
+    reflux; 1 is the still's own vapour, 0 the liquid itself."""
+    logs = [
+        c1 * math.log(a) + math.log(xi) if a > 0 and xi > 0 else None
+        for a, xi in zip(alpha, x, strict=True)
+    ]
+    top = max(v for v in logs if v is not None)
+    w = [math.exp(v - top) if v is not None else 0.0 for v in logs]
+    s = sum(w)
+    return [wi / s for wi in w]
+
+
+def underwood_root(alpha: list[float], x: list[float], heavy: int) -> float | None:
+    """Underwood's root ``theta`` of ``sum_i alpha_i x_i / (alpha_i - theta) = 0`` (the still
+    as the feed, a saturated liquid), between the heavy key's volatility and the next one above
+    it among the components the still holds; where the heavy key is gone or the most volatile
+    left, between the two most volatile left. None with fewer than two volatile components."""
+    poles = sorted({a for a, xi in zip(alpha, x, strict=True) if a > 0 and xi > 0})
+    if len(poles) < 2:
+        return None
+    a_hk = alpha[heavy] if 0 <= heavy < len(alpha) and x[heavy] > 0 and alpha[heavy] > 0 else None
+    above = [p for p in poles if a_hk is not None and p > a_hk]
+    lo, hi = (a_hk, above[0]) if above else (poles[-2], poles[-1])
+
+    def g(theta: float) -> float:
+        return sum(a * xi / (a - theta) for a, xi in zip(alpha, x, strict=True) if a > 0 and xi > 0)
+
+    # g rises from -inf just above lo to +inf just below hi
+    a, b = lo + 1e-15 * (hi - lo), hi - 1e-15 * (hi - lo)
+    for _ in range(200):
+        mid = 0.5 * (a + b)
+        if g(mid) > 0:
+            b = mid
+        else:
+            a = mid
+        if b - a <= 1e-15 * hi:
+            break
+    return 0.5 * (a + b)
+
+
+def underwood_min_reflux(alpha: list[float], xd: list[float], theta: float) -> float:
+    """Underwood's minimum reflux ratio for distillate *xd*: ``sum alpha_i x_D,i / (alpha_i -
+    theta) - 1``."""
+    return sum(a * d / (a - theta) for a, d in zip(alpha, xd, strict=True) if a > 0 and d > 0) - 1.0
+
+
+def gilliland_stages(reflux: float, min_reflux: float, min_stages: float) -> float:
+    """Theoretical stages at *reflux* (Gilliland in Molokanov's form); infinite at or below the
+    minimum reflux."""
+    x = (reflux - min_reflux) / (reflux + 1.0)
+    if x <= 0:
+        return math.inf
+    if x >= 1:
+        return min_stages
+    # Molokanov: Y = (N - Nmin)/(N + 1) = 1 - e, so N = (Nmin + 1 - e)/e; just above the
+    # minimum reflux e underflows (X below about 5e-6): infinite stages, as at the minimum
+    e = math.exp((1.0 + 54.4 * x) / (11.0 + 117.2 * x) * (x - 1.0) / math.sqrt(x))
+    return (min_stages + 1.0 - e) / e if e > 0 else math.inf
+
+
+def gilliland_reflux(stages: float, min_reflux: float, min_stages: float) -> float:
+    """The reflux ratio at which Gilliland (Molokanov) gives *stages*; infinite when
+    *min_stages* is not below them."""
+    y = (stages - min_stages) / (stages + 1.0)
+    if y <= 0:
+        return math.inf
+
+    def gy(x: float) -> float:
+        return 1.0 - math.exp((1.0 + 54.4 * x) / (11.0 + 117.2 * x) * (x - 1.0) / math.sqrt(x))
+
+    lo, hi = 0.0, 1.0  # Y falls from 1 (X -> 0) to 0 (X = 1)
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if mid <= 0 or gy(mid) > y:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo <= 1e-16:
+            break
+    x = 0.5 * (lo + hi)
+    return (min_reflux + x) / (1.0 - x)
+
+
+@dataclass
+class Top:
+    """The column's top at one point: the distillate's mole fractions, the still's temperature
+    (K, raoult), the reflux ratio and the Fenske index C1 (None: the still's vapour, no column
+    or one volatile component), and the light and heavy key (indices, -1: none)."""
+
+    distillate: list[float]
+    temperature: float | None
+    reflux: float
+    c1: float | None
+    held: bool = True  # constant_distillate: the distillate's spec is held
+    light: int = -1
+    heavy: int = -1
+
+
+class _Column:
+    """A rectifying column above the still (:class:`~.schema.Column`), Diwekar's batch
+    shortcut: at each point of the still's path the column is a continuous one fed with the
+    still's liquid as a saturated liquid, the distillate from Hengstebeck-Geddes at the Fenske
+    index C1, Underwood's minimum reflux and Gilliland's correlation between them."""
+
+    def __init__(self, spec: Any, phase: _Phase, names: list[str], n0: list[float]):
+        self.spec = spec
+        self.phase = phase
+        self.names = names
+        self.notes: list[str] = []
+        if spec.distillate is not None and spec.distillate.key not in names:
+            raise StillError(
+                f"the column's distillate key {spec.distillate.key} is not in the still"
+            )
+        if spec.heavy_key is not None and spec.heavy_key not in names:
+            raise StillError(f"the column's heavy key {spec.heavy_key} is not in the still")
+        self.key = names.index(spec.distillate.key) if spec.distillate is not None else None
+        alpha, _ = phase.volatilities(n0)
+        total = sum(n0)
+        x0 = [n / total for n in n0]
+        self.fixed: tuple[int, int] | None = None
+        self.light, self.heavy = self.keys(alpha, x0)
+        if spec.heavy_key is not None or self.key is not None:
+            self.fixed = (self.light, self.heavy)
+        if self.key is not None:
+            lighter = [
+                names[i]
+                for i, (a, x) in enumerate(zip(alpha, x0, strict=True))
+                if a > alpha[self.key] and x > 0
+            ]
+            if lighter:
+                self.notes.append(
+                    f"the column's distillate key {names[self.key]} is not the most volatile "
+                    f"component of the charge ({', '.join(lighter)} more volatile): holding its "
+                    "share of the distillate assumes it rises with the column's separation, so "
+                    "the reflux is not reliable while they are in the still (collect them in a "
+                    "cut before, or name the most volatile component)"
+                )
+        self.stages = spec.stages
+        self.ratio = spec.ratio
+        self.design: dict[str, float] = {}
+        if spec.minimum_reflux_factor is not None:
+            self._design(alpha, x0)
+
+    def keys(self, alpha: list[float], x: list[float]) -> tuple[int, int]:
+        """The light and the heavy key over the still holding *x* (mole fractions; -1: none).
+        A named heavy key, with the next more volatile component of the charge for the light
+        key, or the distillate's key with the next less volatile one of the charge: both fixed
+        from the charge. Else, at each point, the most volatile component that is not a trace of
+        the still's vapour (at least :data:`TRACE` of it; never the least volatile) and the next
+        less volatile one: after a forerun has taken the lightest component down to traces, the
+        column separates the next pair."""
+        if self.fixed is not None:
+            return self.fixed
+        spec = self.spec
+        order = sorted(
+            (i for i, (a, xi) in enumerate(zip(alpha, x, strict=True)) if a > 0 and xi > 0),
+            key=lambda i: -alpha[i],
+        )
+        if not order:
+            return -1, -1
+        if spec.heavy_key is not None:
+            heavy = self.names.index(spec.heavy_key)
+            above = [i for i in order if alpha[i] > alpha[heavy]]
+            return (above[-1] if above else -1), heavy
+        if self.key is not None:
+            light = self.key
+        else:
+            y = hengstebeck(alpha, x, 1.0)
+            # the light key has a less volatile one below it (a binary keeps its pair)
+            light = next((i for i in order[:-1] if y[i] >= TRACE), order[max(len(order) - 2, 0)])
+        below = [i for i in order if alpha[i] < alpha[light]] if alpha[light] > 0 else []
+        return light, (below[0] if below else -1)
+
+    def distillate(
+        self, alpha: list[float], x: list[float], c1: float, reflux: float, light: int
+    ) -> list[float]:
+        """Hengstebeck-Geddes at *c1*, a component more volatile than the light key taking no
+        more than the still's vapour brings up: ``x_D,i <= (R + 1) y_i`` (the column's balance,
+        ``D x_D,i = V y_i - L x_i`` with the reflux returning ``L x_i >= 0``). One index C1 for
+        all components overpredicts a lighter trace (it would gather at the top, as at total
+        reflux); the rest share what is left as Hengstebeck-Geddes gives them."""
+        xd = hengstebeck(alpha, x, c1)
+        if light < 0 or not math.isfinite(reflux):
+            return xd
+        y = hengstebeck(alpha, x, 1.0)
+        capped: dict[int, float] = {}
+        for _ in range(len(xd)):
+            over = [
+                i
+                for i, a in enumerate(alpha)
+                if a > alpha[light] and i not in capped and xd[i] > (reflux + 1.0) * y[i]
+            ]
+            if not over:
+                break
+            capped.update({i: (reflux + 1.0) * y[i] for i in over})
+            rest = 1.0 - sum(capped.values())
+            others = sum(v for i, v in enumerate(xd) if i not in capped)
+            if rest <= 0 or others <= 0:
+                break
+            xd = [capped[i] if i in capped else v * rest / others for i, v in enumerate(xd)]
+        return xd
+
+    def _design(self, alpha: list[float], x0: list[float]) -> None:
+        """The stages from Gilliland at the start, at the factor times Underwood's minimum
+        reflux for the distillate (``minimum_reflux_factor``)."""
+        spec = self.spec
+        c1 = self._index_for(alpha, x0, spec.distillate.mole_fraction, math.inf)
+        if c1 is None:
+            raise StillError(
+                f"the distillate's {spec.distillate.mole_fraction:g} mole fraction of "
+                f"{spec.distillate.key} cannot be reached from the charge"
+            )
+        if c1 <= 1:
+            raise StillError(
+                f"the still's own vapour holds {spec.distillate.mole_fraction:g} of "
+                f"{spec.distillate.key} at the start: no column is needed (give stages)"
+            )
+        theta = underwood_root(alpha, x0, self.heavy)
+        if theta is None:
+            raise StillError("one volatile component: no column is needed")
+        rmin = underwood_min_reflux(alpha, hengstebeck(alpha, x0, c1), theta)
+        if rmin <= 0:
+            raise StillError(
+                f"Underwood's minimum reflux at the start is {rmin:.4g}: name the heavy key "
+                "(column.heavy_key)"
+            )
+        ratio = spec.minimum_reflux_factor * rmin
+        self.stages = gilliland_stages(ratio, rmin, c1)
+        if spec.reflux == "constant":
+            self.ratio = ratio
+        self.design = {
+            "minimum_reflux": rmin,
+            "reflux": ratio,
+            "minimum_stages": c1,
+            "stages": self.stages,
+        }
+
+    def _index_for(
+        self, alpha: list[float], x: list[float], target: float, cap: float
+    ) -> float | None:
+        """The Fenske index C1 (up to *cap*) at which the distillate holds *target* of the key;
+        None when it does not reach it there."""
+        i = self.key
+        if x[i] <= 0 or alpha[i] <= 0:
+            return None
+        hi = 1.0
+        while hengstebeck(alpha, x, hi)[i] < target:
+            if hi >= cap:
+                return None
+            hi = min(hi * 2.0, cap)
+            if hi > 1e4:
+                return None
+        lo = 0.0
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            if hengstebeck(alpha, x, mid)[i] < target:
+                lo = mid
+            else:
+                hi = mid
+            if hi - lo <= 1e-14 * hi:
+                break
+        return 0.5 * (lo + hi)
+
+    def _index_at(
+        self, alpha: list[float], x: list[float], theta: float, reflux: float, light: int
+    ) -> float:
+        """The Fenske index at *reflux* with the column's stages (Gilliland's stages equal
+        them); never below 1, the still's own stage."""
+        n = self.stages
+        lo, hi = 0.0, n
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            xd = self.distillate(alpha, x, mid, reflux, light)
+            rmin = underwood_min_reflux(alpha, xd, theta)
+            if gilliland_stages(reflux, rmin, mid) < n:
+                lo = mid
+            else:
+                hi = mid
+            if hi - lo <= 1e-14 * n:
+                break
+        return max(0.5 * (lo + hi), 1.0)
+
+    def top(self, moles: list[float]) -> Top:
+        """The distillate, reflux ratio and Fenske index over the still holding *moles*."""
+        spec = self.spec
+        total = sum(moles)
+        if total <= 0:
+            raise StillError("the still is empty")
+        x = [n / total for n in moles]
+        if sum(xi for xi, v in zip(x, self.phase.volatile, strict=True) if v) <= 1e-14:
+            raise StillError("the still boils dry: nothing volatile is left")
+        alpha, t = self.phase.volatilities(moles)
+        light, heavy = self.keys(alpha, x)
+        theta = underwood_root(alpha, x, heavy)
+        constant = spec.reflux == "constant"
+        if theta is None or self.stages <= 1.0 + 1e-12:
+            # one volatile component left, or no stage above the still: its vapour
+            y = hengstebeck(alpha, x, 1.0)
+            if constant:
+                return Top(y, t, self.ratio, None, True, light, heavy)
+            held = self.key is not None and y[self.key] >= spec.distillate.mole_fraction
+            reflux = 0.0 if held else spec.maximum_ratio
+            return Top(y, t, reflux, None, held, light, heavy)
+        if not constant:
+            c1 = self._index_for(alpha, x, spec.distillate.mole_fraction, self.stages)
+            if c1 is not None and c1 <= 1.0:
+                return Top(hengstebeck(alpha, x, 1.0), t, 0.0, 1.0, True, light, heavy)
+            if c1 is not None:
+                xd = hengstebeck(alpha, x, c1)
+                rmin = underwood_min_reflux(alpha, xd, theta)
+                reflux = max(gilliland_reflux(self.stages, rmin, c1), 0.0)
+                if reflux <= spec.maximum_ratio:
+                    return Top(xd, t, reflux, c1, True, light, heavy)
+            reflux = spec.maximum_ratio
+            c1 = self._index_at(alpha, x, theta, reflux, light)
+            xd = self.distillate(alpha, x, c1, reflux, light)
+            return Top(xd, t, reflux, c1, False, light, heavy)
+        c1 = self._index_at(alpha, x, theta, self.ratio, light)
+        xd = self.distillate(alpha, x, c1, self.ratio, light)
+        return Top(xd, t, self.ratio, c1, True, light, heavy)
 
 
 def solve_still(
@@ -285,7 +692,7 @@ def solve_still(
         raise StillError("a boil-up in kW needs the heat_of_vaporization of " + ", ".join(gaps))
     mw = [getattr(components.get(n), "molar_mass", None) for n in names]
     needs_mass = unit == "kg/h" or any(
-        e is not None and e.distilled and e.basis == "mass" for _, e in spec.ends()
+        e is not None and (e.distilled or e.purity) and e.basis == "mass" for _, e in spec.ends()
     )
     if needs_mass and (gaps := [n for n, m in zip(names, mw, strict=True) if not m]):
         raise StillError("no molar_mass of " + ", ".join(gaps))
@@ -302,6 +709,17 @@ def solve_still(
     feed_share = [v / total_feed for v in z] if total_feed > 0 else [0.0] * k
     result = StillResult(dict(zip(names, n0, strict=True)), {}, {}, [], pressure, hours)
     energy_known = all(h is not None for h in latent)
+    column = _Column(spec.column, phase, names, n0) if spec.column is not None else None
+
+    def top(moles: list[float]) -> tuple[list[float], float | None, float, Top | None]:
+        """The distillate's mole fractions over the still holding *moles*, the still's
+        temperature K (raoult), the moles boiled up per mole distilled (R + 1) and the
+        column's top (None: no column, the still's vapour)."""
+        if column is None:
+            y, t = phase.vapour(moles)
+            return y, t, 1.0, None
+        at = column.top(moles)
+        return at.distillate, at.temperature, at.reflux + 1.0, at
 
     def seconds_per_mole(y: list[float]) -> float:
         """s per kmol (per hour of flows) boiled up from vapour *y*."""
@@ -317,10 +735,14 @@ def solve_still(
 
     def derivatives(feeding: bool) -> Callable[[list[float]], list[float]]:
         def f(state: list[float]) -> list[float]:
-            y, _ = phase.vapour(state[:k])
+            y, _, boiled_per_mole, _ = top(state[:k])
             dn = [-yi + (feed_share[i] if feeding else 0.0) for i, yi in enumerate(y)]
             heat = phase.latent_heat(y) if energy_known else None
-            return [*dn, seconds_per_mole(y), hours * (heat or 0.0)]
+            return [
+                *dn,
+                seconds_per_mole(y) * boiled_per_mole,
+                hours * (heat or 0.0) * boiled_per_mole,
+            ]
 
         return f
 
@@ -329,6 +751,8 @@ def solve_still(
     boiled = 0.0  # kmol per hour of flows boiled up so far
     fed = [0.0] * k
     removed = [0.0] * k  # distilled into the cuts closed so far
+    #: kmol fed (per hour of flows) and their sum times the still's K as they mix in
+    mixed_in = {"fed": 0.0, "fed_K": 0.0, "known": True}
     energy_before = 0.0  # kJ per batch taken by the cuts closed so far
     peak = 0.0
     key = _profile_key(spec, names, phase, n0)
@@ -336,10 +760,27 @@ def solve_still(
     result.key = key
     seen_ranges: set[str] = set()
 
+    def mixing(amount: float, *temperatures: float | None) -> None:
+        """*amount* kmol of feed mixes in at the mean of *temperatures* (the still's)."""
+        mixed_in["fed"] += amount
+        known = [t for t in temperatures if t is not None]
+        if len(known) < len(temperatures):
+            mixed_in["known"] = False
+            return
+        mixed_in["fed_K"] += amount * sum(known) / len(known)
+
+    refluxes: list[float | None] = []  # the reflux ratio at each profile point (a column)
+    tops: list[tuple[float, Top]] = []  # (share distilled, the column's top) at each point
+
     def record(state: list[float]) -> None:
         moles = state[:k]
         total = sum(moles)
         y, t = phase.vapour(moles) if any(moles) else ([0.0] * k, None)
+        if column is not None:
+            at = column.top(moles) if any(moles) else None
+            refluxes.append(at.reflux if at is not None else None)
+            if at is not None:
+                tops.append((boiled / (total0 + total_feed), at))
         if t is not None:
             for n, vp, x in zip(names, pressures, moles, strict=True):
                 if vp is not None and x > 0 and not vp.covers(t) and n not in seen_ranges:
@@ -414,7 +855,10 @@ def solve_still(
                 fed[:] = [a + share * h for a, share in zip(fed, feed_share, strict=True)]
             boiled += h
             state = new
+            before = result.profile[-1][2]
             record(state)
+            if feeding:
+                mixing(h, before, result.profile[-1][2])
             if stop is not None and stop(state, boiled) >= -1e-15:
                 return
             if end is not None and boiled >= end * (1 - 1e-12):
@@ -443,6 +887,7 @@ def solve_still(
                 state[:k] = [a + b for a, b in zip(state[:k], portion, strict=True)]
                 fed[:] = [a + b for a, b in zip(fed, portion, strict=True)]
                 record(state)
+                mixing(sum(portion), result.profile[-1][2])  # heated to the new bubble point
             fed[:] = list(z)
     mass0 = sum((a + b) * (m or 0.0) for a, b, m in zip(n0, z, mw, strict=True))
 
@@ -459,6 +904,8 @@ def solve_still(
             return lambda s, b: s[k] - end.time
         if end.temperature is not None:
             return lambda s, b: phase.vapour(s[:k])[1] - end.temperature
+        if end.purity is not None:
+            return purity_stop(end)
         key, target = end.residue.key, end.residue.mole_fraction
         if key not in names:
             raise StillError(f"the residue's key {key} is not in the still")
@@ -472,6 +919,29 @@ def solve_still(
         y, _ = phase.vapour(state[:k])
         sign = 1.0 if target > x_now and y[i] < x_now else -1.0
         return lambda s, b: sign * (s[i] / sum(s[:k]) - target) if sum(s[:k]) > 0 else 1.0
+
+    def purity_stop(end: Any) -> Callable[[list[float], float], float]:
+        """The cut's mean share of the key (since the cut began) falls to the fraction: an
+        empty cut takes the distillate leaving now."""
+        key, target = end.purity.key, end.purity.fraction
+        if key not in names:
+            raise StillError(f"the purity end's key {key} is not in the still")
+        i = names.index(key)
+        start = list(removed)
+        weight = [m or 0.0 for m in mw] if end.basis == "mass" else [1.0] * k
+
+        def share(amounts: list[float]) -> float | None:
+            total = sum(a * w for a, w in zip(amounts, weight, strict=True))
+            return amounts[i] * weight[i] / total if total > 1e-12 * (total0 + total_feed) else None
+
+        def stop(s: list[float], b: float) -> float:
+            cut = [a + f - x - r for a, f, x, r in zip(n0, fed, s[:k], start, strict=True)]
+            mean = share(cut)
+            if mean is None:
+                mean = share(top(s[:k])[0]) or 0.0
+            return target - mean
+
+        return stop
 
     for port, end in ends:
         if end is None:
@@ -490,7 +960,7 @@ def solve_still(
         total_out = [a + f - x for a, f, x in zip(n0, fed, state[:k], strict=True)]
         moles = {n: max(t - r, 0.0) for n, t, r in zip(names, total_out, removed, strict=True)}
         removed = total_out
-        y, t = phase.vapour(state[:k])
+        y, t, _, _ = top(state[:k])
         result.cuts.append(
             Cut(
                 port,
@@ -503,6 +973,8 @@ def solve_still(
         )
         energy_before = state[k + 1]
     result.fed = dict(zip(names, fed, strict=True))
+    if mixed_in["fed"] > 0 and mixed_in["known"]:
+        result.fed_temperature = mixed_in["fed_K"] / mixed_in["fed"]
     result.residue = dict(zip(names, state[:k], strict=True))
     result.time = state[k]
     if energy_known:
@@ -514,11 +986,62 @@ def solve_still(
     end_t = result.profile[-1][2]
     if start_t is not None and end_t is not None:
         result.temperatures = (start_t, end_t)
+    if column is not None:
+        result.column = _column_summary(spec.column, column, refluxes, tops, result)
     if len(result.profile) > PROFILE_POINTS:
         step = len(result.profile) / PROFILE_POINTS
         picked = [int(i * step) for i in range(PROFILE_POINTS)]
         result.profile = [*(result.profile[i] for i in picked), result.profile[-1]]
+        if refluxes:
+            refluxes = [*(refluxes[i] for i in picked), refluxes[-1]]
+    result.refluxes = refluxes
     return result
+
+
+def _column_summary(
+    spec: Any,
+    column: _Column,
+    refluxes: list[float | None],
+    tops: list[tuple[float, Top]],
+    result: StillResult,
+) -> dict[str, Any]:
+    """What a still's column did: its stages, the reflux at the start and the end, the
+    design at the start (minimum_reflux_factor), where a constant distillate was not held and
+    where the keys moved."""
+    known = [r for r in refluxes if r is not None]
+    found: dict[str, Any] = {
+        "reflux": spec.reflux,
+        "stages": column.stages,
+        "reflux_ratio": [known[0], known[-1]] if known else None,
+        "maximum_ratio": spec.maximum_ratio,
+        "distillate": spec.distillate.model_dump(mode="json") if spec.distillate else None,
+        "heavy_key": column.names[column.heavy] if column.heavy >= 0 else None,
+        "design": dict(column.design) or None,
+    }
+    result.notes.extend(column.notes)
+    unheld = [share for share, at in tops if not at.held]
+    if spec.reflux == "constant_distillate" and unheld:
+        last = tops[-1][0]
+        where = (
+            f"from {100 * unheld[0]:.3g} % of the charge distilled to the end"
+            if unheld[-1] >= last
+            else f"from {100 * unheld[0]:.3g} % to {100 * unheld[-1]:.3g} % of the charge distilled"
+        )
+        result.notes.append(
+            f"the column reached its maximum reflux ratio {spec.maximum_ratio:g}: the "
+            f"distillate is below {spec.distillate.mole_fraction:g} of {spec.distillate.key} "
+            + where
+        )
+    for (_, before), (share, at) in zip(tops, tops[1:], strict=False):
+        if at.light != before.light and at.light >= 0 and before.light >= 0:
+            result.notes.append(
+                f"the column's light key moved from {column.names[before.light]} to "
+                f"{column.names[at.light]} at {100 * share:.3g} % of the charge distilled "
+                f"({column.names[before.light]} below {TRACE:g} of the still's vapour)"
+            )
+    if column.stages != int(column.stages):
+        result.notes.append(f"the column has {column.stages:.4g} theoretical stages (not whole)")
+    return found
 
 
 def _profile_key(spec: Any, names: list[str], phase: _Phase, n0: list[float]) -> str:
@@ -697,6 +1220,11 @@ def solve_node(
         raise StillError(str(failure)) from failure
     if not basis.startswith("process/recipe.yaml"):
         result.notes.append(f"one batch: {basis}")
+    result.charge_temperature = _temperature(process, charge, case)
+    if spec.heat_up:
+        _heat_up(result, comps)
+        if feed is not None:
+            _feed_heat_up(result, comps, _temperature(process, feed, case))
     names = sorted({*moles, *(fed or {})})
     # the fingerprint holds what the outlets' flows and compositions depend on: not the
     # provenance and source texts, not the vapour pressures' fitted ranges (notes only), and
@@ -704,7 +1232,15 @@ def solve_node(
     inputs: dict[str, Any] = {
         "still": spec.model_dump(
             mode="json",
-            exclude={"boilup": True, "provenance": True, "source": True, "volatility": _TEXTS},
+            exclude={
+                "boilup": True,
+                "heat_up": True,  # the duty's, not the outlets'
+                "provenance": True,
+                "source": True,
+                "volatility": _TEXTS,
+                "column": _TEXTS,
+                "condenser_port": True,
+            },
         ),
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
         "nonvolatile": sorted(nonvolatile & set(names)),
@@ -726,6 +1262,71 @@ def solve_node(
                 n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
             }
     return result, inputs
+
+
+def _temperature(process: Any, stream: Any, case: str) -> float | None:
+    from chemeascode.foundation.units import to_kelvin
+
+    q = getattr(stream.state.get(case), "temperature", None)
+    return to_kelvin(q.value, q.unit or process.flowsheet.units.temperature) if q else None
+
+
+def _heat_up(result: StillResult, comps: Mapping[str, Any]) -> None:
+    """The charge's heat-up from its inlet temperature to its bubble point at the start, kJ per
+    batch at the components' ``liquid_heat_capacity`` (``still.heat_up``, ADR 0063), or why it
+    is not known. A charge at or above its bubble point takes none (its flash is not
+    modelled: a note says so)."""
+    t_in = result.charge_temperature
+    bubble = result.temperatures[0] if result.temperatures else None
+    if t_in is None or bubble is None:
+        result.heat_up_missing = "the charge's temperature and its bubble point"
+        return
+    lacking = sorted(
+        n for n, v in result.charge.items() if v > 0 and not comps[n].liquid_heat_capacity
+    )
+    if lacking:
+        result.heat_up_missing = "the liquid_heat_capacity of " + ", ".join(lacking)
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in result.charge.items() if v > 0)
+    if t_in >= bubble:
+        result.notes.append(
+            f"heat_up: the charge enters at {t_in:.5g} K, at or above its bubble point "
+            f"{bubble:.5g} K (its flash is not modelled): no heat-up"
+        )
+        result.heat_up = 0.0
+        return
+    result.heat_up = capacity * (bubble - t_in) * result.hours
+
+
+def _feed_heat_up(result: StillResult, comps: Mapping[str, Any], t_feed: float | None) -> None:
+    """A swap's feed warmed from its inlet temperature *t_feed* K to the still's as it mixes
+    in (``still.heat_up``, ADR 0063): ``sum_i F_i cp_i (T_mix - T_feed)``, kJ per batch, with
+    ``T_mix`` the still's mean temperature by the kmol fed (the bubble point each portion
+    reaches), or why it is not known (``heat_up_missing``). A feed at or above that
+    temperature takes none (its flash is not modelled: a note says so)."""
+    t_mix = result.fed_temperature
+    if t_feed is None or t_mix is None:
+        result.heat_up_missing = result.heat_up_missing or (
+            "the feed's temperature and the still's as it mixes in"
+        )
+        return
+    lacking = sorted(
+        n for n, v in result.fed.items() if v > 0 and not comps[n].liquid_heat_capacity
+    )
+    if lacking:
+        result.heat_up_missing = result.heat_up_missing or (
+            "the liquid_heat_capacity of " + ", ".join(lacking) + " (the feed)"
+        )
+        return
+    capacity = sum(v * comps[n].liquid_heat_capacity for n, v in result.fed.items() if v > 0)
+    if t_feed >= t_mix:
+        result.notes.append(
+            f"heat_up: the feed enters at {t_feed:.5g} K, at or above the still's {t_mix:.5g} K "
+            "as it mixes in (its flash is not modelled): no heat-up of the feed"
+        )
+        result.feed_heat_up = 0.0
+        return
+    result.feed_heat_up = capacity * (t_mix - t_feed) * result.hours
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
@@ -930,7 +1531,60 @@ def rules(process: Any) -> list[Finding]:
                 "give heat_of_vaporization (kJ/kmol near the still's temperature) in "
                 "materials.yaml with its source",
             )
+        column = spec.column
+        if column is not None:
+            named = [
+                ("distillate", column.distillate.key if column.distillate else None),
+                ("heavy_key", column.heavy_key),
+            ]
+            for what, name in named:
+                if name is not None and name not in comps:
+                    add(
+                        "error",
+                        f"{node.id}: the column's {what} {name} is not a component",
+                        [*loc, "column", what],
+                        node.id,
+                        f"declare {name} in process/materials.yaml, or name a component of "
+                        "the charge",
+                    )
+                elif name is not None and (name in spec.nonvolatile or name in solids):
+                    add(
+                        "error",
+                        f"{node.id}: the column's {what} {name} is non-volatile",
+                        [*loc, "column", what],
+                        node.id,
+                        "name a volatile component of the charge",
+                    )
+        port = spec.condenser_port
+        if port is not None:
+            found = next((p for p in node.ports if p.id == port), None)
+            if found is None or found.kind != "energy" or found.direction != "out":
+                add(
+                    "error",
+                    f"{node.id}: condenser_port {port} is no energy port out of it",
+                    [*loc, "condenser_port"],
+                    node.id,
+                    "name the still's energy port (kind: energy, direction: out) whose stream "
+                    "goes to the cooling utility",
+                )
+            elif port == getattr(node, "energy_port", None):
+                add(
+                    "error",
+                    f"{node.id}: condenser_port and energy_port are both {port}",
+                    [*loc, "condenser_port"],
+                    node.id,
+                    "the reboiler's heat comes in on energy_port, the condenser's leaves on "
+                    "condenser_port: two streams",
+                )
         for i, (_, end) in enumerate(spec.ends()):
+            if end is not None and end.purity is not None and end.purity.key not in comps:
+                add(
+                    "error",
+                    f"{node.id}: the end's purity key {end.purity.key} is not a component",
+                    [*loc, *(["cuts", i, "end"] if spec.cuts else ["end"]), "purity"],
+                    node.id,
+                    "name a component of the charge",
+                )
             if end is not None and end.residue is not None and end.residue.key not in comps:
                 add(
                     "error",
@@ -988,6 +1642,13 @@ def _amounts(process: Any, moles: Mapping[str, float], hours: float) -> dict[str
     }
 
 
+def _mass_fractions(process: Any, moles: Mapping[str, float]) -> dict[str, float]:
+    comps = process.components()
+    kg = {n: v * comps[n].molar_mass for n, v in moles.items() if v > 0}
+    total = sum(kg.values())
+    return {n: v / total for n, v in kg.items()} if total > 0 else {}
+
+
 def _flowsheet_differences(
     process: Any, node: Any, case: str, ports: dict[str, dict[str, float]]
 ) -> list[str]:
@@ -1006,7 +1667,13 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
     spec = node.still
     entry: dict[str, Any] = {
         "node": node.id,
-        "model": "still" if spec.feed is None else "solvent swap",
+        "model": (
+            "batch rectification"
+            if spec.column is not None
+            else "still"
+            if spec.feed is None
+            else "solvent swap"
+        ),
         "basis": basis.basis,
         "predictive": basis.predictive,
         "sourced": basis.sourced,
@@ -1055,10 +1722,62 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         ],
         "notes": result.notes,
     }
+    if result.column is not None:
+        sol = entry["solution"]
+        sol["column"] = result.column
+        sol["condenser_year_average_duty_kW"] = (
+            -sol["year_average_duty_kW"] if sol["year_average_duty_kW"] is not None else None
+        )
+        for point, reflux in zip(sol["profile"], result.refluxes, strict=True):
+            point["reflux_ratio"] = reflux
+        for cut, c in zip(sol["cuts"], result.cuts, strict=True):
+            cut["recovery"] = {
+                n: v / (result.charge.get(n, 0.0) + result.fed.get(n, 0.0))
+                for n, v in c.moles.items()
+                if v > 0 and result.charge.get(n, 0.0) + result.fed.get(n, 0.0) > 0
+            }
+            cut["mass_fractions"] = _mass_fractions(process, c.moles)
+    _heat_entry(process, node, case, result, entry["solution"])
     entry["differences"] = _flowsheet_differences(
         process, node, case, node_outlets(process, spec, result)
     )
     return entry
+
+
+def _heat_entry(
+    process: Any, node: Any, case: str, result: StillResult, solution: dict[str, Any]
+) -> None:
+    """With ``heat_up`` or a recipe vessel's metal (ADR 0063): the year-average duty its
+    energy stream carries is the model's whole duty, with its terms, the heat-up per batch and
+    the whole energy per batch on the duty's basis (``total_energy_kWh_per_batch``;
+    ``energy_kWh_per_batch`` stays the boil-up's latent heat); a still without them reports as
+    before."""
+    from chemeascode.domains.process.duties import still_duty
+    from chemeascode.domains.process.recipe import metal_of
+
+    try:
+        metal = metal_of(process, node.id, case) is not None
+    except ValueError:
+        metal = True  # declared, its batch's hours not known: the duty says so
+    if not node.still.heat_up and not metal:
+        return
+    duty = still_duty(node, result, process, case)
+    solution["year_average_duty_kW"] = duty.heat_kW
+    # kWh per batch: the year-average kW over the batch's hours of flows
+    solution["total_energy_kWh_per_batch"] = (
+        duty.heat_kW * result.hours if duty.heat_kW is not None else None
+    )
+    solution["duty_terms_kW"] = dict(duty.terms_kW)
+    if duty.missing:
+        solution["duty_missing"] = list(duty.missing)
+    if node.still.heat_up:
+        solution["heat_up_kWh_per_batch"] = (
+            result.heat_up / 3600.0 if result.heat_up is not None else None
+        )
+        if node.still.feed is not None:
+            solution["feed_heat_up_kWh_per_batch"] = (
+                result.feed_heat_up / 3600.0 if result.feed_heat_up is not None else None
+            )
 
 
 def still_report(root: Path, case: str | None = None) -> StillReport:
@@ -1150,7 +1869,9 @@ def report_text(report: StillReport) -> str:
                 f"{num(sol['energy_kWh_per_batch'], ' kWh', '.4g')}"
                 + (
                     f", year average {sol['year_average_duty_kW']:.6g} kW"
-                    if sol.get("year_average_duty_kW") is not None
+                    # with the terms of ADR 0063 the year average is the whole duty's: below,
+                    # beside the whole energy per batch on its basis
+                    if sol.get("year_average_duty_kW") is not None and "duty_terms_kW" not in sol
                     else ""
                 )
                 + (
@@ -1159,6 +1880,51 @@ def report_text(report: StillReport) -> str:
                     else ""
                 )
             )
+            if "duty_terms_kW" in sol:  # the heat-up and the vessel's metal (ADR 0063)
+                terms = ", ".join(f"{k} {v:.6g}" for k, v in sol["duty_terms_kW"].items())
+                lines.append(
+                    f"  whole duty {num(sol['total_energy_kWh_per_batch'], ' kWh', '.4g')} per "
+                    f"batch, year average {num(sol['year_average_duty_kW'], ' kW')}"
+                    + (f" ({terms} kW)" if terms else "")
+                    + (
+                        f"; missing {'; '.join(sol['duty_missing'])}"
+                        if "duty_missing" in sol
+                        else ""
+                    )
+                )
+            col = sol.get("column")
+            if col is not None:
+                ratio = col["reflux_ratio"]
+                design = col["design"]
+                lines.append(
+                    f"  column: {col['stages']:.4g} theoretical stages (the still included), "
+                    + (
+                        f"reflux ratio {ratio[0]:.4g} -> {ratio[1]:.4g}"
+                        if ratio and abs(ratio[1] - ratio[0]) > 1e-9 * max(1.0, ratio[0])
+                        else f"reflux ratio {ratio[0]:.4g}"
+                        if ratio
+                        else "reflux ?"
+                    )
+                    + (
+                        f" ({col['reflux'].replace('_', ' ')}: "
+                        f"{col['distillate']['mole_fraction']:g} {col['distillate']['key']}, "
+                        f"at most {col['maximum_ratio']:g})"
+                        if col["reflux"] == "constant_distillate"
+                        else ""
+                    )
+                    + (
+                        f"; designed at the start: Rmin {design['minimum_reflux']:.4g}, "
+                        f"Nmin {design['minimum_stages']:.4g}"
+                        if design
+                        else ""
+                    )
+                    + (
+                        f"; condenser {-sol['condenser_year_average_duty_kW']:.6g} kW out, "
+                        "year average"
+                        if sol.get("condenser_year_average_duty_kW") is not None
+                        else ""
+                    )
+                )
             rows = [("charge", sol["charge"])]
             if sol["fed"] is not None:
                 rows.append(("fed", sol["fed"]))
@@ -1170,6 +1936,14 @@ def report_text(report: StillReport) -> str:
                     extra = f", ends at {a['end_time_h']:.4g} h" + (
                         f", {a['end_temperature_K']:.5g} K" if a["end_temperature_K"] else ""
                     )
+                if a.get("mass_fractions"):
+                    extra += "; " + ", ".join(
+                        f"{n} {x * 100:.4g} wt%" for n, x in a["mass_fractions"].items()
+                    )
+                if recovered := [
+                    f"{x * 100:.4g} % of {n}" for n, x in a.get("recovery", {}).items()
+                ]:
+                    extra += "; recovers " + ", ".join(recovered)
                 lines.append(
                     f"  {label}: {a['kmol_per_batch']:.6g} kmol ({a['kg_per_batch']:.6g} kg) per "
                     f"batch, {a['kmol_h']:.6g} kmol/h{extra}; {comp(a['mole_fractions'])}"
