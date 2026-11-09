@@ -138,6 +138,12 @@ class Candidate:
     questions: list[str]
     #: The other nodes the path enters, in order, each with the first object of it on the path.
     crosses: list[tuple[str, str]] = field(default_factory=list)
+    #: The names a scenario may give the cause and the object the walk ends at (tag, object id),
+    #: and each one's train (:func:`_train`), for coverage.
+    cause_names: tuple[str, ...] = ()
+    cause_train: str = ""
+    end_names: tuple[str, ...] = ()
+    end_train: str = ""
 
     def path_text(self) -> str:
         return " > ".join(f"{s.label} ({s.deviation.text()}, {s.effect})" for s in self.path)
@@ -720,9 +726,39 @@ def propagate(
                                 safeguards=_safeguards(index, walked.path, context),
                                 questions=questions,
                                 crosses=crosses(walked.path),
+                                cause_names=_names(index, key),
+                                cause_train=_train(index, key),
+                                end_names=_names(index, last.key),
+                                end_train=_train(index, last.key),
                             )
                         )
     return Propagation(candidates, uncovered, unresolved)
+
+
+#: A train letter after the number of a tag (MOV-413B).
+TRAIN = re.compile(r"(?<=\d)[A-Z]$")
+
+
+def _names(index: _Index, key: int) -> tuple[str, ...]:
+    """The tag and the object id of *key*: a scenario's ``refs`` may name it either way."""
+    obj = index.objects.get(key) or index.functions.get(key)
+    return tuple(dict.fromkeys(n for n in (obj.tag, obj.id) if n)) if obj else ()
+
+
+def _train(index: _Index, key: int) -> str:
+    """The tag that places *key* in a train of parallel ones: its own tag, or for an untagged
+    object (a pump's check valve) the train tag of the object next to it with its class
+    (``MOV-412B|SwingCheckValve``), else its id."""
+    obj = index.objects.get(key) or index.functions.get(key)
+    if obj is None:
+        return ""
+    if obj.tag:
+        return obj.tag
+    for near, _segment in [*index.down.get(key, []), *index.up.get(key, [])]:
+        tag = index.objects[near].tag if near in index.objects else None
+        if tag and TRAIN.search(tag):
+            return f"{tag}|{obj.cls}"
+    return obj.id
 
 
 # ---------------------------------------------------------------------------
@@ -760,9 +796,13 @@ class Coverage:
 
 def _alike(a: str, b: str) -> bool:
     """The same tag, or one of parallel trains studied once: equal but for the train letter
-    after the number (MOV-413B and MOV-413A)."""
-    stem = re.sub(r"(?<=\d)[A-Z]$", "", a)
-    return a == b or (stem != a and stem == re.sub(r"(?<=\d)[A-Z]$", "", b))
+    after the number (MOV-413B and MOV-413A; MOV-412B|CheckValve and MOV-412A|CheckValve)."""
+    if a == b:
+        return True
+    head_a, _, rest_a = a.partition("|")
+    head_b, _, rest_b = b.partition("|")
+    stem = TRAIN.sub("", head_a)
+    return rest_a == rest_b and stem != head_a and stem == TRAIN.sub("", head_b)
 
 
 def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] = ()) -> Coverage:
@@ -785,14 +825,32 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         "question": set(),
     }
     reached: set[str] = set()
+    # Every name the walk knows an object by (tag, object id) -> the object's train.
+    train_of: dict[str, str] = {}
+    for c in candidates:
+        for names, train in ((c.cause_names, c.cause_train), (c.end_names, c.end_train)):
+            for name in names:
+                train_of.setdefault(name, train or name)
+
+    def same(a: str, b: str) -> bool:
+        return _alike(train_of.get(a, a), train_of.get(b, b))
+
     for c in candidates:
         deviation = (c.deviation.guide_word, c.deviation.parameter)
-        naming = [(refs, sid) for dev, refs, sid in rows if dev == deviation and c.cause in refs]
+        cause_names = c.cause_names or (c.cause,)
+        naming = [
+            (refs, sid)
+            for dev, refs, sid in rows
+            if dev == deviation and any(n in refs for n in cause_names)
+        ]
         reached.update(sid for _, sid in naming)
-        anywhere = [refs for _, refs, _ in rows if any(_alike(c.cause, r) for r in refs)]
+        anywhere = [
+            refs for _, refs, _ in rows if any(same(n, r) for n in cause_names for r in refs)
+        ]
         if c.end != "top-event":
             continue
         at = c.path[-1].label
+        end_names = c.end_names or (at,)
         decision = next(
             (
                 o
@@ -806,7 +864,7 @@ def coverage(node: Node, candidates: list[Candidate], triage: Iterable[Outcome] 
         if decision is not None:
             pairs[decision.status].add(pair)
             continue
-        if any(any(_alike(at, r) for r in refs) for refs in anywhere):
+        if any(same(n, r) for refs in anywhere for r in refs for n in end_names):
             pairs["covered"].add(pair)
             continue
         gap = gaps.setdefault(

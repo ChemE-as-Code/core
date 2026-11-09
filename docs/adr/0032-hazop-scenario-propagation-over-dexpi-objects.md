@@ -99,7 +99,9 @@ gaps. The walk now reads the normal state from the P&ID itself:
   final element) belongs to any function with final elements.
 - **Coverage.** A row of the node covers a walk's top event under whichever deviation it was
   written, and a tag stands for its parallel trains (equal but for the letter after the
-  number). The triage file's format is unchanged.
+  number). A row may name an object by its tag or its object id, and an untagged item takes
+  the train of the tagged item next to it (a pump's check valve, `MOV-412B|SwingCheckValve`).
+  The triage file's format is unchanged.
 - **The walk follows drafting.** The skill runs the walk only after the node's rows are written:
   its candidates are the library's generic causes and, read first, displaced the plant-specific
   causes a team finds.
