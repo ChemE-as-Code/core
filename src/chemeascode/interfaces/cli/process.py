@@ -849,7 +849,7 @@ def propagate(
 @process_app.command("simulate")
 def simulate(
     fill: Annotated[
-        bool, typer.Option("--fill", help="Write the simulated values streams lack.")
+        bool, typer.Option("--fill", help="Record the run and fill supported stream values.")
     ] = False,
     check: Annotated[
         bool, typer.Option("--check", help="Simulate and report; write nothing.")
@@ -860,12 +860,14 @@ def simulate(
         typer.Option(help="Also save the DWSIM flowsheet here (.dwxmz; DWSIM only)."),
     ] = None,
 ) -> None:
-    """Solve the flowsheet in DWSIM, or in IDAES where process/simulation.yaml says simulator:
-    idaes (optional; CHEME_IDAES_PYTHON names a Python with idaes-pse): feeds from
-    process/flowsheet.yaml, simulator, property package and step specifications from
-    process/simulation.yaml.
+    """Run the simulator selected in process/simulation.yaml (DWSIM by default).
 
-    --fill writes temperature, pressure, flow and composition of every simulated stream that
+    DWSIM and IDAES use flowsheet feeds, a property package and step specifications.
+    CHEME_IDAES_PYTHON selects a Python with idaes-pse for the optional IDAES backend.
+    QSDsan runs the A2/O worker in its numerical environment. --fill records the dynamic
+    result in native wastewater units; --check runs the worker on a temporary project copy.
+
+    For DWSIM and IDAES, --fill writes temperature, pressure, flow and composition of a stream that
     lacks them (and the duty of energy streams) as `calculated` with a fingerprint; given and
     assumed values are never overwritten, a deviation from them is a warning. --fill also
     records the run (convergence, unit results, stream values, input fingerprints) in

@@ -285,18 +285,29 @@ class MethodSelection(Strict):
     )
 
 
+class QSDsanConfiguration(Strict):
+    """The opt-in, project-owned A2/O worker; not a general flowsheet translator."""
+
+    model: Literal["wwtp-a2o"]
+    environment: str = ".venv"
+    input: str = "inputs/baseline.json"
+    timeout_s: float = Field(default=300, gt=0, le=3600, allow_inf_nan=False)
+
+
 class Simulation(Strict):
     """``process/simulation.yaml``."""
 
     schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
     kind: Literal["simulation"]
-    simulator: Literal["dwsim", "idaes"] = Field(
+    simulator: Literal["dwsim", "idaes", "qsdsan"] = Field(
         default="dwsim",
-        description="The simulator that solves the flowsheet (ADR 0039): dwsim (the default) or "
+        description="The simulator that solves the flowsheet: dwsim (the default), "
+        "qsdsan (the A2/O worker), or "
         "idaes, an optional backend run in the Python CHEME_IDAES_PYTHON names (heater, cooler, "
         "valve, pump, compressor, expander, mixer, splitter, flash, conversion reactor and "
         "recycles; property packages 'IDAES ideal VLE' and 'IDAES Peng-Robinson').",
     )
+    qsdsan: QSDsanConfiguration | None = None
     property_package: str = Field(
         default="Peng-Robinson (PR)",
         description="The simulator's property package name: with dwsim one of the packages the "
@@ -346,4 +357,12 @@ class Simulation(Strict):
     def _version(self) -> Simulation:
         if self.schema_ != SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, SCHEMA))
+        if self.simulator == "qsdsan":
+            if self.qsdsan is None:
+                raise ValueError("simulator: qsdsan requires the qsdsan configuration")
+            other = self.model_fields_set - {"schema_", "kind", "simulator", "qsdsan"}
+            if other:
+                raise ValueError(f"Unsupported fields for qsdsan: {', '.join(sorted(other))}")
+        elif self.qsdsan is not None:
+            raise ValueError("qsdsan configuration requires simulator: qsdsan")
         return self

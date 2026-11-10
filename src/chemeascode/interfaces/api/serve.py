@@ -1713,6 +1713,20 @@ def create_app(
         if drawn:
             table["bfd_connections"] = drawn
         table["bfd_connections_from"] = "sheet" if drawn else "flowsheet"
+        # Wastewater quantities retain their measurement bases, outside molecular states.
+        sim_text = _small(snapshot, "process/simulation.yaml")
+        try:
+            config = yaml.safe_load(sim_text[0]) if sim_text else None
+        except yaml.YAMLError:
+            config = None
+        if isinstance(config, dict) and config.get("simulator") == "qsdsan":
+            from chemeascode.domains.process.wastewater import stream_table as wastewater_table
+
+            try:
+                simulation = _simulation(snapshot, case)
+            except ApiError as failure:
+                simulation = {"spec": {"simulator": "qsdsan"}, "problem": failure.message}
+            table = wastewater_table(table, simulation)
         return {"rev": snapshot.commit, **table}
 
     def _case_of(process: Any, case: str | None) -> str:
@@ -1724,6 +1738,9 @@ def create_app(
 
     @app.get("/api/simulation")
     def get_simulation(case: str | None = None, rev: str | None = None) -> dict[str, Any]:
+        return _simulation(repo.snapshot(rev), case)
+
+    def _simulation(snapshot: Snapshot, case: str | None) -> dict[str, Any]:
         """``process/simulation.yaml`` parsed, the run ``cheme process simulate --fill``
         recorded in ``process/simulation-run.json`` (null without one), whether that record is
         stale against the inputs now, and one merged row per unit. 404 without the simulation
@@ -1733,14 +1750,36 @@ def create_app(
         from chemeascode.domains.process.simulation.translate import load as load_simulation
         from chemeascode.foundation.provenance import content_fingerprint
 
-        snapshot = repo.snapshot(rev)
         sim_text = _need(snapshot, SIMULATION_FILE)
         texts = {}
+        # The QSDsan record depends on the project recipe, not molecular stream properties.
+        # Read through Snapshot even for these extra sources; serving never runs the worker.
+        extra_paths = []
+        try:
+            config = yaml.safe_load(sim_text[0]) or {}
+        except yaml.YAMLError:
+            config = {}
+        if isinstance(config, dict) and config.get("simulator") == "qsdsan":
+            from chemeascode.integrations.qsdsan import recipe_path
+
+            qsdsan = config.get("qsdsan")
+            input_path = (
+                qsdsan.get("input", "inputs/baseline.json") if isinstance(qsdsan, dict) else ""
+            )
+            extra_paths = [
+                e.path
+                for e in snapshot.entries()
+                if e.type == "file" and recipe_path(e.path, input_path)
+            ]
         for path in (*record.RUN_INPUTS, record.RUN_FILE):
             try:
                 found = _small(snapshot, path)
             except ApiError:
                 continue  # too large or not served: counts as absent
+            if found is not None:
+                texts[path] = found
+        for path in extra_paths:
+            found = _small(snapshot, path)
             if found is not None:
                 texts[path] = found
         try:

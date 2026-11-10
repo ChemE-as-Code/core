@@ -861,7 +861,8 @@ def model_bases(
         excluded = left_out(process, sim)
     found = []
     for key, index, node in _units(process):
-        simulated = sim is not None and node.id not in excluded
+        # This classifier describes molecular simulation models. Wastewater evidence is separate.
+        simulated = sim is not None and sim.simulator != "qsdsan" and node.id not in excluded
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]

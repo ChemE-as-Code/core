@@ -19,7 +19,10 @@ const { withRev } = useRev();
 
 const run = computed(() => props.view.run);
 const state = computed(() => runState(props.view));
-const badge = computed(() => RUN_BADGE[state.value]);
+const wastewater = computed(() => props.view.spec.simulator === "qsdsan");
+const badge = computed(() => wastewater.value && state.value === "converged"
+  ? { badge: "pass", label: "integration completed", title: "Requested integration and basic checks passed; steady state and plant validation are separate" }
+  : RUN_BADGE[state.value]);
 /** `dwsim 9.0.5.0`: the recorded run's simulator and version, else the spec's simulator. */
 const simulatorText = computed(() => {
   const version = run.value?.simulator.version;
@@ -58,8 +61,8 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
         <span>{{ simulatorText }}</span>
         <RouterLink class="muted file" :to="fileLink(view.file)">{{ view.file }}</RouterLink>
       </dd>
-      <dt>Property package</dt>
-      <dd data-package>{{ view.spec.property_package }}</dd>
+      <dt>{{ wastewater ? "Model / solver" : "Property package" }}</dt>
+      <dd data-package>{{ wastewater ? (run?.simulator.method ?? "ASM2d") : view.spec.property_package }}</dd>
       <dt>Case</dt>
       <dd>
         <select v-if="view.cases.length > 1" :value="view.case ?? ''" aria-label="Simulation case" @change="$emit('setCase', ($event.target as HTMLSelectElement).value)">
@@ -96,7 +99,11 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
     </p>
     <div v-if="!run" class="notice" data-no-run>
       <p><strong>No run recorded{{ view.case ? ` for case ${view.case}` : "" }}.</strong></p>
-      <p class="muted">
+      <p v-if="wastewater" class="muted">
+        <code>cheme process simulate --fill</code> saves a new wastewater run and its verification
+        report, then records it in <code>{{ view.run_file }}</code>. Molecular stream fields are not filled.
+      </p>
+      <p v-else class="muted">
         <code>cheme process simulate --fill</code> runs {{ view.spec.simulator }}, writes the simulated values into <code>process/flowsheet.yaml</code> and records the run in
         <code>{{ view.run_file }}</code>; commit both.
       </p>
@@ -114,7 +121,11 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
     <p v-if="state === 'failed'" class="notice error" role="note" data-failed>
       The run did not converge<template v-if="run?.messages.length">: {{ run.messages.join("; ") }}</template>. No stream value was written.
     </p>
-    <p v-if="run && state === 'converged'" class="muted hint" data-filled-count>
+    <p v-if="run && state === 'converged' && wastewater" class="notice" data-wastewater-scope>
+      {{ run.messages.join(" ") }} Wastewater concentrations retain their COD/N/P units in the saved
+      report and CSV files. The molecular stream table is not filled.
+    </p>
+    <p v-else-if="run && state === 'converged'" class="muted hint" data-filled-count>
       {{ filledCount }} stream value{{ filledCount === 1 ? "" : "s" }} hold the simulated value (marked <span class="sim-mark">sim</span> in the stream table).
     </p>
 

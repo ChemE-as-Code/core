@@ -4,6 +4,7 @@
 :mod:`chemeascode.integrations.dwsim`) or ``idaes`` (:mod:`chemeascode.integrations.idaes`, an
 optional backend). Both take the same simulator model (:mod:`.translate`) and return results in
 the same shape, so the fill, the check, the run record and the provenance are one path.
+The QSDsan A2/O worker (ADR 0065) returns a dynamic wastewater result in its own units.
 
 The IDAES backend is bounded: the units, property packages and compounds below, which its worker
 (``integrations/idaes_worker.py``, ``UNITS`` and ``PACKAGES``) builds; a test keeps the two in
@@ -20,8 +21,9 @@ from chemeascode.foundation.yamlsource import _yaml_line
 
 DWSIM = "dwsim"
 IDAES = "idaes"
+QSDSAN = "qsdsan"
 #: The name a simulator has in the source of every value it simulates.
-TITLES = {DWSIM: "DWSIM", IDAES: "IDAES"}
+TITLES = {DWSIM: "DWSIM", IDAES: "IDAES", QSDSAN: "QSDsan"}
 
 #: IDAES property package (simulation.yaml ``property_package``) -> the methods.yml method it
 #: implements, its phases' equation of state, and the compounds it holds (CAS -> name). The
