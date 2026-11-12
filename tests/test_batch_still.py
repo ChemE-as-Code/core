@@ -663,8 +663,11 @@ def test_a_template_component_no_inlet_carries_is_not_the_stills(tmp_path):
     flowsheet = FLOWSHEET.replace(
         "        composition: {basis: mole_fraction, values: {B: 1.0}, provenance: given}\n", ""
     )
-    messages = [f.message for f in _findings(_plant(tmp_path / "b", flowsheet, TEMPLATE_W))]
-    assert any("W lack a vapour_pressure" in m for m in messages), messages
+    found = _findings(_plant(tmp_path / "b", flowsheet, TEMPLATE_W))
+    # core#214: only a component the charge holds needs a vapour pressure; the template's
+    # guess (before propagate) is an info, not an error that would stop propagate
+    assert [f.level for f in found] == ["info"], [f.format() for f in found]
+    assert "template lists W without a vapour_pressure" in found[0].message
 
 
 def test_an_assumed_ideal_liquid_is_not_sourced(tmp_path):

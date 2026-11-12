@@ -1267,12 +1267,13 @@ class Volatility(Strict):
 
 class Boilup(Strict):
     """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
-    its heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol
-    of vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)
-    times the distillate (ADR 0061)."""
+    its heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol
+    of vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's
+    temperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR
+    0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061)."""
 
     value: float = Field(gt=0)
-    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h"]
+    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h", "m3/h"]
     provenance: Provenance
     source: str = ""
 
@@ -1318,10 +1319,24 @@ class StillEnd(Strict):
 
 
 class StillCut(Strict):
-    """One distillate cut: its outlet port, collected until its ``end``."""
+    """One distillate cut: its outlet port, collected until its ``end``; at its own
+    ``pressure`` and ``boilup`` (ADR 0068: a vacuum ramp in steps, a forerun the vacuum pump
+    limits), else the still's."""
 
     outlet: str = Field(description="The step's outlet port the cut leaves by.")
     end: StillEnd
+    pressure: float | None = Field(
+        default=None,
+        gt=0,
+        description="kPa(a) of the still while this cut is collected (volatility raoult); "
+        "default: the still's.",
+        exclude_if=lambda value: value is None,  # a still's fingerprint stays as it was
+    )
+    boilup: Boilup | None = Field(
+        default=None,
+        description="The boil-up while this cut is collected; default: the still's.",
+        exclude_if=lambda value: value is None,
+    )
 
 
 class StillFeed(Strict):
@@ -1445,6 +1460,13 @@ class Still(Strict):
         default_factory=list,
         description="Components that stay in the still (solid components always do).",
     )
+    separate_phase: list[str] = Field(
+        default_factory=list,
+        description="Components in a phase of their own (a suspended solid, an immiscible "
+        "non-volatile liquid or salt): they stay in the still and do not count in the liquid's "
+        "mole fractions (Raoult's law, the residue end, the column), ADR 0068.",
+        exclude_if=lambda value: not value,  # a still's fingerprint stays as it was
+    )
     boilup: Boilup
     end: StillEnd | None = None
     cuts: list[StillCut] = Field(default_factory=list)
@@ -1458,6 +1480,14 @@ class Still(Strict):
         "(volatility raoult), and a swap's feed warmed to the still's temperature as it mixes "
         "in, in the still's duty and its whole energy per batch (ADR 0063); default: the "
         "boil-up's latent heat alone.",
+        exclude_if=lambda value: not value,  # a still's dump stays as it was
+    )
+    heat_up_time: bool = Field(
+        default=False,
+        description="The still's heat terms besides the boil-up (heat_up: the charge's and a "
+        "swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the boil-up's "
+        "mean heat input (a boil-up in kW: its value), added to the still's time and to the "
+        "recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
     column: Column | None = Field(
@@ -1489,6 +1519,16 @@ class Still(Strict):
             raise ValueError("an end at a temperature needs volatility raoult")
         if self.heat_up and self.volatility.model == "constant":
             raise ValueError("heat_up needs volatility raoult (the charge's bubble point)")
+        if self.heat_up_time and self.volatility.model == "constant":
+            raise ValueError("heat_up_time needs volatility raoult (a still's temperatures)")
+        raoult = self.volatility.model == "raoult"
+        if not raoult and any(c.pressure is not None for c in self.cuts):
+            raise ValueError("a cut's pressure needs volatility raoult")
+        boilups = [self.boilup, *(c.boilup for c in self.cuts if c.boilup is not None)]
+        if not raoult and any(b.unit == "m3/h" for b in boilups):
+            raise ValueError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
+        if set(self.separate_phase) & set(self.volatility.alpha):
+            raise ValueError("separate_phase: a component in a phase of its own is non-volatile")
         ports = [c.outlet for c in self.cuts]
         if len(set(ports)) != len(ports):
             raise ValueError("cuts: each outlet once")

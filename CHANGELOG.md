@@ -18,11 +18,33 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+- Batch still (ADR 0068, core#182): `still.separate_phase: [ids]`, components in a phase of
+  their own (a suspended solid, a salt, an immiscible non-volatile liquid) left out of the
+  liquid's mole fractions for Raoult's law, the residue end and a column; `cuts[].pressure` and
+  `cuts[].boilup`, a cut's own pressure and boil-up (a vacuum ramp in steps, a forerun the
+  vacuum pump limits), with a note where the still steps to the new bubble point; a boil-up in
+  `m3/h`, the vapour's volume at the still's temperature and pressure; `still.heat_up_time:
+  true`, the heat-up of the charge, a swap's feed and the vessel's metal (ADR 0063) timed at the
+  boil-up's mean heat input, in `cheme process stills` (`heat_up_time_h`, `time_h`) and in a
+  recipe `distil` operation `from:` the still. A still that uses none of them dumps,
+  fingerprints and solves as before.
+
+### Fixed
+
+- An end at a temperature failed with "the still boils dry before its end" for some
+  temperatures between two that solved (core#198): the integrator re-tested the stop at the
+  state its bisection had found, and the bubble point, converged there from another guess, could
+  fall about 1e-9 K short. A step whose stop is found now ends there. A still that solved
+  before gives the same cut within the bubble point's tolerance.
+- A component at zero amount in a still's charge and feed needs no vapour pressure (core#214):
+  `cheme validate` asked one of a component an inlet's template lists before propagate (an
+  error that stopped the plant); it is now an info finding (`cheme.process-still`), and the
+  still asks volatility data only of a component its charge holds.
 
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
-  `props.py`.
+  `props.py` and `batch_still.py`.
 
 ## 1.11.0 (2026-11-06)
 

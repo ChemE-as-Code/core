@@ -607,7 +607,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         if not _sourced(vol):
             lacking.append("ideal liquid (volatility assumed)")
         comps = process.components()
-        stays = set(spec.nonvolatile) | solid_components(process)
+        stays = set(spec.nonvolatile) | set(spec.separate_phase) | solid_components(process)
         for name in sorted(_present(process, inlets_of(process, node)) - stays):
             vp = getattr(comps.get(name), "vapour_pressure", None)
             if _sourced(vp):

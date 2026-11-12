@@ -204,4 +204,5 @@ nav:
       - "0062 Vent vapour, vent condenser and gas solubility": adr/0062-vent-vapour-condenser-and-gas-solubility.md
       - "0063 Heats of solution, heat-up and vessel metal": adr/0063-heats-of-solution-heat-up-and-vessel-metal.md
       - "0064 feos (PC-SAFT) as an optional property backend": adr/0064-feos-pc-saft-as-an-optional-property-backend.md
+      - "0068 Batch still: separate phases, cut conditions, heat-up time": adr/0068-batch-still-phases-cut-conditions-and-heat-up-time.md
       - Template: adr/template.md

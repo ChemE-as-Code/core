@@ -1281,10 +1281,22 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   Pa | mmHg, temperature_unit: K | degC, temperature_range}` in `materials.yaml`, by default
   the NIST form `log10(P/bar) = a - b/(T/K + c)`), or from a constant relative volatility
   (`{model: constant, alpha: {component: value}}`). `nonvolatile:` components (and solid
-  components) stay in the still.
+  components) stay in the still, counted in the liquid as dissolved solutes.
+  `separate_phase: [ids]` (ADR 0068) lists components in a phase of their own (a suspended
+  solid, an immiscible non-volatile liquid, a salt): they stay in the still and are left out of
+  the liquid's mole fractions (the bubble point, the vapour, a residue end's and the profile's
+  key fraction, a column's still liquid). A residue end on a still with it is the key's share
+  of the liquid, not of the pot.
   - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
-    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol) or 1/h (kmol of vapour
-    per hour per kmol of charge).
+    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol), 1/h (kmol of vapour
+    per hour per kmol of charge) or m3/h (raoult, ADR 0068: the vapour's volume at the still's
+    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity).
+  - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
+    `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
+    cuts. At a change of pressure the still steps to the new bubble point (a note; the flash or
+    the heating between is not in the time or the duty). Without a feed the first cut's
+    pressure is the still's from the start. `process stills` gives `pressure_kPa` and `boilup`
+    for a cut with its own.
   - The still stops at `end:` (one of `distilled` with `basis: mole | mass`, `residue: {key,
     mole_fraction}`, `time` s of boil-up, `temperature` K, `purity: {key, fraction}` with
     `basis: mole | mass`: the cut's mean share of the key falls to the fraction, a product cut
@@ -1310,7 +1322,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
     those otherwise it is info, no duty. The components it checks are those its inlets'
-    compositions carry (an inlet's template only while it has none). A `heat_of_vaporization`
+    compositions carry at a non-zero amount (an inlet's template, while it has none, only as an
+    info: needed only if the charge holds them). A `heat_of_vaporization`
     below 2000 kJ/kmol is a warning: NIST gives kJ/mol, times 1000.
   - A residue end's direction is the target's: the key falls to a target below its share, or
     rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
@@ -1323,6 +1336,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     whole energy per batch on the duty's basis (`total_energy_kWh_per_batch`, beside the year
     average; `energy_kWh_per_batch` stays the latent heat) and assumptions that say what the
     duty holds.
+  - `still.heat_up_time: true` (raoult, ADR 0068): the duty's terms besides the boil-up (the
+    charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the boil-up's
+    mean heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` (a boil-up in kW: its
+    value); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
+    heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
+    takes no time.
+  - An end at a temperature (or any end) stops where the integrator found it (core#198: a
+    re-evaluation of the bubble point there could fall short and report a dry still). Only a
+    component the charge or the feed holds at a non-zero amount needs volatility data
+    (core#214); a component only an inlet's template lists (before propagate) is an info.
   - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
     boils (and the heat-up without `heat_up`), losses, constant level by volume. `process
     simulate` does not couple it.

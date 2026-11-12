@@ -1048,7 +1048,7 @@
       },
       "Boilup": {
         "additionalProperties": false,
-        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)\ntimes the distillate (ADR 0061).",
+        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's\ntemperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR\n0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
         "properties": {
           "value": {
             "exclusiveMinimum": 0,
@@ -1061,7 +1061,8 @@
               "kmol/s",
               "kg/h",
               "kW",
-              "1/h"
+              "1/h",
+              "m3/h"
             ],
             "title": "Unit",
             "type": "string"
@@ -3509,6 +3510,14 @@
             "title": "Nonvolatile",
             "type": "array"
           },
+          "separate_phase": {
+            "description": "Components in a phase of their own (a suspended solid, an immiscible non-volatile liquid or salt): they stay in the still and do not count in the liquid's mole fractions (Raoult's law, the residue end, the column), ADR 0068.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Separate Phase",
+            "type": "array"
+          },
           "boilup": {
             "$ref": "#/$defs/Boilup"
           },
@@ -3559,6 +3568,12 @@
             "default": false,
             "description": "Count the charge's heat-up from its inlet temperature to its bubble point (volatility raoult), and a swap's feed warmed to the still's temperature as it mixes in, in the still's duty and its whole energy per batch (ADR 0063); default: the boil-up's latent heat alone.",
             "title": "Heat Up",
+            "type": "boolean"
+          },
+          "heat_up_time": {
+            "default": false,
+            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the boil-up's mean heat input (a boil-up in kW: its value), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
+            "title": "Heat Up Time",
             "type": "boolean"
           },
           "column": {
@@ -3612,7 +3627,7 @@
       },
       "StillCut": {
         "additionalProperties": false,
-        "description": "One distillate cut: its outlet port, collected until its ``end``.",
+        "description": "One distillate cut: its outlet port, collected until its ``end``; at its own\n``pressure`` and ``boilup`` (ADR 0068: a vacuum ramp in steps, a forerun the vacuum pump\nlimits), else the still's.",
         "properties": {
           "outlet": {
             "description": "The step's outlet port the cut leaves by.",
@@ -3621,6 +3636,32 @@
           },
           "end": {
             "$ref": "#/$defs/StillEnd"
+          },
+          "pressure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kPa(a) of the still while this cut is collected (volatility raoult); default: the still's.",
+            "title": "Pressure"
+          },
+          "boilup": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Boilup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The boil-up while this cut is collected; default: the still's."
           }
         },
         "required": [

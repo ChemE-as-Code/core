@@ -138,7 +138,8 @@ class Operation(Strict):
         alias="from",
         description="dose and react: the batch or semi-batch step whose model gives the "
         "duration (its dosing time; its reaction time, the post-reaction of a semi-batch); "
-        "distil: the still step whose model gives its boil-up time (ADR 0055); "
+        "distil: the still step whose model gives its boil-up time (ADR 0055; with its "
+        "heat_up_time, the heat-up's time too, ADR 0068); "
         "dry: a dryer step (its drying time); filter: a solid_separation step with "
         "filtration (Ruth's filtration time).",
     )
@@ -944,6 +945,10 @@ def _duration_from(process: Any, step_id: str, kind: str, case: str) -> float:
         if kind != "distil":
             raise _Reference(f"{step_id} is a still: from: it on a distil operation")
         solved, _ = solve_still(process, node, inlets_of(process, node), case)
+        if getattr(still, "heat_up_time", False):  # the heat-up's time too (ADR 0068)
+            if solved.heat_up_time is None:
+                raise ValueError(f"{step_id}'s heat_up_time: no {solved.heat_up_time_missing}")
+            return (solved.time + solved.heat_up_time) / 3600.0
         return solved.time / 3600.0
     model = getattr(node, "reactor", None)
     if model not in ("batch", "semibatch") or node.batch is None:
