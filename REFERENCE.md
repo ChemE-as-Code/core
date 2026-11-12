@@ -1064,7 +1064,29 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   moment's content, or of a reaction consuming a product of the one setting the MTSR);
   `cheme.reactor-hazard-vent`
   warns without `hazard.vent_capacity` (m3/h) or above it, and is info within it. The pressure
-  of a blocked vent is not screened.
+  of a blocked vent is not screened. ADR 0069 (`domains/safety/reaction_network.py`):
+  `hazard.potential: network` takes dT_ad and the MTSR from the counted reactions as a network,
+  the largest heat forward extents of them together release from the content (a linear
+  programme: a consecutive reaction on a product adds its heat, of competing ones the more
+  exothermic takes the reactant); a batch or semi-batch with a consecutive pair reports it
+  without the choice (JSON `network`, a text line, a note where it is above the largest single
+  reaction's MTSR). A semi-batch gives each dosed reactant's largest accumulation and the share
+  of it the reactions can still consume (`accumulations`: `max`, `reactive_max`; a deliberate
+  excess is not reactive; with more than one dosed reactant or an excess). A vented
+  semi-batch's `gas_release.largest_over_batch` is the largest release over the batch, each
+  step's content at its MTSR with the liquid's vapour (at most what the reactions' heat there
+  evaporates, `heat_limited`), by component, and the `-vent` check
+  takes the larger of it and the release at the MTSR. A content boiling at the MTSR gets
+  `gas_release.boil_up`: its bubble point, the reactions' heat there and the vapour it boils
+  off (kmol/s, m3/h). `dissolved_release` gives the dosed and dissolved gases (and vent
+  components boiling below the MTSR) held in the liquid at their largest over the batch, kg per
+  batch, their boiling point against the MTSR and what the gas release strips of them
+  (`cheme.reactor-hazard-dissolved`, info). The default MTT counts a product a counted reaction
+  forms in the liquid (at least 5 % of it once formed, boiling at or above `T_p`);
+  `hazard.mtt_from: bubble-point` takes the MTT from the content's bubble point at the vessel's
+  pressure instead (Raoult's law over `vapour_pressure`, else `normal_boiling_point` and
+  `heat_of_vaporization`; the lower of the worst moment's content and that after the cooling
+  failure; dissolved gases left out; JSON `bubble_point`).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of

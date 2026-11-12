@@ -48,6 +48,18 @@ Per reactor (a block or step that names reactions or a reactor model), from its 
   gas one reaction forms run to completion: of the counted reactions (``hazard.reactions``,
   else every one) from the worst moment's content, or of a reaction consuming a product of the
   one setting the MTSR from the content after it; compared with ``hazard.vent_capacity``;
+- ADR 0069 (:mod:`.reaction_network`): the counted reactions as a network, their largest heat
+  together from the content (a consecutive reaction on a product counts), reported for a batch
+  or semi-batch with a consecutive pair and setting dT_ad and the MTSR with ``hazard.potential:
+  network``; a semi-batch's accumulation of each dosed reactant and the share of it that can
+  still react (a deliberate excess cannot); a vented semi-batch's largest gas release over the
+  batch (every step's content at its MTSR, with the liquid's vapour), compared with the vent
+  capacity where larger than the release at the MTSR; a content boiling at the MTSR, its
+  boil-up at its bubble point (the reactions' heat there over the vapour's latent heat); the
+  dosed, dissolved and vented gases held in the liquid a cooling failure can release, at their
+  largest over the batch, with what the gas release strips of them; the products a counted
+  reaction forms in the liquid as candidates for the default MTT, and with ``hazard.mtt_from:
+  bubble-point`` the MTT from the content's bubble point (Raoult's law);
 - the criticality class (Stoessel, Chem. Eng. Prog. 89 (1993) 68): 1 MTSR < MTT < TD24,
   2 MTSR < TD24 < MTT, 3 MTT < MTSR < TD24, 4 MTT < TD24 < MTSR, 5 TD24 < MTSR with
   TD24 < MTT;
@@ -68,8 +80,10 @@ Rules (``cheme.reactor-hazard-*``, findings on ``process/flowsheet.yaml``): ``-c
 the TD24 where the class cannot be given), ``-sensitivity`` (warning), ``-missing`` (info: what
 the screening lacks), ``-phase-change`` (info: a step not screened, its reactions all phase
 changes), ``-reactions`` (warning: ``hazard.reactions`` names a reaction not screened in the
-step), ``-vent`` (a vented batch's gas release at the MTSR: a warning without
-``hazard.vent_capacity`` or above it, info within it). With the vent blocked the gas
+step), ``-vent`` (a vented batch's gas release at the MTSR, or a semi-batch's largest over
+the batch: a warning without ``hazard.vent_capacity`` or above it, info within it),
+``-dissolved`` (info: the gases held in the liquid a cooling failure can release, ADR 0069). With
+the vent blocked the gas
 pressurises the vessel: that pressure is not screened (no head space or relief model). These
 are screening values for a concept or basic design: they do not replace calorimetry or a
 reaction-hazard study, and decide nothing.
@@ -136,6 +150,16 @@ class HazardEntry:
     #: mix in (kJ per hour of flows, the batch's basis) and its adiabatic rise, in dT_ad and not
     #: in the MTSR (released on mixing, not accumulated)
     heat_of_solution: dict[str, Any] | None = None
+    #: ADR 0069, in the JSON only when given: the counted reactions as a network (their
+    #: largest heat together, :mod:`.reaction_network`), with hazard.potential: network or a
+    #: consecutive reaction among them; each dosed reactant's accumulation and what of it can
+    #: still react (a semi-batch with more than one dosed reactant, or an excess); the
+    #: content's bubble point (hazard.mtt_from: bubble-point); the dissolved and dosed gases a
+    #: cooling failure can boil off or strip
+    network: dict[str, Any] | None = None
+    accumulations: dict[str, dict[str, float]] = field(default_factory=dict)
+    bubble_point: dict[str, Any] | None = None
+    dissolved_release: dict[str, Any] | None = None
 
 
 #: HazardEntry's fields the JSON gives only when they hold something (ADR 0058): a reactor
@@ -149,6 +173,10 @@ OPTIONAL = (
     "gas_release",
     "mtt_left_out",
     "heat_of_solution",
+    "network",
+    "accumulations",
+    "bubble_point",
+    "dissolved_release",
 )
 
 
@@ -212,12 +240,12 @@ def _location(process: Any, node: str) -> list[Any]:
     return []
 
 
-def _reaction_rises(
+def _heats(
     reactions: list[Any], moles: dict[str, float], t: float, comps: dict[str, Any], data: Any
-) -> tuple[dict[str, float] | None, list[str]]:
-    """K of each reaction whose heat is known: its heat run to completion of its limiting
-    reactant, over the feed's heat capacity (negative: endothermic), and what is lacking.
-    None when the heat capacity is not known."""
+) -> tuple[float | None, dict[str, float], list[str]]:
+    """The feed's heat capacity kJ/K (None when not known), each reaction's heat of reaction
+    kJ/kmol whose heat is known (``heat_of_reaction``, else a gas's ideal-gas data) and what
+    is lacking."""
     from chemeascode.domains.chemistry.thermochemistry import missing, reaction_enthalpy
 
     lacking: list[str] = []
@@ -226,28 +254,43 @@ def _reaction_rises(
     if liquid:
         no_cp = sorted(n for n in present if not getattr(comps.get(n), "liquid_heat_capacity", 0))
         if no_cp:
-            return None, ["liquid_heat_capacity of " + ", ".join(no_cp)]
+            return None, {}, ["liquid_heat_capacity of " + ", ".join(no_cp)]
         capacity = sum(v * comps[n].liquid_heat_capacity for n, v in present.items())
     else:
         if lack := missing(list(present), data):
-            return None, ["ideal_gas data of " + ", ".join(lack)]
+            return None, {}, ["ideal_gas data of " + ", ".join(lack)]
         capacity = sum(v * data[n].cp(t) for n, v in present.items())
     if capacity <= 0:
+        return None, {}, lacking
+    heats: dict[str, float] = {}
+    for r in reactions:
+        if r.heat_of_reaction is not None:
+            heats[r.id] = r.heat_of_reaction.value
+        elif not liquid and not missing(list(r.stoichiometry), data):
+            heats[r.id] = reaction_enthalpy(r.stoichiometry, data, t)
+        else:
+            lacking.append(f"heat_of_reaction of {r.id}")
+    return capacity, heats, lacking
+
+
+def _reaction_rises(
+    reactions: list[Any], moles: dict[str, float], t: float, comps: dict[str, Any], data: Any
+) -> tuple[dict[str, float] | None, list[str]]:
+    """K of each reaction whose heat is known: its heat run to completion of its limiting
+    reactant, over the feed's heat capacity (negative: endothermic), and what is lacking.
+    None when the heat capacity is not known."""
+    capacity, heats, lacking = _heats(reactions, moles, t, comps, data)
+    if capacity is None:
         return None, lacking
     rises: dict[str, float] = {}
     for r in reactions:
-        if r.heat_of_reaction is not None:
-            heat = r.heat_of_reaction.value
-        elif not liquid and not missing(list(r.stoichiometry), data):
-            heat = reaction_enthalpy(r.stoichiometry, data, t)
-        else:
-            lacking.append(f"heat_of_reaction of {r.id}")
+        if r.id not in heats:
             continue
         extent = min(
             (moles.get(n, 0.0) / -nu for n, nu in r.stoichiometry.items() if nu < 0),
             default=0.0,
         )
-        rises[r.id] = -heat * extent / capacity
+        rises[r.id] = -heats[r.id] * extent / capacity
     return rises, lacking
 
 
@@ -431,6 +474,9 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     entry.adiabatic_rise = rise
     if rise is not None:
         entry.mtsr = t_p + accumulation * rise
+    shares = item.batch.vent.shares() if _vented(item) else {}
+    counted_rx = [r for r in reactions if counted is None or r.id in counted]
+    extents = _batch_network(entry, item, counted_rx, moles, t_p, accumulation, comps, process)
     if entry.counted_reactions:
         everyone, _ = _reaction_rises(reactions, moles, t_p, comps, process.ideal_gas())
         # an endothermic reaction alone does not heat the content: its MTSR is T_p, as in
@@ -439,9 +485,47 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
             r: {"adiabatic_rise": x, "mtsr": t_p + accumulation * max(x, 0.0)}
             for r, x in (everyone or {}).items()
         }
-    _limits(entry, item, reactions, moles, comps, p_in, _left_out(item, []))
+    label, end = _end_state(counted_rx, moles, rises, shares, extents)
+    _limits(
+        entry,
+        item,
+        reactions,
+        moles,
+        comps,
+        p_in,
+        _left_out(item, []),
+        _products(counted_rx, moles, shares, extents),
+        [
+            ("the charge" if model == "batch" else "the feed", moles),
+            *([(label, end)] if end else []),
+        ],
+    )
+    stripped: dict[str, float] = {}
     if model == "batch" and _vented(item) and entry.mtsr is not None:
-        _gas(process, item, entry, case, moles, entry.mtsr, p_in or 101.325, rises, counted)
+        stripped = _gas(
+            process,
+            item,
+            entry,
+            case,
+            moles,
+            entry.mtsr,
+            p_in or 101.325,
+            rises,
+            counted,
+            after_network=end if extents else None,
+        )
+    if model == "batch" and entry.mtsr is not None:
+        _dissolved_release(
+            process,
+            item,
+            entry,
+            case,
+            moles,
+            [(0.0, moles, entry.mtsr)],
+            p_in or 101.325,
+            _left_out(item, []),
+            stripped,
+        )
     _uncounted(entry)
     bed = getattr(item, "bed", None)
     if model == "pfr" and bed is not None and bed.heat == "cooled" and bed.coolant_temperature:
@@ -490,32 +574,47 @@ def _screen_semibatch(
         entry.missing.append(f"the semibatch: {failure}")
         return entry
     points = solved.cooling_profile
+    every_rx, _ = process.reactions_of(item.id)
+    shares = item.batch.vent.shares() if _vented(item) else {}
+    # the model's reactions counted (phase changes too, as the model's cooling failure), and
+    # the screened ones (the network's consecutive pairs, the products, dT_ad)
+    model_rx = [r for r in every_rx if counted is None or r.id in counted]
+    counted_rx = [r for r in reactions if counted is None or r.id in counted]
+    values, network = _semibatch_network(entry, item, points, model_rx, counted_rx, shares, counted)
     # the worst moment of the counted reactions (all: the model's own cooling failure)
-    worst = max(points, key=lambda q: q.mtsr(counted)) if points else None
+    worst_k = max(range(len(points)), key=lambda k: values[k]) if points else None
+    worst = points[worst_k] if worst_k is not None else None
     entry.process_temperature = worst.temperature if worst else solved.profile[0][1]
     rise, lacking, _ = _adiabatic_rise(
         reactions, moles, entry.process_temperature, comps, process.ideal_gas(), counted
     )
     entry.missing += lacking
     entry.adiabatic_rise = rise
+    extents = None
+    if entry.network is not None:
+        extents = _semibatch_network_rise(entry, counted_rx, moles, comps, process, shares, network)
     if solutions:
         _solution_rise(entry, moles, comps, mixing)
     entry.accumulation = solved.max_accumulation
-    if worst is not None:
-        entry.mtsr = worst.mtsr(counted)
+    if worst is not None and worst_k is not None:
+        entry.mtsr = values[worst_k]
         entry.notes.append(
             f"accumulation: the dosed reactant's largest, {solved.max_accumulation or 0:.3g} at "
             f"{solved.max_accumulation_time or 0:.6g} s; MTSR at the worst moment, "
             f"{worst.time:.6g} s (dosing stopped, the content's heat capacity then"
             + (f"; of {', '.join(counted)}, hazard.reactions" if counted else "")
+            + ("; the counted reactions as a network, hazard.potential" if network else "")
             + ")"
         )
-        entry.mtsr_profile = _profile(points, counted)
+        entry.mtsr_profile = _profile(points, values)
+        _accumulations(entry, solved, points, reactions, shares)
     elif rise is not None and solved.max_accumulation is not None:
         entry.mtsr = entry.process_temperature + solved.max_accumulation * rise
         entry.notes.append("MTSR: T_p + X_ac dT_ad (no cooling-failure temperature over the run)")
     else:
         entry.missing.append("the accumulation of a dosed reactant")
+    if entry.network is not None and not network:
+        _network_note(entry, entry.network["mtsr_K"])
     if entry.counted_reactions:
         everyone, _ = _reaction_rises(
             reactions, moles, entry.process_temperature, comps, process.ideal_gas()
@@ -528,11 +627,32 @@ def _screen_semibatch(
         )
     if item.batch.vent is not None:
         _vent_note(process, item, entry, inlets, case, solved)
+    # the content once the cooling failure ran its course from the worst moment
+    label, end = ("", None)
+    if worst is not None:
+        net_end = _network_end(model_rx, worst, shares) if network else None
+        label, end = _end_state(model_rx, worst.moles, worst.rises, shares, net_end)
     # what boils in the liquid sets the MTT: the charge and the absorbed share of each dose,
-    # but no vent component, dosed gas or dissolved gas (ADR 0058)
-    _limits(entry, item, reactions, moles, comps, p_in, _left_out(item, gases))
+    # but no vent component, dosed gas or dissolved gas (ADR 0058); the products a counted
+    # reaction forms (ADR 0069)
+    left_out = _left_out(item, gases)
+    _limits(
+        entry,
+        item,
+        reactions,
+        moles,
+        comps,
+        p_in,
+        left_out,
+        _products(counted_rx, moles, shares, extents),
+        [
+            *([("the worst moment's content", worst.moles)] if worst is not None else []),
+            *([(label, end)] if end else []),
+        ],
+    )
+    stripped: dict[str, float] = {}
     if _vented(item) and worst is not None and entry.mtsr is not None:
-        _gas(
+        stripped = _gas(
             process,
             item,
             entry,
@@ -542,8 +662,158 @@ def _screen_semibatch(
             solved.pressure,
             worst.rises,
             counted,
+            after_network=end if network else None,
+            points=points,
+            values=values,
+        )
+    if points:
+        _dissolved_release(
+            process,
+            item,
+            entry,
+            case,
+            moles,
+            [(q.time, q.moles, v) for q, v in zip(points, values, strict=True)],
+            solved.pressure,
+            left_out,
+            stripped,
         )
     return entry
+
+
+def _point_network(q: Any, reactions: list[Any], shares: dict[str, float]) -> float | None:
+    """K: the cooling-failure temperature at the step *q* of the counted *reactions* as a
+    network (their largest heat together from its content over its heat capacity), None
+    without its heat capacity or with an unbounded network."""
+    from chemeascode.domains.safety.reaction_network import network_heat
+
+    if not q.capacity:
+        return None
+    heats = {r.id: q.heats[r.id] for r in reactions if r.id in q.heats}
+    solved = network_heat(reactions, q.moles, heats, shares)
+    if solved is None:
+        return None
+    return q.temperature + max(solved[0], 0.0) / q.capacity
+
+
+def _network_end(reactions: list[Any], q: Any, shares: dict[str, float]) -> dict[str, float] | None:
+    """The network's extents from the step *q*'s content."""
+    from chemeascode.domains.safety.reaction_network import network_heat
+
+    heats = {r.id: q.heats[r.id] for r in reactions if r.id in q.heats}
+    solved = network_heat(reactions, q.moles, heats, shares)
+    return solved[1] if solved is not None else None
+
+
+def _semibatch_network(
+    entry: HazardEntry,
+    item: Any,
+    points: list[Any],
+    model_rx: list[Any],
+    counted_rx: list[Any],
+    shares: dict[str, float],
+    counted: list[str] | None,
+) -> tuple[list[float], bool]:
+    """The cooling-failure temperature at each step (the counted reactions' largest, or with
+    hazard.potential: network the network's), and whether the network counts. With a
+    consecutive pair among the counted reactions, or hazard.potential: network,
+    ``entry.network`` gives the network's worst moment (ADR 0069)."""
+    largest = [q.mtsr(counted) for q in points]
+    potential = _potential(item)
+    pairs = _pairs(counted_rx)
+    if not points or (not pairs and potential != "network"):
+        return largest, False
+    net = [_point_network(q, model_rx, shares) for q in points]
+    if any(v is None for v in net):
+        if potential == "network":
+            entry.missing.append(
+                "the network's potential (hazard.potential: network): the content's heat "
+                "capacity at every step, and a bounded heat"
+            )
+        return largest, False
+    values = [float(v) for v in net if v is not None]
+    k = max(range(len(points)), key=lambda i: values[i])
+    use = potential == "network"
+    entry.network = {
+        "mtsr_K": values[k],
+        "time_s": points[k].time,
+        "consecutive": pairs,
+        "in_mtsr": use,
+    }
+    return (values, True) if use else (largest, False)
+
+
+NETWORK_LACKING = (
+    "the network's potential (hazard.potential: network): the heat_of_reaction of every "
+    "counted reaction (the known ones release no heat together)"
+)
+
+
+def _semibatch_network_rise(
+    entry: HazardEntry,
+    counted_rx: list[Any],
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    process: Any,
+    shares: dict[str, float],
+    use: bool,
+) -> dict[str, float] | None:
+    """dT_ad of the whole batch (charge and doses) as the counted reactions' network
+    (``entry.network``'s; with hazard.potential: network, *use*, the entry's too, and the
+    network's extents are returned)."""
+    from chemeascode.domains.safety.reaction_network import network_heat
+
+    t = entry.process_temperature or 298.15
+    capacity, heats, lacking = _heats(counted_rx, moles, t, comps, process.ideal_gas())
+    solved = network_heat(counted_rx, moles, heats, shares) if capacity else None
+    if solved is None or not capacity:
+        return None
+    if lacking and solved[0] <= 0.0:
+        # no known heat, or only endothermic ones: what is lacking may be exothermic, so the
+        # network's dT_ad is not known (as _adiabatic_rise's)
+        if use:
+            entry.missing.append(NETWORK_LACKING)
+        return None
+    rise = max(solved[0], 0.0) / capacity
+    if entry.network is not None:
+        entry.network = {"adiabatic_rise_K": rise, **entry.network}
+    if not use:
+        return None
+    entry.adiabatic_rise = rise
+    return solved[1]
+
+
+def _accumulations(
+    entry: HazardEntry,
+    solved: Any,
+    points: list[Any],
+    reactions: list[Any],
+    shares: dict[str, float],
+) -> None:
+    """``entry.accumulations`` (ADR 0069): each dosed reactant's largest accumulation over the
+    batch, ``n_i(t) / (charged + dosed)``, and of it the share the screened reactions can still
+    consume from the content then (:func:`.reaction_network.reactive`): a deliberate excess
+    with nothing left to react with is not reactive. Given with more than one dosed reactant,
+    or when the reactive share is below the plain one (an excess)."""
+    from chemeascode.domains.safety.reaction_network import reactive
+
+    found: dict[str, dict[str, float]] = {}
+    differs = False
+    for n, total in solved.dosed_reactants.items():
+        plain = [max(q.moles.get(n, 0.0), 0.0) / total for q in points]
+        able = [reactive(reactions, q.moles, n, shares) / total for q in points]
+        i = max(range(len(points)), key=lambda k: plain[k])
+        j = max(range(len(points)), key=lambda k: able[k])
+        found[n] = {
+            "max": plain[i],
+            "time_s": points[i].time,
+            "reactive_max": able[j],
+            "reactive_time_s": points[j].time,
+        }
+        if able[j] < plain[i] * (1.0 - 1e-6) - 1e-12:
+            differs = True
+    if len(found) > 1 or differs:
+        entry.accumulations = found
 
 
 def _solution_rise(
@@ -579,9 +849,10 @@ def _solution_rise(
     )
 
 
-def _profile(points: list[Any], counted: list[str] | None) -> list[dict[str, float | None]]:
-    """The MTSR at the model's steps nearest PROFILE_POINTS moments evenly over the run, each
-    step once, and the worst moment: values at a step, never interpolated."""
+def _profile(points: list[Any], values: list[float]) -> list[dict[str, float | None]]:
+    """The MTSR (*values*, one per step) at the model's steps nearest PROFILE_POINTS moments
+    evenly over the run, each step once, and the worst moment: values at a step, never
+    interpolated."""
     end = points[-1].time
     picked = {
         min(
@@ -590,13 +861,13 @@ def _profile(points: list[Any], counted: list[str] | None) -> list[dict[str, flo
         )
         for i in range(PROFILE_POINTS)
     }
-    picked.add(max(range(len(points)), key=lambda k: points[k].mtsr(counted)))
+    picked.add(max(range(len(points)), key=lambda k: values[k]))
     return [
         {
             "time_s": points[k].time,
             "accumulation": points[k].accumulation,
             "temperature_K": points[k].temperature,
-            "mtsr_K": points[k].mtsr(counted),
+            "mtsr_K": values[k],
         }
         for k in sorted(picked)
     ]
@@ -614,6 +885,215 @@ def _per_reaction(rises: dict[str, float], points: list[Any]) -> dict[str, dict[
         found.setdefault(r, {"adiabatic_rise": None})
         found[r] |= {"mtsr": worst.mtsr([r]), "time_s": worst.time}
     return found
+
+
+def _hours(process: Any, case: str) -> float | None:
+    """h of the flowsheet's flows per batch (process/recipe.yaml's batch size), else None."""
+    from chemeascode.domains.process.recipe import hours_per_batch
+
+    try:
+        return hours_per_batch(process, case)
+    except ValueError:
+        return None
+
+
+def _basis(hours: float | None) -> str:
+    return (
+        f"per batch ({hours:.6g} h of the flowsheet's flows, process/recipe.yaml)"
+        if hours
+        else "per hour of the flowsheet's flows (no process/recipe.yaml batch size)"
+    )
+
+
+def _potential(item: Any) -> str | None:
+    return getattr(getattr(item, "hazard", None), "potential", None)
+
+
+def _pairs(reactions: list[Any]) -> list[str]:
+    """Each consecutive pair of *reactions*, as text (ADR 0069)."""
+    from chemeascode.domains.safety.reaction_network import consecutive
+
+    return [f"{a} on a product of {b}" for a, b in consecutive(reactions)]
+
+
+def _network_note(entry: HazardEntry, mtsr: float) -> None:
+    if entry.mtsr is not None and mtsr > entry.mtsr + 0.05:
+        entry.notes.append(
+            f"the counted reactions as a network ({'; '.join(entry.network['consecutive'])}) "
+            f"reach an MTSR of {mtsr:.1f} K, above the largest single reaction's "
+            f"{entry.mtsr:.1f} K: hazard.potential: network counts it"
+        )
+
+
+def _batch_network(
+    entry: HazardEntry,
+    item: Any,
+    counted_rx: list[Any],
+    moles: dict[str, float],
+    t_p: float,
+    accumulation: float,
+    comps: dict[str, Any],
+    process: Any,
+) -> dict[str, float] | None:
+    """``entry.network`` of a batch, CSTR, PFR or conversion step (ADR 0069), given with
+    hazard.potential: network or a consecutive reaction among the counted ones: the counted
+    reactions' largest heat together from the feed over its heat capacity. With
+    hazard.potential: network it sets dT_ad and the MTSR (its extents are returned)."""
+    from chemeascode.domains.safety.reaction_network import network_heat
+
+    potential = _potential(item)
+    pairs = _pairs(counted_rx)
+    # without hazard.potential the network is reported for a batch's cooling failure only
+    if potential != "network" and not (pairs and getattr(item, "reactor", None) == "batch"):
+        return None
+    shares = item.batch.vent.shares() if _vented(item) else {}
+    capacity, heats, lacking = _heats(counted_rx, moles, t_p, comps, process.ideal_gas())
+    solved = network_heat(counted_rx, moles, heats, shares) if capacity else None
+    if solved is None or capacity is None:
+        if potential == "network":
+            entry.missing.append(
+                "the network's potential (hazard.potential: network): "
+                + ("the feed's heat capacity" if not capacity else "a bounded heat (a cycle)")
+            )
+        return None
+    heat, extents = solved
+    if lacking and heat <= 0.0:
+        # no known heat, or only endothermic ones: what is lacking may be exothermic, so the
+        # network's rise is not known and dT_ad and the MTSR stay unset (as _adiabatic_rise's)
+        if potential == "network":
+            entry.missing.append(NETWORK_LACKING)
+        return None
+    rise = max(heat, 0.0) / capacity
+    mtsr = t_p + accumulation * rise
+    use = potential == "network"
+    entry.network = {
+        "adiabatic_rise_K": rise,
+        "mtsr_K": mtsr,
+        "consecutive": pairs,
+        "in_mtsr": use,
+    }
+    if not use:
+        _network_note(entry, mtsr)
+        return None
+    entry.adiabatic_rise, entry.mtsr = rise, mtsr
+    entry.notes.append(
+        "dT_ad and the MTSR: the counted reactions as a network (hazard.potential: network), "
+        "their largest heat together"
+    )
+    return extents
+
+
+def _end_state(
+    counted_rx: list[Any],
+    content: dict[str, float],
+    rises: dict[str, float] | None,
+    shares: dict[str, float],
+    extents: dict[str, float] | None,
+) -> tuple[str, dict[str, float] | None]:
+    """The content once the cooling failure ran its course, and its label: the counted
+    reactions' network end state (*extents*), else the content once the reaction setting the
+    MTSR (the largest of *rises*) ran to completion; None without one."""
+    from chemeascode.domains.safety.reaction_network import after
+
+    if extents:
+        return "the content after the counted reactions as a network", after(
+            counted_rx, content, extents, shares
+        )
+    ids = {r.id: r for r in counted_rx}
+    picked = {r: x for r, x in (rises or {}).items() if x > 0 and r in ids}
+    if not picked:
+        return "", None
+    setter = max(picked, key=lambda r: picked[r])
+    return f"the content after {setter}", _after(ids[setter], content, shares)
+
+
+def _products(
+    counted_rx: list[Any],
+    moles: dict[str, float],
+    shares: dict[str, float],
+    extents: dict[str, float] | None,
+) -> dict[str, tuple[float, str]]:
+    """Product -> its largest share of the liquid once a counted reaction alone ran to
+    completion of *moles* (or the network, *extents*), and after which: the products that are
+    candidates for the default MTT (ADR 0069)."""
+    from chemeascode.domains.safety.reaction_network import after
+
+    found: dict[str, tuple[float, str]] = {}
+
+    def take(content: dict[str, float], where: str, made: list[str]) -> None:
+        total = sum(v for v in content.values() if v > 0)
+        if total <= 0:
+            return
+        for n in made:
+            share = max(content.get(n, 0.0), 0.0) / total
+            if share > 0 and share > found.get(n, (0.0, ""))[0]:
+                found[n] = (share, where)
+
+    for r in counted_rx:
+        made = [n for n, nu in r.stoichiometry.items() if nu > 0]
+        if made and _extent(r, moles) > 0:
+            take(_after(r, moles, shares), f"after {r.id}", made)
+    if extents:
+        made = list(
+            dict.fromkeys(n for r in counted_rx for n, nu in r.stoichiometry.items() if nu > 0)
+        )
+        take(after(counted_rx, moles, extents, shares), "after the network", made)
+    return found
+
+
+def _dissolved_release(
+    process: Any,
+    item: Any,
+    entry: HazardEntry,
+    case: str,
+    moles: dict[str, float],
+    samples: list[tuple[float, dict[str, float], float]],
+    pressure: float,
+    left_out: dict[str, str],
+    stripped: dict[str, float],
+) -> None:
+    """``entry.dissolved_release`` (ADR 0069, core#178 item 5): each dosed gas, dissolved gas
+    and vent component boiling below the MTSR (as the default MTT leaves them out) held in the
+    liquid, at its largest
+    over *samples* (time s, content, the MTSR then): what a cooling failure can boil off or
+    strip, per batch; its boiling point at the vessel's pressure against the MTSR then, and
+    the most the gas release strips of it (*stripped*, kmol/s, with ``vent.vapour``)."""
+    comps = process.components()
+    candidates = dict(left_out) | _dissolved(
+        moles, comps, pressure, entry.process_temperature, left_out
+    )
+    hours = _hours(process, case)
+    scale = hours or 1.0
+    found: dict[str, dict[str, Any]] = {}
+    for n, why in candidates.items():
+        when, content, mtsr = max(samples, key=lambda q, n=n: q[1].get(n, 0.0))
+        amount = max(content.get(n, 0.0), 0.0) * scale
+        strip = stripped.get(n, 0.0)
+        if amount <= 0 and strip <= 0:
+            continue
+        mass = getattr(comps.get(n), "molar_mass", None)
+        at = _boiling_at(comps.get(n), n, pressure)
+        if why == "vent component" and at is not None and mtsr < at[0] and n not in stripped:
+            continue  # a vented liquid (a product partly vented) that does not boil off
+        row: dict[str, Any] = {
+            "why": why,
+            "kmol": amount,
+            "kg": amount * mass if mass else None,
+            "time_s": when,
+            "mtsr_K": mtsr,
+            "boiling_point_K": at[0] if at else None,
+            "mtsr_above_boiling_point": bool(at and mtsr >= at[0]),
+        }
+        if n in stripped:
+            row["stripped_kmol_s"] = strip
+            row["stripped_kg_h"] = strip * mass * 3600.0 if mass else None
+        found[n] = row
+    if found:
+        entry.dissolved_release = {
+            "basis": _basis(hours),
+            "pressure_kPa": pressure,
+            "components": found,
+        }
 
 
 def _vented(item: Any) -> bool:
@@ -667,15 +1147,20 @@ def _gas(
     pressure: float,
     rises: dict[str, float] | None = None,
     counted: list[str] | None = None,
-) -> None:
+    after_network: dict[str, float] | None = None,
+    points: list[Any] | None = None,
+    values: list[float] | None = None,
+) -> dict[str, float]:
     """``entry.gas_release`` (see the module docstring): the vent gas forming at the MTSR, the
     larger of two contents, *moles* (the worst moment's) and what is in the vessel once the
-    reaction setting the MTSR (the largest of *rises*, of the *counted*) ran to completion, so
-    that gas formed from its products counts; and the most one reaction forms run to completion,
-    of the counted ones from *moles*, or of a reaction consuming a product of the one setting
-    the MTSR from the content after it."""
+    reaction setting the MTSR (the largest of *rises*, of the *counted*; with hazard.potential:
+    network the network's end state, *after_network*) ran to completion, so that gas formed
+    from its products counts; and the most one reaction forms run to completion, of the counted
+    ones from *moles*, or of a reaction consuming a product of the one setting the MTSR from the
+    content after it. A semi-batch's *points* with their MTSR (*values*) give the largest
+    release over the batch (ADR 0069). Returns the most of each volatile component the gas
+    strips off the liquid over the batch (kmol/s, the gas release's basis)."""
     from chemeascode.domains.chemistry.thermochemistry import R
-    from chemeascode.domains.process.recipe import hours_per_batch
     from chemeascode.domains.process.stirred_tank import TankError, vent_gas_rate
 
     every, _ = process.reactions_of(item.id)
@@ -686,16 +1171,16 @@ def _gas(
     if setter is not None and (picked[setter] <= 0 or setter not in by_id):
         setter = None
     after = _after(by_id[setter], moles, shares) if setter else None
+    after_label = f"the content after {setter}" if setter else ""
+    if after_network is not None:
+        after, after_label = after_network, "the content after the counted reactions as a network"
     try:
         rate = vent_gas_rate(process, item, moles, temperature, pressure)
         rate_after = vent_gas_rate(process, item, after, temperature, pressure) if after else 0.0
     except TankError as failure:
         entry.missing.append(f"the gas release at the MTSR: {failure}")
-        return
-    try:
-        hours = hours_per_batch(process, case)
-    except ValueError:
-        hours = None
+        return {}
+    hours = _hours(process, case)
     # from the worst moment's content: the counted reactions (hazard.reactions, else all)
     formed = _formed([r for r in every if counted is None or r.id in counted], moles, shares)
     source = dict.fromkeys(formed, "the worst moment's content")
@@ -706,7 +1191,7 @@ def _gas(
             for r in every
             if r.id != setter and any(nu < 0 and n in products for n, nu in r.stoichiometry.items())
         ]
-        for r, kmol in _formed(chain, after, shares).items():
+        for r, kmol in _formed(chain, _after(by_id[setter], moles, shares), shares).items():
             if kmol > formed.get(r, 0.0):
                 formed[r], source[r] = kmol, f"the content after {setter}"
     largest = max(formed, key=lambda r: formed[r]) if formed else None
@@ -717,9 +1202,7 @@ def _gas(
         "rate_kmol_s": top * scale,
         "rate_m3_h": top * scale * volume * 3600.0,
         "rate_from": (
-            f"the content after {setter}"
-            if setter and rate_after > rate
-            else "the worst moment's content"
+            after_label if after_label and rate_after > rate else "the worst moment's content"
         ),
         "temperature_K": temperature,
         "pressure_kPa": pressure,
@@ -727,20 +1210,139 @@ def _gas(
         "formed_kmol": formed.get(largest or "", 0.0) * scale,
         "formed_m3": formed.get(largest or "", 0.0) * scale * volume,
         "formed_from": source.get(largest or ""),
-        "basis": (
-            f"per batch ({hours:.6g} h of the flowsheet's flows, process/recipe.yaml)"
-            if hours
-            else "per hour of the flowsheet's flows (no process/recipe.yaml batch size)"
-        ),
+        "basis": _basis(hours),
         "per_batch": bool(hours),
     }
-    _vapour_laden(process, item, entry, gas, moles, temperature, pressure)
+    _vapour_laden(process, item, entry, gas, moles, temperature, pressure, scale)
+    stripped = (
+        _over_batch(process, item, entry, gas, points, values, pressure, scale)
+        if points and values
+        else {}
+    )
     capacity = getattr(getattr(item, "hazard", None), "vent_capacity", None)
     if capacity:
         gas["vent_capacity_m3_h"] = capacity
         if hours:
             gas["capacity_ratio"] = gas["rate_m3_h"] / capacity
+            if (over := gas.get("largest_over_batch")) is not None:
+                over["capacity_ratio"] = over["rate_m3_h"] / capacity
+            if (boil := gas.get("boil_up")) is not None:
+                boil["capacity_ratio"] = boil["vapour_m3_h"] / capacity
     entry.gas_release = gas
+    return stripped
+
+
+def _saturation(phase: Any, moles: dict[str, float], t: float, p: float) -> dict[str, float]:
+    """``y_i = gamma_i x_i P_i^sat(t) / p`` of the vent's volatile components over *moles*."""
+    total = sum(v for v in moles.values() if v > 0)
+    if total <= 0:
+        return {}
+    return {
+        n: phase.activity.get(n, 1.0)
+        * max(moles.get(n, 0.0), 0.0)
+        / total
+        * phase.vapour_pressure[n].kpa(t)
+        / p
+        for n in phase.volatile
+    }
+
+
+def _over_batch(
+    process: Any,
+    item: Any,
+    entry: HazardEntry,
+    gas: dict[str, Any],
+    points: list[Any],
+    values: list[float],
+    pressure: float,
+    scale: float,
+) -> dict[str, float]:
+    """``gas_release.largest_over_batch`` (ADR 0069): at every step of a semi-batch, the gas
+    its content forms at that moment's MTSR (every reaction at its rate law, the vent's shares)
+    with the liquid's vapour it carries (``vent.vapour``: ``G Y / (1 - Y)`` at that MTSR), the
+    largest in m3/h; and the most of each volatile component stripped off the liquid over the
+    batch (returned, kmol/s). The vapour takes its latent heat from the reactions' heat there,
+    ``Q = sum_j (-dHr_j) M_j r_j``: it is at most ``Q / sum_i y_i dHvap_i`` (``heat_limited``),
+    which bounds it as ``Y`` nears 1 and is a content's boil-up where it boils at that MTSR
+    (without the heats, a boiling content counts its non-condensables only)."""
+    from chemeascode.domains.chemistry.thermochemistry import R
+    from chemeascode.domains.process.stirred_tank import TankError, extent_rates
+    from chemeascode.domains.process.vent_vapour import VentError, phase_of
+
+    vent = item.batch.vent
+    phase = None
+    if vent.vapour is not None:
+        try:
+            phase = phase_of(process, vent, list(points[0].moles), process.ideal_gas())
+        except VentError:
+            phase = None  # _vapour_laden named it
+    every, _ = process.reactions_of(item.id)
+    shares = vent.shares()
+    try:
+        rates = extent_rates(process, item, list(points[0].moles))
+        extents = [rates(q.moles, t, pressure) for q, t in zip(points, values, strict=True)]
+    except TankError as failure:
+        entry.missing.append(f"the gas release over the batch: {failure}")
+        return {}
+    heats = (
+        {r.id: -r.heat_of_reaction.value for r in every}
+        if all(r.heat_of_reaction is not None for r in every)
+        else None
+    )
+    stripped: dict[str, float] = {}
+    best: dict[str, Any] | None = None
+    for q, t, xi in zip(points, values, extents, strict=True):
+        by = {
+            g: f * sum(max(r.stoichiometry.get(g, 0.0) * xi[r.id], 0.0) for r in every)
+            for g, f in shares.items()
+        }
+        made = sum(by.values())
+        vapour: dict[str, float] = {}
+        share = None
+        limited = False
+        if phase is not None and made > 0:
+            ys = _saturation(phase, q.moles, t, pressure)
+            share = sum(ys.values())
+            carried = (
+                {n: made * y / (1.0 - share) for n, y in ys.items() if y > 0}
+                if share < 1.0
+                else None
+            )
+            ceiling = None
+            latent = sum(y * (phase.heat_of_vaporization.get(n) or 0.0) for n, y in ys.items())
+            if (
+                heats is not None
+                and share > 0
+                and all(phase.heat_of_vaporization.get(n) for n, y in ys.items() if y > 0)
+            ):
+                heat = max(sum(heats[r.id] * xi[r.id] for r in every), 0.0)
+                ceiling = {n: heat / latent * y for n, y in ys.items() if y > 0}
+            if ceiling is not None and (
+                carried is None or sum(ceiling.values()) < sum(carried.values())
+            ):
+                vapour, limited = ceiling, True
+            elif carried is not None:
+                vapour = carried
+        for n, v in vapour.items():
+            stripped[n] = max(stripped.get(n, 0.0), v * scale)
+        m3_h = (made + sum(vapour.values())) * scale * R * t / pressure * 3600.0
+        if best is None or m3_h > best["rate_m3_h"]:
+            best = {
+                "time_s": q.time,
+                "temperature_K": t,
+                "rate_kmol_s": made * scale,
+                "rate_m3_h": m3_h,
+                "by_component_kmol_s": {n: v * scale for n, v in {**by, **vapour}.items() if v > 0},
+            }
+            if share is not None:
+                best["vapour_share"] = share
+                if share >= 1.0:
+                    best["boils"] = True
+            if limited:
+                best["heat_limited"] = True
+    if best is not None:
+        gas["largest_over_batch"] = best
+    return stripped
 
 
 def _vapour_laden(
@@ -751,12 +1353,14 @@ def _vapour_laden(
     moles: dict[str, float],
     temperature: float,
     pressure: float,
+    scale: float = 1.0,
 ) -> None:
     """A vent with ``vapour`` (ADR 0062): the gas release leaves the vessel saturated with the
     liquid's volatile components at the MTSR, so its volume is the non-condensables' over
     ``1 - Y``, ``Y = sum_i gamma_i x_i P_i^sat(MTSR) / P`` over the content *moles* (a vent
     condenser is not credited: its cooling may fail too). ``Y >= 1``: the content boils at the
-    MTSR, and its boil-up, not the gas, sets the release (``boils``)."""
+    MTSR, and its boil-up, not the gas, sets the release (``boils``; its vapour load at the
+    content's bubble point, ``boil_up``, ADR 0069)."""
     from chemeascode.domains.process.vent_vapour import VentError, phase_of
 
     vent = item.batch.vent
@@ -770,28 +1374,87 @@ def _vapour_laden(
     total = sum(v for v in moles.values() if v > 0)
     if not phase.volatile or total <= 0:
         return
-    share = sum(
-        phase.activity.get(n, 1.0)
-        * max(moles.get(n, 0.0), 0.0)
-        / total
-        * phase.vapour_pressure[n].kpa(temperature)
-        / pressure
-        for n in phase.volatile
-    )
+    share = sum(_saturation(phase, moles, temperature, pressure).values())
     gas["vapour_share"] = share
     gas["noncondensable_m3_h"] = gas["rate_m3_h"]
     if share >= 1.0:
         gas["boils"] = True
+        _boil_up(process, item, entry, gas, phase, moles, temperature, pressure, scale)
+        boil = gas.get("boil_up")
         entry.notes.append(
             f"the content boils at the MTSR ({temperature:.1f} K): its vapour pressure "
-            f"{share * pressure:.4g} kPa reaches the vessel's {pressure:.4g} kPa(a); the gas "
-            "release is the boil-up, which the screening does not size (gas_release.boils)"
+            f"{share * pressure:.4g} kPa reaches the vessel's {pressure:.4g} kPa(a); "
+            + (
+                f"its boil-up at the bubble point {boil['temperature_K']:.1f} K is "
+                f"{boil['vapour_m3_h']:.4g} m3/h of vapour (gas_release.boil_up: the reaction's "
+                "heat there boils the content, a tempered reaction; no two-phase relief load)"
+                if boil
+                else "the gas release is the boil-up, which the screening does not size "
+                "(gas_release.boils)"
+            )
         )
         return
     gas["rate_m3_h"] /= 1.0 - share
     # formed_kmol and formed_m3 stay the gas formed (the non-condensables, one basis); the
     # volume it leaves with, the liquid's vapour included, is a key of its own
     gas["formed_m3_with_vapour"] = gas["formed_m3"] / (1.0 - share)
+
+
+def _boil_up(
+    process: Any,
+    item: Any,
+    entry: HazardEntry,
+    gas: dict[str, Any],
+    phase: Any,
+    moles: dict[str, float],
+    mtsr: float,
+    pressure: float,
+    scale: float,
+) -> None:
+    """``gas_release.boil_up`` (ADR 0069, a content boiling at the MTSR): the content (*moles*)
+    boils at its bubble point ``T_b`` (the vent's volatile components, Raoult's law), where the
+    reactions' heat at their rate laws, ``Q = sum_j (-dHr_j) M_j r_j(T_b)``, goes into its
+    vapour (a tempered reaction at the vessel's pressure): ``V = Q / sum_i y_i dHvap_i``,
+    ``y_i`` the vapour's composition at ``T_b``. The volume at ``T_b`` and the vessel's
+    pressure. Not a two-phase relief load (no level swell, no head space)."""
+    from chemeascode.domains.chemistry.thermochemistry import R
+    from chemeascode.domains.process.stirred_tank import TankError, extent_rates
+
+    low, high = 1.0, mtsr
+    for _ in range(200):
+        mid = 0.5 * (low + high)
+        if sum(_saturation(phase, moles, mid, pressure).values()) < 1.0:
+            low = mid
+        else:
+            high = mid
+        if high - low < 1e-10:
+            break
+    t_b = 0.5 * (low + high)
+    y = _saturation(phase, moles, t_b, pressure)
+    norm = sum(y.values()) or 1.0
+    y = {n: v / norm for n, v in y.items() if v > 0}
+    if lack := sorted(n for n in y if not phase.heat_of_vaporization.get(n)):
+        entry.missing.append("the boil-up at the MTSR: heat_of_vaporization of " + ", ".join(lack))
+        return
+    every, _ = process.reactions_of(item.id)
+    if lack := [r.id for r in every if r.heat_of_reaction is None]:
+        entry.missing.append("the boil-up at the MTSR: heat_of_reaction of " + ", ".join(lack))
+        return
+    try:
+        rates = extent_rates(process, item, list(moles))(moles, t_b, pressure)
+    except TankError as failure:
+        entry.missing.append(f"the boil-up at the MTSR: {failure}")
+        return
+    heat = sum(-r.heat_of_reaction.value * rates[r.id] for r in every) * scale  # kW
+    latent = sum(v * phase.heat_of_vaporization[n] for n, v in y.items())  # kJ/kmol
+    vapour = max(heat, 0.0) / latent
+    gas["boil_up"] = {
+        "temperature_K": t_b,
+        "heat_kW": heat,
+        "vapour_kmol_s": vapour,
+        "vapour_m3_h": vapour * R * t_b / pressure * 3600.0,
+        "by_component_kmol_s": {n: vapour * v for n, v in y.items()},
+    }
 
 
 def _vapour_text(gas: dict[str, Any]) -> str:
@@ -862,13 +1525,20 @@ def _limits(
     comps: dict[str, Any],
     p_in: float | None,
     left_out: dict[str, str] | None = None,
+    products: dict[str, tuple[float, str]] | None = None,
+    contents: list[tuple[str, dict[str, float]]] | None = None,
 ) -> None:
-    """The MTT and TD24 of *entry*, and its class once the MTSR is known."""
+    """The MTT and TD24 of *entry*, and its class once the MTSR is known. *products*: product
+    -> its largest share of the liquid once a counted reaction ran to completion, and after
+    which (ADR 0069); *contents*: the (label, content) whose bubble point hazard.mtt_from:
+    bubble-point takes."""
     hazard = getattr(item, "hazard", None)
     if hazard is not None and hazard.mtt:
         entry.mtt, entry.mtt_basis = hazard.mtt, "hazard.mtt"
+    elif getattr(hazard, "mtt_from", None) == "bubble-point":
+        _bubble_mtt(entry, item, moles, comps, p_in, left_out or {}, contents or [])
     elif any(r.phase == "liquid" for r in reactions):
-        _default_mtt(entry, moles, comps, p_in, left_out or {})
+        _default_mtt(entry, moles, comps, p_in, left_out or {}, products or {})
     else:
         entry.missing.append("the MTT (hazard.mtt)")
     if hazard is not None and hazard.td24:
@@ -879,15 +1549,62 @@ def _limits(
         entry.criticality = criticality(entry.mtsr, entry.mtt, entry.td24)
 
 
+def _boiling_at(comp: Any, name: str, pressure: float) -> tuple[float, str, bool] | None:
+    """*comp*'s boiling point K at *pressure* kPa(a), its basis and whether its
+    heat_of_vaporization was lacking away from atmospheric pressure (the normal boiling point
+    then stands in); None without a normal boiling point."""
+    normal = getattr(comp, "normal_boiling_point", None)
+    if not normal:
+        return None
+    if BELOW_ATMOSPHERIC <= pressure <= ATMOSPHERIC:
+        return normal, f"normal boiling point of {name}", False
+    heat = getattr(comp, "heat_of_vaporization", None)
+    if heat:
+        return (
+            boiling_point(normal, heat, pressure),
+            f"boiling point of {name} at {pressure:.4g} kPa(a), Clausius-Clapeyron with its "
+            "heat_of_vaporization",
+            False,
+        )
+    return normal, f"normal boiling point of {name}", True
+
+
+def _dissolved(
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    pressure: float,
+    t_p: float | None,
+    left_out: dict[str, str],
+) -> dict[str, str]:
+    """Component -> why it is a dissolved gas: a minor share of the liquid (below DISSOLVED)
+    boiling below *t_p* at *pressure* (ADR 0058); above atmospheric a component without
+    heat_of_vaporization is never one (its boiling point there is not known)."""
+    found: dict[str, str] = {}
+    total = sum(v for v in moles.values() if v > 0)
+    if t_p is None or total <= 0:
+        return found
+    for n, v in moles.items():
+        if n in left_out or (at := _boiling_at(comps.get(n), n, pressure)) is None:
+            continue
+        share = v / total
+        if at[0] < t_p and share < DISSOLVED and not (pressure > ATMOSPHERIC and at[2]):
+            found[n] = (
+                f"dissolved gas ({share:.2%} of the liquid, boils at {at[0]:.1f} K, below "
+                f"T_p {t_p:.1f} K)"
+            )
+    return found
+
+
 def _default_mtt(
     entry: HazardEntry,
     moles: dict[str, float],
     comps: dict[str, Any],
     p_in: float | None,
     left_out: dict[str, str],
+    products: dict[str, tuple[float, str]] | None = None,
 ) -> None:
     """The lowest boiling point at the vessel's pressure of what boils in the liquid (see the
-    module docstring)."""
+    module docstring), the products a counted reaction forms in it among the candidates."""
     pressure = p_in if p_in is not None else 101.325
     above = pressure > ATMOSPHERIC
     atmospheric = BELOW_ATMOSPHERIC <= pressure <= ATMOSPHERIC
@@ -895,48 +1612,60 @@ def _default_mtt(
     boiling: dict[str, tuple[float, str]] = {}
     unknown: list[str] = []  # no heat_of_vaporization: the normal boiling point stands in
     out: dict[str, str] = {}
-    total = sum(v for v in moles.values() if v > 0)
+    dissolved = _dissolved(moles, comps, pressure, t_p, left_out)
     for n in moles:
-        comp = comps.get(n)
-        normal = getattr(comp, "normal_boiling_point", None)
-        if not normal:
+        at = _boiling_at(comps.get(n), n, pressure)
+        if at is None:
             continue
         if n in left_out:
             out[n] = left_out[n]
             continue
-        heat = getattr(comp, "heat_of_vaporization", None)
-        if atmospheric:
-            found = (normal, f"normal boiling point of {n}")
-        elif heat:
-            found = (
-                boiling_point(normal, heat, pressure),
-                f"boiling point of {n} at {pressure:.4g} kPa(a), Clausius-Clapeyron with its "
-                "heat_of_vaporization",
+        if at[2]:
+            unknown.append(n)
+        if n in dissolved:
+            out[n] = dissolved[n]
+            continue
+        boiling[n] = (at[0], at[1])
+    # ADR 0069: a product a counted reaction forms in the liquid boils too; a minor one (below
+    # DISSOLVED) or one boiling below T_p (it leaves as it forms, or the vessel is pressurised)
+    # does not boil the batch, and is named only where it would have set the MTT
+    passed: dict[str, tuple[float, str]] = {}
+    vacuum: list[str] = []
+    for n, (share, where) in (products or {}).items():
+        # a vented product the liquid keeps in part (its share after the vent's) boils too
+        if moles.get(n, 0.0) > 0 or left_out.get(n, "vent component") != "vent component":
+            continue
+        if (at := _boiling_at(comps.get(n), n, pressure)) is None:
+            continue
+        if share < DISSOLVED or (t_p is not None and at[0] < t_p):
+            continue  # a minor product, or one that leaves as it forms: no candidate
+        if above and at[2]:
+            # its boiling point here is not known: no candidate (a product never leaves the
+            # MTT missing), named where its normal boiling point is below the MTT
+            passed[n] = (
+                at[0],
+                f"product without heat_of_vaporization (normal boiling point {at[0]:.1f} K; "
+                f"its boiling point at {pressure:.4g} kPa(a) is not known)",
             )
         else:
-            unknown.append(n)
-            found = (normal, f"normal boiling point of {n}")
-        share = moles[n] / total if total > 0 else 0.0
-        if (
-            t_p is not None
-            and found[0] < t_p
-            and share < DISSOLVED
-            and not (above and n in unknown)
-        ):
-            out[n] = (
-                f"dissolved gas ({share:.2%} of the liquid, boils at {found[0]:.1f} K, below "
-                f"T_p {t_p:.1f} K)"
+            if at[2]:  # under vacuum: named below where it could set the MTT
+                vacuum.append(n)
+            boiling[n] = (at[0], f"{at[1]}, a product ({share:.0%} of the liquid {where})")
+
+    def named(mtt: float | None) -> None:
+        for n, (bp, why) in passed.items():
+            if mtt is None or bp < mtt:
+                out[n] = why
+        entry.mtt_left_out = out
+        if out:
+            entry.notes.append(
+                "MTT: left out "
+                + ", ".join(f"{n} ({why})" for n, why in out.items())
+                + ": they leave or boil off rather than boil the batch"
             )
-            continue
-        boiling[n] = found
-    entry.mtt_left_out = out
-    if out:
-        entry.notes.append(
-            "MTT: left out "
-            + ", ".join(f"{n} ({why})" for n, why in out.items())
-            + ": they leave or boil off rather than boil the batch"
-        )
+
     if not boiling:
+        named(None)
         if out:
             entry.missing.append(
                 "the MTT (hazard.mtt): nothing else boils in the liquid than vent "
@@ -955,7 +1684,8 @@ def _default_mtt(
     lowest = min(known)[0] if known else None
     open_ = [n for n in unknown if lowest is None or boiling[n][0] < lowest] if above else []
     if above and (open_ or not known):
-        lacking = open_ or unknown
+        named(None)
+        lacking = open_ or [n for n in unknown if n in boiling]
         entry.missing.append("the MTT (hazard.mtt)")
         entry.notes.append(
             f"the MTT at {pressure:.4g} kPa(a) needs heat_of_vaporization of "
@@ -965,7 +1695,9 @@ def _default_mtt(
         return
     if above:
         mtt, basis = min(known)
-    elif unknown and not atmospheric:
+    named(mtt)
+    unknown += [n for n in vacuum if boiling[n][0] <= mtt]
+    if not above and unknown and not atmospheric:
         entry.notes.append(
             f"at {pressure:.4g} kPa(a) " + ", ".join(unknown) + " boil(s) below the normal "
             "boiling point taken (no heat_of_vaporization): the MTT is lower"
@@ -976,6 +1708,84 @@ def _default_mtt(
             "point (at reflux); a cooling failure boils it at once"
         )
     entry.mtt, entry.mtt_basis = mtt, basis
+
+
+def _bubble_mtt(
+    entry: HazardEntry,
+    item: Any,
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    p_in: float | None,
+    left_out: dict[str, str],
+    contents: list[tuple[str, dict[str, float]]],
+) -> None:
+    """hazard.mtt_from: bubble-point (ADR 0069): the MTT is the lowest bubble point at the
+    vessel's pressure of *contents* (the worst moment's, and once the reaction setting the
+    MTSR ran to completion), leaving out the vent components, dosed gases and dissolved gases
+    (they leave or boil off), with ``vent.vapour.activity`` where given."""
+    from chemeascode.domains.safety.reaction_network import bubble_point
+
+    pressure = p_in if p_in is not None else 101.325
+    t_p = entry.process_temperature
+    # a gas held in solution does not follow Raoult's law: a vent component or dosed gas boiling
+    # below T_p is left out, as a dissolved gas; one boiling above it is a volatile liquid
+    out = {
+        n: why
+        for n, why in left_out.items()
+        if t_p is None or (at := _boiling_at(comps.get(n), n, pressure)) is None or at[0] < t_p
+    } | _dissolved(moles, comps, pressure, t_p, left_out)
+    # a product a counted reaction forms (not in the charge or feed) boiling below T_p leaves as
+    # it forms, a gas held in solution: left out as the default MTT leaves it out (ADR 0069)
+    for _, content in contents:
+        for n, v in content.items():
+            if v <= 0 or n in out or moles.get(n, 0.0) > 0:
+                continue
+            at = _boiling_at(comps.get(n), n, pressure)
+            if (
+                t_p is not None
+                and at is not None
+                and at[0] < t_p
+                and not (pressure > ATMOSPHERIC and at[2])
+            ):
+                out[n] = f"product boiling at {at[0]:.1f} K, below T_p {t_p:.1f} K"
+    vent = getattr(getattr(item, "batch", None), "vent", None)
+    vapour = getattr(vent, "vapour", None)
+    activity = dict(getattr(vapour, "activity", None) or {})
+    found: dict[str, float | None] = {}
+    lacking: list[str] = []
+    for label, content in contents:
+        t, lack = bubble_point(content, comps, pressure, activity, list(out))
+        found[label] = t
+        lacking += [n for n in lack if n not in lacking]
+    entry.bubble_point = {
+        "pressure_kPa": pressure,
+        "contents": found,
+        "left_out": sorted(out),
+    }
+    if lacking:
+        entry.missing.append(
+            "the MTT (hazard.mtt): the bubble point needs vapour_pressure (or "
+            "heat_of_vaporization) of " + ", ".join(lacking)
+        )
+        return
+    known = {k: v for k, v in found.items() if v is not None}
+    if not known:
+        entry.missing.append("the MTT (hazard.mtt): nothing in the content boils")
+        return
+    label = min(known, key=lambda k: known[k])
+    entry.mtt = known[label]
+    entry.mtt_basis = f"bubble point of {label} at {pressure:.4g} kPa(a)"
+    if out:
+        entry.notes.append(
+            "bubble point: left out " + ", ".join(sorted(out)) + " (vent components, dosed or "
+            "dissolved gases and products boiling below T_p: gases held in solution, they boil "
+            "off rather than boil the batch)"
+        )
+    if t_p is not None and entry.mtt < t_p:
+        entry.notes.append(
+            f"MTT {entry.mtt:.1f} K ({entry.mtt_basis}) below T_p {t_p:.1f} K: the content "
+            "boils at once on a cooling failure"
+        )
 
 
 def _sensitivity(process: Any, item: Any, inlet: Any, case: str) -> float | None:
@@ -1117,12 +1927,35 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
                 f"{gas['pressure_kPa']:.4g} kPa(a)" + _vapour_text(gas) + f", {gas['basis']}"
             )
             capacity = gas.get("vent_capacity_m3_h")
+            # ADR 0069: the largest release over a semi-batch where it is above the MTSR's
+            over = gas.get("largest_over_batch")
+            if over is not None and over["rate_m3_h"] > gas["rate_m3_h"] * (1 + 1e-9):
+                release += (
+                    f"; over the batch up to {over['rate_m3_h']:.4g} m3/h at "
+                    f"{over['time_s'] / 3600:.3g} h (its MTSR {over['temperature_K']:.1f} K)"
+                )
+            else:
+                over = None
             if gas.get("boils"):
+                boil = gas.get("boil_up")
                 add(
                     "warning",
                     "vent",
                     release + ": the content boils at the MTSR (its vapour pressure reaches "
-                    "the vessel's)",
+                    "the vessel's)"
+                    + (
+                        f"; its boil-up at the bubble point {boil['temperature_K']:.1f} K is "
+                        f"{boil['vapour_m3_h']:.4g} m3/h of vapour ({boil['heat_kW']:.4g} kW "
+                        "of reaction heat)"
+                        + (
+                            f", {boil['capacity_ratio']:.3g} times the vent capacity "
+                            f"{capacity:.4g} m3/h"
+                            if "capacity_ratio" in boil
+                            else ""
+                        )
+                        if boil
+                        else ""
+                    ),
                     "the boil-up at a cooling failure sets the vent's and relief's load: size "
                     "them for it (a two-phase relief study), or lower the MTSR",
                 )
@@ -1143,7 +1976,7 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
                     "give process/recipe.yaml a batch_size: the rate per batch needs it",
                 )
             else:
-                ratio = gas["capacity_ratio"]
+                ratio = max(gas["capacity_ratio"], over["capacity_ratio"] if over else 0.0)
                 add(
                     "warning" if ratio > 1 else "info",
                     "vent",
@@ -1153,10 +1986,28 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
                     "a gas release above the vent's capacity pressurises the vessel: limit "
                     "the accumulation, or size the vent and relief for it"
                     if ratio > 1
-                    else "screening values: the rate is the larger of the worst moment's "
-                    "content and the content after the reaction setting the MTSR, at the MTSR; "
-                    "gas from a longer chain of consecutive reactions is not covered",
+                    else (
+                        "screening values: the rate is the largest release over the batch, "
+                        "each step's content at its own MTSR (every reaction at its rate law, "
+                        "with the liquid's vapour, at most what the reactions' heat there "
+                        "evaporates)"
+                        if over is not None
+                        else "screening values: the rate is the larger of the worst moment's "
+                        "content and the content after the reaction setting the MTSR, at the "
+                        "MTSR; gas from a longer chain of consecutive reactions is not covered"
+                    ),
                 )
+        if (held := e.dissolved_release) is not None:
+            add(
+                "info",
+                "dissolved",
+                f"{e.node}: a cooling failure can release the gases held in the liquid: "
+                + "; ".join(_held_text(n, row) for n, row in held["components"].items())
+                + f" ({held['basis']})",
+                "a toxic or flammable one needs its release screened: hold the scrubber or "
+                "catch tank for the inventory, dose it against its consumption (limit its "
+                "accumulation) and check its dispersion",
+            )
         if e.missing:
             add(
                 "info",
@@ -1168,6 +2019,21 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
 
     paths = [FLOWSHEET_FILE, MATERIALS_FILE, "process/reactions.yaml", "process/catalysts.yaml"]
     return HazardReport(entries, findings, source_revision(root, paths), skipped)
+
+
+def _held_text(name: str, row: dict[str, Any]) -> str:
+    """One dissolved or dosed gas of ``dissolved_release`` (ADR 0069), as text."""
+    mass = f" ({row['kg']:.4g} kg)" if row.get("kg") is not None else ""
+    text = f"{name} up to {row['kmol']:.4g} kmol{mass} at {row['time_s'] / 3600:.3g} h"
+    if row.get("boiling_point_K") is not None:
+        text += (
+            f", boiling at {row['boiling_point_K']:.1f} K "
+            + ("below" if row["mtsr_above_boiling_point"] else "above")
+            + f" the MTSR {row['mtsr_K']:.1f} K then"
+        )
+    if row.get("stripped_kg_h") is not None:
+        text += f", stripped into the gas release at most {row['stripped_kg_h']:.4g} kg/h"
+    return text
 
 
 def hazard_text(report: HazardReport) -> str:
@@ -1200,6 +2066,32 @@ def hazard_text(report: HazardReport) -> str:
                     + f", MTSR {num(v.get('mtsr'), 'K')}"
                     for r, v in e.per_reaction.items()
                 )
+            )
+        if (net := e.network) is not None:
+            lines.append(
+                "  network of the counted reactions"
+                + (f" ({'; '.join(net['consecutive'])})" if net.get("consecutive") else "")
+                + f": dT_ad {num(net.get('adiabatic_rise_K'), 'K')}, MTSR {num(net['mtsr_K'], 'K')}"
+                + (f" at {net['time_s'] / 3600:.3g} h" if net.get("time_s") is not None else "")
+                + (
+                    " (counted: hazard.potential: network)"
+                    if net["in_mtsr"]
+                    else " (not counted; hazard.potential: network counts it)"
+                )
+            )
+        if e.accumulations:
+            lines.append(
+                "  accumulation of each dosed reactant (largest; of it still able to react): "
+                + "; ".join(
+                    f"{n} {v['max']:.3g} at {v['time_s'] / 3600:.3g} h ({v['reactive_max']:.3g}"
+                    f" at {v['reactive_time_s'] / 3600:.3g} h)"
+                    for n, v in e.accumulations.items()
+                )
+            )
+        if (bubble := e.bubble_point) is not None:
+            lines.append(
+                f"  bubble point at {bubble['pressure_kPa']:.4g} kPa(a): "
+                + "; ".join(f"{label} {num(t, 'K')}" for label, t in bubble["contents"].items())
             )
         if e.mtsr_profile:
             profile = e.mtsr_profile
@@ -1236,6 +2128,53 @@ def hazard_text(report: HazardReport) -> str:
                     if "vent_capacity_m3_h" in gas
                     else ""
                 )
+            )
+            if (over := gas.get("largest_over_batch")) is not None:
+                lines.append(
+                    f"  largest gas release over the batch: {over['rate_kmol_s']:.4g} kmol/s, "
+                    f"{over['rate_m3_h']:.4g} m3/h at {over['time_s'] / 3600:.3g} h (its MTSR "
+                    f"{over['temperature_K']:.1f} K"
+                    + (
+                        f", vapour share {over['vapour_share']:.3g}"
+                        if "vapour_share" in over
+                        else ""
+                    )
+                    + (", the content boils" if over.get("boils") else "")
+                    + (
+                        ", the vapour limited by the reactions' heat"
+                        if over.get("heat_limited")
+                        else ""
+                    )
+                    + ")"
+                    + (
+                        ": "
+                        + ", ".join(f"{n} {v:.4g}" for n, v in over["by_component_kmol_s"].items())
+                        + " kmol/s"
+                        if over["by_component_kmol_s"]
+                        else ""
+                    )
+                    + (
+                        f"; {over['capacity_ratio']:.3g} times the vent capacity"
+                        if "capacity_ratio" in over
+                        else ""
+                    )
+                )
+            if (boil := gas.get("boil_up")) is not None:
+                lines.append(
+                    f"  boil-up at the bubble point {boil['temperature_K']:.1f} K: "
+                    f"{boil['vapour_kmol_s']:.4g} kmol/s, {boil['vapour_m3_h']:.4g} m3/h of "
+                    f"vapour from {boil['heat_kW']:.4g} kW of reaction heat"
+                    + (
+                        f"; {boil['capacity_ratio']:.3g} times the vent capacity"
+                        if "capacity_ratio" in boil
+                        else ""
+                    )
+                )
+        if (held := e.dissolved_release) is not None:
+            lines.append(
+                "  gases held in the liquid a cooling failure can release: "
+                + "; ".join(_held_text(n, row) for n, row in held["components"].items())
+                + f" ({held['basis']})"
             )
         lines += [f"  note: {n}" for n in e.notes]
     for p in report.phase_changes:
