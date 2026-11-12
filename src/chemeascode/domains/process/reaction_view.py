@@ -43,6 +43,7 @@ REACTION_RULES = (
     "cheme.process-reaction",
     "cheme.process-reactor",
     "cheme.process-heat-of-reaction",
+    "cheme.process-condenser-freezing",
 )
 #: Balance rules, kept for the reactive blocks and steps.
 BALANCE_RULES = (

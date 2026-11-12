@@ -1196,8 +1196,39 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   temperature (an isothermal batch: its liquid outlet's given temperature, which the model
   holds it at, else the charge's; a warning for an adiabatic one, at its charge's); (warning) a
   `vapour` with no volatile
-  component. The vent carries vapour only on the gas the reactions form and a passing dose: a
-  displaced head space or a sweep gas is not modelled.
+  component.
+  A gas-liquid batch may say more still (ADR 0071; a vent without these keys, a component
+  without `melting_point`, solves as in 1.11.0): `inerts: [N2]` are gases that never dissolve:
+  a dose's share of them passes straight through to the vent (a nitrogen sweep or purge dosed
+  with `start` and `time`, the nitrogen of a dosed air), each carrying the liquid's vapour like
+  a formed gas; `components` may then be empty (a vent of a sweep alone), and an inert in the
+  charge is refused. `head_space: {stream, provenance, source}` (needs `inerts`) pads the
+  vessel's head space by `stream`, an inlet of the step that carries only inerts (its kmol/h:
+  the head space's inert at the start); the vessel is the charge's volume plus that head space
+  at the start, saturated; the head space holds `(1 - Y) P (V_vessel - V) / (R T)` and expels,
+  vapour-laden, what a dose displaces, a rising vapour pressure or a warming pushes out, with
+  what forms and passes through; what it holds at the end leaves by the vent too (with the
+  next charge), and a liquid that fills the vessel is refused. A batch with a head space takes
+  one charge stream besides the pad. `vapour.henry: {gas: {points: [[K, kPa]], provenance}}`
+  degasses a dissolved gas without a vapour pressure (above its critical point) at `y = H x /
+  P`; it never condenses (a vent condenser passes it as a gas). Any vapour component, by
+  Raoult's law or Henry's, is stripped by whatever gas leaves, so a charged or dosed excess
+  degasses under a sweep. `heat_of_absorption: {values: {gas: kJ/kmol}, provenance}` (negative:
+  released) is released as a formed gas's dissolved share forms (`1 - fraction`, or its Henry
+  share: the duty's term `absorption`, the adiabatic balance, the peak cooling duty; not the
+  MTSR) and taken back by a degassing gas as it leaves (in its `vent vapour` term). `process
+  reactors` adds the head space (`vent.head_space`: `vessel_m3`, `start_m3`, `end_m3`,
+  `start_kmol`, `end_kmol`, `expelled_kmol`, per hour of charge), `reactor-hazards` leaves the
+  inerts and the pad out of the content and the MTT, and a vent of inerts only has no gas
+  release at the MTSR. `cheme.process-reactor` adds: an inert or degassing gas undeclared, an
+  inert in a reaction, a pad that is no material inlet of the step or carries more than the
+  inerts, a vent template lacking an inert. `cheme.process-condenser-freezing` (warning): a
+  vent condenser's outlet temperature, or the `supply_temperature` of the utility its
+  `energy_port` stream runs to, below a condensed component's `melting_point` (K, on the
+  component in `materials.yaml`; the pure component's, no freezing-point depression): keep both
+  above it (a tempered coolant) or say in DESIGN.md why the mixture cannot freeze. Not
+  modelled: a pressure balance (the vessel stays at its stream pressure), mass-transfer limits,
+  a content at its boiling point.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or

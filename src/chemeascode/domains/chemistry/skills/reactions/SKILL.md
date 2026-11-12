@@ -173,10 +173,19 @@ each value taken from the evidence cites its observation in `source`.
      the liquid's components that have an Antoine `vapour_pressure` (Raoult, ideal unless
      `activity: {id: gamma}` from a source), the vapour leaves the liquid and its
      `heat_of_vaporization` cools the vessel (part of its model duty). Do not type a vapour
-     `fraction` or script the evaporative cooling any more, unless the vent gas is mostly a
-     displaced head space or a sweep gas (a dose pushing out the head space, a nitrogen
-     purge): the model carries vapour only on the gas the reactions form and a passing dose,
-     so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
+     `fraction` or script the evaporative cooling any more. Where the vent gas is mostly a
+     displaced head space or a sweep gas (ADR 0071), model the carrier: list the inert in
+     `inerts: [N2]` (it never dissolves: a dose's share of it passes straight through, carrying
+     vapour), pad the head space with `head_space: {stream: PAD, provenance, source}` (an
+     inlet of the step with only the inert, its kmol/h the head space's gas at the start, so
+     the empty volume over the charge), and dose a sweep or purge as a dose of the inert
+     (`dosing: [{stream: SWEEP, start: s, time: s}]`). The head space then expels, vapour-laden,
+     what the dose displaces and the rising vapour pressure pushes out; whatever leaves strips
+     the liquid's volatile components, so a dosed excess (a methyl bromide, a solvent)
+     degasses under the sweep: do not type a stripping share. A dissolved gas without a vapour
+     pressure (HCl above its critical point) degasses with `vapour: {components: [..., HCL],
+     henry: {HCL: {points: [[K, kPa]], provenance, source}}}`. A vent of an inert alone needs
+     no `components`; the vent stream's template lists the inerts. A
      reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
      energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
      (an isothermal batch's is its liquid outlet's given temperature, which `heat_up` heats a
@@ -191,8 +200,15 @@ each value taken from the evidence cites its observation in `source`.
      template lists it). A content that boils at the vessel's pressure is refused: that is a
      still or a reflux, not a vent. `reactor-hazards` then takes the gas release at the MTSR
      with its vapour (no condenser credited); `boils` there is a warning to size the relief
-     for the boil-up. Not modelled: a head-space or sweep gas the dose displaces, mass-transfer
-     limits, the heat of absorption.
+     for the boil-up. A gas that dissolves releases its heat of absorption: give
+     `heat_of_absorption: {values: {HCL: kJ/kmol}, provenance, source}` on the vent (negative:
+     released; the formed gas's dissolved share releases it, a degassing gas takes it back;
+     keep the reactions' heats on the gas basis). Give a condensable's `melting_point` (K) in
+     `materials.yaml` where it freezes near the coolant's temperature (tert-butanol, 298.3 K,
+     acetic acid, 289.8 K): `cheme.process-condenser-freezing` warns when the vent condenser's
+     outlet or its coolant's supply lies below it; move the condenser to a tempered loop or say
+     in DESIGN.md why the mixture cannot freeze. Not modelled: a pressure balance (a closed
+     vessel, a depressurising), mass-transfer limits.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A
@@ -342,6 +358,8 @@ each value taken from the evidence cites its observation in `source`.
   or names an undeclared component.
 - `cheme.process-heat-of-reaction` (warning): a given heat of reaction more than 2 % from
   the formation data; check the coefficients and the sources.
+- `cheme.process-condenser-freezing` (warning): a vent condenser's outlet, or its coolant's
+  supply, below the `melting_point` of a component it condenses (ADR 0071).
 
 ## Expected outputs and provenance
 

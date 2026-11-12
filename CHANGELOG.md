@@ -18,11 +18,33 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+- Gas-liquid batch (ADR 0071, core#179): `batch.vent.inerts` (gases that never dissolve: a
+  dose's share passes straight through to the vent, carrying the liquid's vapour; a vent of a
+  sweep alone needs no `components`), `batch.vent.head_space: {stream, provenance}` (the
+  vessel's head space padded by an inlet of inerts; it expels its gas, vapour-laden, as a dose
+  displaces it, the vapour pressure rises or it warms, and its gas left at the end leaves by
+  the vent), `batch.vent.vapour.henry` (a dissolved gas without a vapour pressure degasses at
+  Henry's law and passes the vent condenser), so an inert sweep or purge degasses a dissolved,
+  unreacted charge or dose; `batch.vent.heat_of_absorption` (released by a formed gas's
+  dissolved share, the duty's term `absorption`; taken back by a degassing gas); a component's
+  `melting_point` and the rule `cheme.process-condenser-freezing` (warning: a vent condenser's
+  outlet or its coolant's supply below a condensate's melting point). `process reactors` adds
+  the head space (`vent.head_space`); `reactor-hazards` leaves inerts and the pad out of the
+  content and gives a vent of inerts only no gas release at the MTSR; `cheme.process-reactor`
+  checks the inerts, the pad and the degassing gases. Shown on scratch copies of
+  acetyl-chloride-1 (L-3: the head space as the vapour's carrier) and
+  methyltriphenylphosphonium-bromide-1 (L-3: the nitrogen sweep stripping the methyl bromide).
+  A vent without the new keys solves, reports and fingerprints as in 1.11.0 (the library's
+  twelve batch entries unchanged).
 
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `props.py`.
+- The committed example sheets are regenerated again: the generator code fingerprint covers
+  the process modules ADR 0071 changed.
+- ADR 0062's acetyl-chloride-1 figure is per acetyl chloride formed (0.0006 %), not per kmol
+  of the reaction's extent (0.0019 %).
 
 ## 1.11.0 (2026-11-06)
 

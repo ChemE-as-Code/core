@@ -369,6 +369,10 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         counted = _counted(item, entry, every, [r.id for r in reactions])
         return _uncounted(_screen_semibatch(process, item, entry, reactions, inlets, case, counted))
     counted = _counted(item, entry, [r.id for r in reactions], [r.id for r in reactions])
+    from chemeascode.domains.process.stirred_tank import pad_stream
+
+    # a batch's head space's pad is no feed of the liquid (ADR 0071)
+    inlets = [s for s in inlets if s.id != pad_stream(item)]
     if len(inlets) != 1:
         entry.missing.append("one inlet stream")
         return _uncounted(entry)
@@ -440,7 +444,7 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
             for r, x in (everyone or {}).items()
         }
     _limits(entry, item, reactions, moles, comps, p_in, _left_out(item, []))
-    if model == "batch" and _vented(item) and entry.mtsr is not None:
+    if model == "batch" and _forms_gas(item) and entry.mtsr is not None:
         _gas(process, item, entry, case, moles, entry.mtsr, p_in or 101.325, rises, counted)
     _uncounted(entry)
     bed = getattr(item, "bed", None)
@@ -473,12 +477,18 @@ def _screen_semibatch(
     solutions = {d.stream: d.heat_of_solution for d in item.batch.dosing if d.heat_of_solution}
     gases: list[str] = []  # the components of a dosed gas
     mixing = 0.0  # kJ the doses release as they mix in (ADR 0063)
+    # a vent's inerts never dissolve, a head space's pad is no liquid (ADR 0071)
+    vent = item.batch.vent
+    inerts = set(vent.inerts) if vent is not None else set()
+    pad = vent.head_space.stream if vent is not None and vent.head_space is not None else None
     try:
         for stream in inlets:
+            if stream.id == pad:
+                continue
             found, t_in, kpa = stream_moles(process, stream, case)
             share = absorbed.get(stream.id, 1.0)
             for n, v in found.items():
-                if v > 0:  # a template's component the stream does not carry is not there
+                if v > 0 and n not in inerts:  # a template's component it does not carry is not
                     moles[n] = moles.get(n, 0.0) + v * share
                     if stream.id in absorbed:
                         gases.append(n)
@@ -531,7 +541,7 @@ def _screen_semibatch(
     # what boils in the liquid sets the MTT: the charge and the absorbed share of each dose,
     # but no vent component, dosed gas or dissolved gas (ADR 0058)
     _limits(entry, item, reactions, moles, comps, p_in, _left_out(item, gases))
-    if _vented(item) and worst is not None and entry.mtsr is not None:
+    if _forms_gas(item) and worst is not None and entry.mtsr is not None:
         _gas(
             process,
             item,
@@ -619,6 +629,12 @@ def _per_reaction(rises: dict[str, float], points: list[Any]) -> dict[str, dict[
 def _vented(item: Any) -> bool:
     batch = getattr(item, "batch", None)
     return batch is not None and batch.vent is not None
+
+
+def _forms_gas(item: Any) -> bool:
+    """A vented batch whose vent takes gas the reactions form: a vent of inerts only (a sweep,
+    a head space's pad, ADR 0071) forms none at a cooling failure, the dosing stopped."""
+    return _vented(item) and bool(item.batch.vent.components)
 
 
 def _extent(reaction: Any, moles: dict[str, float]) -> float:
@@ -823,9 +839,13 @@ def _vent_note(
             entry.missing.append(f"the vented batch: {failure}")
             return
     rate = solved.peak_vent_rate
+    gone = f"{', '.join(vent.components)} leave(s) as formed"
+    if vent.inerts:  # ADR 0071
+        gone = ", ".join(
+            [*([gone] if vent.components else []), f"{', '.join(vent.inerts)} pass(es) through"]
+        )
     entry.notes.append(
-        f"vent {vent.stream}: {', '.join(vent.components)} leave(s) as formed, no part of the "
-        "heat capacity or the MTSR"
+        f"vent {vent.stream}: {gone}, no part of the heat capacity or the MTSR"
         + (
             f"; peak gas rate {rate:.4g} kmol/(s m3) at {solved.peak_vent_time:.6g} s"
             if rate
@@ -841,6 +861,7 @@ def _left_out(item: Any, gases: list[str]) -> dict[str, str]:
     found = dict.fromkeys(gases, "dosed gas")
     if _vented(item):
         found |= dict.fromkeys(item.batch.vent.components, "vent component")
+        found |= dict.fromkeys(item.batch.vent.inerts, "vent inert")  # ADR 0071
     return found
 
 

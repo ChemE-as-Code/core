@@ -702,6 +702,9 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
                         found.problems.append((node.id, str(failure)))
                 else:
                     result = {n: outlet.get(n, 0.0) * (mw[n] or 1.0) for n in names}
+                    if vent is not None and (inert := getattr(node.batch.vent, "inerts", None)):
+                        # an inert never dissolves: no trace of it in the liquid (ADR 0071)
+                        result = {n: v for n, v in result.items() if n not in inert}
                     changed |= put(
                         out, "composition", _mix(work, result), kind, node.id, ins, extra
                     )

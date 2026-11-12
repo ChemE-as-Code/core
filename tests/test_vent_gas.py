@@ -1,0 +1,434 @@
+"""Gas-liquid batch, ADR 0071: a vent's inerts passing through, a head space the batch expels,
+an inert sweep that degasses a dissolved volatile (Raoult) or gas (Henry), a formed gas's heat
+of absorption and the vent condenser's freezing check. Against closed forms: the stripping of
+a dissolved volatile by a sweep, ``n_S ln(n/n_0) + (1 - K)(n - n_0) = -g K t``; the head space
+a dose displaces at a constant vapour share, ``F = c v q / (1 + v P Y / (R T))``; the head
+space's gas at the end, ``(1 - Y) P (V_vessel - V) / (R T)``; the heat of absorption of the
+dissolved share. In a plant: propagate with a pad stream and a sweep dose, the rules, the
+reports. A vent without the new fields solves, reports and fingerprints as in 1.11.0."""
+
+import math
+
+import pytest
+import yaml
+
+from chemeascode.domains.chemistry.liquid import Liquid
+from chemeascode.domains.chemistry.reactions import Reactions
+from chemeascode.domains.chemistry.thermochemistry import R
+from chemeascode.domains.process.model import load, rules
+from chemeascode.domains.process.propagate import run
+from chemeascode.domains.process.reactors import reactor_report
+from chemeascode.domains.process.schema import Batch, HenryConstant, Vent
+from chemeascode.domains.process.stirred_tank import Dose, TankError, solve_batch
+from chemeascode.domains.process.vent_vapour import VentPhase
+from tests.test_semibatch_vent import CP, HEAT, V, _reactions
+from tests.test_vent_vapour import GAS, _clausius, _constant, _vapour_flowsheet
+from tests.test_vent_vapour import _plant as _vapour_plant
+
+P = 101.325
+T = 300.0
+DHVAP = 30000.0
+SWEEP = 3600.0  # s
+
+
+def _slow():
+    """A -> B, liquid, both at the same molar volume: no change of the volume or the vapour."""
+    return Reactions.model_validate(
+        {
+            "schema": "cheme/reactions/v1",
+            "kind": "reactions",
+            "reactions": [
+                {
+                    "id": "R1",
+                    "stoichiometry": {"A": -1, "B": 1},
+                    "phase": "liquid",
+                    "heat_of_reaction": {"value": -1000.0, "provenance": "assumed"},
+                    "rate": {
+                        "form": "power_law",
+                        "basis": "volume",
+                        "driving": "concentration",
+                        "k": {"A": 1e-3},
+                        "orders": {"A": 1},
+                        "provenance": "assumed",
+                    },
+                }
+            ],
+        }
+    ).reactions
+
+
+def _phase(volatile, pressures, degassing=None, condenser=None, heats=None):
+    return VentPhase(
+        volatile=list(volatile),
+        vapour_pressure={n: p for n, p in pressures.items() if n not in (degassing or {})},
+        heat_of_vaporization=heats if heats is not None else dict.fromkeys(volatile, DHVAP),
+        liquid_heat_capacity=dict.fromkeys(volatile, 150.0),
+        gas={"G": GAS, "N": GAS},
+        condenser=condenser,
+        degassing=degassing or {},
+    )
+
+
+def _vent(**kw):
+    return {"stream": "V"} | kw
+
+
+def _batch(vent, dosed=False, **kw):
+    dosing = {"dosing": [{"stream": "D", "time": SWEEP}]} if dosed else {}
+    return Batch.model_validate({"provenance": "assumed", "vent": vent} | dosing | kw)
+
+
+def _solve(vent, charge, doses, phase=None, pad=None, reactions=None, volumes=None, **kw):
+    return solve_batch(
+        reactions or _slow(),
+        charge,
+        T,
+        P,
+        _batch(vent, bool(doses), **kw),
+        {"N": GAS, "G": GAS},
+        Liquid(volumes or {"A": 0.1, "B": 0.1, "S": 0.1, "D": 0.1}),
+        {"A": 150.0, "B": 150.0, "S": 150.0, "D": 150.0},
+        doses=doses,
+        vent_phase=phase,
+        head_space=pad,
+    )
+
+
+def _stripped(n0, solvent, k, g, t):
+    """n of a dissolved volatile left after a sweep of g kmol/s for t s over a non-volatile
+    solvent: n_S ln(n / n_0) + (1 - K)(n - n_0) = -g K t (Newton)."""
+    n = n0
+    for _ in range(100):
+        f = solvent * math.log(n / n0) + (1 - k) * (n - n0) + g * k * t
+        n -= f / (solvent / n + (1 - k))
+    return n
+
+
+@pytest.mark.parametrize("law", ["raoult", "henry"])
+def test_an_inert_sweep_degasses_a_dissolved_volatile(law):
+    """A dissolved D (5 % of a non-volatile S) swept by an inert N at g kmol/s: dn/dt = -g y /
+    (1 - Y), y = K x; by Raoult's law (K = P_D / P) or Henry's (K = H / P, ADR 0071) alike. The
+    sweep passes through whole; the liquid holds no trace of it."""
+    k = 0.6
+    if law == "raoult":
+        phase = _phase("D", {"D": _constant(k * P)})
+        vapour = {"components": ["D"]}
+    else:
+        henry = HenryConstant(points=[(T, k * P)], provenance="assumed")
+        phase = _phase("D", {}, degassing={"D": henry}, heats={"D": 20000.0})
+        vapour = {"components": ["D"], "henry": {"D": henry.model_dump()}}
+    sweep = 2.0  # kmol of N over the hour
+    result = _solve(
+        _vent(inerts=["N"], vapour=vapour),
+        {"S": 5.0, "D": 0.25},
+        [Dose({"N": sweep}, T, [(0.0, SWEEP, 1.0)])],
+        phase,
+    )
+    expected = _stripped(0.25, 5.0, k, sweep / SWEEP, SWEEP)
+    assert result.outlet["D"] == pytest.approx(expected, rel=1e-7)
+    assert result.vent["D"] == pytest.approx(0.25 - expected, rel=1e-7)
+    assert result.vent["N"] == pytest.approx(sweep, rel=1e-12)
+    assert "N" not in result.outlet or result.outlet["N"] == 0.0
+    # the vapour's heat: Raoult's latent heat, or Henry's heat of desorption
+    heat = DHVAP if law == "raoult" else 20000.0
+    assert result.heat_terms["vent vapour"] == pytest.approx(heat * result.vapour["D"], rel=1e-12)
+    assert result.vapour["D"] == pytest.approx(0.25 - expected, rel=1e-7)
+
+
+def test_a_degassing_gas_passes_the_condenser():
+    """With a condenser, a Henry gas passes it whole (it never condenses) and counts with the
+    non-condensables; a condensable is flashed over both."""
+    henry = HenryConstant(points=[(T, 0.6 * P)], provenance="assumed")
+    pressure = _clausius(50.0, 4000.0)
+    phase = _phase("SD", {"S": pressure}, degassing={"D": henry}, condenser=270.0)
+    vent = _vent(
+        inerts=["N"],
+        vapour={"components": ["S", "D"], "henry": {"D": henry.model_dump()}},
+        condenser={"temperature": 270.0, "provenance": "assumed"},
+    )
+    result = _solve(vent, {"S": 5.0, "D": 0.25}, [Dose({"N": 2.0}, T, [(0.0, SWEEP, 1.0)])], phase)
+    assert result.condensate["D"] == pytest.approx(0.0, abs=1e-15)
+    assert result.vent["D"] == pytest.approx(result.vapour["D"], rel=1e-12)
+    assert 0 < result.condensate["S"] < result.vapour["S"]
+    # the condenser's terms: the Henry gas cooled as a gas, not condensed
+    assert result.condenser_terms["condensation"] == pytest.approx(
+        result.condensate["S"] * DHVAP, rel=1e-12
+    )
+
+
+def test_a_dose_of_air_passes_its_nitrogen():
+    """copper-i-chloride-1 L-3: a dose with an inert passes it straight through to the vent; the
+    rest of the dose dissolves (a vent of inerts only, no gas formed)."""
+    result = _solve(
+        _vent(inerts=["N"]),
+        {"S": 5.0},
+        [Dose({"A": 1.0, "N": 3.76}, T, [(0.0, SWEEP, 1.0)])],
+    )
+    assert result.vent == {"N": pytest.approx(3.76, rel=1e-12)}
+    assert result.outlet.get("N", 0.0) == 0.0
+    assert result.outlet["A"] + result.outlet["B"] == pytest.approx(1.0, rel=1e-9)
+    assert result.peak_vent_flow == pytest.approx(3.76 / SWEEP, rel=1e-9)
+    with pytest.raises(TankError, match="in the charge"):
+        _solve(_vent(inerts=["N"]), {"S": 5.0, "N": 0.1}, [Dose({"A": 1.0}, T, [(0, SWEEP, 1)])])
+
+
+def test_the_head_space_a_dose_displaces():
+    """Every liquid component at P0 (Y = P0 / P constant): the head space expels F = c v q /
+    (1 + v P Y / (R T)), c = (1 - Y) P / (R T), while A doses at q (molar volume v), and the
+    gas carries F Y / (1 - Y) of vapour; what is left of the pad leaves by the vent at the end."""
+    y = 30.0 / P
+    phase = _phase("ABS", dict.fromkeys("ABS", _constant(30.0)))
+    pad = {"N": 0.5}
+    vent = _vent(inerts=["N"], vapour={}, head_space={"stream": "PAD", "provenance": "assumed"})
+    result = _solve(vent, {"S": 5.0}, [Dose({"A": 1.0}, T, [(0.0, SWEEP, 1.0)])], phase, pad)
+    c = (1 - y) * P / (R * T)
+    expelled = c * 0.1 * 1.0 / (1 + 0.1 * P * y / (R * T))
+    head = result.head_space
+    assert head["expelled_kmol"]["N"] == pytest.approx(expelled, rel=1e-8)
+    assert sum(result.vapour.values()) == pytest.approx(expelled * y / (1 - y), rel=1e-8)
+    assert head["end_kmol"]["N"] == pytest.approx(0.5 - expelled, rel=1e-8)
+    assert result.vent["N"] == pytest.approx(0.5, rel=1e-12)  # the whole pad, in the end
+    # the vessel: the charge's 0.5 m3 and the head space its pad fills, saturated
+    assert head["start_m3"] == pytest.approx(0.5 * R * T / ((1 - y) * P), rel=1e-12)
+    assert head["vessel_m3"] == pytest.approx(0.5 + head["start_m3"], rel=1e-12)
+    # at the end the head space holds (1 - Y) P (V_vessel - V) / (R T)
+    room = head["vessel_m3"] - result.volume
+    assert head["end_m3"] == pytest.approx(room, rel=1e-12)
+    assert head["end_kmol"]["N"] == pytest.approx((1 - y) * P * room / (R * T), rel=1e-8)
+    # the peak: the displacement's own gas with its vapour, all along the dose
+    assert result.peak_vent_flow == pytest.approx(expelled / (1 - y) / SWEEP, rel=1e-6)
+    # a pad too small for the dose: the liquid fills the vessel
+    with pytest.raises(TankError, match="fills the vessel"):
+        _solve(vent, {"S": 5.0}, [Dose({"A": 1.0}, T, [(0.0, SWEEP, 1.0)])], phase, {"N": 0.002})
+
+
+def test_the_head_space_follows_the_vapour_pressure_rise():
+    """A batch of S with A charged, A -> B where only B is volatile: the vapour's share rises as
+    B forms and the head space expels its gas; it holds (1 - Y) P (V_vessel - V) / (R T) at the
+    end, and its gas formed and expelled add up to the pad."""
+    phase = _phase("B", {"B": _constant(60.0)})
+    vent = _vent(
+        inerts=["N"],
+        vapour={"components": ["B"]},
+        head_space={"stream": "PAD", "provenance": "assumed"},
+    )
+    result = _solve(vent, {"S": 4.0, "A": 1.0}, [], phase, {"N": 0.4}, time=3600)
+    head = result.head_space
+    held = {n: v for n, v in result.outlet.items() if v > 0}
+    y = 60.0 * held["B"] / sum(held.values()) / P
+    room = head["end_m3"]  # the vessel less the liquid at the end (result.volume: the charge's)
+    assert sum(head["end_kmol"].values()) == pytest.approx((1 - y) * P * room / (R * T), rel=1e-7)
+    assert head["end_kmol"]["N"] + head["expelled_kmol"]["N"] == pytest.approx(0.4, rel=1e-9)
+    assert head["expelled_kmol"]["N"] > 0.02
+    assert result.vapour["B"] > 0
+    # the balance: B formed is in the liquid or left as vapour
+    assert result.outlet["B"] + result.vent["B"] == pytest.approx(result.extents["R1"], rel=1e-9)
+
+
+def test_a_formed_gas_releases_its_heat_of_absorption():
+    """A -> B + G, 40 % of G vented: its dissolved 60 % releases its heat of absorption as it
+    forms, a term of the isothermal duty and heat in the adiabatic balance."""
+    volumes, cp = V | {"G": 0.05}, CP | {"G": 60.0}
+    vent = {
+        "stream": "V",
+        "components": ["G"],
+        "fraction": {"G": 0.4},
+        "heat_of_absorption": {"values": {"G": -50000.0}, "provenance": "assumed"},
+    }
+    batch = Batch.model_validate({"time": 1800, "vent": vent, "provenance": "assumed"})
+    args = (_reactions(1e-3), {"S": 5.0, "A": 1.0}, T, P)
+    result = solve_batch(*args, batch, {}, Liquid(volumes), cp)
+    extent = result.extents["R1"]
+    assert result.heat_terms["absorption"] == pytest.approx(0.6 * extent * -50000.0, rel=1e-7)
+    assert result.heat_terms["reaction"] == pytest.approx(-extent * -HEAT, rel=1e-7)
+    hot = solve_batch(
+        *args, batch.model_copy(update={"heat": "adiabatic"}), {}, Liquid(volumes), cp
+    )
+    plain = Batch.model_validate(
+        {"time": 1800, "heat": "adiabatic", "provenance": "assumed"}
+        | {"vent": {k: v for k, v in vent.items() if k != "heat_of_absorption"}}
+    )
+    cool = solve_batch(*args, plain, {}, Liquid(volumes), cp)
+    assert hot.temperature > cool.temperature + 1.0
+
+
+def test_the_schema_of_the_gas_liquid_vent():
+    pad = {"stream": "PAD", "provenance": "assumed"}
+    Vent.model_validate(_vent(inerts=["N"], head_space=pad))
+    with pytest.raises(ValueError, match="components that form, or inerts"):
+        Vent.model_validate(_vent())
+    with pytest.raises(ValueError, match="give vent.inerts"):
+        Vent.model_validate(_vent(components=["G"], head_space=pad))
+    with pytest.raises(ValueError, match="forms or an inert, not both"):
+        Vent.model_validate(_vent(components=["G"], inerts=["G"]))
+    with pytest.raises(ValueError, match="an inert is a gas"):
+        Vent.model_validate(_vent(inerts=["N"], vapour={"components": ["N"]}))
+    with pytest.raises(ValueError, match="neither forms nor degasses"):
+        Vent.model_validate(
+            _vent(
+                inerts=["N"],
+                heat_of_absorption={"values": {"N": -1.0}, "provenance": "assumed"},
+            )
+        )
+    # a vent without the new fields dumps as in 1.11.0
+    assert set(Vent.model_validate(_vent(components=["G"])).model_dump()) == {
+        "stream",
+        "components",
+    }
+
+
+# -- in a plant ---------------------------------------------------------------------------------
+
+N2 = (
+    "  - {id: N, name: nitrogen, formula: N2, molar_mass: 28.01, normal_boiling_point: 77.4,\n"
+    "     ideal_gas: {dHf_298: 0, S_298: 191.6, cp_R: [3.5]}}\n"
+)
+PAD = (
+    "  - id: SP\n    from: NP.out\n    to: R.pad\n    template: pad\n    state:\n      design:\n"
+    "        temperature: {value: 300, provenance: given}\n"
+    "        pressure: {value: 101.325, provenance: given}\n"
+    "        flow: {value: 0.5, provenance: given}\n"
+    "        composition: {basis: mole_fraction, values: {N: 1.0}, provenance: given}\n"
+)
+HEAD = (
+    "vent: {stream: S4, components: [G], inerts: [N], vapour: {}, head_space: {stream: SP, "
+    "provenance: assumed}, condenser: {temperature: 270, energy_port: qc, provenance: assumed}}"
+)
+
+
+def _gas_plant(tmp_path, vent=HEAD, melting="", supply="", pad=PAD):
+    from tests.test_vent_vapour import VAPOUR_MATERIALS
+
+    materials = (
+        VAPOUR_MATERIALS.replace("templates:\n", N2 + "templates:\n")
+        .replace("{id: gas, components: [G, S]}", "{id: gas, components: [G, S, N]}")
+        .replace("templates:\n", "templates:\n  - {id: pad, components: [N]}\n")
+        .replace("heat_of_vaporization: 30000", "heat_of_vaporization: 30000" + melting)
+    )
+    flowsheet = (
+        _vapour_flowsheet(vent)
+        .replace("feeds:\n", "feeds:\n  - {id: NP, ports: [{id: out, direction: out}]}\n")
+        .replace("{id: dose, direction: in}", "{id: dose, direction: in}, {id: pad, direction: in}")
+        .replace("utility: {kind: cooling_water}", "utility: {kind: cooling_water" + supply + "}")
+    )
+    return _vapour_plant(tmp_path, flowsheet + pad, materials)
+
+
+def _found(ws, rule="cheme.process-reactor"):
+    process, found = load(ws.root)
+    assert process is not None, [f.format() for f in found]
+    return [(f.level, f.message) for f in found + rules(process) if f.rule == rule]
+
+
+def test_propagate_with_a_padded_head_space(tmp_path):
+    """The pad stream's nitrogen leaves by the vent, the liquid holds none, the balance closes;
+    process reactors reports the head space."""
+    ws = _gas_plant(tmp_path)
+    assert not [m for level, m in _found(ws) if level == "error"]
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert result.written >= 3, [f.format() for f in result.findings]
+    data = yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())["streams"]
+    states = {s["id"]: s.get("state", {}).get("design", {}) for s in data}
+    gas, liquid = states["S4"]["composition"]["values"], states["S3"]["composition"]["values"]
+    assert "N" not in liquid
+    assert 0 < gas["N"] < 1  # the pad, with the gas formed and the vapour past the condenser
+    process, _ = load(ws.root)
+    from chemeascode.domains.process.model import balance_of
+
+    assert balance_of(process, "R", "design").status == "ok"
+    assert not [f.format() for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+    (row,) = reactor_report(ws.root).reactors
+    head = row["tank"]["vent"]["head_space"]
+    assert head["start_kmol"] == {"N": 0.5} and head["expelled_kmol"]["N"] > 0
+    assert row["tank"]["vent"]["kmol_h"]["N"] == pytest.approx(0.5, rel=1e-12)
+    from chemeascode.domains.process.reactors import reactor_text
+
+    assert "head space" in reactor_text(reactor_report(ws.root))
+
+
+def test_gas_rules(tmp_path):
+    errors = [m for level, m in _found(_gas_plant(tmp_path, pad="")) if level == "error"]
+    assert any("pad SP is no inlet stream" in m for m in errors)
+    stray = PAD.replace("values: {N: 1.0}", "values: {N: 0.9, S: 0.1}")
+    errors = [m for level, m in _found(_gas_plant(tmp_path / "b", pad=stray)) if level == "error"]
+    assert any("carries S, no inert" in m for m in errors)
+    unknown = HEAD.replace("inerts: [N]", "inerts: [N, X]")
+    errors = [m for level, m in _found(_gas_plant(tmp_path / "c", unknown)) if level == "error"]
+    assert any("inert(s) X not declared" in m for m in errors)
+    lacking = _gas_plant(tmp_path / "d")
+    text = (lacking.root / "process/materials.yaml").read_text()
+    (lacking.root / "process/materials.yaml").write_text(
+        text.replace("{id: gas, components: [G, S, N]}", "{id: gas, components: [G, S]}")
+    )
+    errors = [m for level, m in _found(lacking) if level == "error"]
+    assert any("lacks N (N: an inert of the vent)" in m for m in errors)
+
+
+def test_the_vent_condenser_freezing_check(tmp_path):
+    """potassium-tert-butoxide-1 L-9: S melts at 280 K; the condenser's outlet at 270 K and the
+    cooling water's supply at 275 K both lie below it (warnings); none without a melting
+    point, or above it."""
+    rule = "cheme.process-condenser-freezing"
+    assert not _found(_gas_plant(tmp_path), rule)
+    found = _found(
+        _gas_plant(
+            tmp_path / "b",
+            melting=", melting_point: 280",
+            supply=", supply_temperature: {value: 275, provenance: assumed}",
+        ),
+        rule,
+    )
+    assert [level for level, _ in found] == ["warning", "warning"]
+    assert "its outlet at 270 K" in found[0][1] and "S (280 K)" in found[0][1]
+    assert "its coolant CW's supply at 275 K" in found[1][1]
+    assert not _found(_gas_plant(tmp_path / "c", melting=", melting_point: 260"), rule)
+
+
+def test_a_sweep_dose_in_a_plant_and_its_screening(tmp_path):
+    """A dose that carries an inert (half of it N): propagate passes all the N to the vent and
+    none to the liquid; the screening leaves it out of the content (no liquid_molar_volume
+    asked of it) and still reports the gas the reaction forms at the MTSR."""
+    from chemeascode.domains.process.model import balance_of
+    from chemeascode.domains.safety.reaction_hazards import screen
+
+    vent = "vent: {stream: S4, components: [G], inerts: [N], vapour: {}}"
+    ws = _gas_plant(tmp_path, vent=vent, pad="")
+    flowsheet = ws.root / "process/flowsheet.yaml"
+    flowsheet.write_text(
+        flowsheet.read_text().replace("values: {A: 1.0}", "values: {A: 0.5, N: 0.5}")
+    )
+    materials = ws.root / "process/materials.yaml"
+    materials.write_text(
+        materials.read_text().replace(
+            "{id: liquid, components: [A, B, S]}", "{id: liquid, components: [A, B, S, N]}"
+        )
+    )
+    assert not [m for level, m in _found(ws) if level == "error"]
+    process, _ = load(ws.root)
+    run(ws, process, "design", write=True)
+    data = yaml.safe_load(flowsheet.read_text())["streams"]
+    states = {s["id"]: s.get("state", {}).get("design", {}) for s in data}
+    assert "N" not in states["S3"]["composition"]["values"]
+    assert states["S4"]["composition"]["values"]["N"] > 0
+    process, _ = load(ws.root)
+    assert balance_of(process, "R", "design").status == "ok"
+    (entry,) = screen(ws.root).entries
+    assert not [m for m in entry.missing if "N" in m.split()]
+    assert entry.gas_release is not None and entry.gas_release["rate_kmol_s"] > 0
+    assert any("N pass(es) through" in note for note in entry.notes)
+
+
+def test_a_vent_of_inerts_only_screens_no_gas_release():
+    """A vent that takes no formed gas (a sweep, a pad) releases none at a cooling failure:
+    no gas release, so no warning for a missing vent capacity."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.safety.reaction_hazards import _forms_gas
+
+    def item(vent):
+        return SimpleNamespace(batch=SimpleNamespace(vent=vent))
+
+    assert not _forms_gas(item(Vent.model_validate(_vent(inerts=["N"]))))
+    assert _forms_gas(item(Vent.model_validate(_vent(components=["G"], inerts=["N"]))))
+    assert not _forms_gas(item(None))
