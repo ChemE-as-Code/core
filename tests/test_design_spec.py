@@ -597,3 +597,161 @@ def test_the_basis_finding_names_the_batch_that_closes_it(jacketed):
     result = _cli("process", "recipe")
     assert "cheme.recipe-basis [S3]" in result.output, result.output
     assert "closes it (cycle" in result.output and "batch = rate x cycle" in result.output
+
+
+# -- review: splits that leave no remainder or exceed 1, empty separator outlets, bounds ------
+
+SPLITTER = """\
+schema: cheme/process/v1
+kind: flowsheet
+title: A splitter whose outlet fraction is adjusted
+units: {pressure: kPa(a), temperature: K, flow: kg/h, duty: kW, enthalpy: kJ/kmol}
+cases:
+  - {id: design, description: Design, default: true}
+tolerance: {abs: 0.01, rel: 0.0001}
+specs:
+  - id: a
+    vary: {node: K1, port: liquid, initial: 0.5}
+    target: {stream: S2, quantity: flow, value: 30}
+    provenance: given
+    source: test
+feeds:
+  - {id: F, ports: [{id: out, direction: out}]}
+products:
+  - {id: PL, ports: [{id: in, direction: in}]}
+  - {id: PV, ports: [{id: in, direction: in}]}
+steps: []
+blocks:
+  - id: K1
+    class: SplittingMaterial
+    ports:
+      - {id: in, direction: in}
+      - {id: liquid, direction: out}
+      - {id: vent, direction: out}
+streams:
+  - id: S1
+    from: F.out
+    to: K1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mass_fraction, values: {NC4: 0.95, C3: 0.05}, provenance: given}
+        flow: {value: 100, provenance: given}
+  - {id: S2, from: K1.liquid, to: PL.in, template: butanes}
+  - {id: S3, from: K1.vent, to: PV.in, template: butanes}
+"""
+
+
+@pytest.fixture
+def splitter(plant) -> Path:
+    (plant / "process/flowsheet.yaml").write_text(SPLITTER)
+    return plant
+
+
+def _spec_errors(root: Path) -> list[str]:
+    return [m for _, level, m in spec_problems(load(root)[0]) if level == "error"]
+
+
+def test_a_split_spec_alone_solves_against_the_remainder(splitter):
+    assert not _spec_errors(splitter)
+    found = derive(load(splitter)[0], "design")
+    assert found.specs.converged, found.specs.problems
+    assert found.values[("S2", "flow")].value == pytest.approx(30.0, rel=1e-5)
+    assert found.values[("S3", "flow")].value == pytest.approx(70.0, rel=1e-5)
+
+
+def test_a_split_spec_that_leaves_no_remainder_is_a_validate_error(splitter):
+    _edit(splitter, lambda d: _node(d, "K1").update(split={"vent": 0.5}))
+    errors = _spec_errors(splitter)
+    assert any("K1 has no outlet left for the remainder" in m for m in errors), errors
+    found = derive(load(splitter)[0], "design")
+    assert not found.specs.results  # left out, never reported met
+    assert ("S2", "flow") not in found.values or found.values[("S2", "flow")].value == 50.0
+
+
+def test_two_split_specs_on_one_splitter_leave_no_remainder(splitter):
+    def two(d) -> None:
+        d["specs"].append(
+            {
+                "id": "b",
+                "vary": {"node": "K1", "port": "vent", "initial": 0.5},
+                "target": {"stream": "S3", "quantity": "flow", "value": 30},
+                "provenance": "given",
+            }
+        )
+
+    _edit(splitter, two)
+    errors = _spec_errors(splitter)
+    assert sum("K1 has no outlet left for the remainder" in m for m in errors) == 2, errors
+    assert "error cheme.process-spec" in _cli("validate").output
+
+
+def test_two_split_specs_in_different_cases_keep_a_remainder(splitter):
+    def two(d) -> None:
+        d["cases"].append({"id": "turndown", "description": "Turndown"})
+        d["specs"][0]["cases"] = ["design"]
+        d["specs"].append(
+            {
+                "id": "b",
+                "cases": ["turndown"],
+                "vary": {"node": "K1", "port": "vent", "initial": 0.5},
+                "target": {"stream": "S3", "quantity": "flow", "value": 30},
+                "provenance": "given",
+            }
+        )
+
+    _edit(splitter, two)
+    assert not [m for m in _spec_errors(splitter) if "remainder" in m]
+
+
+@pytest.mark.parametrize("bounds", [{"high": 1.5}, {"initial": 1.2}, {"low": 1.1, "high": 2.0}])
+def test_a_split_beyond_one_is_a_validate_error(splitter, bounds):
+    _edit(splitter, lambda d: d["specs"][0]["vary"].update(bounds))
+    errors = _spec_errors(splitter)
+    assert any("a split's low, high and initial lie within [0, 1]" in m for m in errors), errors
+    found = derive(load(splitter)[0], "design")
+    assert not found.specs.results
+
+
+def test_a_separator_outlet_that_receives_nothing_keeps_the_inlet_composition(mixer):
+    # the feed carries no propane: the top takes only propane, so it receives nothing
+    def none(d) -> None:
+        d["specs"] = []
+        _node(d, "K1")["recovery"]["outlets"] = {"top": {"C3": 1.0}}
+        _stream(d, "A")["state"]["design"]["flow"] = {"value": 100, "provenance": "given"}
+        _stream(d, "B")["state"]["design"]["composition"]["values"] = {"NC4": 1.0, "C3": 0.0}
+        _stream(d, "B")["state"]["design"]["flow"] = {"value": 50, "provenance": "given"}
+
+    _edit(mixer, none)
+    found = derive(load(mixer)[0], "design")
+    assert found.values[("V", "flow")].value == 0.0
+    values = found.values[("V", "composition")].values
+    assert sum(values.values()) == pytest.approx(1.0) and values["NC4"] == pytest.approx(1.0)
+    assert _cli("process", "propagate", "--fill").exit_code == 0
+    result = _cli("validate")
+    assert "cheme.process-composition-sum" not in result.output, result.output
+
+
+def test_a_split_at_its_bound_in_a_torn_loop_is_reported_as_the_bound(plant):
+    def infeasible(d) -> None:
+        _unfilled(d)
+        # the fresh feed alone has 5 wt% propane: no purge brings the reactor feed to 1 wt%
+        d["specs"][1]["target"]["value"] = 0.01
+
+    _edit(plant, infeasible)
+    found = derive(load(plant)[0], "design")
+    assert not found.specs.converged
+    (_, sid, message), *_ = found.specs.problems
+    assert sid == "purge", found.specs.problems
+    assert "cannot be met within the bounds" in message and "X1.purge 1" in message, message
+    assert "does not depend" not in message
+
+
+def test_the_propagate_help_names_component_separators_and_specs():
+    from chemeascode.domains.process import propagate as module
+    from chemeascode.interfaces.cli.process import propagate
+
+    for doc in (propagate.__doc__, module.__doc__):
+        text = " ".join((doc or "").split())
+        assert "recovery:" in text and "specs:" in text and "Newton-Broyden" in text
+        assert "Other separators (without `recovery:`)" in text.replace("``", "`")

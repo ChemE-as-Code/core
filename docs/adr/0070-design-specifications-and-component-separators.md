@@ -107,14 +107,17 @@ to the recipe, which propagate does not write.
     the target reached. It is a warning for a spec whose target does not depend on its
     variables, has no value (the target stream is not derived: the node problems of that point
     are reported), lies beyond the variable's bounds (the variable held at a bound twice
-    running), or is not met within `convergence.max_iterations`. After a warning, nothing that
+    running, or a variable at a bound where the target no longer moves: a purge of 1 empties
+    the loop torn after it), or is not met within `convergence.max_iterations`. After a warning, nothing that
     depends on the specs or the tears is written (the sweep without them, as ADR 0060), and the
     adapter result is `not-converged`.
   - `cheme.process-spec` (validate) is an error for a spec that cannot be solved as declared:
     an id or variable named twice; an unknown case, stream, component or unit; a varied stream
     that is no feed, is a tear, or whose flow (or a follower's) is given or assumed; a split of
-    no splitter or of a port its `split:` fixes; an initial value outside the bounds; an annual
-    target without hours; a flow target on its own variable.
+    no splitter or of a port its `split:` fixes; splits that leave a splitter no outlet for the
+    remainder (its `split:` and the specs holding in a case fix every material outlet); a
+    split's `low`, `high` or `initial` outside [0, 1]; an initial value outside the bounds; an
+    annual target without hours; a flow target on its own variable.
   - `cheme.process-recovery` (validate) is an error for a `recovery:` beside another model, on
     a mixing, splitting, pass-through or reacting class or on a block with steps inside; a
     listed port that is no material outlet; two outlets left out; an undeclared component; a

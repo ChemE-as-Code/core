@@ -124,8 +124,10 @@ def spec_problems(process: Process, case: str | None = None) -> list[tuple[int, 
     declared (``cheme.process-spec``): a duplicate id or variable, an unknown case, stream,
     component or unit; a varied stream that is no feed, is a tear, or whose flow (or a
     follower's) is given or assumed in a case it holds in; a split of no splitter, of a port
-    that is no outlet of it or that its ``split:`` fixes; an initial value outside the bounds;
-    an annual target without operating hours; a target on its own variable."""
+    that is no outlet of it or that its ``split:`` fixes, or that leaves the splitter no outlet
+    for the remainder (with its ``split:`` and the other specifications in a case); a split's
+    bounds or initial value outside [0, 1]; an initial value outside the bounds; an annual
+    target without operating hours; a target on its own variable."""
     from chemeascode.domains.process.propagate import behaviour, ours
 
     fs = process.flowsheet
@@ -137,6 +139,8 @@ def spec_problems(process: Process, case: str | None = None) -> list[tuple[int, 
     out: list[tuple[int, str, str]] = []
     ids: set[str] = set()
     varied: dict[str, str] = {}
+    #: splitter -> (spec index, varied outlet, cases the spec holds in)
+    splits: dict[str, list[tuple[int, str, list[str]]]] = {}
     for i, spec in enumerate(fs.specs):
 
         def err(message: str, spec: DesignSpec = spec, i: int = i) -> None:
@@ -154,7 +158,12 @@ def spec_problems(process: Process, case: str | None = None) -> list[tuple[int, 
         v = spec.vary
         low = v.low if v.low is not None else 0.0
         high = v.high if v.high is not None else (1.0 if v.node is not None else None)
-        if high is not None and low >= high:
+        if v.node is not None and max(low, high or 0.0, v.initial) > 1.0:
+            err(
+                f"vary: a split's low, high and initial lie within [0, 1] (low {low:g}, "
+                f"high {high:g}, initial {v.initial:g})"
+            )
+        elif high is not None and low >= high:
             err(f"vary: low {low:g} is not below high {high:g}")
         elif not (low <= v.initial and (high is None or v.initial <= high)):
             top = "inf" if high is None else f"{high:g}"
@@ -194,6 +203,8 @@ def spec_problems(process: Process, case: str | None = None) -> list[tuple[int, 
                     err(f"vary: {v.port} is no material outlet port of {v.node}")
                 elif v.port in node.split:  # type: ignore[attr-defined]
                     err(f"vary: {v.node}'s split: fixes {v.port}; leave it out of split:")
+                else:
+                    splits.setdefault(node.id, []).append((i, v.port, holds or [""]))
             names = [f"{v.node}.{v.port}"]
         for name in names:
             if name in varied:
@@ -215,6 +226,30 @@ def spec_problems(process: Process, case: str | None = None) -> list[tuple[int, 
             err("target: annual needs hours (or process/recipe.yaml's hours_per_year)")
         if v.stream is not None and t.stream in names and t.quantity in ("flow", "annual"):
             err(f"target: {t.stream}'s flow is the variable itself")
+    # a splitter keeps one material outlet for the remainder of its mass balance in every case
+    for nid, entries in splits.items():
+        node = process.nodes[nid]
+        outs = {p.id for p in node.ports if p.direction == "out" and p.kind == "material"}
+        fixed = set(node.split)  # type: ignore[attr-defined]
+        flagged: set[int] = set()
+        for c in dict.fromkeys(c for _, _, holds in entries for c in holds):
+            here = [(i, port) for i, port, holds in entries if c in holds]
+            if not outs <= fixed | {port for _, port in here}:
+                continue
+            by = f"split: fixes {sorted(fixed)}, " if fixed else ""
+            by += f"specs vary {sorted(port for _, port in here)}"
+            for i, _ in here:
+                if i not in flagged:
+                    flagged.add(i)
+                    out.append(
+                        (
+                            i,
+                            "error",
+                            f"spec {fs.specs[i].id}: vary: {nid} has no outlet left for the "
+                            f"remainder{f' ({c})' if c else ''} ({by}); leave one outlet to "
+                            "the mass balance",
+                        )
+                    )
     return out
 
 
@@ -629,15 +664,24 @@ class _Solver:
             "not-solved findings), or a molar mass the target needs is missing",
         )
 
-    def _bound(self, k: int, u: list[float], r: float) -> SpecFailure:
+    def _bound(self, k: int, u: list[float], r: float, at: list[int] | None = None) -> SpecFailure:
+        """Spec *k* not met with the variables *at* (default its own) held at a bound."""
         spec = self.active[k][1]
         value, text = target_text(self.process, spec)
         reached = value + r * self.scales[k]
+        at = [k] if at is None else at
+        where = ", ".join(self.describe(j, u[j]) for j in at)
+        whose = "its variable" if at == [k] else "the variables"
         return SpecFailure(
             k,
-            f"cannot be met within the bounds of its variable: at {self.describe(k, u[k])} "
-            f"(a bound) {text} is {reached:.6g}, the target {value:.6g}",
+            f"cannot be met within the bounds of {whose}: at {where} "
+            f"({'a bound' if len(at) == 1 else 'bounds'}) {text} is {reached:.6g}, the target "
+            f"{value:.6g}",
         )
+
+    def bounded(self, u: list[float]) -> list[int]:
+        """The variables at a bound of theirs."""
+        return [j for j, v in enumerate(u) if v in (self.lows[j], self.highs[j])]
 
     # -- the iterations -----------------------------------------------------------------------
 
@@ -669,6 +713,10 @@ class _Solver:
                 if abs(f[nt + k]) > self.active[k][1].tolerance and all(
                     abs(v) * c <= 1e-9 for v, c in zip(jac[nt + k], self.colscale, strict=True)
                 ):
+                    # at a bound the flowsheet can be degenerate (a split of 1 empties the loop
+                    # torn after it, whose tear then gives back nothing): the bound is the cause
+                    if at := self.bounded(u):
+                        raise self._bound(k, u, f[nt + k], at=[k] if k in at else at)
                     raise SpecFailure(
                         k,
                         f"its target ({self.active[k][1].target.stream}) does not depend on "

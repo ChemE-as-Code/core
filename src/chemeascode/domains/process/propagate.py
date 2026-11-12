@@ -31,14 +31,23 @@ is fully determined by their streams, by the DEXPI class:
   (``energy_port:``, else their one heat stream; :mod:`.duties`); a given or assumed duty is
   compared (``cheme.process-duty``), never overwritten.
 
-Other separators, and reactors without conversions, are only checked (``cheme validate`` balances
-them), never solved.
+- component separators (a block or step with ``recovery:``, ADR 0070): each listed outlet takes
+  its fraction of every component's inlet flow, the one outlet left out the rest
+  (:mod:`.separator`).
+
+Other separators (without ``recovery:``), and reactors without conversions, are only checked
+(``cheme validate`` balances them), never solved.
 
 - recycle loops torn at the streams the flowsheet names in ``tears:``: the sweep is repeated
   from a guess of each tear stream until what the loop gives back matches it within the
   tolerance (successive substitution or Wegstein, :mod:`.recycle`, ADR 0060);
   ``cheme.process-recycle`` reports the iterations, or the residual of a loop that does not
   converge (nothing that depends on it is then written).
+
+- design specifications (``specs:``, ADR 0070): a feed's flow (with its followers at fixed
+  ratios) or a splitter outlet's fraction adjusted until a stream target is met, solved
+  together with the tears by Newton-Broyden (:mod:`.design_spec`); ``cheme.process-design-spec``
+  reports the variables and the targets reached, or why a specification is not met.
 
 Derived values get provenance ``calculated``, source ``cheme process propagate: <rule>
 <step> from <streams>`` and an input fingerprint. They never overwrite a given or assumed value
@@ -631,8 +640,11 @@ def _swept(
         changed = False
         for s, port in outs:
             part = ports[port]
-            changed |= put(s, "flow", kg_h(sum(part.values())), "separator", node.id, ins, extra)
-            changed |= put(s, "composition", _mix(work, part), "separator", node.id, ins, extra)
+            total = sum(part.values())
+            changed |= put(s, "flow", kg_h(total), "separator", node.id, ins, extra)
+            # an outlet that receives nothing keeps the inlet's composition (as a splitter's)
+            shape = part if total > 0 else mass
+            changed |= put(s, "composition", _mix(work, shape), "separator", node.id, ins, extra)
         return changed
 
     waiting: dict[str, str] = {}  # still -> why its batch's hours are not known yet

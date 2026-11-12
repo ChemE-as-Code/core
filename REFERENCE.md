@@ -1618,13 +1618,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     values written come from one more sweep at six digits, so a target reads within the six
     digits written. `cheme.process-design-spec` is info per spec met (the variable, a split's
     fraction, the target reached, the sweeps), and a warning for one that cannot be met (the
-    target does not depend on the variable, has no value, lies beyond the bounds, or is not met
+    target does not depend on the variable, has no value, lies beyond the bounds (a variable
+    held at a bound, or at a bound where the target no longer moves, such as a purge of 1 that
+    empties the loop torn after it), or is not met
     in `convergence.max_iterations`): nothing that depends on the specs or the tears is then
     written, and `--json` is `not-converged`. `cheme validate` reports a spec that cannot be
     solved as declared as `cheme.process-spec` (error): an id or variable named twice, an
     unknown case, stream, component or unit, a varied stream that is no feed, is a tear or has
-    a given or assumed flow, a split of no splitter or of a port its `split:` fixes, an initial
-    value outside the bounds, an annual target without hours, a flow target on its own
+    a given or assumed flow, a split of no splitter or of a port its `split:` fixes, splits that
+    leave a splitter no outlet for the remainder (its `split:` and the specs of a case fix every
+    outlet), a split's `low`, `high` or `initial` above 1, an initial value outside the bounds, an annual target without hours, a flow target on its own
     variable. In a batch plant the flowsheet holds year averages: a spec on the annual product
     sets the flowsheet's rate, and the recipe's batch size must make it, `batch = rate x
     cycle(batch)`, where the cycle depends on the batch (jacket and dosing times, a still, a
