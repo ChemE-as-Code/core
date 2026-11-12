@@ -240,6 +240,17 @@ still:
   `property-retrieval`), or declare the component `nonvolatile` when it really stays in the
   still. Never invent a relative volatility to make the step pass. An assumed `alpha` states
   its basis in its source.
+- A suspended solid, a salt or an immiscible non-volatile liquid goes in `separate_phase:`, not
+  `nonvolatile:`: it then does not dilute the liquid in Raoult's law (ADR 0068). `nonvolatile`
+  is a dissolved solute. Do not declare a component `nonvolatile` only because a template lists
+  it at 0: a component the charge does not hold needs no vapour pressure.
+- A vacuum ramp or a pump-limited forerun is a sequence of `cuts:`, each with its own
+  `pressure:` and `boilup:` (`unit: m3/h` is the vapour's volume at the still, a vacuum pump's
+  capacity). A cut ending at a `temperature` per pressure step replaces a residue key set by
+  hand.
+- `heat_up_time: true` gives the heat-up of the charge and the vessel's metal a time at the
+  boil-up's heat input, added to the recipe's `distil` from the still: do not also write a
+  hand `heat` operation for it.
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
