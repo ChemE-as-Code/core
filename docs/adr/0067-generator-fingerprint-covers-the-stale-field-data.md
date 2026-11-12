@@ -8,7 +8,7 @@
 A BFD/PFD records `generator_sha256`, the fingerprint of the generator
 (`process.provenance.generator_fingerprint`); a sheet whose fingerprint differs from the
 installed cheme-as-code's is reported `cheme.generated-version` until `cheme process build` is
-run. Since 0.6 the fingerprint hashes the sheet-drawing modules (`GENERATOR_MODULES`; ADR 0048
+run. The fingerprint hashes the sheet-drawing modules (`GENERATOR_MODULES`; ADR 0048
 added `pfd_sheet.py`, `symbols.py` and the ISO shapes; `props.py` is in it as well).
 
 The stream table and the energy-duty cells of a PFD leave a stale value blank. `props.stale()`
