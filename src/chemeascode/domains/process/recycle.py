@@ -31,6 +31,7 @@ tear stream stays fixed (a design specification), and only the other is iterated
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -266,10 +267,21 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
     iterates. The given and assumed flow, composition, temperature, pressure and phase of every
     material stream upstream of a tear's source (the loop and what feeds it), those nodes as
     declared but for what no sweep reads (:data:`NOT_SWEPT`), their reactions, the components,
-    the catalysts, the tears and the convergence settings with the tolerance."""
+    the catalysts, the tears and the convergence settings with the tolerance; with design
+    specifications (ADR 0070), those too (the flows they set are calculated, not inputs)."""
+    data = upstream(process, case, tears)
+    if process.flowsheet.specs:
+        data["specs"] = [s.model_dump(mode="json", by_alias=True) for s in process.flowsheet.specs]
+    return value_fingerprint(data)
+
+
+def upstream(process: Process, case: str, streams_from: list[str]) -> dict[str, Any]:
+    """What the values derived at the nodes *streams_from* leave depend on (:func:`loop_inputs`),
+    as data to fingerprint."""
     from chemeascode.domains.process.propagate import ours
 
     fs = process.flowsheet
+    tears = streams_from
     nodes = _nodes(process)
     into: dict[str, list[StreamDef]] = {}
     origin: dict[str, str | None] = {}
@@ -320,7 +332,7 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
         ],
         "catalysts": process.catalysts.model_dump(mode="json") if process.catalysts else None,
     }
-    return value_fingerprint(data)
+    return data
 
 
 def _not_swept(node: Any) -> dict[str, Any]:
@@ -368,10 +380,23 @@ def _step(
     return new
 
 
-def converge(process: Process, case: str) -> Any:
+def converge(
+    process: Process,
+    case: str,
+    evaluate: Callable[[dict[str, State]], Any] | None = None,
+    final: Callable[[dict[str, State]], Any] | None = None,
+) -> Any:
     """:func:`.propagate.derive` of a flowsheet with ``tears:``: the loops converged, the tear
-    values written as calculated (or, unconverged, the sweep without the tears)."""
+    values written as calculated (or, unconverged, the sweep without the tears). *evaluate*
+    sweeps once from the tears' guesses, unrounded, and *final* once from their converged
+    values, rounded (default: :func:`.propagate._sweep`; the design specifications of ADR 0070
+    meet their targets in each)."""
     from chemeascode.domains.process.propagate import _sweep
+
+    if evaluate is None:
+
+        def evaluate(guesses: dict[str, State]) -> Any:
+            return _sweep(process, case, guesses, rounded=False)
 
     fs = process.flowsheet
     settings = fs.convergence or Convergence()
@@ -418,7 +443,7 @@ def converge(process: Process, case: str) -> Any:
     for k in range(settings.max_iterations):
         guesses = {sid: _guess(process, streams[sid], case, x[sid]) for sid in tears}
         # unrounded: g(x) is smooth, and the loop converges to the tolerance asked for
-        found = _sweep(process, case, guesses, rounded=False)
+        found = evaluate(guesses)
         recycle.iterations = k + 1
         given: dict[str, dict[str, float]] = {}
         back: dict[str, dict[str, float]] = {}
@@ -454,7 +479,7 @@ def converge(process: Process, case: str) -> Any:
                 return not_closing(open_)
             recycle.converged = True
             recycle.solution = {sid: dict(given[sid]) for sid in tears}
-            return _written(process, case, recycle, tears, guesses)
+            return _written(process, case, recycle, tears, guesses, final)
         nxt = {
             sid: _step(settings.method, settings.damping, given[sid], back[sid], last.get(sid))
             for sid in tears
@@ -479,6 +504,7 @@ def _written(
     recycle: Recycle,
     tears: dict[str, Any],
     guesses: dict[str, State],
+    final: Callable[[dict[str, State]], Any] | None = None,
 ) -> Any:
     """The derivation of a converged loop: the tear values of the converged guess *guesses*
     rounded to the six digits propagate writes, and one rounded sweep from them (so that the
@@ -488,7 +514,6 @@ def _written(
     from chemeascode.domains.process.propagate import SOURCE, _sweep
 
     fs = process.flowsheet
-    settings = fs.convergence or Convergence()
     streams = {s.id: s for s in fs.streams}
     rounded: dict[str, State] = {}
     for sid, guess in guesses.items():
@@ -499,7 +524,7 @@ def _written(
             values = {n: _sig(v) for n, v in guess.composition.values.items()}
             state.composition = guess.composition.model_copy(update={"values": values})
         rounded[sid] = state
-    found = _sweep(process, case, rounded)
+    found = final(rounded) if final is not None else _sweep(process, case, rounded)
     inputs = loop_inputs(process, case, list(tears))
     for sid in tears:
         a, _ = process.ends(streams[sid])
@@ -517,7 +542,7 @@ def _written(
                 update={
                     "provenance": "calculated",
                     "source": f"{SOURCE}: recycle {node} from {' '.join(into)} "
-                    f"(tear, {settings.method})",
+                    f"(tear, {recycle.method})",
                     "fingerprint": inputs,
                 }
             )

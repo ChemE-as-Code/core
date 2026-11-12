@@ -116,7 +116,7 @@ cheme check                                   # engineering-step gates (checks/c
 cheme cause-effect                            # build/cause-effect.html + .csv
 cheme process build                           # BFD and PFD from process/materials.yaml + flowsheet.yaml
 cheme process streams [--md]                  # stream table with provenance, block balances
-cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors; recycles at tears:
+cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors, separators (recovery:); recycles at tears:, feeds for specs:
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
 cheme process stills                          # per batch still/solvent swap/column: cuts, residue, purity, recovery, reflux, boil-up time, duty per batch
@@ -912,7 +912,9 @@ Their source is two YAML files, schema `cheme/process/v1`:
   `streams` from port to port with a per-case `state` (pressure, temperature, flow, duty,
   composition, phase), `links` to the lists and sheets, `layout.bfd` / `layout.pfd` pins, and
   optionally `tears` and `convergence` (the recycle loops `process propagate` converges, ADR
-  0060). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
+  0060) and `specs` (design specifications: feeds or splits it solves for a stream target, ADR
+  0070); a block or step may give `recovery` (a component separator's specified split, ADR
+  0070). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
   A value or composition may give an `uncertainty` (the LCA's shape, e.g. `{gsd2: 1.2}` or
   `{distribution: triangular, low: 0.9, high: 1.1}`); `cheme assess lca` samples a feed's or
   product's flow with it, and no calculated value's fingerprint includes it. An optional
@@ -1565,8 +1567,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   conversion) converts its fraction of each key component's inlet flow; a crystallizer or a
   filter (`crystallizer:`, `solid_separation:`, below) fills its outlets; a batch,
   semi-batch, still, crystallizer or conversion step writes its duty on its energy stream
-  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`). Other
-  separators, and reactors without conversions, are only checked, never solved. Values are
+  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`); a
+  component separator (`recovery:`, below) splits each component of its inlets by its given
+  fractions. Other separators, and reactors without conversions, are only checked, never
+  solved. Values are
   `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
   are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
   prints the run as an adapter result (`cheme/adapter-result/v1`, `cheme schema
@@ -1612,6 +1616,74 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     for Wegstein). Tears are declared, never chosen.
     `examples/process-purge-loop` is a loop reactor with a recycle split whose steady state is
     analytic (`tests/test_recycle.py`).
+  - **Component separators** (ADR 0070). A block or step without another model (reactions,
+    still, crystallizer, filter, dryer) and of a separating or generic class may give its split:
+
+    ```yaml
+    recovery:
+      outlets: {dry: {TBA: 0.99, H2O: 0.0074358}}   # outlet port -> component -> share of its inlet flow
+      provenance: assumed
+      source: "scripts/makeup_drying.py (D-004)"
+    ```
+
+    Each listed port takes its share of each component's inlet flow (all material inlets
+    together; a component it does not name: none); one material outlet may be left out and
+    takes the rest. Propagate writes the outlets' flows and compositions (`separator <node> from
+    <inlets>`); temperatures and pressures stay as given. The split is specified, not
+    predicted. `cheme validate` reports a `recovery:` that does not fit as `cheme.process-recovery`
+    (error): beside another model, on a mixer, splitter, pass-through or reactor class or on a
+    block with steps inside, a port that is no material outlet, two outlets left out, an
+    undeclared component, a fraction outside [0, 1], or a component's fractions summing beyond 1
+    (with every outlet listed: to other than 1).
+  - **Design specifications** (ADR 0070). `specs:` adjusts one variable per spec until a stream
+    target is met, solved together with the tears:
+
+    ```yaml
+    specs:
+      - id: rate
+        vary: {stream: S4, initial: 70, with: {S1: 1.89688, S3: 0.26124}}  # a feed; followers at fixed ratios
+        target: {stream: S24, quantity: annual, value: 1000, unit: t}         # hours: the recipe's
+        provenance: given
+        source: "design basis: 1000 t/a (D-002)"
+      - id: purge
+        vary: {node: X1, port: purge, initial: 0.1}                           # a splitter outlet
+        target: {stream: S2, component: C3, quantity: fraction, basis: mass, value: 0.1}
+        provenance: assumed
+    ```
+
+    `vary` is a feed stream's flow (`unit`, default `units.flow`; `low`, `high`; `with:` the
+    feeds that follow it, stream -> ratio, so charge ratios are kept) or the fraction of a
+    splitter's inlet to an outlet its `split:` leaves out (`low`/`high` within [0, 1]). The
+    varied flows must not be given or assumed: they are written `calculated`, source `spec <id>
+    (<target>)`. `target` is a stream's (or one `component`'s) `flow` (a flow unit), `annual`
+    amount (`t` or `kg` per year: the flow times `hours`, default the recipe's
+    `hours_per_year`), `ratio` to `per: {stream, component}` or `fraction` of the stream (`basis:
+    mole`, the default, or `mass`); `tolerance` is relative (default 1e-6), `cases` the cases it
+    holds in (default all). Propagate solves the tears' component flows and the variables
+    together by Newton's method with a finite-difference Jacobian kept current by Broyden's
+    update (the recycle's method then reads `broyden`); without tears, one sweep per step. The
+    values written come from one more sweep at six digits, so a target reads within the six
+    digits written. `cheme.process-design-spec` is info per spec met (the variable, a split's
+    fraction, the target reached, the sweeps), and a warning for one that cannot be met (the
+    target does not depend on the variable, has no value, lies beyond the bounds (a variable
+    held at a bound, or at a bound where the target no longer moves, such as a purge of 1 that
+    empties the loop torn after it), or is not met
+    in `convergence.max_iterations`): nothing that depends on the specs or the tears is then
+    written, and `--json` is `not-converged`. `cheme validate` reports a spec that cannot be
+    solved as declared as `cheme.process-spec` (error): an id or variable named twice, an
+    unknown case, stream, component or unit, a varied stream that is no feed, is a tear or has
+    a given or assumed flow, a split of no splitter or of a port its `split:` fixes, splits that
+    leave a splitter no outlet for the remainder (its `split:` and the specs of a case fix every
+    outlet), a split's `low`, `high` or `initial` above 1, an initial value outside the bounds, an annual target without hours, a flow target on its own
+    variable. In a batch plant the flowsheet holds year averages: a spec on the annual product
+    sets the flowsheet's rate, and the recipe's batch size must make it, `batch = rate x
+    cycle(batch)`, where the cycle depends on the batch (jacket and dosing times, a still, a
+    filter or a dryer). `cheme.recipe-basis` names the batch size that closes it and its cycle,
+    or, when the cycle grows about as fast as the batch, the most the batches tried made (the
+    train's capacity); set it in `process/recipe.yaml` and run `--fill` again.
+    `examples/process-design-spec` is a loop reactor with a component separator whose fresh
+    feed and purge are solved for a product rate and an inert level, against their closed form
+    (`tests/test_design_spec.py`).
 - **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
   vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
   process's property package (`property_method.package` in `materials.yaml`, else the package

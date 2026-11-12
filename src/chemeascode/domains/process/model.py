@@ -57,7 +57,11 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
 - ``process-tear``: a tear stream (``tears:``, ADR 0060) propagate cannot iterate: an unknown
   or energy stream, one not between two steps, one named twice, a guess in undeclared
   components or flow units or whose fractions do not sum to 1 (errors), a stream whose flow
-  and composition are both given or assumed (warning).
+  and composition are both given or assumed (warning);
+- ``process-spec``: a design specification (``specs:``, ADR 0070) propagate cannot solve as
+  declared (:func:`.design_spec.spec_problems`);
+- ``process-recovery``: a component separator's ``recovery:`` that does not fit its node, ports
+  or components (:func:`.separator.rules`, ADR 0070).
 """
 
 from __future__ import annotations
@@ -779,6 +783,11 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _terminal_rules(out)
     _calculated_rules(out)
     _tear_rules(out)
+    from chemeascode.domains.process.design_spec import rules as spec_rules
+    from chemeascode.domains.process.separator import rules as recovery_rules
+
+    out.findings += spec_rules(process)
+    out.findings += recovery_rules(process)
     _link_rules(out, lists or {}, set(sheet_ids))
     _bfd_rules(out)
     from chemeascode.domains.process.crystallization import rules as solid_rules

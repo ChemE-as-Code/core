@@ -1,0 +1,168 @@
+# A loop reactor sized by design specifications (ADR 0070): fresh butanes are mixed with the
+# recycle (M1) and isomerised at a per-pass conversion (R1); the component separator K1 sends
+# 98 % of the isobutane, 2 % of the n-butane and 10 % of the propane to the product and the
+# rest back; the purge split X1 bleeds part of that recycle. Two specifications are solved
+# together with the recycle torn at S7:
+# - rate: the fresh feed S1 for 8000 t/a of isobutane in the product S4 over 8000 h;
+# - purge: X1's purge fraction for 10 wt% propane (the inert) in the reactor feed S2.
+# The steady state is analytic (mass, as both butanes have one molar mass): at a purge
+# fraction p, a conversion X = 0.4 and the separator's shares, per kg/h of feed
+#   n-butane into R1   0.95 / (1 - 0.98 (1 - p)(1 - X))
+#   propane into R1    0.05 / (1 - 0.9 (1 - p))
+#   isobutane into R1  0.02 (1 - p) X N / (1 - 0.02 (1 - p))
+# tests/test_design_spec.py solves these for p and the feed and checks the streams. Feed
+# values are ASSUMED illustration values. Regenerate the sheets with `cheme process build`
+# (never edit process/*.xml).
+schema: cheme/process/v1
+kind: flowsheet
+title: Isomerisation loop with a component separator, solved for a product rate and a purge
+units:
+  pressure: kPa(a)
+  temperature: K
+  flow: kg/h
+  duty: kW
+  enthalpy: kJ/kmol
+cases:
+  - {id: design, description: Design case, default: true}
+tolerance: {abs: 0.1, rel: 0.001}
+tears:
+  - stream: S7
+convergence: {method: wegstein, max_iterations: 50, tolerance: {abs: 0.0001, rel: 1.0e-8}}
+specs:
+  - id: rate
+    vary: {stream: S1, initial: 1000}
+    target: {stream: S4, component: IC4, quantity: annual, value: 8000, unit: t, hours: 8000}
+    provenance: assumed
+    source: ASSUMED illustration capacity, 8000 t/a of isobutane in 8000 h
+  - id: purge
+    vary: {node: X1, port: purge, initial: 0.1}
+    target: {stream: S2, component: C3, quantity: fraction, basis: mass, value: 0.1}
+    provenance: assumed
+    source: ASSUMED illustration limit of the inert in the reactor feed
+
+feeds:
+  - id: FEED
+    title: Field butanes
+    ports: [{id: out, direction: out}]
+products:
+  - id: PROD
+    title: Isobutane
+    ports: [{id: in, direction: in}]
+  - id: PURGE
+    title: Purge
+    ports: [{id: in, direction: in}]
+
+blocks:
+  - id: RXN
+    title: Isomerisation loop
+    class: ReactingChemicals
+    ports:
+      - {id: feed, direction: in}
+      - {id: product, direction: out}
+      - {id: purge, direction: out}
+
+steps:
+  - id: M1
+    block: RXN
+    title: Feed and recycle mixer
+    class: Mixing
+    ports:
+      - {id: feed, direction: in, delegates: feed}
+      - {id: recycle, direction: in}
+      - {id: out, direction: out}
+  - id: R1
+    block: RXN
+    title: Isomerisation reactor
+    class: ReactingChemicals
+    reactions: [ISOM]
+    reactor: conversion
+    ports:
+      - {id: in, direction: in}
+      - {id: out, direction: out}
+  - id: K1
+    block: RXN
+    title: Product separator (specified split)
+    class: Separating
+    recovery:
+      outlets: {product: {IC4: 0.98, NC4: 0.02, C3: 0.1}}
+      provenance: assumed
+      source: ASSUMED illustration split
+    ports:
+      - {id: in, direction: in}
+      - {id: product, direction: out, delegates: product}
+      - {id: recycle, direction: out}
+  - id: X1
+    block: RXN
+    title: Purge split
+    class: SplittingMaterial
+    ports:
+      - {id: in, direction: in}
+      - {id: purge, direction: out, delegates: purge}
+      - {id: recycle, direction: out}
+
+streams:
+  - id: S1
+    title: Fresh feed
+    from: FEED.out
+    to: M1.feed
+    template: butanes
+    state:
+      design:
+        temperature: {value: 310, provenance: assumed, source: ASSUMED illustration value}
+        pressure: {value: 1500, provenance: assumed, source: ASSUMED illustration value}
+        composition: {basis: mass_fraction, values: {NC4: 0.95, IC4: 0.0, C3: 0.05}, provenance: assumed, source: ASSUMED illustration value}
+        flow: {value: 1321.13, provenance: calculated, source: 'cheme process propagate: spec rate (S4 IC4 t/a 8000)', fingerprint: df73e17c7d62ac62}
+  - id: S2
+    title: Reactor feed
+    from: M1.out
+    to: R1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.866267, IC4: 0.00598892, C3: 0.127745}, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S7', fingerprint: d73135e2ee9ae652}
+        flow: {value: 2805.57, provenance: calculated, source: 'cheme process propagate: mixer M1 from S1 S7', fingerprint: 04bff7abcd28185c}
+  - id: S3
+    title: Reactor effluent
+    from: R1.out
+    to: K1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.51976, IC4: 0.352495, C3: 0.127745}, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 84a8956516631ddb}
+        flow: {value: 2805.57, provenance: calculated, source: 'cheme process propagate: reactor R1 from S2', fingerprint: 5ba4978ce351d3bd}
+  - id: S4
+    title: Isobutane
+    from: K1.product
+    to: PROD.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.0282007, IC4: 0.937144, C3: 0.0346554}, provenance: calculated, source: 'cheme process propagate: separator K1 from S3', fingerprint: 1cc89e2d377b7c97}
+        flow: {value: 1058.15, provenance: calculated, source: 'cheme process propagate: separator K1 from S3', fingerprint: 1cc89e2d377b7c97}
+  - id: S5
+    title: Separator recycle
+    from: K1.recycle
+    to: X1.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.806742, IC4: 0.0111658, C3: 0.182092}, provenance: calculated, source: 'cheme process propagate: separator K1 from S3', fingerprint: 1cc89e2d377b7c97}
+        flow: {value: 1747.42, provenance: calculated, source: 'cheme process propagate: separator K1 from S3', fingerprint: 1cc89e2d377b7c97}
+  - id: S6
+    title: Purge
+    from: X1.purge
+    to: PURGE.in
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.806742, IC4: 0.0111658, C3: 0.182092}, provenance: calculated, source: 'cheme process propagate: splitter X1 from S5', fingerprint: 234a3130d96def9d}
+        flow: {value: 262.981, provenance: calculated, source: 'cheme process propagate: splitter X1 from S5', fingerprint: 24fda35cfaa4d22b}
+  - id: S7
+    title: Recycle
+    from: X1.recycle
+    to: M1.recycle
+    template: butanes
+    state:
+      design:
+        composition: {basis: mole_fraction, values: {NC4: 0.806742, IC4: 0.0111658, C3: 0.182092}, provenance: calculated, source: 'cheme process propagate: recycle X1 from S5 (tear, broyden)', fingerprint: cece179a857d0a05}
+        flow: {value: 1484.44, provenance: calculated, source: 'cheme process propagate: recycle X1 from S5 (tear, broyden)', fingerprint: cece179a857d0a05}

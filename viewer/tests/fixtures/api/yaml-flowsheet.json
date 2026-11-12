@@ -767,6 +767,18 @@
       "Block": {
         "additionalProperties": false,
         "properties": {
+          "recovery": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Recovery"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A separator (a Separating, Absorbing, Adsorbing ... step or a generic ProcessStep, without another model): the outlets solved from the share of each component's inlet flow to each outlet port."
+          },
           "energy_port": {
             "anyOf": [
               {
@@ -1732,6 +1744,61 @@
           "provenance"
         ],
         "title": "Declared",
+        "type": "object"
+      },
+      "DesignSpec": {
+        "additionalProperties": false,
+        "description": "A design specification (ADR 0070): ``cheme process propagate`` adjusts one variable\n(a feed's flow, or a split) until the target is met, solved together with the tears.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "vary": {
+            "$ref": "#/$defs/SpecVariable"
+          },
+          "target": {
+            "$ref": "#/$defs/SpecTarget"
+          },
+          "tolerance": {
+            "default": 1e-06,
+            "description": "Met when |value - target| <= tolerance x target (relative).",
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Tolerance",
+            "type": "number"
+          },
+          "cases": {
+            "description": "The cases it holds in; default every case.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cases",
+            "type": "array"
+          },
+          "provenance": {
+            "description": "Of the target: a design input (given) or an assumption.",
+            "enum": [
+              "given",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "Where the target comes from.",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vary",
+          "target",
+          "provenance"
+        ],
+        "title": "DesignSpec",
         "type": "object"
       },
       "Dosing": {
@@ -2821,6 +2888,45 @@
         "title": "ReactionHazard",
         "type": "object"
       },
+      "Recovery": {
+        "additionalProperties": false,
+        "description": "A component separator's specified split (ADR 0070): the share of each component's inlet\nflow that leaves by each outlet. ``cheme process propagate`` solves the outlets from it.",
+        "properties": {
+          "outlets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "description": "Outlet port -> component -> fraction of that component's inlet flow (all material inlets together) that leaves by the port; a component a listed port does not name leaves none by it. One material outlet may be left out: it takes the rest.",
+            "minProperties": 1,
+            "title": "Outlets",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "Where the fractions come from (vendor data, a balance script, a DESIGN.md decision).",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outlets",
+          "provenance"
+        ],
+        "title": "Recovery",
+        "type": "object"
+      },
       "ResidualMoisture": {
         "additionalProperties": false,
         "description": "The volatiles a dried product keeps: the dryer's specification.",
@@ -3168,6 +3274,242 @@
         "title": "Solubility",
         "type": "object"
       },
+      "SpecPer": {
+        "additionalProperties": false,
+        "description": "The denominator of a ratio target: a stream, or one component of it.",
+        "properties": {
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "component": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Component"
+          }
+        },
+        "required": [
+          "stream"
+        ],
+        "title": "SpecPer",
+        "type": "object"
+      },
+      "SpecTarget": {
+        "additionalProperties": false,
+        "description": "What a design specification holds (ADR 0070).",
+        "properties": {
+          "stream": {
+            "description": "The material stream the target is measured on.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "component": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "One component of it; default: the whole stream.",
+            "title": "Component"
+          },
+          "quantity": {
+            "default": "flow",
+            "description": "flow: its flow in unit; annual: its amount per year (unit t or kg), the flow times hours (default the recipe's hours_per_year); ratio: its flow per the flow of per (basis mole or mass); fraction: its share of the stream (basis).",
+            "enum": [
+              "flow",
+              "annual",
+              "ratio",
+              "fraction"
+            ],
+            "title": "Quantity",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "flow: a flow unit (default units.flow); annual: t (default) or kg.",
+            "title": "Unit"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "mole",
+                  "mass"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ratio and fraction: on moles (default) or masses.",
+            "title": "Basis"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SpecPer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ratio: the denominator."
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 8784,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "annual: operating hours per year; default the recipe's hours_per_year.",
+            "title": "Hours"
+          }
+        },
+        "required": [
+          "stream",
+          "value"
+        ],
+        "title": "SpecTarget",
+        "type": "object"
+      },
+      "SpecVariable": {
+        "additionalProperties": false,
+        "description": "What a design specification adjusts (ADR 0070): the flow of a feed stream, or the\nfraction of a splitter's inlet that leaves by one of its outlets.",
+        "properties": {
+          "stream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A feed stream (from a feed terminal) whose flow is adjusted; its flow is then written by cheme process propagate (calculated), never given or assumed.",
+            "title": "Stream"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A splitter (SplittingMaterial) whose outlet fraction is adjusted.",
+            "title": "Node"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "With node: the outlet port, not in the splitter's split:.",
+            "title": "Port"
+          },
+          "initial": {
+            "description": "Where the iterations start: the flow (in unit) or the fraction.",
+            "minimum": 0,
+            "title": "Initial",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A stream's flow: the flow unit of initial, low, high and the written flow; default units.flow.",
+            "title": "Unit"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Least value; default 0.",
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Largest value; default none (a fraction: 1).",
+            "title": "High"
+          },
+          "with": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "A stream: other feed streams whose flow follows it, stream -> ratio (their flow is the ratio times the adjusted flow, in its unit): charge ratios kept.",
+            "title": "With",
+            "type": "object"
+          }
+        },
+        "required": [
+          "initial"
+        ],
+        "title": "SpecVariable",
+        "type": "object"
+      },
       "State": {
         "additionalProperties": false,
         "properties": {
@@ -3252,6 +3594,18 @@
       "Step": {
         "additionalProperties": false,
         "properties": {
+          "recovery": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Recovery"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A separator (a Separating, Absorbing, Adsorbing ... step or a generic ProcessStep, without another model): the outlets solved from the share of each component's inlet flow to each outlet port."
+          },
           "energy_port": {
             "anyOf": [
               {
@@ -4774,6 +5128,14 @@
         ],
         "default": null,
         "description": "How propagate converges the torn loops; default: Wegstein, 100 iterations, the flowsheet's tolerance."
+      },
+      "specs": {
+        "description": "Design specifications for cheme process propagate: feeds or splits adjusted until a stream target is met (ADR 0070).",
+        "items": {
+          "$ref": "#/$defs/DesignSpec"
+        },
+        "title": "Specs",
+        "type": "array"
       },
       "bfd": {
         "anyOf": [

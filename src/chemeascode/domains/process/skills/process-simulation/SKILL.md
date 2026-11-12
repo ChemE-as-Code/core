@@ -16,7 +16,8 @@ shortcut and rigorous columns, and recycle loops. `cheme process propagate` cove
 pass-through, mixer, splitter and reactor balances and its own batch and solids models, with
 the model duties of batch and semi-batch steps, `still:`, `crystallizer:` with `energy:` and
 conversion steps on their energy streams (ADR 0059: `--fill` writes and checks them, so do not
-type them by hand) and recycles torn at `tears:` (skill `process-design`); simulate covers
+type them by hand), recycles torn at `tears:`, feeds solved for `specs:` and separators with a
+specified `recovery:` (skill `process-design`); simulate covers
 the other energy balances and the separations.
 
 ## Required inputs and missing inputs
