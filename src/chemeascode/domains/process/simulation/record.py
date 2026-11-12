@@ -301,6 +301,11 @@ def view(
     load (*problem* says why): the spec and the record are then shown, the staleness is None."""
     from chemeascode.domains.process.simulation.translate import translate
 
+    if sim.simulator == "qsdsan":
+        from chemeascode.domains.process.simulation.qsdsan import view as qsdsan_view
+
+        return qsdsan_view(process, sim, data, case, fingerprints, problem)
+
     findings: list[Finding] = []
     cases: list[str] = []
     current = None

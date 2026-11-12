@@ -326,9 +326,11 @@ def test_the_energy_audit_states_the_idaes_enthalpy_reference(hda):
     assert plant["status"] == "unsupported" and plant["basis"] == "simulator"
 
 
-def test_every_simulator_has_an_enthalpy_reference():
+def test_every_molecular_simulator_has_an_enthalpy_reference():
     """A backend added to ``simulator:`` without its reference would crash the energy audit."""
     simulators = set(get_args(Simulation.model_fields["simulator"].annotation))
+    # The dynamic A2/O worker returns water-quality indicators and bypasses the energy audit.
+    simulators.remove(backends.QSDSAN)
     assert set(energy_checks.REFERENCES) == simulators
     assert set(energy_checks.FORMATION_REFERENCES) == simulators
 

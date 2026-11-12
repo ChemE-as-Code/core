@@ -208,7 +208,7 @@ def translation(process: Process, case: str) -> Translation | None:
         found = None
         try:
             sim, doc, _ = load(process.root)
-            if sim is not None:
+            if sim is not None and sim.simulator != "qsdsan":
                 found = translate(process, sim, doc, case)
         except Exception:  # noqa: BLE001 - a model that does not translate is simulate's to report
             found = None
@@ -442,6 +442,9 @@ def property_package_findings(
     - ``cheme.process-sim-method-unrecorded`` (info, only with *require_selection*, for
       maturity checks): no ``method_selection`` is recorded.
     """
+    if sim.simulator == "qsdsan":
+        return []  # ASM components are not molecular thermodynamic property packages.
+
     from chemeascode.domains.process.thermodynamics.methods import (
         method_for_package,
         simulation_packages,
@@ -638,6 +641,8 @@ def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Tra
     """The simulator model of *case*, or the findings why it cannot be made."""
     fs = process.flowsheet
     out = Translation()
+    if sim.simulator == "qsdsan":
+        return out  # The project worker owns this model; it is not a DWSIM translation.
     out.findings += property_package_findings(sim, sim_doc)
     refused = any(f.level == "error" for f in out.findings)
 

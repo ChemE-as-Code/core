@@ -249,6 +249,22 @@ findings: [...]
 | DWSIM | `simulate --fill`: each entry of `process/simulation-run.json` | `simulator` key: `dwsim`, version, `method` = property package | flowsheet passes: one per solve without a recycle, else the passes of the worker's accelerated tear iteration plus DWSIM's recycle test on its result, summed over the re-solves (DWSIM's flowsheet solver has no count of its own) | the simulator's messages |
 | Propagation | `cheme process propagate --json` | `cheme process propagate`, cheme-as-code version | sweeps through the nodes | the nodes not solved (also in `units`, `status: not-solved`) |
 | Properties | `cheme process props --json` | `thermo`, its version, the EOS | null (one flash per stream) | the streams refused or missing inputs |
+| QSDsan A2/O (local, ADR 0065) | `simulate --fill`: fresh `runs/<id>/` plus `process/simulation-run.json` | `simulator` key: `QSDsan`, version, `method` = ASM2d / integrator | null | failed attempts retain evidence; the preceding successful native entry is kept |
+
+The bounded A2/O adapter retains explicit wastewater measurement bases in `streams.values`
+and leaves `filled` empty. Its `converged` status means requested integration and basic checks,
+not a steady-state or plant-validation claim. `property_package` is null for this biokinetic
+model. Numerical JSON and project worker sources are fingerprinted; no molecular composition
+is inferred from COD fractions. See [ADR 0065](../adr/0065-qsdsan-a2o-process-worker.md).
+
+For QSDsan cases, `GET /api/streams` adds `wastewater` metadata (case, status, saved record,
+run time, evidence path, input staleness, changed files, column units/bases and findings).
+Each row may contain `wastewater` calculated quantities joined by stream id. Their numeric
+values and measurement bases are preserved; missing or invalid cells are absent, not zero.
+The existing molecular properties, composition and balance payloads remain unchanged.
+The native viewer uses these columns for wastewater and labels the molecular balance panel
+separately. This read-only projection does not prove steady state or N/P conservation.
+See [ADR 0066](../adr/0066-wastewater-stream-table.md).
 
 The DWSIM entry keeps the keys it had (`simulator`, `converged`, `property_package`); an entry
 written before `status` and `simulator.method` existed reads the same, `status` following

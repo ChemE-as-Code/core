@@ -1,5 +1,7 @@
 """``cheme process simulate --fill/--check``: the flowsheet solved by DWSIM, or by the optional
 IDAES backend where ``process/simulation.yaml`` says ``simulator: idaes`` (ADR 0039).
+The QSDsan A2/O worker uses the same command and records wastewater quantities in their
+own units (ADR 0065). The molecular flowsheet workflow below applies to DWSIM and IDAES.
 
 The feeds (temperature, pressure, flow, composition) and the specifications in
 ``process/simulation.yaml`` go to the simulator; every other material stream comes back with its
@@ -52,7 +54,7 @@ from chemeascode.domains.process.simulation import (
     record,
 )
 from chemeascode.domains.process.simulation import energy as energy_checks
-from chemeascode.domains.process.simulation.backends import IDAES, TITLES
+from chemeascode.domains.process.simulation.backends import IDAES, QSDSAN, TITLES
 from chemeascode.domains.process.simulation.translate import (
     _mole_fractions,
     load,
@@ -111,6 +113,11 @@ def run(
                 )
             )
         return result
+
+    if sim.simulator == QSDSAN:
+        from chemeascode.domains.process.simulation.qsdsan import run as run_qsdsan
+
+        return run_qsdsan(workspace.root, case, sim, write=write, save=save)
     found_model = translate(process, sim, sim_doc, case)
     result.findings += found_model.findings
     model = found_model.model

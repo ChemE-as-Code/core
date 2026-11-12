@@ -94,6 +94,8 @@ export interface ProcessStream {
     stale: boolean;
   } | null;
   calculated: Record<string, ProcessValue>;
+  /** Saved final-time wastewater results, never molecular mass/mole fractions. */
+  wastewater?: Record<string, ProcessValue>;
   /** Names of calculated values whose inputs changed since they were calculated. */
   stale: string[];
   /** Blocks or steps whose balance fails and that this stream crosses. */
@@ -125,6 +127,17 @@ export interface ProcessNode {
 }
 
 export interface StreamTable {
+  wastewater?: {
+    status: "available" | "partial" | "missing" | "failed" | "invalid";
+    case: string;
+    run_file: string;
+    run_at: string | null;
+    evidence: string | null;
+    stale: boolean | null;
+    changed_files: string[];
+    columns: { key: string; label: string; unit: string; basis: string }[];
+    findings: { file: string; rule: string; message: string; hint: string }[];
+  };
   rev: string | null;
   case: string;
   cases: { id: string; description: string; default: boolean }[];
@@ -572,7 +585,7 @@ export interface SimulationRun {
   tool: string;
   /** `method`: the property method the simulator ran with (older servers leave it out). */
   simulator: { name: string; version: string | null; method?: string };
-  property_package: string;
+  property_package: string | null;
   /** The fingerprint every simulated stream value carries. */
   model_fingerprint: string;
   /** The inputs as they were after the run: HEAD, the files changed against it, each input file's fingerprint. */
@@ -618,7 +631,7 @@ export interface SimulationView {
   cases: string[];
   spec: {
     simulator: string;
-    property_package: string;
+    property_package: string | null;
     components: Record<string, string>;
     tolerance: Record<string, number>;
     tear_streams: string[];
