@@ -709,3 +709,51 @@ def test_a_rayleigh_still_with_a_condenser_port_writes_its_condenser(tmp_path):
     expected = unit["solution"]["year_average_duty_kW"]
     assert streams["Q1"].state["design"].duty.value == pytest.approx(expected, rel=1e-5)
     assert streams["Q2"].state["design"].duty.value == pytest.approx(expected, rel=1e-5)
+
+
+def test_the_still_condensers_freezing_check(tmp_path):
+    """ADR 0071 (process-library potassium-tert-butoxide-1 L-9): a still's condenser whose
+    coolant's supply lies below the melting point of a component its distillate carries warns;
+    a trace (below 1 mol%) does not count, nor does a supply above the melting point."""
+    rule = "cheme.process-condenser-freezing"
+
+    def found(ws):
+        process, findings = load(ws.root)
+        return [f for f in findings + rules(process) if f.rule == rule]
+
+    def cold(supply):
+        return lambda t: t.replace(
+            "utility: {kind: cooling_water}",
+            f"utility: {{kind: cooling_water, supply_temperature: {{value: {supply}, "
+            "provenance: assumed}}",
+        )
+
+    def melting(ws, edits):
+        path = ws.root / "process/materials.yaml"
+        text = path.read_text()
+        for name, tm in edits.items():
+            text = text.replace(f"  - id: {name}\n", f"  - id: {name}\n    melting_point: {tm}\n")
+        path.write_text(text)
+        return ws
+
+    # acetic acid (289.8 K) is a trace of the distillate: no warning
+    assert not found(melting(_copy(tmp_path / "a", cold(285)), {"ACOH": 289.8}))
+    # a distillate of ACCL melting at 290 K (illustrative) over a 285 K coolant: the column's
+    # default condenser stream Q2 warns
+    ws = melting(_copy(tmp_path / "b", cold(285)), {"ACOH": 289.8, "ACCL": 290})
+    (warning,) = found(ws)
+    assert warning.level == "warning" and "ACCL (290 K)" in warning.message
+    assert "ACOH" not in warning.message and "coolant CW's supply at 285 K" in warning.message
+    assert warning.line is not None and warning.hint
+    # named as the condenser_port, the same
+    named = _copy(
+        tmp_path / "c",
+        lambda t: cold(285)(t).replace(
+            "      outlets: {residue: bottom}\n",
+            "      outlets: {residue: bottom}\n      condenser_port: condenser\n",
+        ),
+    )
+    assert len(found(melting(named, {"ACCL": 290}))) == 1
+    # a coolant above the melting point, or no supply temperature: none
+    assert not found(melting(_copy(tmp_path / "d", cold(295)), {"ACCL": 290}))
+    assert not found(melting(_copy(tmp_path / "e"), {"ACCL": 290}))

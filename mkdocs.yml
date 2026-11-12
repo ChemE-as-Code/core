@@ -207,4 +207,5 @@ nav:
       - "0068 Batch still: separate phases, cut conditions, heat-up time": adr/0068-batch-still-phases-cut-conditions-and-heat-up-time.md
       - "0069 Thermal screening beyond the largest reaction": adr/0069-thermal-screening-beyond-the-largest-reaction.md
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
+      - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
       - Template: adr/template.md

@@ -158,6 +158,14 @@ class Component(Strict):
         "boiling point; ADR 0058).",
         exclude_if=lambda value: value is None,
     )
+    melting_point: float | None = Field(
+        default=None,
+        gt=0,
+        description="K: the pure liquid's freezing point. A batch's vent condenser whose outlet "
+        "or coolant supply, or a batch still's condenser whose coolant supply, lies below it may "
+        "freeze shut (cheme.process-condenser-freezing, ADR 0071).",
+        exclude_if=lambda value: value is None,  # a component's dump stays as it was
+    )
     phase: Literal["solid"] | None = Field(
         default=None,
         description="solid: the component is a solid (a crystal, a hydrate with its water of "
@@ -490,63 +498,6 @@ class Dosing(Strict):
         return found
 
 
-class VentVapour(Strict):
-    """The vent gas leaves the vessel saturated with the liquid's volatile components at its
-    temperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each
-    component's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless
-    ``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``
-    kmol of vapour, ``Y = sum_i y_i``."""
-
-    components: list[str] = Field(
-        default_factory=list,
-        description="The volatile components the gas carries; default every component in the "
-        "liquid with a vapour_pressure (a vent component is a gas, never one of them).",
-        exclude_if=lambda value: not value,
-    )
-    activity: dict[str, float] = Field(
-        default_factory=dict,
-        description="Component -> a constant activity coefficient in the vessel's liquid, from "
-        "a source (default 1: an ideal liquid).",
-        exclude_if=lambda value: not value,
-    )
-    source: str = ""
-
-    @model_validator(mode="after")
-    def _positive(self) -> VentVapour:
-        if len(set(self.components)) != len(self.components):
-            raise ValueError("vent.vapour.components: each component once")
-        if any(g <= 0 for g in self.activity.values()):
-            raise ValueError("vent.vapour.activity: a coefficient above 0")
-        if self.components and (stray := sorted(set(self.activity) - set(self.components))):
-            raise ValueError(
-                "vent.vapour.activity of a component not in its components: " + ", ".join(stray)
-            )
-        return self
-
-
-class VentCondenser(Strict):
-    """A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to
-    ``temperature``, the non-condensables leave it saturated there over an ideal condensate
-    (a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel
-    (reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy
-    stream at ``energy_port`` (ADR 0059)."""
-
-    temperature: float = Field(gt=0, description="K: the gas and condensate leave at it.")
-    returns: str = Field(
-        default="vessel",
-        description="vessel (the condensate runs back into the liquid), or the outlet stream "
-        "of the step the condensate leaves by.",
-    )
-    energy_port: str | None = Field(
-        default=None,
-        description="The step's energy port whose stream takes the condenser's duty (the heat "
-        "it removes); none: the duty is reported, not written.",
-        exclude_if=lambda value: value is None,
-    )
-    provenance: Provenance
-    source: str = ""
-
-
 class HenryConstant(Strict):
     """A vent gas's solubility in the batch's liquid, Henry's law ``p_g = H x_g`` (kPa per mole
     fraction): ``points`` of (K, kPa); ln H is interpolated linearly in 1/T between them (one
@@ -582,6 +533,109 @@ class HenryConstant(Strict):
         return value, not low - 1e-9 <= kelvin <= high + 1e-9
 
 
+class VentVapour(Strict):
+    """The vent gas leaves the vessel saturated with the liquid's volatile components at its
+    temperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each
+    component's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless
+    ``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``
+    kmol of vapour, ``Y = sum_i y_i``."""
+
+    components: list[str] = Field(
+        default_factory=list,
+        description="The volatile components the gas carries; default every component in the "
+        "liquid with a vapour_pressure (a vent component is a gas, never one of them).",
+        exclude_if=lambda value: not value,
+    )
+    activity: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> a constant activity coefficient in the vessel's liquid, from "
+        "a source (default 1: an ideal liquid).",
+        exclude_if=lambda value: not value,
+    )
+    henry: dict[str, HenryConstant] = Field(
+        default_factory=dict,
+        description="Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no "
+        "Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above "
+        "its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's "
+        "law; it never condenses in a vent condenser.",
+        exclude_if=lambda value: not value,  # a vapour's dump stays as in 1.10.0
+    )
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> VentVapour:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.vapour.components: each component once")
+        if self.components and (stray := sorted(set(self.henry) - set(self.components))):
+            raise ValueError(
+                "vent.vapour.henry of a component not in its components: " + ", ".join(stray)
+            )
+        if both := sorted(set(self.henry) & set(self.activity)):
+            raise ValueError(
+                "vent.vapour: henry or activity for a component, not both: " + ", ".join(both)
+            )
+        if any(g <= 0 for g in self.activity.values()):
+            raise ValueError("vent.vapour.activity: a coefficient above 0")
+        if self.components and (stray := sorted(set(self.activity) - set(self.components))):
+            raise ValueError(
+                "vent.vapour.activity of a component not in its components: " + ", ".join(stray)
+            )
+        return self
+
+
+class VentCondenser(Strict):
+    """A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to
+    ``temperature``, the non-condensables leave it saturated there over an ideal condensate
+    (a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel
+    (reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy
+    stream at ``energy_port`` (ADR 0059)."""
+
+    temperature: float = Field(gt=0, description="K: the gas and condensate leave at it.")
+    returns: str = Field(
+        default="vessel",
+        description="vessel (the condensate runs back into the liquid), or the outlet stream "
+        "of the step the condensate leaves by.",
+    )
+    energy_port: str | None = Field(
+        default=None,
+        description="The step's energy port whose stream takes the condenser's duty (the heat "
+        "it removes); none: the duty is reported, not written.",
+        exclude_if=lambda value: value is None,
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class HeadSpace(Strict):
+    """The vessel's head space (ADR 0071): the gas over the liquid, held at the vessel's
+    pressure and saturated with the liquid's vapour. Its inert gas (the pad) enters by
+    ``stream``, an inlet of the step that carries only ``vent.inerts`` (kmol/h of it: the head
+    space's inert at the start, on the batch's basis), so that the head space's volume follows
+    as ``V = n R T / ((1 - Y) P)`` and the vessel's as the liquid's plus that. As the liquid
+    grows (a dose displaces it), its vapour pressure rises or it warms, the head space expels
+    its gas, vapour-laden, by the vent; what is left of it at the end leaves by the vent too
+    (with the next charge or the purge, without vapour)."""
+
+    stream: str = Field(description="The inlet stream of the step that pads the head space.")
+    provenance: Provenance
+    source: str = ""
+
+
+class HeatOfAbsorption(Strict):
+    """The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol
+    dissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share
+    kept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas
+    that degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on
+    the gas basis."""
+
+    values: dict[str, float] = Field(
+        min_length=1, description="Vent gas -> kJ/kmol (J/mol) dissolved."
+    )
+    unit: Literal["kJ/kmol"] = "kJ/kmol"
+    provenance: Provenance
+    source: str = ""
+
+
 class Vent(Strict):
     """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
     liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
@@ -595,7 +649,15 @@ class Vent(Strict):
 
     stream: str = Field(description="The outlet stream of the step the gas leaves by.")
     components: list[str] = Field(
-        min_length=1, description="The components that leave the liquid as they form."
+        default_factory=list,
+        description="The components that leave the liquid as they form (at least one, or inerts).",
+    )
+    inerts: list[str] = Field(
+        default_factory=list,
+        description="Gases that never dissolve (ADR 0071): a dose's share of them passes "
+        "straight through to the vent (a sweep or purge gas, the nitrogen of a dosed air), "
+        "the head space holds them; each carries the liquid's vapour like a formed gas.",
+        exclude_if=lambda value: not value,  # a vent's fingerprint stays as in 1.10.0
     )
     fraction: dict[str, float] = Field(
         default_factory=dict,
@@ -619,11 +681,53 @@ class Vent(Strict):
         "energy_port} (ADR 0062; needs vapour).",
         exclude_if=lambda value: value is None,
     )
+    head_space: HeadSpace | None = Field(
+        default=None,
+        description="The vessel's head space, padded with inerts by an inlet stream: the gas "
+        "it expels carries the vapour (ADR 0071; needs inerts).",
+        exclude_if=lambda value: value is None,
+    )
+    heat_of_absorption: HeatOfAbsorption | None = Field(
+        default=None,
+        description="Of a vent gas that dissolves: released by a formed gas's dissolved share, "
+        "taken back by a gas that degasses (ADR 0071).",
+        exclude_if=lambda value: value is None,
+    )
 
     @model_validator(mode="after")
     def _shares(self) -> Vent:
+        if not self.components and not self.inerts:
+            raise ValueError("vent: give the components that form, or inerts, or both")
         if len(set(self.components)) != len(self.components):
             raise ValueError("vent.components: each component once")
+        if len(set(self.inerts)) != len(self.inerts):
+            raise ValueError("vent.inerts: each component once")
+        if both := sorted(set(self.inerts) & set(self.components)):
+            raise ValueError(
+                "vent: a component that forms or an inert, not both: " + ", ".join(both)
+            )
+        if self.head_space is not None and not self.inerts:
+            raise ValueError("vent.head_space holds inerts: give vent.inerts too")
+        if self.vapour is not None and (
+            both := sorted(set(self.vapour.components) & set(self.inerts))
+        ):
+            raise ValueError("vent.vapour.components: an inert is a gas: " + ", ".join(both))
+        if self.vapour is not None and (
+            both := sorted(set(self.vapour.henry) & {*self.components, *self.inerts})
+        ):
+            raise ValueError(
+                "vent.vapour.henry: a vent component or inert is no dissolved gas that "
+                "degasses (vent.henry keeps a formed gas dissolved): " + ", ".join(both)
+            )
+        if self.heat_of_absorption is not None:
+            degassing = set(self.vapour.henry) if self.vapour is not None else set()
+            if stray := sorted(
+                set(self.heat_of_absorption.values) - set(self.components) - degassing
+            ):
+                raise ValueError(
+                    "vent.heat_of_absorption of a component that neither forms nor degasses "
+                    "(vent.components, vent.vapour.henry): " + ", ".join(stray)
+                )
         if stray := sorted(set(self.fraction) - set(self.components)):
             raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
         if any(not 0 < f <= 1 for f in self.fraction.values()):

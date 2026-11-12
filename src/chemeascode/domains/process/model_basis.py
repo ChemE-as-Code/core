@@ -258,6 +258,15 @@ def _reactor_basis(
                 from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
 
                 assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
+            if vent is not None and (
+                vent.inerts
+                or vent.heat_of_absorption is not None
+                or vent.head_space is not None
+                or (vent.vapour is not None and vent.vapour.henry)
+            ):
+                from chemeascode.domains.process.vent_vapour import GAS_ASSUMPTIONS
+
+                assumptions += list(GAS_ASSUMPTIONS)  # inerts, head space, absorption (ADR 0071)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled

@@ -2302,6 +2302,78 @@
         "title": "Filtration",
         "type": "object"
       },
+      "HeadSpace": {
+        "additionalProperties": false,
+        "description": "The vessel's head space (ADR 0071): the gas over the liquid, held at the vessel's\npressure and saturated with the liquid's vapour. Its inert gas (the pad) enters by\n``stream``, an inlet of the step that carries only ``vent.inerts`` (kmol/h of it: the head\nspace's inert at the start, on the batch's basis), so that the head space's volume follows\nas ``V = n R T / ((1 - Y) P)`` and the vessel's as the liquid's plus that. As the liquid\ngrows (a dose displaces it), its vapour pressure rises or it warms, the head space expels\nits gas, vapour-laden, by the vent; what is left of it at the end leaves by the vent too\n(with the next charge or the purge, without vapour).",
+        "properties": {
+          "stream": {
+            "description": "The inlet stream of the step that pads the head space.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stream",
+          "provenance"
+        ],
+        "title": "HeadSpace",
+        "type": "object"
+      },
+      "HeatOfAbsorption": {
+        "additionalProperties": false,
+        "description": "The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol\ndissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share\nkept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas\nthat degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on\nthe gas basis.",
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Vent gas -> kJ/kmol (J/mol) dissolved.",
+            "minProperties": 1,
+            "title": "Values",
+            "type": "object"
+          },
+          "unit": {
+            "const": "kJ/kmol",
+            "default": "kJ/kmol",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "values",
+          "provenance"
+        ],
+        "title": "HeatOfAbsorption",
+        "type": "object"
+      },
       "HeatOfSolution": {
         "additionalProperties": false,
         "description": "The integral heat of solution, dilution or mixing of a dose's components as they mix into\nthe batch's liquid (ADR 0063): per kmol of the component dosed (kJ/kmol = J/mol), at the\nbatch's dilution and temperature, negative when mixing releases heat (as a heat of\nreaction). A dosed gas's heat of absorption (its dissolved share, ``absorbed``) goes here\ntoo; the heats of the reactions that consume it are then on the dissolved basis.",
@@ -4761,12 +4833,19 @@
             "type": "string"
           },
           "components": {
-            "description": "The components that leave the liquid as they form.",
+            "description": "The components that leave the liquid as they form (at least one, or inerts).",
             "items": {
               "type": "string"
             },
-            "minItems": 1,
             "title": "Components",
+            "type": "array"
+          },
+          "inerts": {
+            "description": "Gases that never dissolve (ADR 0071): a dose's share of them passes straight through to the vent (a sweep or purge gas, the nitrogen of a dosed air), the head space holds them; each carries the liquid's vapour like a formed gas.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Inerts",
             "type": "array"
           },
           "fraction": {
@@ -4808,11 +4887,34 @@
             ],
             "default": null,
             "description": "A partial vent condenser: {temperature K, returns: vessel or a stream, energy_port} (ADR 0062; needs vapour)."
+          },
+          "head_space": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeadSpace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The vessel's head space, padded with inerts by an inlet stream: the gas it expels carries the vapour (ADR 0071; needs inerts)."
+          },
+          "heat_of_absorption": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfAbsorption"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Of a vent gas that dissolves: released by a formed gas's dissolved share, taken back by a gas that degasses (ADR 0071)."
           }
         },
         "required": [
-          "stream",
-          "components"
+          "stream"
         ],
         "title": "Vent",
         "type": "object"
@@ -4886,6 +4988,14 @@
             },
             "description": "Component -> a constant activity coefficient in the vessel's liquid, from a source (default 1: an ideal liquid).",
             "title": "Activity",
+            "type": "object"
+          },
+          "henry": {
+            "additionalProperties": {
+              "$ref": "#/$defs/HenryConstant"
+            },
+            "description": "Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's law; it never condenses in a vent condenser.",
+            "title": "Henry",
             "type": "object"
           },
           "source": {

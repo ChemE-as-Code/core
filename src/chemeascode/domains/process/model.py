@@ -38,7 +38,11 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   reaction at equilibrium (warning), a Gibbs reactor naming reactions; a vented batch or
   semi-batch whose ``batch.vent`` stream is no outlet of it or its only one, whose vent
   components are not declared (or, warning, formed by none of its reactions), or a dose that
-  passes gas through without a vent (ADR 0054);
+  passes gas through without a vent (ADR 0054); a vent's inert undeclared or formed by a
+  reaction, a head space's pad that is no inlet or carries more than inerts (ADR 0071);
+- ``process-condenser-freezing`` (warning): a vent condenser whose outlet temperature, or its
+  coolant's supply temperature, lies below the melting point of a component it condenses
+  (ADR 0071); a batch still's condenser likewise (:func:`.batch_still.rules`);
 - ``process-heat-of-reaction`` (warning): a given heat of reaction more than 2 % (and
   1000 kJ/kmol) from the one of the components' ideal-gas formation data;
 - ``process-catalyst``: a reactor names a catalyst ``process/catalysts.yaml`` does not declare,
@@ -1264,7 +1268,8 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
     ]
     if stray := [d.stream for d in dosing if d.stream not in inlets]:
         problems.append("the dosed stream(s) " + ", ".join(stray) + " are no inlet of it")
-    charges = [s for s in inlets if s not in {d.stream for d in dosing}]
+    pad = _pad(item)
+    charges = [s for s in inlets if s not in {d.stream for d in dosing} and s != pad]
     if dosing and len(charges) != 1:
         problems.append(f"{len(charges)} charge streams (one inlet besides the doses)")
     if gas := [r.id for r in reactions if r.phase != "liquid"]:
@@ -1325,6 +1330,112 @@ def _solution_rules(out: _Out, item: Any, at: list[Any], dosing: list[Any]) -> N
                 where,
                 [item.id, dose.stream],
                 hint="give the heat of solution of the components the dose carries",
+            )
+
+
+def _pad(item: Any) -> str | None:
+    """The stream that pads batch *item*'s head space (ADR 0071), else None."""
+    head = getattr(getattr(getattr(item, "batch", None), "vent", None), "head_space", None)
+    return head.stream if head is not None else None
+
+
+def _carried(process: Any, stream: Any) -> set[str]:
+    """The components *stream* carries: its stated compositions' (above 0), else its
+    template's."""
+    found = {
+        n
+        for state in stream.state.values()
+        if state.composition is not None
+        for n, y in state.composition.values.items()
+        if y > 0
+    }
+    if not found and (t := process.templates().get(stream.template or "")) is not None:
+        found = set(t.components)
+    return found
+
+
+def _gas_rules(out: _Out, item: Any, at: list[Any], vent: Any, reactions: list[Any]) -> None:
+    """ADR 0071: a vent's inerts declared and formed by no reaction; its head space's pad an
+    inlet of the step that carries only inerts; a degassing gas declared."""
+    process = out.process
+    what = f"{at[0][:-1]} {item.id}"
+    where = [*at, "batch", "vent"]
+    declared = process.components()
+    hint = (
+        "batch.vent: {inerts: [gases that never dissolve], head_space: {stream: the inlet that "
+        "pads it, provenance}}; vent.vapour.henry: {gas: {points: [[K, kPa]]}}"
+    )
+    problems = []
+    if unknown := [n for n in vent.inerts if n not in declared]:
+        problems.append("the inert(s) " + ", ".join(unknown) + " not declared")
+    if formed := [n for n in vent.inerts if any(r.stoichiometry.get(n, 0) != 0 for r in reactions)]:
+        problems.append(
+            "the inert(s) " + ", ".join(formed) + " in a reaction (an inert never reacts: list "
+            "a formed gas in vent.components)"
+        )
+    if vent.vapour is not None and (unknown := [n for n in vent.vapour.henry if n not in declared]):
+        problems.append("the degassing gas(es) " + ", ".join(unknown) + " not declared")
+    head = vent.head_space
+    if head is not None:
+        streams = {s.id: s for s in process.flowsheet.streams}
+        stream = streams.get(head.stream)
+        end = process.ends(stream)[1] if stream is not None else None
+        if stream is None or end is None or end.node != item.id or stream.kind != "material":
+            problems.append(f"the head space's pad {head.stream} is no inlet stream of it")
+        elif stray := sorted(_carried(process, stream) - set(vent.inerts)):
+            problems.append(
+                f"the head space's pad {head.stream} carries " + ", ".join(stray) + ", no inert "
+                "(the pad is the head space's gas)"
+            )
+    for problem in problems:
+        out.add("error", "reactor", f"{what}: vent with {problem}", where, [item.id], hint=hint)
+
+
+def _freezing_rule(out: _Out, item: Any, at: list[Any], vent: Any, volatile: list[str]) -> None:
+    """ADR 0071: a vent condenser whose outlet temperature, or the supply temperature of the
+    utility its energy stream runs to (the coldest its tube wall can get), lies below the
+    melting point of a component it condenses: the condensate may freeze and block the vent.
+    The pure component's melting point (no freezing-point depression by the condensate's
+    others)."""
+    process = out.process
+    condenser = vent.condenser
+    declared = process.components()
+    degassing = set(vent.vapour.henry) if vent.vapour is not None else set()
+    melting = {
+        n: declared[n].melting_point
+        for n in volatile
+        if n in declared and n not in degassing and declared[n].melting_point
+    }
+    if not melting:
+        return
+    checks = [(condenser.temperature, "its outlet", ["condenser", "temperature"])]
+    if condenser.energy_port is not None:
+        fs = process.flowsheet
+        for s in fs.streams:
+            start, end = process.ends(s)
+            if s.kind != "energy" or start is None or start.node != item.id:
+                continue
+            if start.port != condenser.energy_port or end is None:
+                continue
+            node = process.nodes.get(end.node)
+            supply = getattr(getattr(node, "utility", None), "supply_temperature", None)
+            if supply is not None:
+                kelvin = to_kelvin(supply.value, supply.unit or fs.units.temperature)
+                checks.append((kelvin, f"its coolant {end.node}'s supply", ["condenser"]))
+    for kelvin, whence, path in checks:
+        if frozen := sorted(n for n, tm in melting.items() if kelvin < tm):
+            out.add(
+                "warning",
+                "condenser-freezing",
+                f"{at[0][:-1]} {item.id}: vent condenser, {whence} at {kelvin:g} K lies below "
+                "the melting point of "
+                + ", ".join(f"{n} ({melting[n]:g} K)" for n in frozen)
+                + ": the condensate may freeze on the tubes and block the vent",
+                [*at, "batch", "vent", *path],
+                [item.id, *frozen],
+                hint="keep the condenser's outlet and its coolant's supply above the condensate's "
+                "melting point (a tempered coolant), or say why it cannot freeze (a mixture's "
+                "lower freezing point) in DESIGN.md",
             )
 
 
@@ -1406,6 +1517,8 @@ def _vent_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> No
         )
     _vent_template_rule(out, item, at, vent, declared)
     _vent_vapour_rules(out, item, at, vent, declared, reactions, outlets)
+    if vent.inerts or (vent.vapour is not None and vent.vapour.henry):
+        _gas_rules(out, item, at, vent, reactions)
     unformed = [
         n
         for n in vent.components
@@ -1445,6 +1558,7 @@ def _vent_condenser_temperature(
         and end.node == item.id
         and s.kind == "material"
         and s.id not in dosed
+        and s.id != _pad(item)
     ]
     if len(charges) != 1:
         return  # the batch's own rules say what its inlets lack
@@ -1486,6 +1600,7 @@ def vent_volatile(process: Any, item: Any, reactions: list[Any]) -> list[str]:
     vent = item.batch.vent
     if vent.vapour.components:
         return list(vent.vapour.components)
+    degassing = list(vent.vapour.henry)  # a degassing gas (ADR 0071)
     declared = process.components()
     templates = process.templates()
     names: list[str] = []
@@ -1499,8 +1614,11 @@ def vent_volatile(process: Any, item: Any, reactions: list[Any]) -> list[str]:
     return [
         n
         for n in dict.fromkeys(names)
-        if n not in vent.components and getattr(declared.get(n), "vapour_pressure", None)
-    ]
+        if n not in vent.components
+        and n not in vent.inerts
+        and n not in degassing
+        and getattr(declared.get(n), "vapour_pressure", None)
+    ] + degassing
 
 
 def _vent_vapour_rules(
@@ -1538,7 +1656,9 @@ def _vent_vapour_rules(
         if lack := [
             n
             for n in vent.vapour.components
-            if n in declared and getattr(declared[n], "vapour_pressure", None) is None
+            if n in declared
+            and n not in vent.vapour.henry  # a degassing gas has a Henry constant (ADR 0071)
+            and getattr(declared[n], "vapour_pressure", None) is None
         ]:
             errors.append(
                 "vapour component(s) " + ", ".join(lack) + " without a vapour_pressure (Antoine)"
@@ -1581,6 +1701,7 @@ def _vent_vapour_rules(
                 )
         if condenser is not None:
             _vent_condenser_temperature(out, item, what, where, condenser)
+            _freezing_rule(out, item, at, vent, known)
     if vent.henry:
         liquid = [
             s for s in outlets if s != vent.stream and s != getattr(vent.condenser, "returns", None)
@@ -1610,6 +1731,7 @@ def _vent_template_rule(out: _Out, item: Any, at: list[Any], vent: Any, declared
     if template is None:
         return  # no such outlet, or no template: said by the stream rules
     needed: dict[str, str] = {n: "a vent component" for n in vent.components if n in declared}
+    needed |= {n: "an inert of the vent" for n in vent.inerts if n in declared}
     for dose in item.batch.dosing:
         if dose.absorbed is None or dose.absorbed >= 1 or dose.stream not in streams:
             continue

@@ -85,6 +85,26 @@
 - `examples/process-design-spec`: an isomerisation loop with a component separator, its fresh
   feed solved for 8000 t/a of isobutane and its purge for 10 wt% propane in the reactor feed,
   against the closed form (`tests/test_design_spec.py`).
+- Gas-liquid batch (ADR 0071, core#179): `batch.vent.inerts` (gases that never dissolve: a
+  dose's share passes straight through to the vent, carrying the liquid's vapour; a vent of a
+  sweep alone needs no `components`), `batch.vent.head_space: {stream, provenance}` (the
+  vessel's head space padded by an inlet of inerts; it expels its gas, vapour-laden, as a dose
+  displaces it, the vapour pressure rises or it warms, and its gas left at the end leaves by
+  the vent), `batch.vent.vapour.henry` (a dissolved gas without a vapour pressure degasses at
+  Henry's law and passes the vent condenser), so an inert sweep or purge degasses a dissolved,
+  unreacted charge or dose; `batch.vent.heat_of_absorption` (released by a formed gas's
+  dissolved share, the duty's term `absorption`; taken back by a degassing gas); a component's
+  `melting_point` and the rule `cheme.process-condenser-freezing` (warning: a vent condenser's
+  outlet or its coolant's supply below a condensate's melting point; a batch still's condenser,
+  its `condenser_port` coolant's supply below the melting point of a component its distillate
+  carries at 1 mol% or more; a cooler block that condenses is not checked). `process reactors` adds
+  the head space (`vent.head_space`); `reactor-hazards` leaves inerts and the pad out of the
+  content and gives a vent of inerts only no gas release at the MTSR; `cheme.process-reactor`
+  checks the inerts, the pad and the degassing gases. Shown on scratch copies of
+  acetyl-chloride-1 (L-3: the head space as the vapour's carrier) and
+  methyltriphenylphosphonium-bromide-1 (L-3: the nitrogen sweep stripping the methyl bromide).
+  A vent without the new keys solves, reports and fingerprints as in 1.11.0 (the library's
+  twelve batch entries unchanged).
 
 ### Fixed
 
@@ -101,7 +121,7 @@
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
-  `props.py`, `batch_still.py`, `schema.py` and the process modules changed for ADR 0070.
+  `props.py`, `batch_still.py`, `schema.py` and the process modules changed for ADRs 0070 and 0071.
 - The default MTT counts a product a counted reaction forms in the liquid (at least 5 % of it
   once that reaction ran to completion, a vented product with the share the liquid keeps,
   boiling at or above `T_p`; ADR 0069): a fix where the product boils lowest (acetyl chloride's
@@ -121,6 +141,8 @@
   without a basis mismatch reports as before. Every other plant without `specs:` or
   `recovery:` solves, reports and fingerprints as in 1.11.0 (both fields are left out of a
   model dump when absent).
+- ADR 0062's acetyl-chloride-1 figure is per acetyl chloride formed (0.0006 %), not per kmol
+  of the reaction's extent (0.0019 %).
 
 ## 1.11.0 (2026-11-06)
 
