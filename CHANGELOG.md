@@ -18,11 +18,52 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+- Thermal screening beyond the largest reaction (`cheme process reactor-hazards`, ADR 0069,
+  core#178; `domains/safety/reaction_network.py`):
+  - `hazard.potential: network`: dT_ad and the MTSR (every step, the profile, the worst moment)
+    from the counted reactions as a network, the largest heat forward extents of them together
+    release from the content (a linear programme, simplex with Bland's rule): a consecutive
+    reaction on a product adds its heat (copper(I) chloride: 46.0 K against the chlorination's
+    36.9 K). A batch or semi-batch with a consecutive pair among its counted reactions reports
+    it without the choice (JSON `network`, a text line, a note where it is above the largest
+    single reaction's MTSR).
+  - A semi-batch's accumulation of each dosed reactant and the share of it the reactions can
+    still consume (JSON `accumulations`: `max`, `time_s`, `reactive_max`, `reactive_time_s`;
+    with more than one dosed reactant, or where a deliberate excess is not reactive).
+  - A vented semi-batch's largest gas release over the batch (`gas_release.largest_over_batch`:
+    every step's content at its own MTSR, with the liquid's vapour, by component, and its ratio
+    to the vent capacity; the vapour at most what the reactions' heat there evaporates,
+    `heat_limited`), and a content boiling at the MTSR its boil-up at its bubble point
+    (`gas_release.boil_up`: the reactions' heat there over the vapour's latent heat, kmol/s and
+    m3/h).
+  - The dosed, dissolved and vented gases held in the liquid a cooling failure can release, at
+    their largest over the batch, kg per batch, with their boiling point against the MTSR and
+    what the gas release strips of them (JSON `dissolved_release`; new rule
+    `cheme.reactor-hazard-dissolved`, info).
+  - `hazard.mtt_from: bubble-point`: the MTT from the content's bubble point at the vessel's
+    pressure (Raoult's law over the components' `vapour_pressure`, else `normal_boiling_point`
+    and `heat_of_vaporization`), the lower of the worst moment's content and that after the
+    cooling failure (JSON `bubble_point`).
+  - `stirred_tank.extent_rates` and `vent_gas_rates` (the rates for many contents, the mixture
+    built once); `CoolingPoint.heats` and `.capacity`, `TankResult.dosed_reactants`.
 
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `props.py`.
+- The default MTT counts a product a counted reaction forms in the liquid (at least 5 % of it
+  once that reaction ran to completion, a vented product with the share the liquid keeps,
+  boiling at or above `T_p`; ADR 0069): a fix where the product boils lowest (acetyl chloride's
+  324.1 K, not PCl3's 349.1 K; benzoyl chloride's 471.0 K, not benzotrichloride's). No core
+  example or library entry changes its MTT: where a product boils lowest, they set `hazard.mtt`
+  by hand.
+- `cheme.reactor-hazard-vent` of a vented semi-batch compares the larger of the gas release at
+  the MTSR and the largest over the batch with `hazard.vent_capacity`, and names the latter
+  where it is larger (a fix: the release at the highest MTSR can be the smallest; none of the
+  library's entries changes level, p-toluenesulfonyl-chloride-1's R101 goes from 0.40 to 0.97
+  of its vent). A content boiling at the MTSR names its boil-up in the finding and the note.
+- The committed example sheets are regenerated: the generator code fingerprint covers
+  `schema.py` (the two new `hazard` fields; no drawn output changes).
 
 ## 1.11.0 (2026-11-06)
 

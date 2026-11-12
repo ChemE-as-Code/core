@@ -330,7 +330,14 @@ def test_a_dissolved_gas_is_left_out_of_the_mtt(tmp_path):
     no_bp = WITH_D.replace(", normal_boiling_point: 390}", "}").replace(
         ", normal_boiling_point: 373}", "}"
     )
+    # the product B (410 K) boils in the liquid it forms in (ADR 0069): it sets the MTT
     entry = _charged(tmp_path / "c", "{A: 0.2, S: 0.78, D: 0.02}", no_bp)
+    assert (entry.mtt, entry.mtt_basis) == (
+        410.0,
+        "normal boiling point of B, a product (20% of the liquid after R1)",
+    )
+    no_bp = no_bp.replace(", normal_boiling_point: 410}", "}")
+    entry = _charged(tmp_path / "d", "{A: 0.2, S: 0.78, D: 0.02}", no_bp)
     assert entry.mtt is None and set(entry.mtt_left_out) == {"D"}
     assert any("nothing else boils in the liquid" in m for m in entry.missing)
 

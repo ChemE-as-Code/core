@@ -206,6 +206,9 @@ class TankResult:
     #: semi-batch, every accepted step (the thermal screening's MTSR profile, ADR 0058): the
     #: cooling-failure potential of each reaction then
     cooling_profile: list[CoolingPoint] = field(default_factory=list, repr=False)
+    #: semi-batch: kmol (per hour of charge) of each dosed reactant charged and dosed, the
+    #: liquid's share of a dosed gas (the denominator of its accumulation, ADR 0069)
+    dosed_reactants: dict[str, float] = field(default_factory=dict, repr=False)
 
 
 @dataclass
@@ -213,13 +216,17 @@ class CoolingPoint:
     """A moment of a semi-batch for a cooling failure, the dosing stopped (ADR 0058): its time
     s, temperature K and accumulation of the dosed reactant (None without one), the rise K each
     exothermic reaction gives run to completion of what is in the vessel then, over the
-    content's heat capacity, and what is in the vessel (kmol by component, the batch's basis)."""
+    content's heat capacity, and what is in the vessel (kmol by component, the batch's basis).
+    ADR 0069: each reaction's heat of reaction then (kJ/kmol of extent, negative: exothermic)
+    and the content's heat capacity (kJ/K), for the potential of a reaction network."""
 
     time: float
     temperature: float
     accumulation: float | None
     rises: dict[str, float]
     moles: dict[str, float]
+    heats: dict[str, float] = field(default_factory=dict)
+    capacity: float | None = None
 
     def mtsr(self, counted: Sequence[str] | None = None) -> float:
         """K: the temperature a cooling failure now reaches, the largest of the *counted*
@@ -949,10 +956,11 @@ def _solve_batch(
         given = n0[ki] + (fed(clock)[ki] if doses else 0.0)
         return 1.0 - state[ki] / given if given > 0 else 0.0
 
-    def potentials(moles: Sequence[float], t: float) -> list[float]:
+    def potentials(moles: Sequence[float], t: float) -> tuple[list[float], list[float], float]:
         """K of each reaction: the rise if cooling fails now and the dosing stops, its heat
         run to completion of what is in the vessel, over the content's heat capacity (0 for
-        an endothermic one); the largest is the cooling-failure potential."""
+        an endothermic one); the largest is the cooling-failure potential. With the heats of
+        reaction (kJ/kmol) and the content's heat capacity (kJ/K) they come from."""
         heats = energies(t)
         capacity = mix.capacity(dict(zip(names, moles, strict=True)), t)
         found = []
@@ -962,7 +970,7 @@ def _solve_batch(
                 found.append(-heats[j] * extent / capacity)
             else:
                 found.append(0.0)
-        return found
+        return found, heats, capacity
 
     unknown_heat = ""
     try:
@@ -1139,7 +1147,7 @@ def _solve_batch(
             result.accumulation.append((clock, accumulated))
         if worst_known:
             try:
-                rises = potentials(moles, t)
+                rises, heats, capacity = potentials(moles, t)
             except TankError:
                 return  # no heat capacity of what is there: no value at this step
             reached = t + max(rises, default=0.0)
@@ -1152,6 +1160,8 @@ def _solve_batch(
                     accumulated,
                     {r.id: x for r, x in zip(reactions, rises, strict=True)},
                     dict(zip(names, moles, strict=True)),
+                    {r.id: h for r, h in zip(reactions, heats, strict=True)},
+                    capacity,
                 )
             )
 
@@ -1266,6 +1276,11 @@ def _solve_batch(
             result.peak_cooling_duty = cooling / result.volume
         if reagent is None:
             result.notes.append("no dosed reactant: no accumulation")
+        result.dosed_reactants = {
+            n: n0[i] + dosed[i]
+            for i, n in enumerate(names)
+            if dosed[i] > 0 and n in is_reactant and n0[i] + dosed[i] > 0
+        }
     result.charge_temperature = charge_temperature
     if not adiabatic:
         _heat_terms(result, known, unknown_heat, heat, temperature, doses, dose_capacity)
@@ -1753,14 +1768,44 @@ def vent_gas_rate(
     share ``f_g`` of what each reaction forms of each vent component ``g``, every reaction at
     its rate law (the thermal screening's gas release at the MTSR, ADR 0058). The dosing has
     stopped: no dosed gas passes through. Raises TankError (a ValueError of a rate law too)."""
+    return sum(vent_gas_rates(process, node, list(moles))(moles, temperature, pressure).values())
+
+
+def vent_gas_rates(
+    process: Any, node: Any, names: Sequence[str]
+) -> Callable[[Mapping[str, float], float, float], dict[str, float]]:
+    """:func:`vent_gas_rate` by vent component (kmol/s), for many contents over *names*: the
+    mixture is built once (the screening's gas release over the batch, ADR 0069)."""
+    shares = node.batch.vent.shares()
+    rates = extent_rates(process, node, names)
+    reactions, _ = process.reactions_of(node.id)
+
+    def gas(moles: Mapping[str, float], temperature: float, pressure: float) -> dict[str, float]:
+        extents = rates(moles, temperature, pressure)
+        return {
+            g: f * sum(max(r.stoichiometry.get(g, 0.0) * extents[r.id], 0.0) for r in reactions)
+            for g, f in shares.items()
+        }
+
+    return gas
+
+
+def extent_rates(
+    process: Any, node: Any, names: Sequence[str]
+) -> Callable[[Mapping[str, float], float, float], dict[str, float]]:
+    """A function of a content (kmol by component, the batch's basis), *temperature* K and
+    *pressure* kPa(a) giving each reaction's rate of extent ``M_j r_j`` (kmol/s) in the liquid
+    batch or semi-batch *node*, every reaction at its rate law; *names* the components the
+    contents may hold. A vent's components that were never in the liquid are gone, as in the
+    run. Raises TankError (a ValueError of a rate law too)."""
     from chemeascode.domains.process.liquid_phase import liquid_of
 
     vent = node.batch.vent
     reactions, unknown = process.reactions_of(node.id)
     if unknown:
         raise TankError("undeclared reactions " + ", ".join(unknown))
-    shares = vent.shares()
-    names = list(dict.fromkeys([*moles, *(n for r in reactions for n in r.stoichiometry), *shares]))
+    shares = vent.shares() if vent is not None else {}
+    names = list(dict.fromkeys([*names, *(n for r in reactions for n in r.stoichiometry), *shares]))
     comps = process.components()
     capacity = {n: getattr(comps.get(n), "liquid_heat_capacity", None) for n in names}
     mix = _mixture(
@@ -1772,22 +1817,23 @@ def vent_gas_rate(
         node.batch.catalyst_loading,
     )
     if mix.liquid is None:
-        raise TankError("a vent takes its gas from a liquid: liquid-phase reactions only")
-    mix.gone = frozenset(n for n, f in shares.items() if f >= 1.0 and not moles.get(n))
-    state = [max(moles.get(n, 0.0), 0.0) for n in names]
-    try:
-        volume = mix.volume_flow(dict(zip(names, state, strict=True)), temperature, pressure)
-        mult = mix.multipliers(volume)
-        rates = mix.rates(state, temperature, pressure)
-    except TankError:
-        raise
-    except (ValueError, OverflowError, ZeroDivisionError) as failure:
-        raise TankError(str(failure)) from failure
-    return sum(
-        f
-        * sum(
-            max(r.stoichiometry.get(g, 0.0) * x * k, 0.0)
-            for r, x, k in zip(reactions, mult, rates, strict=True)
+        raise TankError(
+            "a vent takes its gas from a liquid: liquid-phase reactions only"
+            if vent is not None
+            else "the rates of a liquid batch: liquid-phase reactions only"
         )
-        for g, f in shares.items()
-    )
+
+    def rates(moles: Mapping[str, float], temperature: float, pressure: float) -> dict[str, float]:
+        mix.gone = frozenset(n for n, f in shares.items() if f >= 1.0 and not moles.get(n))
+        state = [max(moles.get(n, 0.0), 0.0) for n in names]
+        try:
+            volume = mix.volume_flow(dict(zip(names, state, strict=True)), temperature, pressure)
+            mult = mix.multipliers(volume)
+            found = mix.rates(state, temperature, pressure)
+        except TankError:
+            raise
+        except (ValueError, OverflowError, ZeroDivisionError) as failure:
+            raise TankError(str(failure)) from failure
+        return {r.id: x * k for r, x, k in zip(reactions, mult, found, strict=True)}
+
+    return rates

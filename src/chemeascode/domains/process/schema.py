@@ -783,6 +783,24 @@ class ReactionHazard(Strict):
         "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
         exclude_if=lambda value: value is None,
     )
+    potential: Literal["largest", "network"] | None = Field(
+        default=None,
+        description="How the counted reactions' heat sets dT_ad and the MTSR: largest (the "
+        "default: each reaction alone run to completion, the largest counts) or network (the "
+        "largest heat any forward extents of the counted reactions together release from the "
+        "content: a consecutive reaction on a product counts, ADR 0069).",
+        exclude_if=lambda value: value is None,
+    )
+    mtt_from: Literal["boiling-points", "bubble-point"] | None = Field(
+        default=None,
+        description="The default MTT without mtt: boiling-points (the default: the lowest "
+        "boiling point of what boils in the liquid, ADR 0058) or bubble-point (the content's "
+        "bubble point at the vessel's pressure from the components' vapour_pressure, else "
+        "normal_boiling_point and heat_of_vaporization; the lower of the worst moment's "
+        "content and the content once the reaction setting the MTSR ran to completion, "
+        "ADR 0069).",
+        exclude_if=lambda value: value is None,
+    )
     provenance: Provenance
     source: str = ""
 

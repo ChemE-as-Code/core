@@ -13,7 +13,7 @@ points (vents, relief outlets, seals, flanges) by release grade and substance cl
 ASSUMED with its basis; the spatial domain places the volumes in the 3D model (no dispersion
 modelling). `reaction_hazards.py`: thermal screening of reactors (adiabatic rise, MTSR,
 Stoessel's criticality class from a given TD24 and MTT, a cooled bed's parametric sensitivity;
-`cheme process reactor-hazards`), screening values a HAZOP study can cite. The bundled skill `skills/area-classification/` says how a plant repository declares
+`cheme process reactor-hazards`), screening values a HAZOP study can cite; `reaction_network.py`: what a cooling failure can still do to a content (a reaction network's largest heat, what of a reactant can still react, a bubble point; ADR 0069). The bundled skill `skills/area-classification/` says how a plant repository declares
 its zones with it, and what a competent person must still decide.
 
 **HAZOP** ([docs/framework/hazop.md](../../../../docs/framework/hazop.md)).
