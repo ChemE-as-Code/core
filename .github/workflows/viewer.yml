@@ -6,8 +6,10 @@ on:
   pull_request:
     paths:
       - "viewer/**"
-      - "src/chemeascode/interfaces/api/**"
-      - "src/chemeascode/**/schemas/**"
+      # the API fixtures embed generated sheets and results of examples/, so any core source
+      # change can alter them (#203)
+      - "src/chemeascode/**"
+      - "examples/**"
       - "tests/test_serve*.py"
       - "pyproject.toml"
       - "uv.lock"
@@ -16,8 +18,10 @@ on:
     branches: [main]
     paths:
       - "viewer/**"
-      - "src/chemeascode/interfaces/api/**"
-      - "src/chemeascode/**/schemas/**"
+      # the API fixtures embed generated sheets and results of examples/, so any core source
+      # change can alter them (#203)
+      - "src/chemeascode/**"
+      - "examples/**"
       - "tests/test_serve*.py"
       - "pyproject.toml"
       - "uv.lock"
