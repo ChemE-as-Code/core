@@ -18,11 +18,41 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+- Design specifications in `cheme process propagate` (`specs:` in `process/flowsheet.yaml`, ADR
+  0070, core#181 part 2): a feed stream's flow (with the feeds that follow it at fixed ratios,
+  `with:`, so charge ratios are kept) or a splitter outlet's fraction adjusted until a stream
+  target is met: a flow, an annual amount (default hours: the recipe's `hours_per_year`), a
+  ratio to another stream or component, or a component's fraction. They are solved together
+  with the tears of ADR 0060 by Newton's method with Broyden's update. The adjusted flows are
+  `calculated` (source `spec <id> (...)`) and fingerprinted on the specs and their upstream
+  inputs. `cheme.process-design-spec` (propagate) reports each spec met (info) or not met
+  (warning: target independent of its variable, beyond the bounds, no value, not met in the
+  iterations; nothing that depends on them is then written); `cheme.process-spec` (validate)
+  lists specs that cannot be solved as declared. On a scratch copy of the library's
+  potassium-tert-butoxide-1, the make-up holding the charge ratio and the feed for 1000 t/a
+  converge with the 0.995-gain alcohol loop in 3 iterations (8 sweeps), where Wegstein took 156
+  iterations for the loop alone with the make-up tuned by hand.
+- Component separators solved from their specified split (`recovery:` on a block or step, ADR
+  0070, core#181 part 3): per outlet port, the share of each component's inlet flow, one outlet
+  left out for the rest. Propagate writes the outlets' flows and compositions; such a separator
+  was only checked before. `cheme.process-recovery` (validate) checks the declaration.
+- `recipe.batch_for_rate`: the batch size whose cycle makes a rate, `batch = rate x
+  cycle(batch)`, with the cycle's dependence on the batch (jacket, dosing, still, filter and
+  dryer times).
+- `examples/process-design-spec`: an isomerisation loop with a component separator, its fresh
+  feed solved for 8000 t/a of isobutane and its purge for 10 wt% propane in the reactor feed,
+  against the closed form (`tests/test_design_spec.py`).
 
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
-  `props.py`.
+  `props.py` and the process modules changed for ADR 0070.
+- `cheme.recipe-basis` (warning, unchanged level and rule) now names the batch size that closes
+  the recipe at the flowsheet's rate, with its cycle, or, when the cycle grows about as fast as
+  the batch, the most the batches tried made; its hint mentions a design specification. A plant
+  without a basis mismatch reports as before. Every other plant without `specs:` or
+  `recovery:` solves, reports and fingerprints as in 1.11.0 (both fields are left out of a
+  model dump when absent).
 
 ## 1.11.0 (2026-11-06)
 

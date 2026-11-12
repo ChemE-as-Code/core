@@ -193,6 +193,13 @@ class Derivation:
     torn: dict[str, tuple[dict[str, float] | None, dict[str, float] | None]] = field(
         default_factory=dict
     )
+    #: (node id, message) for component separators (``recovery:``) that cannot be solved.
+    separators: list[tuple[str, str]] = field(default_factory=list)
+    #: Stream id -> its component flows (kg/h) after the sweep, for the streams asked for
+    #: (the targets of the design specifications, ADR 0070).
+    measured: dict[str, dict[str, float] | None] = field(default_factory=dict)
+    #: The design specifications and how they were met (:mod:`.design_spec`); None without.
+    specs: Any = None
 
 
 def _inputs(case: str, streams: list[StreamDef], extra: Any = None) -> str:
@@ -250,12 +257,29 @@ def _converted(
 def derive(process: Process, case: str) -> Derivation:
     """Every value propagate derives in *case*, from the given and assumed values (values it
     wrote earlier are derived again, not used); the loops torn at ``tears:`` converged
-    (:func:`.recycle.converge`, ADR 0060)."""
+    (:func:`.recycle.converge`, ADR 0060), together with the design specifications of
+    ``specs:`` (:func:`.design_spec.solve`, ADR 0070)."""
+    if process.flowsheet.specs:
+        from chemeascode.domains.process.design_spec import solve
+
+        return solve(process, case)
     if not process.flowsheet.tears:
         return _sweep(process, case)
     from chemeascode.domains.process.recycle import converge
 
     return converge(process, case)
+
+
+@dataclass
+class Settings:
+    """What the design specifications set in one sweep (ADR 0070): feed flows and splits."""
+
+    #: Stream id -> its flow (a feed's, or one that follows it).
+    flows: dict[str, Quantity] = field(default_factory=dict)
+    #: (splitter id, outlet port) -> its fraction of the inlet.
+    splits: dict[tuple[str, str], float] = field(default_factory=dict)
+    #: Streams whose component flows the sweep reports (:attr:`Derivation.measured`).
+    measure: tuple[str, ...] = ()
 
 
 def _sweep(
@@ -264,20 +288,27 @@ def _sweep(
     guesses: dict[str, State] | None = None,
     *,
     rounded: bool = True,
+    settings: Settings | None = None,
 ) -> Derivation:
     """:func:`derive` without recycles: sweeps through the nodes until nothing more can be
     derived. With *guesses* (tear stream id -> its iterated flow and composition), each tear
     stream holds its guess for the node it enters, and the node it leaves writes a copy of it
     (:attr:`Derivation.torn`), so that one call evaluates the loops once. Not *rounded*, the
-    derived values keep every digit (the iterations of :func:`.recycle.converge`)."""
+    derived values keep every digit (the iterations of :func:`.recycle.converge`). With
+    *settings*, the design specifications' variables at their iterate (ADR 0070)."""
     token = _EXACT.set(not rounded)
     try:
-        return _swept(process, case, guesses)
+        return _swept(process, case, guesses, settings)
     finally:
         _EXACT.reset(token)
 
 
-def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Derivation:
+def _swept(
+    process: Process,
+    case: str,
+    guesses: dict[str, State] | None,
+    settings: Settings | None = None,
+) -> Derivation:
     fs = process.flowsheet.model_copy(deep=True)
     work = Process(process.root, process.materials, fs, reactions=process.reactions)
     work.catalysts = process.catalysts
@@ -288,6 +319,12 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
             for name in WRITTEN if s.kind == "material" else ("duty",):
                 if ours(getattr(state, name)):
                     setattr(state, name, None)
+    if settings is not None:
+        for sid, flow in settings.flows.items():
+            streams[sid].state.setdefault(case, State()).flow = flow
+        for (node_id, port), fraction in settings.splits.items():
+            node = work.nodes[node_id]
+            node.split = {**node.split, port: fraction}  # type: ignore[attr-defined]
     shadows: dict[str, StreamDef] = {}
     for sid, guess in (guesses or {}).items():
         shadows[sid] = streams[sid].model_copy(deep=True)
@@ -317,6 +354,8 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         if n.dryer is not None
         else "reactor"
         if n.reactions or n.reactor
+        else "component-separator"
+        if n.recovery is not None
         else behaviour(n.class_)
         for n in nodes
     }
@@ -568,6 +607,34 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
             changed |= put(s, "composition", _mix(work, shape), kind, node.id, ins, extra)
         return changed
 
+    def separator(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
+        """The outlets of component separator *node* from its ``recovery:`` (ADR 0070)."""
+        from chemeascode.domains.process.separator import outlets
+
+        flows = [stream_flows(work, s, case) for s in ins]
+        if any(f.components is None for f in flows):
+            return False
+        mass: dict[str, float] = {}
+        for f in flows:
+            for n, v in (f.components or {}).items():
+                mass[n] = mass.get(n, 0.0) + v
+        try:
+            ports = outlets(node.recovery, mass, [port for _, port in outs])
+        except ValueError as failure:
+            if (node.id, str(failure)) not in found.separators:
+                found.separators.append((node.id, str(failure)))
+            return False
+        extra = {
+            "recovery": node.recovery.outlets,
+            "inlet": _converted(work, case, ins, components=list(mass)),
+        }
+        changed = False
+        for s, port in outs:
+            part = ports[port]
+            changed |= put(s, "flow", kg_h(sum(part.values())), "separator", node.id, ins, extra)
+            changed |= put(s, "composition", _mix(work, part), "separator", node.id, ins, extra)
+        return changed
+
     waiting: dict[str, str] = {}  # still -> why its batch's hours are not known yet
 
     def still(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
@@ -653,6 +720,9 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         elif kind in ("crystallizer", "solid-separation", "dryer"):
             if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
                 changed |= solids(node, ins, outs)
+        elif kind == "component-separator":
+            if ins and outs:
+                changed |= separator(node, ins, outs)
         elif kind == "pass-through" and len(ins) == 1 and len(outs) == 1:
             a, b = ins[0], outs[0][0]
             for name in FIELDS:
@@ -832,6 +902,7 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
             )
             or any(p[0] == node.id for p in found.solids)
             or any(p[0] == node.id for p in found.stills)
+            or any(p[0] == node.id for p in found.separators)
         )
         if not solved:
             label = kind or f"class {node.class_}"
@@ -849,6 +920,8 @@ def _swept(process: Process, case: str, guesses: dict[str, State] | None) -> Der
         )
         for name in FIELDS:
             found.values.pop((sid, name), None)
+    for sid in settings.measure if settings is not None else ():
+        found.measured[sid] = stream_flows(work, streams[sid], case).components
     return found
 
 
@@ -1261,6 +1334,20 @@ def run(workspace: Any, process: Process, case: str, *, write: bool) -> PropsRes
         )
     for node, level, message, hint, _ in found.duties:
         add(level, "duty", message, list(keys.get(node, ())), [node], hint)
+    for node, message in found.separators:
+        add(
+            "warning",
+            "recovery",
+            f"{node} (component separator): not solved: {message}",
+            [*keys.get(node, ()), "recovery"],
+            [node],
+            "list each outlet port's fractions, one outlet left out for the rest (cheme "
+            "validate checks recovery:)",
+        )
+    from chemeascode.domains.process.design_spec import spec_findings
+
+    for level, message, loc, ids, hint in spec_findings(found, case):
+        add(level, "design-spec", message, loc, ids, hint)
     for node, kind, lacking in found.unsolved:
         how = (
             "only checked (cheme validate balances it), never solved"
@@ -1433,6 +1520,14 @@ def _adapter_result(
     for node, message in found.stills:
         messages.append(f"{node} (still): not solved: {message}")
         units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
+    for node, message in found.separators:
+        messages.append(f"{node} (component separator): not solved: {message}")
+        units.append({"id": node, "status": "not-solved", "converged": False, "reason": message})
+    from chemeascode.domains.process.design_spec import spec_findings
+
+    for level, message, *_ in spec_findings(found, case, declared=False):
+        if level == "warning":
+            messages.append(message)
     # a tear declaration left out (or a fully specified one kept as given) is a validate
     # finding, not a loop that failed to converge
     for level, message, *_ in recycle_findings(found, case, declared=False):

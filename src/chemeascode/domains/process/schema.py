@@ -1525,7 +1525,37 @@ class Energetic(Strict):
     )
 
 
-class Block(Node, Reacting, Solids, Distilling, Energetic):
+class Recovery(Strict):
+    """A component separator's specified split (ADR 0070): the share of each component's inlet
+    flow that leaves by each outlet. ``cheme process propagate`` solves the outlets from it."""
+
+    outlets: dict[str, dict[str, float]] = Field(
+        min_length=1,
+        description="Outlet port -> component -> fraction of that component's inlet flow (all "
+        "material inlets together) that leaves by the port; a component a listed port does not "
+        "name leaves none by it. One material outlet may be left out: it takes the rest.",
+    )
+    provenance: Provenance
+    source: str = Field(
+        default="",
+        description="Where the fractions come from (vendor data, a balance script, a DESIGN.md "
+        "decision).",
+    )
+
+
+class Separating(Strict):
+    """The specified split of a component separator (ADR 0070)."""
+
+    recovery: Recovery | None = Field(
+        default=None,
+        description="A separator (a Separating, Absorbing, Adsorbing ... step or a generic "
+        "ProcessStep, without another model): the outlets solved from the share of each "
+        "component's inlet flow to each outlet port.",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling, Energetic, Separating):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -1545,7 +1575,7 @@ class Block(Node, Reacting, Solids, Distilling, Energetic):
     )
 
 
-class Step(Node, Reacting, Solids, Distilling, Energetic):
+class Step(Node, Reacting, Solids, Distilling, Energetic, Separating):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
@@ -1798,6 +1828,129 @@ class Convergence(Strict):
     )
 
 
+class SpecVariable(Strict):
+    """What a design specification adjusts (ADR 0070): the flow of a feed stream, or the
+    fraction of a splitter's inlet that leaves by one of its outlets."""
+
+    stream: str | None = Field(
+        default=None,
+        description="A feed stream (from a feed terminal) whose flow is adjusted; its flow is "
+        "then written by cheme process propagate (calculated), never given or assumed.",
+    )
+    node: str | None = Field(
+        default=None,
+        description="A splitter (SplittingMaterial) whose outlet fraction is adjusted.",
+    )
+    port: str | None = Field(
+        default=None, description="With node: the outlet port, not in the splitter's split:."
+    )
+    initial: float = Field(
+        ge=0, description="Where the iterations start: the flow (in unit) or the fraction."
+    )
+    unit: str | None = Field(
+        default=None,
+        description="A stream's flow: the flow unit of initial, low, high and the written "
+        "flow; default units.flow.",
+    )
+    low: float | None = Field(default=None, ge=0, description="Least value; default 0.")
+    high: float | None = Field(
+        default=None, gt=0, description="Largest value; default none (a fraction: 1)."
+    )
+    with_: dict[str, float] = Field(
+        default_factory=dict,
+        alias="with",
+        description="A stream: other feed streams whose flow follows it, stream -> ratio (their "
+        "flow is the ratio times the adjusted flow, in its unit): charge ratios kept.",
+    )
+
+    @model_validator(mode="after")
+    def _one(self) -> SpecVariable:
+        if (self.stream is None) == (self.node is None):
+            raise ValueError("give stream (a feed's flow) or node and port (a split), not both")
+        if self.node is not None and self.port is None:
+            raise ValueError("node: give the splitter's outlet port too")
+        if self.node is not None and (self.with_ or self.unit is not None):
+            raise ValueError("with and unit are for a stream's flow, not a split")
+        if any(v <= 0 for v in self.with_.values()):
+            raise ValueError("with: ratios are positive")
+        return self
+
+
+class SpecPer(Strict):
+    """The denominator of a ratio target: a stream, or one component of it."""
+
+    stream: str
+    component: str | None = None
+
+
+class SpecTarget(Strict):
+    """What a design specification holds (ADR 0070)."""
+
+    stream: str = Field(description="The material stream the target is measured on.")
+    component: str | None = Field(
+        default=None, description="One component of it; default: the whole stream."
+    )
+    quantity: Literal["flow", "annual", "ratio", "fraction"] = Field(
+        default="flow",
+        description="flow: its flow in unit; annual: its amount per year (unit t or kg), the "
+        "flow times hours (default the recipe's hours_per_year); ratio: its flow per the flow "
+        "of per (basis mole or mass); fraction: its share of the stream (basis).",
+    )
+    value: float = Field(ge=0)
+    unit: str | None = Field(
+        default=None,
+        description="flow: a flow unit (default units.flow); annual: t (default) or kg.",
+    )
+    basis: Literal["mole", "mass"] | None = Field(
+        default=None, description="ratio and fraction: on moles (default) or masses."
+    )
+    per: SpecPer | None = Field(default=None, description="ratio: the denominator.")
+    hours: float | None = Field(
+        default=None,
+        gt=0,
+        le=8784,
+        description="annual: operating hours per year; default the recipe's hours_per_year.",
+    )
+
+    @model_validator(mode="after")
+    def _fits(self) -> SpecTarget:
+        if (self.quantity == "ratio") != (self.per is not None):
+            raise ValueError("per: is the denominator of a ratio (and only of a ratio)")
+        if self.quantity == "fraction" and self.component is None:
+            raise ValueError("fraction: name the component")
+        if self.quantity in ("ratio", "fraction") and (self.unit or self.hours):
+            raise ValueError(f"{self.quantity}: no unit or hours (give basis)")
+        if self.quantity in ("flow", "annual") and self.basis is not None:
+            raise ValueError(f"{self.quantity}: no basis (the unit says it)")
+        if self.quantity == "annual" and self.unit not in (None, "t", "kg"):
+            raise ValueError("annual: unit t or kg (per year)")
+        if self.quantity != "annual" and self.hours is not None:
+            raise ValueError("hours: only for an annual target")
+        return self
+
+
+class DesignSpec(Strict):
+    """A design specification (ADR 0070): ``cheme process propagate`` adjusts one variable
+    (a feed's flow, or a split) until the target is met, solved together with the tears."""
+
+    id: str
+    vary: SpecVariable
+    target: SpecTarget
+    tolerance: float = Field(
+        default=1e-6,
+        gt=0,
+        lt=1,
+        description="Met when |value - target| <= tolerance x target (relative).",
+    )
+    cases: list[str] = Field(
+        default_factory=list, description="The cases it holds in; default every case."
+    )
+    provenance: Literal["given", "assumed"] = Field(
+        description="Of the target: a design input (given) or an assumption."
+    )
+    source: str = Field(default="", description="Where the target comes from.")
+
+
 class Flowsheet(Versioned):
     """Feeds, products, blocks, steps and streams: the source of the BFD and PFD."""
 
@@ -1821,6 +1974,12 @@ class Flowsheet(Versioned):
         description="How propagate converges the torn loops; default: Wegstein, 100 "
         "iterations, the flowsheet's tolerance.",
         exclude_if=lambda value: value is None,
+    )
+    specs: list[DesignSpec] = Field(
+        default_factory=list,
+        description="Design specifications for cheme process propagate: feeds or splits "
+        "adjusted until a stream target is met (ADR 0070).",
+        exclude_if=lambda value: not value,  # a plant without specs dumps as it did
     )
     bfd: BfdView | None = Field(default=None, description="How the BFD draws the streams.")
     layout: Layout = Field(default_factory=Layout)
