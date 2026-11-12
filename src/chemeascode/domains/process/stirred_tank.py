@@ -1839,6 +1839,17 @@ def _solve_node(
         streams = inlet if isinstance(inlet, list) else [inlet]
         found = [s for s in streams if s.id == pad_id]
         if not found:
+            # a caller that passed the material inlets without the pad (the charge alone, as
+            # the hazard screening and the sampling take it): the pad is an inlet of the node
+            found = [
+                s
+                for s in process.flowsheet.streams
+                if s.id == pad_id
+                and (ends := process.ends(s))
+                and ends[1] is not None
+                and ends[1].node == node.id
+            ]
+        if not found:
             raise TankError(f"the head space's pad {pad_id} is no inlet stream of {node.id}")
         pad, _, _ = stream_moles(process, found[0], case)
         if node.reactor == "batch":

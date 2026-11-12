@@ -1383,6 +1383,114 @@ def _present(process: Any, streams: list[Any]) -> set[str]:
     return found
 
 
+#: The least mole fraction of a distillate's component the condenser's freezing check counts:
+#: a trace freezes out far below its pure melting point.
+FREEZING_SHARE = 0.01
+
+
+def _condensed(process: Any, streams: list[Any]) -> set[str]:
+    """The components *streams* (the distillate's cuts) carry at a mole fraction of at least
+    :data:`FREEZING_SHARE` in a composition of theirs; their template's before one is given."""
+    found: set[str] = set()
+    templates = process.templates()
+    comps = process.components()
+    for s in streams:
+        given = [
+            comp
+            for state in s.state.values()
+            if (comp := getattr(state, "composition", None)) is not None
+        ]
+        if not given:
+            template = templates.get(s.template or "")
+            found |= set(template.components if template else [])
+        for comp in given:
+            values = dict(comp.values)
+            if comp.basis == "mass_fraction":
+                values = {
+                    n: v / mw
+                    for n, v in values.items()
+                    if (mw := getattr(comps.get(n), "molar_mass", None))
+                }
+            total = sum(values.values())
+            found |= {n for n, v in values.items() if total > 0 and v / total >= FREEZING_SHARE}
+    return found
+
+
+def _freezing(
+    process: Any, node: Any, spec: Any, loc: list[Any], volatile: list[str]
+) -> list[Finding]:
+    """ADR 0071, as for a vent condenser: the still's condenser (the energy stream on its
+    ``condenser_port``, by default a column's one heat stream out, to a cooling utility)
+    whose coolant's supply temperature (the coldest its tube wall can get) lies below the
+    melting point of a component the distillate carries (at a mole fraction of at least
+    :data:`FREEZING_SHARE`): the condensate may freeze and block the condenser. The pure
+    component's melting point."""
+    from chemeascode.foundation.units import to_kelvin
+
+    port = spec.condenser_port
+    outs = [p for p in node.ports if p.kind == "energy" and p.direction == "out"]
+    if port is None and spec.column is not None and len(outs) == 1:
+        port = outs[0].id  # as propagate defaults a column's condenser stream
+    if (
+        port is None
+        or port not in {p.id for p in outs}
+        or port == getattr(node, "energy_port", None)
+    ):
+        return []  # no condenser stream, or one the still's other rules refuse
+    fs = process.flowsheet
+    comps = process.components()
+    cuts = {p for p, _ in spec.ends()}
+    distillate = [
+        s
+        for s in fs.streams
+        if (start := process.ends(s)[0]) is not None
+        and start.node == node.id
+        and start.port in cuts
+    ]
+    carried = _condensed(process, distillate) if distillate else set(volatile)
+    melting = {
+        n: comps[n].melting_point
+        for n in volatile
+        if n in carried and n in comps and getattr(comps[n], "melting_point", None)
+    }
+    found: list[Finding] = []
+    if not melting:
+        return found
+    for s in fs.streams:
+        start, end = process.ends(s)
+        if s.kind != "energy" or start is None or start.node != node.id or end is None:
+            continue
+        if start.port != port:
+            continue
+        supply = getattr(
+            getattr(process.nodes.get(end.node), "utility", None), "supply_temperature", None
+        )
+        if supply is None:
+            continue
+        kelvin = to_kelvin(supply.value, supply.unit or fs.units.temperature)
+        if frozen := sorted(n for n, tm in melting.items() if kelvin < tm):
+            found.append(
+                Finding(
+                    FLOWSHEET_FILE,
+                    "warning",
+                    "cheme.process-condenser-freezing",
+                    f"{node.id}: the still's condenser, its coolant {end.node}'s supply at "
+                    f"{kelvin:g} K lies below the melting point of "
+                    + ", ".join(f"{n} ({melting[n]:g} K)" for n in frozen)
+                    + ": the distillate may freeze on the tubes and block the condenser",
+                    line=_yaml_line(
+                        process.flowsheet_doc,
+                        [*loc, "condenser_port" if spec.condenser_port else "column"],
+                    ),
+                    ids=[node.id, *frozen],
+                    hint="keep the coolant's supply above the distillate's melting point (a "
+                    "tempered coolant), or say why it cannot freeze (a mixture's lower freezing "
+                    "point) in DESIGN.md",
+                )
+            )
+    return found
+
+
 def rules(process: Any) -> list[Finding]:
     """``cheme.process-still`` findings: a still's ports, inlets, references and the data its
     volatility and boil-up need."""
@@ -1576,6 +1684,7 @@ def rules(process: Any) -> list[Finding]:
                     "the reboiler's heat comes in on energy_port, the condenser's leaves on "
                     "condenser_port: two streams",
                 )
+        findings += _freezing(process, node, spec, loc, volatile)
         for i, (_, end) in enumerate(spec.ends()):
             if end is not None and end.purity is not None and end.purity.key not in comps:
                 add(

@@ -4565,7 +4565,7 @@
             "additionalProperties": {
               "$ref": "#/$defs/HenryConstant"
             },
-            "description": "Component -> its Henry's-law constant (ADR 0071): a dissolved gas without a vapour pressure (above its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's law; it never condenses in a vent condenser.",
+            "description": "Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's law; it never condenses in a vent condenser.",
             "title": "Henry",
             "type": "object"
           },

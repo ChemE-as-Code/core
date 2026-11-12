@@ -1210,9 +1210,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   what forms and passes through; what it holds at the end leaves by the vent too (with the
   next charge), and a liquid that fills the vessel is refused. A batch with a head space takes
   one charge stream besides the pad. `vapour.henry: {gas: {points: [[K, kPa]], provenance}}`
-  degasses a dissolved gas without a vapour pressure (above its critical point) at `y = H x /
-  P`; it never condenses (a vent condenser passes it as a gas). Any vapour component, by
-  Raoult's law or Henry's, is stripped by whatever gas leaves, so a charged or dosed excess
+  degasses a dissolved gas with no Antoine `vapour_pressure` in `materials.yaml` (a dilute
+  solute such as HCl, or a gas above its critical point) at `y = H x / P`; it never condenses
+  (a vent condenser passes it as a gas). Any vapour component, by Raoult's law or Henry's, is stripped by whatever gas leaves, so a charged or dosed excess
   degasses under a sweep. `heat_of_absorption: {values: {gas: kJ/kmol}, provenance}` (negative:
   released) is released as a formed gas's dissolved share forms (`1 - fraction`, or its Henry
   share: the duty's term `absorption`, the adiabatic balance, the peak cooling duty; not the
@@ -1226,7 +1226,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   vent condenser's outlet temperature, or the `supply_temperature` of the utility its
   `energy_port` stream runs to, below a condensed component's `melting_point` (K, on the
   component in `materials.yaml`; the pure component's, no freezing-point depression): keep both
-  above it (a tempered coolant) or say in DESIGN.md why the mixture cannot freeze. Not
+  above it (a tempered coolant) or say in DESIGN.md why the mixture cannot freeze. The rule
+  also checks a batch still's condenser: the `supply_temperature` of the utility its
+  `condenser_port` stream (by default a column's one heat stream out) runs to, below the
+  `melting_point` of a component its distillate's cuts carry at 1 mol% or more. Not
   modelled: a pressure balance (the vessel stays at its stream pressure), mass-transfer limits,
   a content at its boiling point.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`

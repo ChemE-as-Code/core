@@ -28,7 +28,9 @@
   unreacted charge or dose; `batch.vent.heat_of_absorption` (released by a formed gas's
   dissolved share, the duty's term `absorption`; taken back by a degassing gas); a component's
   `melting_point` and the rule `cheme.process-condenser-freezing` (warning: a vent condenser's
-  outlet or its coolant's supply below a condensate's melting point). `process reactors` adds
+  outlet or its coolant's supply below a condensate's melting point; a batch still's condenser,
+  its `condenser_port` coolant's supply below the melting point of a component its distillate
+  carries at 1 mol% or more; a cooler block that condenses is not checked). `process reactors` adds
   the head space (`vent.head_space`); `reactor-hazards` leaves inerts and the pad out of the
   content and gives a vent of inerts only no gas release at the MTSR; `cheme.process-reactor`
   checks the inerts, the pad and the degassing gases. Shown on scratch copies of

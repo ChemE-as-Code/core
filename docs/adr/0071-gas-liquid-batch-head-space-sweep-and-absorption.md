@@ -57,9 +57,10 @@ Options considered:
   - `Vent.heat_of_absorption: {values: {gas: kJ/kmol}, unit, provenance, source}`
     (`HeatOfAbsorption`): per kmol dissolved, negative when dissolving releases heat; for a
     formed gas (`components`) or a degassing gas (`vapour.henry`).
-  - `VentVapour.henry: {gas: HenryConstant}`: a dissolved gas without a vapour pressure (above
-    its critical point, such as HCl) that degasses at `y = H x / P` instead of Raoult's law; it
-    is a vapour component, never a vent component or inert, never condensed.
+  - `VentVapour.henry: {gas: HenryConstant}`: a dissolved gas with no Antoine
+    `vapour_pressure` in `materials.yaml` (a dilute solute such as HCl, or a gas above its
+    critical point) that degasses at `y = H x / P` instead of Raoult's law; it is a vapour
+    component, never a vent component or inert, never condensed.
   - `Component.melting_point` (K): the pure liquid's freezing point.
 - **Model** (`stirred_tank.solve_batch`, `vent_vapour.py`):
   - Inerts: each dose's inerts are moved to the dose's passing gas (ADR 0054's path): they
@@ -105,7 +106,10 @@ Options considered:
   the supply temperature of the utility its `energy_port` stream runs to (the coldest its tube
   wall can get), lies below the `melting_point` of a component it condenses (not a Henry gas),
   with the hint to keep both above it (a tempered coolant) or to say in DESIGN.md why the
-  mixture cannot freeze.
+  mixture cannot freeze. The same rule checks a batch still's condenser (`batch_still.rules`):
+  the supply temperature of the utility its `condenser_port` stream (by default a column's one
+  heat stream out) runs to, against the `melting_point` of each component its distillate's
+  cuts carry at 1 mol% or more (a trace freezes out far below its pure melting point).
 - **Unchanged behaviour**: a vent without `inerts`, `head_space`, `heat_of_absorption` and
   `vapour.henry`, and a component without `melting_point`, solves, propagates, fingerprints,
   reports and screens as in 1.11.0. The twelve batch entries of the process library (acetyl-
@@ -157,14 +161,19 @@ Options considered:
     as the gas forms, like a heat of solution in ADR 0063);
   - the freezing check takes the pure component's melting point (no freezing-point depression
     by the condensate's other components) and a utility's supply temperature only through the
-    condenser's `energy_port` stream;
+    vent condenser's `energy_port` stream or the still's `condenser_port` stream (a still has
+    no condenser outlet temperature); a condenser modelled as its own block (a `Cooling` step
+    such as potassium-tert-butoxide-1's E201) is not checked;
   - `process simulate` still refuses a vented batch.
 - Follow-ups: a pressure balance (a closed, padded vessel such as methyltriphenylphosphonium-
   bromide-1's R-101, its depressurising); mass-transfer limits; a reflux at the boiling point.
   This ADR covers core#179's head space, inert sweep and purge gas, item 2 (degassing of a
   dissolved charge or dose) and item 4 (heat of absorption), and potassium-tert-butoxide-1
-  L-9's freezing check; a pressure balance and mass transfer, a content at its boiling point
-  and `process simulate` for a vented batch stay open.
+  L-9's freezing check of the condensers it names (R101's vent condenser and ST101's still
+  condenser: on a scratch copy with tert-butanol's `melting_point: 298.3` and the tempered
+  water's supply at 293.15 K both warn); a cooler block that condenses (E201), a pressure
+  balance and mass transfer, a content at its boiling point and `process simulate` for a
+  vented batch stay open.
 
 ## Evidence
 

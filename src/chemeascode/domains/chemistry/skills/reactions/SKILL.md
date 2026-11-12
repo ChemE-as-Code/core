@@ -182,8 +182,9 @@ each value taken from the evidence cites its observation in `source`.
      (`dosing: [{stream: SWEEP, start: s, time: s}]`). The head space then expels, vapour-laden,
      what the dose displaces and the rising vapour pressure pushes out; whatever leaves strips
      the liquid's volatile components, so a dosed excess (a methyl bromide, a solvent)
-     degasses under the sweep: do not type a stripping share. A dissolved gas without a vapour
-     pressure (HCl above its critical point) degasses with `vapour: {components: [..., HCL],
+     degasses under the sweep: do not type a stripping share. A dissolved gas with no Antoine
+     `vapour_pressure` in `materials.yaml` (a dilute solute such as HCl, or a gas above its
+     critical point) degasses with `vapour: {components: [..., HCL],
      henry: {HCL: {points: [[K, kPa]], provenance, source}}}`. A vent of an inert alone needs
      no `components`; the vent stream's template lists the inerts. A
      reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
@@ -206,7 +207,8 @@ each value taken from the evidence cites its observation in `source`.
      keep the reactions' heats on the gas basis). Give a condensable's `melting_point` (K) in
      `materials.yaml` where it freezes near the coolant's temperature (tert-butanol, 298.3 K,
      acetic acid, 289.8 K): `cheme.process-condenser-freezing` warns when the vent condenser's
-     outlet or its coolant's supply lies below it; move the condenser to a tempered loop or say
+     outlet or its coolant's supply, or a batch still's condenser's coolant supply, lies below
+     it; move the condenser to a tempered loop or say
      in DESIGN.md why the mixture cannot freeze. Not modelled: a pressure balance (a closed
      vessel, a depressurising), mass-transfer limits.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
@@ -359,7 +361,9 @@ each value taken from the evidence cites its observation in `source`.
 - `cheme.process-heat-of-reaction` (warning): a given heat of reaction more than 2 % from
   the formation data; check the coefficients and the sources.
 - `cheme.process-condenser-freezing` (warning): a vent condenser's outlet, or its coolant's
-  supply, below the `melting_point` of a component it condenses (ADR 0071).
+  supply, below the `melting_point` of a component it condenses; a batch still's condenser's
+  coolant supply below that of a component its distillate carries at 1 mol% or more (ADR
+  0071).
 
 ## Expected outputs and provenance
 

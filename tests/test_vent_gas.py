@@ -252,6 +252,36 @@ def test_a_formed_gas_releases_its_heat_of_absorption():
     assert hot.temperature > cool.temperature + 1.0
 
 
+def test_a_semibatchs_peak_cooling_duty_takes_the_heat_of_absorption():
+    """A -> B + G dosed into an isothermal semi-batch, 40 % of G vented: the dissolved 60 %
+    releases its heat of absorption as it forms, so the peak cooling duty is the one without
+    it times 1 + (1 - f) |h_abs| / |dH_r| (the same trajectory, every step's heat scaled)."""
+    from tests.test_semibatch_vent import _batch as _dosed
+
+    volumes, cp = V | {"G": 0.05}, CP | {"G": 60.0}
+    vent = {"stream": "V", "components": ["G"], "fraction": {"G": 0.4}}
+    absorbing = vent | {"heat_of_absorption": {"values": {"G": -50000.0}, "provenance": "assumed"}}
+
+    def solved(spec):
+        return solve_batch(
+            _reactions(1e-2),
+            {"S": 5.0},
+            T,
+            P,
+            _dosed(spec),
+            {},
+            Liquid(volumes),
+            cp,
+            doses=[Dose({"A": 1.0}, T, [(0.0, 3600.0, 1.0)])],
+        )
+
+    plain, heated = solved(vent), solved(absorbing)
+    assert plain.peak_cooling_duty > 0
+    assert heated.peak_cooling_duty == pytest.approx(
+        plain.peak_cooling_duty * (1 + 0.6 * 50000.0 / abs(HEAT)), rel=1e-9
+    )
+
+
 def test_the_schema_of_the_gas_liquid_vent():
     pad = {"stream": "PAD", "provenance": "assumed"}
     Vent.model_validate(_vent(inerts=["N"], head_space=pad))
@@ -432,3 +462,75 @@ def test_a_vent_of_inerts_only_screens_no_gas_release():
     assert not _forms_gas(item(Vent.model_validate(_vent(inerts=["N"]))))
     assert _forms_gas(item(Vent.model_validate(_vent(components=["G"], inerts=["N"]))))
     assert not _forms_gas(item(None))
+
+
+def _batch_gas_plant(tmp_path):
+    """The padded gas plant as a plain ``reactor: batch``: the charge S1 (S and A) and the
+    head space's pad SP its only inlets, no dose."""
+    ws = _gas_plant(tmp_path)
+    flowsheet = ws.root / "process/flowsheet.yaml"
+    text = flowsheet.read_text()
+    dose = text[text.index("  - id: S2\n") : text.index("  - id: S3\n")]
+    flowsheet.write_text(
+        text.replace(dose, "")
+        .replace("reactor: semibatch", "reactor: batch")
+        .replace("batch: {dosing: [{stream: S2, time: 3600}], ", "batch: {time: 3600, ")
+        .replace("{id: dose, direction: in}, ", "")
+        .replace("  - {id: G, ports: [{id: out, direction: out}]}\n", "")
+        .replace("flow: {value: 5, provenance: given}", "flow: {value: 6, provenance: given}")
+        .replace("values: {S: 1.0}", "values: {S: 0.8333333333, A: 0.1666666667}")
+    )
+    return ws
+
+
+def test_a_plain_batch_with_a_padded_head_space(tmp_path):
+    """A ``reactor: batch`` with a head space (not only a semi-batch): propagate closes the
+    balance, process reactors and the recipe solve it, the hazard screening solves the vented
+    batch with its pad (the pad no feed of the liquid) and the Monte Carlo samples it."""
+    from chemeascode.domains.process.model import balance_of
+    from chemeascode.domains.process.reactor_uncertainty import sample_node
+    from chemeascode.domains.process.recipe import Recipe, evaluate
+    from chemeascode.domains.safety.reaction_hazards import screen
+
+    ws = _batch_gas_plant(tmp_path)
+    assert not [m for level, m in _found(ws) if level == "error"]
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert result.written >= 3, [f.format() for f in result.findings]
+    process, _ = load(ws.root)
+    assert balance_of(process, "R", "design").status == "ok"
+    (row,) = reactor_report(ws.root).reactors
+    assert row["tank"]["vent"]["head_space"]["start_kmol"] == {"N": 0.5}
+    (entry,) = screen(ws.root).entries
+    assert not entry.missing, entry.missing
+    assert any(note.startswith("vent S4:") for note in entry.notes)
+    assert entry.mtsr is not None
+    reactions = ws.root / "process/reactions.yaml"
+    reactions.write_text(
+        reactions.read_text().replace(
+            "orders: {A: 1}, provenance: assumed}}",
+            "orders: {A: 1}, provenance: assumed,\n            uncertainty: {A: {gsd2: 4.0}}}}",
+        )
+    )
+    sampled = sample_node(ws.root, "R", samples=20)
+    assert sampled.key == "A"
+    data = yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())["streams"]
+    s3 = next(s for s in data if s["id"] == "S3")["state"]["design"]["flow"]["value"]
+    recipe = Recipe.model_validate(
+        {
+            "schema": "cheme/recipe/v1",
+            "kind": "recipe",
+            "batch_size": {"value": 2 * s3, "unit": "kg", "stream": "S3", "provenance": "assumed"},
+            "hours_per_year": {"value": 8000, "provenance": "assumed"},
+            "unit_procedures": [
+                {
+                    "id": "UP1",
+                    "unit": "R",
+                    "operations": [{"id": "react", "kind": "react", "from": "R"}],
+                }
+            ],
+        }
+    )
+    process, _ = load(ws.root)
+    (gas,) = evaluate(process, recipe).vents
+    assert "N" in gas.kmol

@@ -162,8 +162,8 @@ class Component(Strict):
         default=None,
         gt=0,
         description="K: the pure liquid's freezing point. A batch's vent condenser whose outlet "
-        "or coolant supply lies below it may freeze shut (cheme.process-condenser-freezing, "
-        "ADR 0071).",
+        "or coolant supply, or a batch still's condenser whose coolant supply, lies below it may "
+        "freeze shut (cheme.process-condenser-freezing, ADR 0071).",
         exclude_if=lambda value: value is None,  # a component's dump stays as it was
     )
     phase: Literal["solid"] | None = Field(
@@ -554,9 +554,10 @@ class VentVapour(Strict):
     )
     henry: dict[str, HenryConstant] = Field(
         default_factory=dict,
-        description="Component -> its Henry's-law constant (ADR 0071): a dissolved gas without "
-        "a vapour pressure (above its critical point) degasses into the gas leaving at y = H x "
-        "/ P instead of Raoult's law; it never condenses in a vent condenser.",
+        description="Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no "
+        "Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above "
+        "its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's "
+        "law; it never condenses in a vent condenser.",
         exclude_if=lambda value: not value,  # a vapour's dump stays as in 1.10.0
     )
     source: str = ""

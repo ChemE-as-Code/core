@@ -42,7 +42,7 @@ Rules (``cheme.process-*``), each finding naming the file, line, rule and a hint
   reaction, a head space's pad that is no inlet or carries more than inerts (ADR 0071);
 - ``process-condenser-freezing`` (warning): a vent condenser whose outlet temperature, or its
   coolant's supply temperature, lies below the melting point of a component it condenses
-  (ADR 0071);
+  (ADR 0071); a batch still's condenser likewise (:func:`.batch_still.rules`);
 - ``process-heat-of-reaction`` (warning): a given heat of reaction more than 2 % (and
   1000 kJ/kmol) from the one of the components' ideal-gas formation data;
 - ``process-catalyst``: a reactor names a catalyst ``process/catalysts.yaml`` does not declare,
