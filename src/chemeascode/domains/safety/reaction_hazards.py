@@ -743,6 +743,12 @@ def _semibatch_network(
     return (values, True) if use else (largest, False)
 
 
+NETWORK_LACKING = (
+    "the network's potential (hazard.potential: network): the heat_of_reaction of every "
+    "counted reaction (the known ones release no heat together)"
+)
+
+
 def _semibatch_network_rise(
     entry: HazardEntry,
     counted_rx: list[Any],
@@ -758,9 +764,15 @@ def _semibatch_network_rise(
     from chemeascode.domains.safety.reaction_network import network_heat
 
     t = entry.process_temperature or 298.15
-    capacity, heats, _ = _heats(counted_rx, moles, t, comps, process.ideal_gas())
+    capacity, heats, lacking = _heats(counted_rx, moles, t, comps, process.ideal_gas())
     solved = network_heat(counted_rx, moles, heats, shares) if capacity else None
     if solved is None or not capacity:
+        return None
+    if lacking and solved[0] <= 0.0:
+        # no known heat, or only endothermic ones: what is lacking may be exothermic, so the
+        # network's dT_ad is not known (as _adiabatic_rise's)
+        if use:
+            entry.missing.append(NETWORK_LACKING)
         return None
     rise = max(solved[0], 0.0) / capacity
     if entry.network is not None:
@@ -935,7 +947,7 @@ def _batch_network(
     if potential != "network" and not (pairs and getattr(item, "reactor", None) == "batch"):
         return None
     shares = item.batch.vent.shares() if _vented(item) else {}
-    capacity, heats, _ = _heats(counted_rx, moles, t_p, comps, process.ideal_gas())
+    capacity, heats, lacking = _heats(counted_rx, moles, t_p, comps, process.ideal_gas())
     solved = network_heat(counted_rx, moles, heats, shares) if capacity else None
     if solved is None or capacity is None:
         if potential == "network":
@@ -945,6 +957,12 @@ def _batch_network(
             )
         return None
     heat, extents = solved
+    if lacking and heat <= 0.0:
+        # no known heat, or only endothermic ones: what is lacking may be exothermic, so the
+        # network's rise is not known and dT_ad and the MTSR stay unset (as _adiabatic_rise's)
+        if potential == "network":
+            entry.missing.append(NETWORK_LACKING)
+        return None
     rise = max(heat, 0.0) / capacity
     mtsr = t_p + accumulation * rise
     use = potential == "network"
@@ -1716,6 +1734,20 @@ def _bubble_mtt(
         for n, why in left_out.items()
         if t_p is None or (at := _boiling_at(comps.get(n), n, pressure)) is None or at[0] < t_p
     } | _dissolved(moles, comps, pressure, t_p, left_out)
+    # a product a counted reaction forms (not in the charge or feed) boiling below T_p leaves as
+    # it forms, a gas held in solution: left out as the default MTT leaves it out (ADR 0069)
+    for _, content in contents:
+        for n, v in content.items():
+            if v <= 0 or n in out or moles.get(n, 0.0) > 0:
+                continue
+            at = _boiling_at(comps.get(n), n, pressure)
+            if (
+                t_p is not None
+                and at is not None
+                and at[0] < t_p
+                and not (pressure > ATMOSPHERIC and at[2])
+            ):
+                out[n] = f"product boiling at {at[0]:.1f} K, below T_p {t_p:.1f} K"
     vent = getattr(getattr(item, "batch", None), "vent", None)
     vapour = getattr(vent, "vapour", None)
     activity = dict(getattr(vapour, "activity", None) or {})
@@ -1746,8 +1778,8 @@ def _bubble_mtt(
     if out:
         entry.notes.append(
             "bubble point: left out " + ", ".join(sorted(out)) + " (vent components, dosed or "
-            "dissolved gases boiling below T_p: gases held in solution, they boil off rather "
-            "than boil the batch)"
+            "dissolved gases and products boiling below T_p: gases held in solution, they boil "
+            "off rather than boil the batch)"
         )
     if t_p is not None and entry.mtt < t_p:
         entry.notes.append(
@@ -1954,9 +1986,16 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
                     "a gas release above the vent's capacity pressurises the vessel: limit "
                     "the accumulation, or size the vent and relief for it"
                     if ratio > 1
-                    else "screening values: the rate is the larger of the worst moment's "
-                    "content and the content after the reaction setting the MTSR, at the MTSR; "
-                    "gas from a longer chain of consecutive reactions is not covered",
+                    else (
+                        "screening values: the rate is the largest release over the batch, "
+                        "each step's content at its own MTSR (every reaction at its rate law, "
+                        "with the liquid's vapour, at most what the reactions' heat there "
+                        "evaporates)"
+                        if over is not None
+                        else "screening values: the rate is the larger of the worst moment's "
+                        "content and the content after the reaction setting the MTSR, at the "
+                        "MTSR; gas from a longer chain of consecutive reactions is not covered"
+                    ),
                 )
         if (held := e.dissolved_release) is not None:
             add(

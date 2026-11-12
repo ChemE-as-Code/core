@@ -208,6 +208,42 @@ def test_a_batch_screens_its_consecutive_reactions_as_a_network(tmp_path):
     assert counted.mtsr == pytest.approx(330 + 120000 / 560)
 
 
+def test_a_network_without_a_known_heat_leaves_the_mtsr_unknown(tmp_path):
+    """hazard.potential: network with no heat_of_reaction known, or only an endothermic one
+    known beside an exothermic one that is not: the network's dT_ad is not known, so dT_ad, the
+    MTSR and the class stay unset (as without the network), not dT_ad 0 and MTSR = T_p."""
+    flowsheet = plain.FLOWSHEET.replace(
+        'hazard: {td24: 420, provenance: given, source: "ARC test 12"}',
+        "hazard: {potential: network, td24: 420, mtt: 400, provenance: given}",
+    )
+    unknown = plain.REACTIONS.replace(
+        "     heat_of_reaction: {value: -80000, provenance: assumed},\n", ""
+    )
+    endothermic = plain.REACTIONS.replace("value: -80000", "value: 30000") + (
+        "  - {id: R2, stoichiometry: {B: -1, C: 1}, phase: liquid,\n"
+        "     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 1.0e-12},\n"
+        "            orders: {B: 1}, provenance: assumed}}\n"
+    )
+    materials = plain.MATERIALS.replace(
+        "templates:",
+        "  - {id: C, name: C, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,\n"
+        "     liquid_heat_capacity: 160, normal_boiling_point: 420}\ntemplates:",
+    ).replace("components: [A, B, S]}", "components: [A, B, S, C]}")
+    for name, reactions, ids in (
+        ("unknown", unknown, "[R1]"),
+        ("endothermic", endothermic, "[R1, R2]"),
+    ):
+        root = plain._plant(tmp_path / name, flowsheet.replace("[R1]", ids), materials)
+        (root / "process/reactions.yaml").write_text(reactions)
+        report = screen(root)
+        (entry,) = report.entries
+        assert entry.adiabatic_rise is None and entry.mtsr is None, name
+        assert entry.criticality is None and entry.network is None, name
+        assert any("heat_of_reaction of R" in m for m in entry.missing), name
+        assert any("hazard.potential: network" in m for m in entry.missing), name
+        assert {f.rule for f in report.findings} == {"cheme.reactor-hazard-missing"}, name
+
+
 # -- the accumulation of each dosed reactant ----------------------------------------------------
 
 TWO_DOSED = dosed.REACTIONS + (
@@ -301,6 +337,25 @@ def test_the_largest_gas_release_over_the_batch(tmp_path, ea):
     assert over["capacity_ratio"] == pytest.approx(over["rate_m3_h"] / 5, rel=1e-12)
     assert over["rate_m3_h"] >= gas["rate_m3_h"] * (1 - 1e-9)
     assert "  largest gas release over the batch: " in hazard_text(report)
+
+
+@pytest.mark.parametrize("ea, largest", [(0.0, True), (40000.0, False)])
+def test_the_vent_hint_names_where_its_rate_comes_from(tmp_path, ea, largest):
+    """Within the vent capacity, the info's hint names the release its ratio comes from: the
+    largest over the batch where it is above the release at the MTSR (ea 0), else the release
+    at the MTSR (ea 40 kJ/kmol: the worst moment's is the largest)."""
+    flowsheet = vented.FLOWSHEET.replace(
+        "hazard: {td24: 390,", "hazard: {vent_capacity: 100, td24: 390,"
+    )
+    ws = screening._vent_plant(tmp_path, flowsheet, screening.RECIPE, ea=ea)
+    report = screen(ws.root)
+    (finding,) = [f for f in report.findings if f.rule == "cheme.reactor-hazard-vent"]
+    assert finding.level == "info"
+    assert ("over the batch up to" in finding.message) is largest
+    assert ("the largest release over the batch, each step's content" in finding.hint) is largest
+    assert ("content after the reaction setting the MTSR, at the MTSR" in finding.hint) is not (
+        largest
+    )
 
 
 # -- the gases held in the liquid ---------------------------------------------------------------
@@ -432,6 +487,47 @@ def test_the_mtt_from_the_contents_bubble_point(tmp_path):
     (entry,) = screen(root).entries
     assert entry.mtt is None
     assert any("bubble point needs vapour_pressure" in m and "A, S" in m for m in entry.missing)
+
+
+def test_a_gaseous_product_does_not_set_the_bubble_point_mtt(tmp_path):
+    """R1 A -> B + G, G boiling at 195 K far below T_p 330 K and no vent: G leaves as it forms
+    (a gas held in solution), so the bubble point after R1 leaves it out, as the default MTT
+    does, and the MTT is not far below T_p."""
+    materials = (
+        screening._vaporization(A=35000, B=38000, S=30000)
+        .replace(
+            "templates:",
+            "  - {id: G, heat_of_vaporization: 25000, name: G, formula: C2H4O, molar_mass: 44.05,\n"
+            "     liquid_molar_volume: 0.1, liquid_heat_capacity: 160, normal_boiling_point: 195}\n"
+            "templates:",
+        )
+        .replace("components: [A, B, S]}", "components: [A, B, S, G]}")
+    )
+    flowsheet = plain.FLOWSHEET.replace(
+        "hazard: {td24: 420,", "hazard: {mtt_from: bubble-point, td24: 600,"
+    )
+    root = plain._plant(tmp_path, flowsheet, materials)
+    (root / "process/reactions.yaml").write_text(
+        plain.REACTIONS.replace("{A: -1, B: 1}", "{A: -1, B: 1, G: 1}")
+    )
+    (entry,) = screen(root).entries
+    assert "G" in entry.bubble_point["left_out"]
+    after = entry.bubble_point["contents"]["the content after R1"]
+    process, _ = load(root)
+    comps = process.components()
+    # B 1, S 4 and G 1 kmol, G counted in the liquid but not boiling: sum x_i P_i(T) = P
+    p = sum(
+        v
+        / 6
+        * 101.325
+        * math.exp(
+            -comps[n].heat_of_vaporization / R * (1 / after - 1 / comps[n].normal_boiling_point)
+        )
+        for n, v in {"B": 1, "S": 4}.items()
+    )
+    assert p == pytest.approx(101.325, rel=1e-9)
+    assert entry.mtt > entry.process_temperature
+    assert not any("boils at once" in n for n in entry.notes)
 
 
 # -- unchanged without the inputs ---------------------------------------------------------------

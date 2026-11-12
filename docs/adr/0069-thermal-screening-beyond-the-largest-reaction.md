@@ -58,7 +58,10 @@ unchanged.
    semi-batch with a consecutive pair among its counted reactions reports it without the
    choice (`network`: `adiabatic_rise_K`, `mtsr_K`, a semi-batch's `time_s`, `consecutive`,
    `in_mtsr`; a text line; a note where it is above the largest single reaction's MTSR). A
-   continuous reactor reports it only with the choice.
+   continuous reactor reports it only with the choice. A counted reaction without a known
+   heat is left out of the programme; where the known ones then release no heat together,
+   the network is not known (as dT_ad without it): dT_ad, the MTSR and the class stay unset,
+   not dT_ad 0 and the MTSR `T_p`.
 2. **Every dosed reactant.** A semi-batch reports, per dosed reactant, its largest
    accumulation and when (`max`, `time_s`), and of it the share the screened reactions can
    still consume from the content then (`reactive_max`, `reactive_time_s`): the same programme
@@ -90,8 +93,10 @@ unchanged.
    `phase: solid`, does not boil; one with a boiling point only leaves the MTT missing, named),
    the lower of the worst moment's content (a batch: its charge) and that content once the
    cooling failure ran its course (the reaction setting the MTSR, or the network). Left out:
-   dissolved gases (ADR 0058) and vent components and dosed gases boiling below `T_p`, gases
-   held in solution that do not follow Raoult's law. JSON `bubble_point`.
+   dissolved gases (ADR 0058), vent components and dosed gases boiling below `T_p`, and a
+   product a counted reaction forms (not charged or dosed) boiling below `T_p`, as the default
+   MTT leaves it out: gases held in solution that do not follow Raoult's law, counted in the
+   liquid but not boiling. JSON `bubble_point`.
 5. **Gases held in the liquid.** A batch or semi-batch reports `dissolved_release`: each dosed
    gas, dissolved gas and vent component boiling below the MTSR then (as the default MTT
    leaves them out) at its largest amount in the liquid over the batch (kmol and kg per

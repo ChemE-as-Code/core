@@ -26,7 +26,9 @@
     reaction on a product adds its heat (copper(I) chloride: 46.0 K against the chlorination's
     36.9 K). A batch or semi-batch with a consecutive pair among its counted reactions reports
     it without the choice (JSON `network`, a text line, a note where it is above the largest
-    single reaction's MTSR).
+    single reaction's MTSR). With a counted reaction's heat unknown and the known ones
+    releasing no heat together, the network leaves dT_ad, the MTSR and the class unset (named
+    under `-missing`), as without it.
   - A semi-batch's accumulation of each dosed reactant and the share of it the reactions can
     still consume (JSON `accumulations`: `max`, `time_s`, `reactive_max`, `reactive_time_s`;
     with more than one dosed reactant, or where a deliberate excess is not reactive).
@@ -43,7 +45,8 @@
   - `hazard.mtt_from: bubble-point`: the MTT from the content's bubble point at the vessel's
     pressure (Raoult's law over the components' `vapour_pressure`, else `normal_boiling_point`
     and `heat_of_vaporization`), the lower of the worst moment's content and that after the
-    cooling failure (JSON `bubble_point`).
+    cooling failure (JSON `bubble_point`); a product boiling below `T_p` (a gas formed in a
+    closed vessel) does not boil there, as the default MTT leaves it out.
   - `stirred_tank.extent_rates` and `vent_gas_rates` (the rates for many contents, the mixture
     built once); `CoolingPoint.heats` and `.capacity`, `TankResult.dosed_reactants`.
 
@@ -61,7 +64,9 @@
   the MTSR and the largest over the batch with `hazard.vent_capacity`, and names the latter
   where it is larger (a fix: the release at the highest MTSR can be the smallest; none of the
   library's entries changes level, p-toluenesulfonyl-chloride-1's R101 goes from 0.40 to 0.97
-  of its vent). A content boiling at the MTSR names its boil-up in the finding and the note.
+  of its vent), its hint then naming the largest release over the batch rather than the
+  release at the MTSR. A content boiling at the MTSR names its boil-up in the finding and the
+  note.
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `schema.py` (the two new `hazard` fields; no drawn output changes).
 
