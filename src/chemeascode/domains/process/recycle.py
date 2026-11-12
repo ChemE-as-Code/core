@@ -328,14 +328,15 @@ def _not_swept(node: Any) -> dict[str, Any]:
     changes only its duty (ADR 0063: a batch's or still's ``heat_up``, an isothermal batch's
     heats of solution; the energy ports a duty is written on: a still's ``condenser_port``,
     ADR 0061, and a vent condenser's ``energy_port``, ADR 0062), which is in the duty's own
-    fingerprint."""
+    fingerprint, or only the recipe's time (a still's ``heat_up_time``, ADR 0068)."""
     from chemeascode.domains.process.stirred_tank import duty_only
 
     found: dict[str, Any] = dict.fromkeys(NOT_SWEPT, True)
     if getattr(node, "batch", None) is not None:
         found["batch"] = duty_only(node.batch)
     if getattr(node, "still", None) is not None:
-        found["still"] = {"heat_up": True, "condenser_port": True}  # as batch_still.solve_node
+        # as batch_still.solve_node
+        found["still"] = {"heat_up": True, "heat_up_time": True, "condenser_port": True}
     return found
 
 

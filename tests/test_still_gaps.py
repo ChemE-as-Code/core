@@ -407,6 +407,54 @@ def test_the_heat_up_time_is_in_the_report_and_the_recipes_distil(tmp_path, meta
     assert "heat_up_time_h" not in plain_unit["solution"]
 
 
+def _ramp_plant(tmp_path, metal=2500.0):
+    """The swap of _timed_plant charged at 330 K, its distillate in two cuts, the second at
+    5 kPa(a), which ends the still below the charge's temperature, in C-101 with its metal."""
+    path = _timed_plant(tmp_path, metal=metal).root / "process/flowsheet.yaml"
+    text = (
+        path.read_text()
+        .replace(
+            "      end: {residue: {key: A, mole_fraction: 0.01}}\n"
+            "      outlets: {distillate: top, residue: bottom}\n",
+            "      cuts:\n"
+            "        - {outlet: top, end: {distilled: 0.3}}\n"
+            "        - {outlet: top2, pressure: 5, end: {distilled: 0.6}}\n"
+            "      outlets: {residue: bottom}\n",
+        )
+        .replace(
+            "      - {id: top, direction: out}\n",
+            "      - {id: top, direction: out}\n      - {id: top2, direction: out}\n",
+        )
+        .replace(
+            "  - {id: D, ports: [{id: in, direction: in}]}\n",
+            "  - {id: D, ports: [{id: in, direction: in}]}\n"
+            "  - {id: D2, ports: [{id: in, direction: in}]}\n",
+        )
+        .replace("temperature: {value: 300,", "temperature: {value: 330,", 1)
+    )
+    path.write_text(text + "  - id: S5\n    from: S.top2\n    to: D2.in\n    template: liquid\n")
+    return path.parent.parent
+
+
+def test_a_vacuum_ramp_ending_below_the_charge_times_the_metals_heat_up(tmp_path):
+    """A still charged at 330 K, boiling up from its bubble point T_0 at 1 atm and ending near
+    305 K at 5 kPa(a): its metal's term in the duty is negative (C_m (T_end - 330) over the
+    hours), but it heats with the charge from 330 K to T_0 first. The heat-up takes the charge's
+    and the feed's heat-up plus C_m (T_0 - 330), not their sum less the metal's cooling."""
+    (unit,) = still_report(_ramp_plant(tmp_path / "t")).units
+    sol = unit["solution"]
+    first, end = sol["temperatures_K"]
+    assert end < 330.0 < first
+    terms = sol["duty_terms_kW"]
+    assert terms["vessel metal"] == pytest.approx(2500.0 * (end - 330.0) / (4 * 3600), rel=1e-9)
+    heated = (terms["charge heat-up"] + terms["feed heat-up"]) * 4.0  # kWh per batch
+    metal = 2500.0 * (first - 330.0) / 3600.0  # kWh: C-101's metal to T_0
+    assert sol["heat_up_time_h"] == pytest.approx((heated + metal) / sol["duty_kW"], rel=1e-9)
+    timed = recipe_report(_ramp_plant(tmp_path / "r"))
+    (swap,) = [s for s in timed.steps if s.operation == "swap"]
+    assert swap.end - swap.start == pytest.approx(sol["time_h"], rel=1e-9)
+
+
 def test_heat_up_time_needs_raoult():
     with pytest.raises(ValueError, match="heat_up_time needs volatility raoult"):
         still._still(heat_up_time=True)

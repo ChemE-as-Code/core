@@ -1341,7 +1341,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     mean heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` (a boil-up in kW: its
     value); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
     heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
-    takes no time.
+    takes no time; the metal is timed from its start to the still's first bubble point `T_0`
+    and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
+    vacuum ramp that ends below the charge still times the metal's heat-up.
   - An end at a temperature (or any end) stops where the integrator found it (core#198: a
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data

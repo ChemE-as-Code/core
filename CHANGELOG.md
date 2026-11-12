@@ -26,8 +26,10 @@
   `m3/h`, the vapour's volume at the still's temperature and pressure; `still.heat_up_time:
   true`, the heat-up of the charge, a swap's feed and the vessel's metal (ADR 0063) timed at the
   boil-up's mean heat input, in `cheme process stills` (`heat_up_time_h`, `time_h`) and in a
-  recipe `distil` operation `from:` the still. A still that uses none of them dumps,
-  fingerprints and solves as before.
+  recipe `distil` operation `from:` the still (the metal timed to the still's first bubble
+  point even where a vacuum ramp ends it colder; `heat_up_time` is in neither the outlets' nor
+  a tear's fingerprint). A still that uses none of them dumps, fingerprints and solves as
+  before.
 
 ### Fixed
 

@@ -75,8 +75,11 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   boil-up's mean heat input: `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)`, which for a
   boil-up in kW is its value. `cheme process stills` reports it (`heat_up_time_h`, `time_h`),
   and a recipe `distil` operation `from:` the still takes the boil-up and this time together.
-  A term that gives heat back takes no time. Without the field the time is the boil-up's, as
-  before.
+  A term that gives heat back takes no time. The metal heats with the charge from its start
+  to the still's first bubble point `T_0`, then over the boil-up only as far as the still ends
+  above `T_0`: `C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`. A vacuum ramp that ends colder
+  than the charge still times the metal's heat-up to `T_0` and gives no time back for its
+  cooling. Without the field the time is the boil-up's, as before.
 - **What a still that does not use them keeps.** Each new field is optional and left out of the
   still's dump when unset: `separate_phase`, `heat_up_time`, a cut's `pressure` and `boilup`.
   So the outlets' fingerprint stays as it was. A cut's pressure enters the fingerprint. A cut's

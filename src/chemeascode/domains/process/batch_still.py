@@ -1411,7 +1411,10 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
     boil-up (the charge's and a swap's feed's heat-up, a recipe vessel's metal; ADR 0063) take
     time at the boil-up's mean heat input, ``t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)``
     (a boil-up in kW: its value), s per batch; or why it is not known. A term that gives heat
-    back (the metal of a still that ends colder than it starts) takes no time."""
+    back takes no time. The metal (``C_m``, kJ/K) heats with the charge from its start to the
+    still's first bubble point ``T_0``, then over the boil-up as far as the still ends above
+    ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0, 0)]``; one that ends colder (a vacuum
+    ramp) gives no time back."""
     from chemeascode.domains.process.duties import still_duty
 
     rate = result.duty  # kW: the boil-up's mean heat input
@@ -1422,8 +1425,17 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
     if duty.heat_kW is None:
         result.heat_up_time_missing = "; ".join(duty.missing) or "the still's duty"
         return
-    extra = sum(v for name, v in duty.terms_kW.items() if name != "boil-up")
-    result.heat_up_time = max(extra, 0.0) * result.hours * 3600.0 / rate
+    # kJ per batch: each term on its own, none below zero (a term that gives heat back)
+    extra = sum(
+        max(v, 0.0) for name, v in duty.terms_kW.items() if name not in ("boil-up", "vessel metal")
+    )
+    kj = extra * result.hours * 3600.0
+    metal = duty.inputs.get("vessel_metal")
+    if metal is not None and result.temperatures is not None:
+        first = result.temperatures[0]  # K: the still's bubble point as its boil-up starts
+        start, end = metal["temperatures"]
+        kj += metal["heat_capacity"] * (max(first - start, 0.0) + max(end - first, 0.0))
+    result.heat_up_time = kj / rate
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
