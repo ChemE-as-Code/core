@@ -8,8 +8,9 @@ Every generated sheet starts with one XML comment::
 
 ``source_sha256`` fingerprints the canonical input (both YAML files as parsed, the view's layout
 overrides, the title-block data); ``output_sha256`` the canonical XML (C14N, comments left out)
-as generated; ``generator_sha256`` the generator code (the sources of
-:mod:`chemeascode.domains.process`). ``cheme validate`` compares them:
+as generated; ``generator_sha256`` the generator: the sources of the sheet-drawing modules
+(:data:`GENERATOR_MODULES`) and the stale-field data (:data:`STALE_FIELD_DATA`).
+``cheme validate`` compares them:
 
 - XML changed since generation: ``cheme.generated-edited`` (error);
 - generator version, generator code or schema version changed: ``cheme.generated-version``
@@ -35,9 +36,20 @@ from chemeascode.domains.process import GENERATOR_VERSION, SCHEMA
 _COMMENT = re.compile(rb"<!-- cheme-process (\{.*?\}) -->\n?")
 
 
-# The modules that turn process/*.yaml into BFD/PFD sheets, and the symbol shapes they draw.
-# Reports, checks and YAML-writing commands (streams, summary, sheets, fill, propagate) are left
-# out: editing them changes no sheet.
+# What generator_sha256 covers, so that changing it marks every BFD/PFD
+# cheme.generated-version until cheme process build is run:
+# - GENERATOR_MODULES, by file content: the modules that turn process/*.yaml into BFD/PFD sheets
+#   (layout, sheet, stream table, title block, the props.stale() the table asks) and the symbol
+#   shapes they draw;
+# - STALE_FIELD_DATA, by value: which fields propagate and simulate write and the source their
+#   values carry, so adding or removing a field that can be shown stale changes the fingerprint.
+# Not covered: reports, checks and YAML-writing commands (streams, summary, sheets, fill), which
+# change no sheet; and, on purpose (every edit would mark every library BFD/PFD outdated), the
+# code that decides whether a value is stale (propagate.py, recycle.py, duties.py,
+# simulation/translate.py). Editing that code can change which stream-table and duty cells a
+# sheet leaves blank without changing generator_sha256. cheme validate does not catch that
+# either: it rebuilds generated P&IDs (cheme.generated-sheet-drift), not BFD/PFD sheets.
+# cheme process build does, and says "written" for each sheet that changed.
 GENERATOR_MODULES = (
     "__init__.py",
     "build.py",
@@ -51,17 +63,40 @@ GENERATOR_MODULES = (
     "data/iso_shapes.json",
 )
 
+#: The data, not the code, behind the stream-table and duty cells a sheet can leave blank as
+#: stale: :func:`.props.stale` asks ``propagate.stale_fields`` and ``translate.stale_fields``,
+#: which consider the ``WRITTEN`` fields of a stream whose value carries the tool's ``SOURCE``.
+#: (module, attribute) pairs under :mod:`chemeascode.domains.process`.
+STALE_FIELD_DATA = (
+    ("propagate", "SOURCE"),
+    ("propagate", "WRITTEN"),
+    ("simulation.translate", "SOURCE"),
+    ("simulation.translate", "WRITTEN"),
+)
+
+
+def stale_field_data() -> str:
+    """:data:`STALE_FIELD_DATA` with its values, as canonical JSON."""
+    from importlib import import_module
+
+    values = {
+        f"{module}.{name}": getattr(import_module(f"{__package__}.{module}"), name)
+        for module, name in STALE_FIELD_DATA
+    }
+    return json.dumps(values, sort_keys=True, separators=(",", ":"))
+
 
 @cache
 def generator_fingerprint() -> str:
-    """SHA-256 of the generator code: the :data:`GENERATOR_MODULES` of
-    :mod:`chemeascode.domains.process` by name and content (line endings normalised), so a code
-    change without a version bump is noticed."""
+    """SHA-256 of the generator: the :data:`GENERATOR_MODULES` of
+    :mod:`chemeascode.domains.process` by name and content (line endings normalised) and
+    :func:`stale_field_data`, so a change without a version bump is noticed."""
     digest = hashlib.sha256()
     here = Path(__file__).parent
     for path in (here / name for name in GENERATOR_MODULES):
         digest.update(path.name.encode() + b"\0")
         digest.update(path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    digest.update(b"stale-field-data\0" + stale_field_data().encode() + b"\0")
     return digest.hexdigest()
 
 
