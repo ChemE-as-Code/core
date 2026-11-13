@@ -211,6 +211,27 @@ each value taken from the evidence cites its observation in `source`.
      it; move the condenser to a tempered loop or say
      in DESIGN.md why the mixture cannot freeze. Not modelled: a pressure balance (a closed
      vessel, a depressurising), mass-transfer limits.
+   - Beyond one temperature and one liquid (ADR 0074): a step that starts only after an
+     induction period (a Grignard on passivated magnesium) gives `batch.initiation: {time,
+     factor, reactions, provenance, source}` and doses its main feed with `after_initiation:
+     true` (the interlock on a positive initiation), its initiation charge as a dose without
+     it; read the uninitiated scenario in `process reactors` (`initiation.uninitiated`) and
+     `cheme.reactor-hazard-initiation`: it is what a dosing that runs on into a charge that
+     never initiates accumulates, and it sizes the initiation charge. Do not stand in a slow `k`
+     for an induction any more. A metal or other solid reactant (Mg turnings, copper, red
+     phosphorus) goes in `batch.solids: {MG: {density, diameter or specific_area, provenance,
+     source}}` (a `phase: solid` component) and its reaction takes a rate per m2 of its surface,
+     `rate: {form: power_law, basis: surface, solid: MG, ...}`, not an order in a
+     pseudo-concentration; it must be charged, not dosed. A salt precipitating as it forms
+     goes in `batch.solids` with its density only: it leaves the liquid's concentrations and
+     counts in the slurry's volume. An isothermal step that doses at one temperature and holds
+     at another gives `batch.program: {points: [[0, K], [s, K], ...], provenance}`; a reflux
+     reactor whose temperature follows the content's bubble point gives `heat: reflux` (every
+     volatile component with a `vapour_pressure`, no outlet temperature given). A
+     light-driven step gives `rate: {form: photochemical, basis: volume, k: {A: quantum
+     yield}}` and `batch.light: {power: W per m3 of charge, wavelength: nm, absorber,
+     absorptivity: m2/kmol, path_length: m, on: [[s, s]], provenance, source}`; a lamp failure
+     is a window of `on`, not a smaller `k`. Every value is a sourced or ASSUMED input.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A

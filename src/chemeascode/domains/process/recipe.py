@@ -59,7 +59,8 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
 - ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
-  ``U A (T - T_coolant)`` of the jacket at the charge (the smallest wetted area); info without a
+  ``U A (T - T_coolant)`` of the jacket at the charge (the smallest wetted area; with a
+  temperature programme at its lowest temperature over the batch, ADR 0074); info without a
   coolant temperature;
 - ``recipe-basis`` (warning): the flowsheet's flow of the batch-size stream differs from batch
   size x batches per year / hours by more than 1 % (the balance, the LCI per kg and the TEA
@@ -353,7 +354,7 @@ class VesselResult:
     rounded: bool  # to a preferred size
     fill: float  # working volume over the vessel's
     diameter: float  # m
-    process_temperature: float  # K
+    process_temperature: float  # K (a temperature programme: its lowest, ADR 0074)
     peak_duty: float | None = None  # kW to remove at the peak (isothermal)
     jacket_area: float | None = None  # m2 at the smallest content (the charge)
     removable: float | None = None  # kW: U A (T - T_coolant) there
@@ -598,13 +599,21 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     rate = solved.peak_cooling_duty if model == "semibatch" else solved.peak_heat_rate
     # None: not isothermal, or the heat released is not known (no heat of reaction)
     peak = rate * end_volume if node.batch.heat == "isothermal" and rate is not None else None
+    temperature = solved.temperature
+    if (program := getattr(node.batch, "program", None)) is not None:
+        # ADR 0074: the jacket removes least where the programme is coldest, and the peak duty
+        # may fall there (dosed cold, held warm): the lowest temperature over the batch
+        end = solved.time or 0.0
+        temperature = min(
+            program.at(x) for x in (0.0, end, *(s for s, _ in program.points if s <= end))
+        )
     return _Content(
         capacity(charged),
         capacity(solved.outlet),
         charge_volume,
         end_volume,
         peak,
-        solved.temperature,
+        temperature,
     )
 
 

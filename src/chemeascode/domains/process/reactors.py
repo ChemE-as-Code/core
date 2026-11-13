@@ -181,9 +181,12 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     moles_out = [_moles(process, s, case) for s in outs]
     y = None
     moles_liquid = [_moles(process, s, case) for s in liquid_outs]
+    # a batch's solid phase (ADR 0074) is out of the liquid's composition, its activity 1
+    solids = set(getattr(getattr(item, "batch", None), "solids", None) or ())
     if len(liquid_outs) == 1 and moles_liquid[0] is not None:
-        total = sum(moles_liquid[0].values())
-        y = {n: v / total for n, v in moles_liquid[0].items()} if total > 0 else None
+        held = {n: v for n, v in moles_liquid[0].items() if n not in solids}
+        total = sum(held.values())
+        y = {n: v / total for n, v in held.items()} if total > 0 else None
     phi = None
     real_gas_unknown = False
     if getattr(item, "fugacity", "ideal") == "peng_robinson" and y and t is not None and p:
@@ -214,6 +217,7 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             "rate_unit": None,
         }
         names = list(reaction.stoichiometry)
+        stoich = {n: v for n, v in reaction.stoichiometry.items() if n not in solids}
         if t is not None:
             if not missing(names, data) and not outside(names, data, t):
                 entry["heat_of_reaction_kJ_kmol"] = reaction_enthalpy(
@@ -228,11 +232,11 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             entry["ln_k"] is not None and y is not None and p is not None and not real_gas_unknown
         )
         liquid_known = entry["ln_k"] is not None and y is not None and on_liquid is not None
-        if liquid_known and all(y.get(n, 0.0) > 0 for n in names):  # type: ignore[union-attr]
+        if liquid_known and all(y.get(n, 0.0) > 0 for n in stoich):  # type: ignore[union-attr]
             from chemeascode.domains.chemistry.liquid import ln_quotient
 
             try:  # on the basis K is written on, the activities at the outlet temperature
-                ln_q = ln_quotient(reaction.stoichiometry, basis, y, t, on_liquid)  # type: ignore[arg-type]
+                ln_q = ln_quotient(stoich, basis, y, t, on_liquid)  # type: ignore[arg-type]
                 entry["ln_q_over_k"] = ln_q - entry["ln_k"]
                 entry["basis"] = basis
             except ValueError as failure:
@@ -248,7 +252,11 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 )
             entry["ln_q_over_k"] = ln_q - entry["ln_k"]
         law = reaction.rate
-        if law is not None and y is not None and t is not None and p is not None:
+        if law is not None and law.form == "photochemical":
+            # its rate takes the light the content absorbs, the tank's (tank.light), not the
+            # outlet stream's (ADR 0074)
+            entry["rate_note"] = "a photochemical rate: the light absorbed is the tank's"
+        elif law is not None and y is not None and t is not None and p is not None:
             if not law.covers(t):
                 lacking.append(f"a temperature inside the rate's range of {reaction.id}")
             else:
@@ -259,12 +267,18 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                         if law.reverse == "equilibrium"
                         else None
                     )
-                    entry["rate"] = rate(
-                        law, reaction.stoichiometry, y, t, p, k_out, on_liquid, basis
-                    )
-                    entry["rate_unit"] = (
-                        "kmol/(kg s)" if law.basis == "catalyst_mass" else "kmol/(m3 s)"
-                    )
+                    entry["rate"] = rate(law, stoich, y, t, p, k_out, on_liquid, basis)
+                    gone = [
+                        n
+                        for n, v in reaction.stoichiometry.items()
+                        if n in solids and v * entry["rate"] < 0
+                    ]
+                    if any(moles_liquid[0].get(n, 0.0) <= 0 for n in gone):  # type: ignore[union-attr]
+                        entry["rate"] = 0.0  # a solid that is not there neither reacts
+                    entry["rate_unit"] = {
+                        "catalyst_mass": "kmol/(kg s)",
+                        "surface": "kmol/(m2 s)",
+                    }.get(law.basis, "kmol/(m3 s)")
                     if phi is not None and law.reverse == "equilibrium":
                         entry["rate_note"] = (
                             "(1 - Q/K) of the rate law on partial pressures, the equilibrium on "
@@ -365,6 +379,7 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             }
             if solved_tank.kind == "semibatch":
                 tank_entry |= semibatch_entry(solved_tank)
+            tank_entry |= kinetics_entry(solved_tank)
             if vent is not None:
                 tank_entry |= vent_entry(solved_tank, vent.stream)
             if item.reactor in ("batch", "semibatch"):
@@ -532,6 +547,8 @@ def reactor_text(report: ReactorReport) -> str:
                     + f"; peak cooling duty {num(tank['peak_cooling_duty_kW_m3'], ' kW/m3')}"
                     + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
                 )
+        if tank:
+            lines += kinetics_lines(tank)
         if r.get("model_duty"):
             lines += report_lines(r["model_duty"])
         if r["missing"]:
@@ -615,6 +632,59 @@ def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
             k: dict(v) if isinstance(v, dict) else v for k, v in solved.head_space.items()
         }
     return {"vent": found}
+
+
+def kinetics_entry(solved: Any) -> dict[str, Any]:
+    """What ``process reactors`` adds for a batch or semi-batch's ADR 0074 terms, each only
+    where declared: ``initiation`` (with the uninitiated scenario), ``solids``, ``light`` and
+    ``temperatures`` (a programme's or a reflux's)."""
+    found: dict[str, Any] = {}
+    for key in ("initiation", "solids", "light", "temperatures"):
+        if value := getattr(solved, key, None):
+            found[key] = value
+    return found
+
+
+def kinetics_lines(tank: dict[str, Any]) -> list[str]:
+    """The text lines of :func:`kinetics_entry`."""
+    lines = []
+    if start := tank.get("initiation"):
+        line = (
+            f"    initiation at {start['time_s']:.6g} s (rates at {start['factor']:g} of theirs "
+            f"before it, {', '.join(start['reactions'])})"
+        )
+        if (scenario := start.get("uninitiated")) is not None:
+            worst = scenario.get("cooling_failure")
+            x = scenario.get("max_accumulation")
+            line += f"; uninitiated until {scenario['until_s']:.6g} s: " + (
+                f"accumulation at most {x:.3g}" if x is not None else "nothing dosed accumulates"
+            )
+            if worst:
+                line += f", cooling failure at worst {worst['mtsr_K']:.6g} K"
+            if scenario.get("missing"):
+                line += f" ({scenario['missing']})"
+        lines.append(line)
+    for name, solid in (tank.get("solids") or {}).items():
+        area = (
+            f", surface {solid['area_start_m2']:.4g} -> {solid['area_end_m2']:.4g} m2"
+            if "area_start_m2" in solid
+            else ""
+        )
+        lines.append(
+            f"    solid {name}: {solid['start_kmol_h']:.4g} -> {solid['end_kmol_h']:.4g} kmol/h"
+            + area
+        )
+    if light := tank.get("light"):
+        lines.append(
+            f"    light {light['power_kW']:.4g} kW: {light['photons_absorbed_kmol_h']:.4g} kmol "
+            f"of photons and {light['absorbed_kJ_h']:.6g} kJ absorbed per hour of charge"
+        )
+    if temps := tank.get("temperatures"):
+        lines.append(
+            f"    {temps['mode']}: {temps['start_K']:.6g} K at the start, {temps['end_K']:.6g} K "
+            f"at the end (at most {temps['max_K']:.6g} K)"
+        )
+    return lines
 
 
 def semibatch_entry(solved: Any) -> dict[str, Any]:

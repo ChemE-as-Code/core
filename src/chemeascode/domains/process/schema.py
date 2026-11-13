@@ -463,6 +463,12 @@ class Dosing(Strict):
         exclude_if=lambda value: not value,
     )
     start: float = Field(default=0.0, ge=0, description="s after the charge the dosing starts")
+    after_initiation: bool = Field(
+        default=False,
+        description="The dose waits for the reaction to initiate (batch.initiation, ADR 0074): "
+        "its start counts from the initiation, as a feed interlocked on a positive initiation.",
+        exclude_if=lambda value: not value,  # a dose's fingerprint stays as it was
+    )
     absorbed: float | None = Field(
         default=None,
         gt=0,
@@ -496,6 +502,134 @@ class Dosing(Strict):
             found.append((clock, clock + duration, share))
             clock += duration
         return found
+
+
+class Initiation(Strict):
+    """A reaction that initiates only after an induction period (ADR 0074; a Grignard
+    formation on a passivated metal): before ``time`` the ``reactions``' rate laws run at
+    ``factor`` of their rate (0: not at all), from then on at their own. A dose with
+    ``after_initiation`` waits for it."""
+
+    time: float = Field(gt=0, description="s after the charge the reaction initiates")
+    factor: float = Field(
+        default=0.0, ge=0, lt=1, description="The rate laws' share of their rate before it."
+    )
+    reactions: list[str] = Field(
+        default_factory=list,
+        description="The reactions it holds back (default: every reaction of the step).",
+        exclude_if=lambda value: not value,
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class TemperatureProgram(Strict):
+    """An isothermal batch or semi-batch held to a temperature programme (ADR 0074): ``points``
+    of (s after the charge, K), the first at 0 s, the content's temperature linear between
+    them and held at the last after it; e.g. a dose at one temperature and the post-reaction at
+    another."""
+
+    points: list[tuple[float, float]] = Field(
+        min_length=1, description="(time s, temperature K) pairs, the first at 0 s."
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _ordered(self) -> TemperatureProgram:
+        times = [t for t, _ in self.points]
+        if times[0] != 0.0:
+            raise ValueError("program.points: the first at 0 s (the charge)")
+        if any(b <= a for a, b in zip(times, times[1:], strict=False)):
+            raise ValueError("program.points: times rising")
+        if any(k <= 0 for _, k in self.points):
+            raise ValueError("program.points: temperatures above 0 K")
+        return self
+
+    def at(self, time: float) -> float:
+        """K at *time* s."""
+        points = self.points
+        for (a, ta), (b, tb) in zip(points, points[1:], strict=False):
+            if time <= b:
+                return ta + (tb - ta) * max(time - a, 0.0) / (b - a)
+        return points[-1][1]
+
+
+class SolidPhase(Strict):
+    """A component a liquid batch or semi-batch carries as a solid phase (ADR 0074): out of the
+    liquid's composition (its mole fractions, concentrations and activities), its volume ``n M
+    / density`` in the content's, its ``liquid_heat_capacity`` (materials.yaml) in the content's
+    heat capacity. A rate law per m2 of its surface (``basis: surface``) takes its particles at
+    the charge, of ``diameter`` (equal spheres) or ``specific_area``, shrinking as they react
+    (``A = A_0 (n / n_0)^(2/3)``, the particles' number constant)."""
+
+    density: float = Field(gt=0, description="kg/m3 of the solid (not the bulk's)")
+    diameter: float | None = Field(
+        default=None, gt=0, description="m: of the particles charged, taken as equal spheres"
+    )
+    specific_area: float | None = Field(
+        default=None, gt=0, description="m2/kg of the particles charged (instead of diameter)"
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _size(self) -> SolidPhase:
+        if self.diameter is not None and self.specific_area is not None:
+            raise ValueError("solids: diameter or specific_area, not both")
+        return self
+
+    def area(self) -> float | None:
+        """m2 per kg of the particles charged; None without their size."""
+        if self.specific_area is not None:
+            return self.specific_area
+        if self.diameter is not None:
+            return 6.0 / (self.density * self.diameter)
+        return None
+
+
+class Light(Strict):
+    """The light of a photochemical batch or semi-batch (ADR 0074): ``power`` W of radiant power
+    at ``wavelength`` entering the content per m3 of the charge, of which the content absorbs
+    ``1 - 10^(-epsilon c l)`` (Beer-Lambert, decadic: the ``absorber``'s concentration, its
+    ``absorptivity`` and the ``path_length``), or all of it without an absorber. The photons
+    absorbed drive the photochemical rate laws; the power absorbed heats the content. The lamp
+    is on in the ``on`` windows (default: throughout)."""
+
+    power: float = Field(gt=0, description="W into the content per m3 of the charge")
+    wavelength: float = Field(gt=0, description="nm (monochromatic, or the band's centre)")
+    absorber: str | None = Field(
+        default=None, description="The component that absorbs the light; none: all of it."
+    )
+    absorptivity: float | None = Field(
+        default=None,
+        gt=0,
+        description="m2/kmol: the absorber's decadic molar absorption coefficient (one L/(mol "
+        "cm) is 100 m2/kmol).",
+    )
+    path_length: float | None = Field(default=None, gt=0, description="m: the light's path")
+    on: list[tuple[float, float]] = Field(
+        default_factory=list,
+        description="(s, s) windows the lamp is on, after the charge; default: throughout.",
+        exclude_if=lambda value: not value,
+    )
+    provenance: Provenance
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _form(self) -> Light:
+        if self.absorber is not None and (self.absorptivity is None or self.path_length is None):
+            raise ValueError("light.absorber: give its absorptivity and the path_length")
+        if self.absorber is None and (self.absorptivity or self.path_length):
+            raise ValueError("light: absorptivity and path_length are the absorber's")
+        ends = [x for window in self.on for x in window]
+        if any(b <= a for a, b in zip(ends, ends[1:], strict=False)) or any(x < 0 for x in ends):
+            raise ValueError("light.on: windows (start, end) in s, rising, not overlapping")
+        return self
+
+    def lit(self, time: float) -> bool:
+        """Whether the lamp is on at *time* s."""
+        return not self.on or any(a <= time < b for a, b in self.on)
 
 
 class HenryConstant(Strict):
@@ -768,7 +902,12 @@ class Batch(Strict):
 
     time: float | None = Field(default=None, gt=0, description="s of reaction")
     target: BatchTarget | None = None
-    heat: Literal["isothermal", "adiabatic"] = "isothermal"
+    heat: Literal["isothermal", "adiabatic", "reflux"] = Field(
+        default="isothermal",
+        description="isothermal (at the outlet's temperature, or a program), adiabatic, or "
+        "reflux: a liquid held at its bubble point at the vessel's pressure, its vapour "
+        "condensed and returned (ADR 0074).",
+    )
     catalyst_loading: float | None = Field(
         default=None, gt=0, description="kg of catalyst per m3: rate laws per kg of catalyst."
     )
@@ -790,6 +929,29 @@ class Batch(Strict):
         "holds the batch at its temperature from the start and leaves it to the recipe.",
         exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
     )
+    initiation: Initiation | None = Field(
+        default=None,
+        description="An induction period: the rate laws held back until the reaction "
+        "initiates (ADR 0074).",
+        exclude_if=lambda value: value is None,
+    )
+    program: TemperatureProgram | None = Field(
+        default=None,
+        description="An isothermal batch's temperature programme: {points: [(s, K)]} (ADR 0074).",
+        exclude_if=lambda value: value is None,
+    )
+    solids: dict[str, SolidPhase] = Field(
+        default_factory=dict,
+        description="Component -> its solid phase: carried out of the liquid, with its "
+        "particles for a surface rate law (ADR 0074).",
+        exclude_if=lambda value: not value,
+    )
+    light: Light | None = Field(
+        default=None,
+        description="The light of photochemical rate laws: lamp power, wavelength, absorber "
+        "(ADR 0074).",
+        exclude_if=lambda value: value is None,
+    )
     provenance: Provenance
     source: str = ""
 
@@ -804,11 +966,26 @@ class Batch(Strict):
         streams = [d.stream for d in self.dosing]
         if len(set(streams)) != len(streams):
             raise ValueError("dosing: each stream once")
+        if self.program is not None and self.heat != "isothermal":
+            raise ValueError("program: an isothermal batch (heat: isothermal)")
+        if self.heat_up and self.heat == "reflux":
+            raise ValueError("heat_up: an isothermal batch (at reflux it starts at its boil)")
+        if self.initiation is None and any(d.after_initiation for d in self.dosing):
+            raise ValueError("dosing.after_initiation: give batch.initiation")
         return self
+
+    def segments(self, dosing: Dosing) -> list[tuple[float, float, float]]:
+        """(start s, end s, share) of *dosing*'s segments after the charge: from its start, or
+        from the initiation with ``after_initiation`` (ADR 0074)."""
+        found = dosing.segments()
+        if dosing.after_initiation and self.initiation is not None:
+            shift = self.initiation.time
+            found = [(a + shift, b + shift, s) for a, b, s in found]
+        return found
 
     def dosing_end(self) -> float:
         """s: when the last dose ends (0 without dosing)."""
-        return max((b for d in self.dosing for _, b, _ in d.segments()), default=0.0)
+        return max((b for d in self.dosing for _, b, _ in self.segments(d)), default=0.0)
 
 
 class SelectivityUncertainty(Strict):

@@ -253,6 +253,10 @@ def _reactor_basis(
             }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
             assumptions += _heat_assumptions(spec) if model != "cstr" else []
+            if model != "cstr" and spec is not None:
+                from chemeascode.domains.process.batch_kinetics import assumptions as kinetics
+
+                assumptions += kinetics(spec)  # its ADR 0074 terms, where declared
             vent = getattr(spec, "vent", None) if model != "cstr" else None
             if vent is not None and (vent.vapour is not None or vent.henry):
                 from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT

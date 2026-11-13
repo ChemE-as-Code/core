@@ -118,6 +118,30 @@
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
+- Semi-batch kinetics beyond one temperature and one liquid (ADR 0074, core#184 part B), each
+  opt-in on `batch:`. `initiation: {time, factor, reactions}`: an induction period, the rate laws
+  held at `factor` until the reaction initiates; `dosing[].after_initiation` interlocks a dose
+  on it; a semi-batch with an initiation also runs the uninitiated scenario (the dosing going on
+  into a charge that never initiates, its largest accumulation and worst cooling failure),
+  reported by `process reactors` (`tank.initiation`) and `reactor-hazards` (`initiation`,
+  `cheme.reactor-hazard-initiation`). `solids: {id: {density, diameter | specific_area}}`
+  carries a component as a solid phase (out of the liquid's composition, its Henry solvent and
+  the outlet rate `process reactors` reports; a precipitate forming as it reacts; charged alone,
+  nothing reacts until the liquid is dosed; one the batch never holds is refused), and
+  `rate.basis: surface` with `rate.solid` is a rate per m2 of its shrinking particles (`A_0 (n /
+  n_0)^(2/3)`). `program: {points}` moves an isothermal batch's temperature, `heat: reflux`
+  holds it at the content's bubble point; their duty adds the content's sensible heat
+  (`content`) and takes the doses, the dosed gas passing through (`vent gas`) and a returned
+  condensate (`condensate return`) at the temperature each met; the recipe's jacket check takes
+  a programme's lowest temperature. `rate.form: photochemical` (the quantum yield times the
+  photons absorbed) with `light: {power, wavelength, absorber, absorptivity, path_length, on}`
+  (Beer-Lambert, CODATA 2022 constants; the light's heat in the duty's `light` term; `process
+  reactors` gives no outlet rate for it, the light being the tank's). A vent's peak rate takes
+  the initiation's factor and the lamp from the start. `process reactors` adds `solids`,
+  `light` and `temperatures` where declared; `cheme.process-reactor` checks the new keys. A
+  batch without them solves, propagates and fingerprints as in 1.12.0: the library's batch and
+  semi-batch entries' `propagate --check`, `recipe`, `reactors`, `reactor-hazards`, `stills`
+  and `crystallizers` (which reports the dryers) output is unchanged (rel 1e-9).
 
 ### Fixed
 
