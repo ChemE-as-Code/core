@@ -73,9 +73,13 @@ def rate_law_view(law: RateLaw, window: tuple[float, float] | None = None) -> di
     ``temperature_range`` (else *window*, the catalyst's; neither: no profile)."""
     symbol = "p" if law.driving == "partial_pressure" else "c"
     driving_unit = "bar" if law.driving == "partial_pressure" else "kmol/m3"
-    rate_unit = "kmol/(kg s)" if law.basis == "catalyst_mass" else "kmol/(m3 s)"
+    rate_unit = {"catalyst_mass": "kmol/(kg s)", "surface": "kmol/(m2 s)"}.get(
+        law.basis, "kmol/(m3 s)"
+    )
     terms = [_power(f"{symbol}_{n}", a) for n, a in law.orders.items() if a != 0]
     text = " · ".join(["k(T)", *terms])
+    if law.form == "photochemical":  # k: the quantum yield, times the photons absorbed (ADR 0074)
+        text += " · q_a"
     if law.reverse == "equilibrium":
         text += " · (1 - Q/K)"
     if law.form == "lhhw":
@@ -88,6 +92,8 @@ def rate_law_view(law: RateLaw, window: tuple[float, float] | None = None) -> di
     order = sum(law.orders.values())
     base = f"({driving_unit})" if "/" in driving_unit else driving_unit
     k_unit = rate_unit if order == 0 else f"{rate_unit} / {base}^{order:g}"
+    if law.form == "photochemical":
+        k_unit = "kmol/kmol of photons" + ("" if order == 0 else f" / {base}^{order:g}")
     span, frm = law.temperature_range, "temperature_range"
     if span is None and window is not None:
         span, frm = window, "catalyst window"

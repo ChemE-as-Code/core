@@ -63,6 +63,13 @@ adiabatic balance, the peak cooling duty and the heat term ``solution``; it is n
 so the cooling-failure potentials leave it out. With ``batch.heat_up`` the charge's heat-up
 from its inlet temperature to the batch's is the heat term ``charge heat-up``.
 
+ADR 0074 (:mod:`.batch_kinetics`), each only where declared: an initiation holds its reactions
+back until it initiates (and a semi-batch's uninitiated scenario runs it never initiating), a
+temperature programme or reflux moves the temperature (the heat terms ``content`` and ``doses``
+warmed to the temperature each met), a solid phase leaves the liquid's composition (a rate per
+m2 of its shrinking particles, ``M_j = A_0 (n / n_0)^(2/3)``), and a photochemical rate law
+takes the photons the liquid absorbs of the batch's light (its power the heat term ``light``).
+
 Phases: every reaction of a tank is gas-phase or every one liquid-phase (:mod:`.chemistry.liquid`
 gives a liquid's mole fractions, activities or concentrations). A gas's enthalpies are the
 ideal-gas data's; a liquid's are ``heat_of_reaction`` plus ``liquid_heat_capacity`` (both needed
@@ -71,6 +78,7 @@ for an adiabatic liquid, and for a liquid's duty). Pure Python.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -213,6 +221,17 @@ class TankResult:
     #: semi-batch: kmol (per hour of charge) of each dosed reactant charged and dosed, the
     #: liquid's share of a dosed gas (the denominator of its accumulation, ADR 0069)
     dosed_reactants: dict[str, float] = field(default_factory=dict, repr=False)
+    #: ADR 0074, each only where declared: the initiation and the uninitiated scenario (the
+    #: dosing going on into a charge that never initiates: its largest accumulation and worst
+    #: cooling failure), the solid phase (kmol by component at the start and the end, a surface
+    #: rate's solid's area m2 then), the light (kmol of photons and kJ absorbed, per hour of
+    #: charge), the temperature programme or reflux (the temperature at the start and the end)
+    initiation: dict[str, Any] = field(default_factory=dict)
+    solids: dict[str, Any] = field(default_factory=dict)
+    light: dict[str, Any] = field(default_factory=dict)
+    temperatures: dict[str, Any] = field(default_factory=dict)
+    #: kmol by component charged (the batch's basis): a surface rate's particles at the start
+    charged: dict[str, float] = field(default_factory=dict, repr=False)
 
 
 @dataclass
@@ -253,29 +272,86 @@ class _Mixture:
     loading: float | None
     #: components vented as they form (fraction 1): never in the liquid, so no trace of them
     gone: frozenset[str] = frozenset()
+    #: ADR 0074: the components carried as a solid phase, m3/kmol of each (M / density): out
+    #: of the liquid's composition, in the content's volume
+    solids: Mapping[str, float] = field(default_factory=dict)
+    #: a surface rate's solid -> (m2 of its particles at the charge, kmol of it charged)
+    surfaces: Mapping[str, tuple[float, float]] = field(default_factory=dict)
+    #: the light of photochemical rate laws: (kmol/s of photons into the content, kW of its
+    #: radiant power, the :class:`~.schema.Light`), on the batch's basis
+    light: tuple[float, float, Any] | None = None
 
     def nu(self) -> list[list[float]]:
         return [[r.stoichiometry.get(n, 0.0) for r in self.reactions] for n in self.names]
 
     def rates(self, moles: Sequence[float], t: float, p: float) -> list[float]:
-        """kmol/(m3 s) or kmol/(kg s) per reaction at the composition *moles*."""
-        total = sum(moles)
-        # a trace instead of zero: an integrator's trial stage may empty a reactant, where a
-        # (1 - Q/K) law is not defined; the trace gives a large reverse rate the step rejects
-        x = {
-            n: 0.0 if n in self.gone else max(v / total, 1e-30)
-            for n, v in zip(self.names, moles, strict=True)
-        }
+        """kmol/(m3 s), kmol/(kg s) or kmol/(m2 s) per reaction at the composition *moles*."""
+        solid = self.solids
+        x = self.fractions(moles)
+        photons = self.absorbed(moles, x)[0] if self.light is not None else None
         found = []
         for r in self.reactions:
             law = r.rate
             basis = k_basis(r)
             ln_k = reaction_ln_k(r, self.data, t, basis) if law.reverse == "equilibrium" else None
-            found.append(rate(law, r.stoichiometry, x, t, p, ln_k, self.liquid, basis))
+            stoich = r.stoichiometry
+            if solid:  # a solid's activity is 1: no part of Q (ADR 0074)
+                stoich = {n: v for n, v in stoich.items() if n not in solid}
+            value = rate(law, stoich, x, t, p, ln_k, self.liquid, basis, photons)
+            if solid and value:
+                # a solid that is not there neither reacts nor dissolves
+                held = dict(zip(self.names, moles, strict=True))
+                side = [n for n, v in r.stoichiometry.items() if n in solid and v * value < 0]
+                if any(held.get(n, 0.0) <= 0 for n in side):
+                    value = 0.0
+            found.append(value)
         return found
 
-    def multipliers(self, volume: float) -> list[float]:
-        """M_j: the volume (rate per m3) or the catalyst mass (rate per kg) of each rate."""
+    def fractions(self, moles: Sequence[float]) -> dict[str, float]:
+        """The liquid's mole fractions at *moles*: a vented gas (``gone``) and a solid phase
+        (ADR 0074) at 0."""
+        solid = self.solids
+        if solid:  # a solid phase is no part of the liquid's composition (ADR 0074)
+            total = sum(v for n, v in zip(self.names, moles, strict=True) if n not in solid)
+        else:
+            total = sum(moles)
+        # a trace instead of zero: an integrator's trial stage may empty a reactant, where a
+        # (1 - Q/K) law is not defined; the trace gives a large reverse rate the step rejects
+        return {
+            n: 0.0 if n in self.gone or n in solid else max(v / total, 1e-30)
+            for n, v in zip(self.names, moles, strict=True)
+        }
+
+    def absorbed(
+        self, moles: Sequence[float], x: Mapping[str, float] | None = None
+    ) -> tuple[float, float, float]:
+        """The light the content of *moles* (mole fractions *x* of its liquid) absorbs: kmol/(m3
+        s) of photons per m3 of the content, the kW of radiant power and the kmol/s of photons
+        (ADR 0074)."""
+        from chemeascode.domains.process.batch_kinetics import absorbed_share
+
+        if x is None:
+            x = self.fractions(moles)
+        flux, power, light = self.light  # type: ignore[misc]
+        concentration = 0.0
+        if light.absorber is not None:
+            liquid = {n: v for n, v in x.items() if v > 0 and n not in self.gone}
+            concentration = x.get(light.absorber, 0.0) / self.liquid.molar_volume(liquid)
+        share = absorbed_share(light, concentration)
+        volume = self.liquid_volume(moles)
+        return (flux * share / volume if volume > 0 else 0.0), power * share, flux * share
+
+    def liquid_volume(self, moles: Sequence[float]) -> float:
+        """m3 of the liquid of *moles*: the content less a solid phase (ADR 0074)."""
+        held = {n: v for n, v in zip(self.names, moles, strict=True) if n not in self.solids}
+        return self.volume_flow(held, 0.0, 0.0)
+
+    def multipliers(self, volume: float, moles: Sequence[float] | None = None) -> list[float]:
+        """M_j: the volume (rate per m3), the catalyst mass (rate per kg) or the solid's surface
+        at *moles* (rate per m2, ADR 0074) of each rate. With a solid phase a rate per m3 is
+        per m3 of the liquid: the content's *volume* less the solid's."""
+        if self.solids and moles is not None:
+            volume = self.liquid_volume(moles)
         found = []
         for r in self.reactions:
             if r.rate.basis == "catalyst_mass":
@@ -284,12 +360,36 @@ class _Mixture:
                         f"reaction {r.id}: a rate per kg of catalyst needs catalyst_loading"
                     )
                 found.append(volume * self.loading)
+            elif r.rate.basis == "surface":
+                found.append(self.surface(r, moles))
             else:
                 found.append(volume)
         return found
 
+    def surface(self, reaction: Any, moles: Sequence[float] | None) -> float:
+        """m2 of the surface of *reaction*'s solid at *moles*: its particles at the charge,
+        shrinking at a constant number, ``A_0 (n / n_0)^(2/3)`` (ADR 0074)."""
+        solid = reaction.rate.solid
+        if solid not in self.surfaces or moles is None:
+            raise TankError(
+                f"reaction {reaction.id}: a rate per m2 of {solid}'s surface needs a liquid "
+                f"batch or semi-batch that charges {solid} as a solid phase (batch.solids) with "
+                "its particles' diameter or specific_area"
+            )
+        area, charged = self.surfaces[solid]
+        held = max(moles[self.names.index(solid)], 0.0)
+        return area * (held / charged) ** (2.0 / 3.0)
+
     def volume_flow(self, moles: Mapping[str, float], t: float, p: float) -> float:
-        """m3/s of a flow of *moles* (kmol/s)."""
+        """m3/s of a flow of *moles* (kmol/s); a solid phase at its own density (ADR 0074)."""
+        if self.liquid is not None and self.solids:
+            solid = sum(max(v, 0.0) * self.solids[n] for n, v in moles.items() if n in self.solids)
+            liquid = {n: v for n, v in moles.items() if n not in self.solids}
+            total = sum(liquid.values())
+            if total <= 0:
+                return solid
+            fractions = {n: v / total for n, v in liquid.items()}
+            return total * self.liquid.molar_volume(fractions) + solid
         if self.liquid is not None:
             total = sum(moles.values())
             if total <= 0:
@@ -456,6 +556,72 @@ def _mixture(
     return _Mixture(reactions, names, data, liquid if is_liquid else None, heat_capacity, loading)
 
 
+def _solid_phase(
+    mix: _Mixture,
+    batch: Any,
+    reactions: list[Any],
+    charge: Mapping[str, float],
+    doses: Sequence[Any],
+    components: Mapping[str, Any],
+) -> None:
+    """*mix* with *batch*'s solid phase (``batch.solids``, ADR 0074): each solid's volume per
+    kmol (``M / density``) and, for a rate law per m2 of its surface, its particles' area at the
+    *charge*. Raises TankError: a surface rate without its solid charged as a phase with a
+    size, a dosed one (the surface of a dosed solid needs the particles' population), a rate
+    law on a solid phase's concentration, a gas batch."""
+    solids = dict(getattr(batch, "solids", None) or {})
+    surface = [r for r in reactions if r.rate is not None and r.rate.basis == "surface"]
+    if lacking := sorted({r.rate.solid for r in surface} - set(solids)):
+        raise TankError(
+            "a rate per m2 of the surface of " + ", ".join(lacking) + ": give it in "
+            "batch.solids (its density and its particles' diameter or specific_area)"
+        )
+    if not solids:
+        return
+    if mix.liquid is None:
+        raise TankError("batch.solids: a solid phase in a liquid batch (liquid-phase reactions)")
+    if lacking := sorted(n for n in solids if not getattr(components.get(n), "molar_mass", None)):
+        raise TankError("batch.solids: no molar_mass for " + ", ".join(lacking))
+    named = [
+        r.id
+        for r in reactions
+        if r.rate is not None
+        and (
+            any(n in solids for n in r.rate.orders)
+            or any(n in solids for a in r.rate.adsorption for n in a.exponents)
+        )
+    ]
+    if named:
+        raise TankError(
+            "the rate law(s) of " + ", ".join(named) + " take a solid phase's concentration "
+            "(an order in it): a solid is out of the liquid; give the rate per m2 of its surface "
+            "(basis: surface, solid:)"
+        )
+    mix.solids = {n: components[n].molar_mass / spec.density for n, spec in solids.items()}
+    surfaces: dict[str, tuple[float, float]] = {}
+    for r in surface:
+        name = r.rate.solid
+        per_kg = solids[name].area()
+        if per_kg is None:
+            raise TankError(
+                f"batch.solids.{name}: its particles' diameter or specific_area (reaction "
+                f"{r.id}'s rate per m2 of its surface)"
+            )
+        charged = charge.get(name, 0.0)
+        if charged <= 0:
+            raise TankError(
+                f"reaction {r.id}: a rate per m2 of {name}'s surface needs {name} charged "
+                "(its particles at the start)"
+            )
+        if any(getattr(d, "moles", {}).get(name, 0.0) > 0 for d in doses):
+            raise TankError(
+                f"{name} is dosed: the surface of a dosed solid needs its particles' population "
+                "(not modelled); charge it"
+            )
+        surfaces[name] = (per_kg * charged * components[name].molar_mass, charged)
+    mix.surfaces = surfaces
+
+
 def solve_cstr(
     reactions: list[Any],
     feed: Mapping[str, float],
@@ -588,6 +754,8 @@ class Dose:
     #: kJ/kmol by component of its ``heat_of_solution`` (negative: exothermic); a component
     #: the vent's vapour takes off the liquid takes it back in (ADR 0063, ADR 0062)
     solution_by: Mapping[str, float] = field(default_factory=dict)
+    #: it waits for the initiation (``after_initiation``, ADR 0074): its segments start then
+    waits: bool = False
 
     def rate(self, t: float) -> float:
         """The share of the feed per second at time *t* s."""
@@ -611,13 +779,16 @@ def solve_batch(
     doses: Sequence[Dose] = (),
     vent_phase: Any = None,
     head_space: Mapping[str, float] | None = None,
+    components: Mapping[str, Any] | None = None,
 ) -> TankResult:
     """:func:`_solve_batch`; with a ``vent.henry`` component the share of what forms that
     leaves is found by successive substitution over whole runs, so that the liquid at the end
     holds its solubility (:mod:`.vent_vapour`, ADR 0062). *vent_phase* is the vent's
     :class:`~.vent_vapour.VentPhase` (its vapour, condenser and Henry constants); *head_space*
     the inert gas (kmol by component, the charge's basis) that pads the vessel's head space
-    (``vent.head_space``, ADR 0071). Raises TankError."""
+    (``vent.head_space``, ADR 0071); *components* the materials' components (a solid phase's
+    molar mass, a reflux's vapour pressures, ADR 0074). A semi-batch with an initiation also
+    runs its uninitiated scenario (:func:`_uninitiated`). Raises TankError."""
     from chemeascode.domains.process.vent_vapour import HENRY_RUNS, VentError
 
     vent = getattr(batch, "vent", None)
@@ -625,20 +796,66 @@ def solve_batch(
     args = (reactions, charge, temperature, pressure, batch, data, liquid, heat_capacity)
     pad = dict(head_space or {})
     doses = _inert_doses(set(getattr(vent, "inerts", None) or ()), charge, doses)
+    shares: dict[str, float] | None = None
     try:
         if not henry:
-            return _solve_batch(*args, isothermal_at, doses, vent_phase, None, pad)
-        shares = vent.shares()
-        for _ in range(HENRY_RUNS):
-            result = _solve_batch(*args, isothermal_at, doses, vent_phase, shares, pad)
-            if _henry_step(result, reactions, doses, henry, shares, vent_phase, pressure):
-                return result
-        result.notes.append(
-            f"vent: the Henry split did not converge in {HENRY_RUNS} runs of the batch"
-        )
+            result = _solve_batch(*args, isothermal_at, doses, vent_phase, None, pad, components)
+        else:
+            shares = vent.shares()
+            for _ in range(HENRY_RUNS):
+                result = _solve_batch(
+                    *args, isothermal_at, doses, vent_phase, shares, pad, components
+                )
+                if _henry_step(result, reactions, doses, henry, shares, vent_phase, pressure):
+                    break
+            else:
+                result.notes.append(
+                    f"vent: the Henry split did not converge in {HENRY_RUNS} runs of the batch"
+                )
+        if getattr(batch, "initiation", None) is not None:
+            run = (*args, isothermal_at, doses, vent_phase, shares, pad, components)
+            _uninitiated(result, batch, reactions, doses, run)
         return result
     except VentError as failure:
         raise TankError(str(failure)) from failure
+
+
+def _uninitiated(
+    result: TankResult, batch: Any, reactions: list[Any], doses: Sequence[Dose], run: tuple
+) -> None:
+    """The initiation of *batch* (ADR 0074) into *result*: its time, factor and reactions and,
+    for a semi-batch, the uninitiated scenario: the run again with the initiation never coming,
+    the doses that wait for it left out, until the initiation was due or the last other dose
+    ends; its largest accumulation of the dosed reactant and its worst cooling failure (the
+    content then reacting to completion adiabatically, the dosing stopped)."""
+    start = batch.initiation
+    held = start.reactions or [r.id for r in reactions]
+    result.initiation = {
+        "time_s": start.time,
+        "factor": start.factor,
+        "reactions": list(held),
+        "doses_waiting": sum(1 for d in doses if d.waits),
+    }
+    if not doses:
+        return
+    kept = [d for d in doses if not d.waits]
+    until = max([start.time, *(b for d in kept for _, b, _ in d.segments)])
+    scenario: dict[str, Any] = {"until_s": until}
+    try:
+        found = _solve_batch(*run[:9], kept, *run[10:], uninitiated=True)
+    except TankError as failure:
+        scenario["missing"] = str(failure)
+        result.initiation["uninitiated"] = scenario
+        return
+    worst = found.cooling_failure
+    scenario |= {
+        "max_accumulation": found.max_accumulation,
+        "max_accumulation_time_s": found.max_accumulation_time,
+        "cooling_failure": (
+            {"time_s": worst[0], "temperature_K": worst[1], "mtsr_K": worst[2]} if worst else None
+        ),
+    }
+    result.initiation["uninitiated"] = scenario
 
 
 def _inert_doses(
@@ -760,6 +977,8 @@ def _solve_batch(
     vent_phase: Any = None,
     vent_shares: Mapping[str, float] | None = None,
     head_space: Mapping[str, float] | None = None,
+    components: Mapping[str, Any] | None = None,
+    uninitiated: bool = False,
 ) -> TankResult:
     """The composition of the *charge* (kmol, or kmol/h of charge) at *temperature* K and
     *pressure* kPa after *batch* (a :class:`~.schema.Batch`): its ``time``, or its ``target``
@@ -773,7 +992,15 @@ def _solve_batch(
 
     With ``batch.vent`` (liquid), the vent's components leave as they form (see the module
     docstring); the result's ``vent`` is what left, ``outlet`` the liquid. A vent's inerts
-    pass through (ADR 0071); *head_space* (kmol of inert by component) pads its head space."""
+    pass through (ADR 0071); *head_space* (kmol of inert by component) pads its head space.
+
+    ADR 0074 (:mod:`.batch_kinetics`): ``batch.initiation`` holds its reactions back until it
+    initiates (*uninitiated*: for good, the run ending when the initiation was due or the last
+    dose ends), ``batch.program`` or ``heat: reflux`` move the temperature, ``batch.solids``
+    carries a solid phase (a surface rate law on its shrinking particles), ``batch.light``
+    drives the photochemical rate laws; the run is split where these change."""
+    from chemeascode.domains.process import batch_kinetics
+
     doses = list(doses)
     vent = getattr(batch, "vent", None)
     shares = vent.shares() if vent is not None else {}
@@ -801,6 +1028,7 @@ def _solve_batch(
         )
     )
     mix = _mixture(reactions, names, data, liquid, heat_capacity or {}, batch.catalyst_loading)
+    _solid_phase(mix, batch, reactions, charge, doses, components or {})
     nu = mix.nu()
     m = len(reactions)
     size = len(names)  # the liquid's components; a vent's running totals follow in the state
@@ -845,8 +1073,71 @@ def _solve_batch(
     charge_temperature = temperature
     if batch.heat == "isothermal" and isothermal_at:
         temperature = isothermal_at  # the batch is held at its given temperature
+    program = getattr(batch, "program", None)
+    reflux = batch.heat == "reflux"
+    if program is not None:  # ADR 0074: the programme sets the temperature
+        if isothermal_at is not None and abs(isothermal_at - program.points[-1][1]) > 1e-6:
+            raise TankError(
+                f"the outlet's given temperature {isothermal_at:.6g} K is not the end of "
+                f"batch.program, {program.points[-1][1]:.6g} K"
+            )
+        temperature = program.points[0][1]
+    if reflux:
+        if mix.liquid is None:
+            raise TankError("heat: reflux: a liquid batch (liquid-phase reactions)")
+        if isothermal_at is not None:
+            raise TankError(
+                f"heat: reflux follows the content's bubble point: the outlet's given "
+                f"temperature {isothermal_at:.6g} K is not the model's (leave it to propagate)"
+            )
+        if vent is not None and (vent.vapour is not None or vent.head_space is not None):
+            raise TankError(
+                "heat: reflux with vent.vapour or vent.head_space: the gas over a boiling liquid "
+                "is its vapour, which the total reflux returns (not modelled; leave them out)"
+            )
+        activity = dict(getattr(getattr(vent, "vapour", None), "activity", None) or {})
+
+        def boiling(moles: Sequence[float]) -> float:
+            """K: the bubble point of the liquid of *moles* at the vessel's pressure."""
+            held = {
+                names[i]: moles[i]
+                for i in range(size)
+                if names[i] not in mix.gone and names[i] not in mix.solids
+            }
+            found, lacking = batch_kinetics.bubble_point(held, components or {}, pressure, activity)
+            if lacking:
+                raise TankError(
+                    "heat: reflux: no vapour_pressure (or heat_of_vaporization with the "
+                    "normal_boiling_point) of " + ", ".join(lacking)
+                )
+            if found is None:
+                raise TankError(f"heat: reflux: the liquid does not boil at {pressure:.6g} kPa")
+            return found
+
+        temperature = boiling(n0)
     gas_volume = None if mix.liquid is not None else total0 * R * temperature / pressure
     adiabatic = batch.heat == "adiabatic"
+    light = getattr(batch, "light", None)
+    photochemical = [r.id for r in reactions if r.rate.form == "photochemical"]
+    if photochemical and light is None:
+        raise TankError(
+            "the photochemical rate law(s) of " + ", ".join(photochemical) + " need "
+            "batch.light (the lamp's power and wavelength, the absorber)"
+        )
+    if light is not None:
+        if mix.liquid is None:
+            raise TankError("batch.light: a liquid batch or semi-batch")
+        if light.absorber is not None and light.absorber not in names:
+            raise TankError(f"batch.light.absorber {light.absorber} is not in the batch")
+        watts = light.power * mix.volume_flow(dict(zip(names, n0, strict=True)), 0.0, 0.0)
+        mix.light = (batch_kinetics.photon_flux(watts, light.wavelength), watts / 1000.0, light)
+    # ADR 0074: the content's temperature moves (a programme, reflux) or a lamp heats it
+    varying = program is not None or reflux or light is not None
+    extra_breaks = batch_kinetics.breaks(batch)
+
+    def regime_of(a: float, b: float | None) -> batch_kinetics.Regime:
+        return batch_kinetics.regime(batch, reactions, a, b, uninitiated)
+
     dnu = [sum(r.stoichiometry.values()) for r in reactions]
 
     def energies(t: float) -> list[float]:
@@ -906,7 +1197,9 @@ def _solve_batch(
     absorbing = any(absorb)
     absorb_at = head_at + 2 * ng
     molar_volume = (
-        [(mix.liquid.molar_volumes.get(n) or 0.0) for n in names] if mix.liquid is not None else []
+        [mix.solids.get(n) or (mix.liquid.molar_volumes.get(n) or 0.0) for n in names]
+        if mix.liquid is not None
+        else []
     )
     dhvap = [phase.heat_of_vaporization.get(names[i]) or 0.0 for i in volatile] if nv else []
     cp_vap = [phase.liquid_heat_capacity.get(names[i]) or 0.0 for i in volatile] if nv else []
@@ -932,7 +1225,11 @@ def _solve_batch(
         gas_now = sum(gas_flows.values())
         if not nv or gas_now <= 0:
             return zero, zero, 0.0, 0.0
-        held = {names[i]: moles[i] for i in range(size) if names[i] not in mix.gone}
+        held = {
+            names[i]: moles[i]
+            for i in range(size)
+            if names[i] not in mix.gone and names[i] not in mix.solids
+        }
         carry = phase.carried(held, t, pressure)
         s = [gas_now * carry[names[i]] for i in volatile]
         qv = sum(a * h for a, h in zip(s, dhvap, strict=True))
@@ -1010,7 +1307,7 @@ def _solve_batch(
         dv = sum(v * d for v, d in zip(molar_volume, dn, strict=False))
         y = dy = 0.0
         if nv:
-            liquid = [i for i in range(size) if names[i] not in mix.gone]
+            liquid = [i for i in range(size) if names[i] not in mix.gone | set(mix.solids)]
             total = sum(max(moles[i], 0.0) for i in liquid)
             d_total = sum(dn[i] for i in liquid)
             k = phase.k_values(t, pressure)
@@ -1121,17 +1418,25 @@ def _solve_batch(
             missing_cooling = str(failure)
 
     def make_derivatives(
-        source: list[float], sensible: list[tuple[float, float]], mixing: float = 0.0
+        source: list[float],
+        sensible: list[tuple[float, float]],
+        mixing: float = 0.0,
+        regime: batch_kinetics.Regime = batch_kinetics.PLAIN,
     ) -> Callable[[list[float]], list[float]]:
         """The state's derivatives, *source* kmol/s dosed and *mixing* kW released as it mixes
-        in (a heat of solution)."""
+        in (a heat of solution), in the ADR 0074 *regime* (the reactions' factors, the lamp,
+        the programme's slope)."""
 
         def derivatives(state: list[float]) -> list[float]:
             moles, t = state[:size], state[-2]
+            if reflux:
+                t = boiling(moles)
             v = volume_of(moles, t)
-            mult = mix.multipliers(v)
+            mult = mix.multipliers(v, moles)
             rates = mix.rates(moles, t, pressure_of(moles, t))
             extent = [mult[j] * rates[j] for j in range(m)]
+            if regime.factors is not None:
+                extent = [e * f for e, f in zip(extent, regime.factors, strict=True)]
             dn = [
                 sum(nu[i][j] * extent[j] for j in range(m)) + source[i] for i in range(len(names))
             ]
@@ -1154,6 +1459,8 @@ def _solve_batch(
                 gain = sum(-h * e for h, e in zip(heats, extent, strict=True))
                 gain += sum(c * (t_dose - t) for c, t_dose in sensible) + mixing
                 gain += dissolving
+                if mix.light is not None and regime.lit:  # the light it absorbs (ADR 0074)
+                    gain += mix.absorbed(moles)[1]
             extra: list[float] = []
             head: list[float] = []
             qv = 0.0
@@ -1164,7 +1471,7 @@ def _solve_batch(
                 for k, i in enumerate(volatile):
                     dn[i] -= v[k] if returns else s[k]
                 extra = [*s, *(v if condensing else ()), qv, qc]
-            dt = 0.0
+            dt = regime.slope  # a temperature programme's (ADR 0074)
             if adiabatic:
                 # the vapour the gas carries off cools the content (ADR 0062)
                 dt = (gain - qv) / cap
@@ -1218,6 +1525,35 @@ def _solve_batch(
         return [*rates, *out], scale * q1, extra
 
     active: list[Callable[[list[float]], list[float]]] = []  # the derivatives now
+    current = [batch_kinetics.PLAIN]  # the ADR 0074 regime now
+    # ADR 0074, with a moving temperature or a lamp: the heat into the content over the batch,
+    # kJ by term (the content's sensible heat, the doses warmed to the temperature they met,
+    # minus the light absorbed), the photons absorbed (kmol), and what lacks a heat capacity
+    moving = {"content": 0.0, "doses": 0.0, "light": 0.0, "photons": 0.0}
+    moving_missing: list[str] = []
+
+    def account(
+        state: Sequence[float],
+        new: Sequence[float],
+        h: float,
+        sensible: Sequence[tuple[float, float]],
+        regime: batch_kinetics.Regime,
+    ) -> None:
+        """One accepted step of *h* s from *state* to *new* into :data:`moving` (trapezoids)."""
+        t0, t1 = state[-2], new[-2]
+        if t1 != t0:
+            try:
+                c0 = mix.capacity(dict(zip(names, state[:size], strict=True)), t0)
+                c1 = mix.capacity(dict(zip(names, new[:size], strict=True)), t1)
+                moving["content"] += 0.5 * (c0 + c1) * (t1 - t0)
+            except TankError as failure:
+                if str(failure) not in moving_missing:
+                    moving_missing.append(str(failure))
+        moving["doses"] += sum(c * (0.5 * (t0 + t1) - t_d) * h for c, t_d in sensible)
+        if mix.light is not None and regime.lit:
+            a, b = mix.absorbed(state[:size]), mix.absorbed(new[:size])
+            moving["light"] += 0.5 * (a[1] + b[1]) * h
+            moving["photons"] += 0.5 * (a[2] + b[2]) * h
 
     def run(
         state: list[float],
@@ -1228,14 +1564,16 @@ def _solve_batch(
         sensible: list[tuple[float, float]],
         post: bool,
         mixing: float = 0.0,
+        regime: batch_kinetics.Regime = batch_kinetics.PLAIN,
     ) -> tuple[list[float], float]:
         """From *state* at *clock* s to *t_end* s or the *target* conversion, *source* kmol/s
-        dosed meanwhile and *mixing* kW released as it mixes in (a heat of solution); the
-        accepted steps go into the result."""
+        dosed meanwhile and *mixing* kW released as it mixes in (a heat of solution), in the
+        ADR 0074 *regime*; the accepted steps go into the result."""
         nonlocal heat, peak, cooling, stalled
 
-        derivatives = make_derivatives(source, sensible, mixing)
+        derivatives = make_derivatives(source, sensible, mixing, regime)
         active[:] = [derivatives]
+        current[:] = [regime]
 
         h = ((t_end - clock) if t_end is not None else 1.0) / 1000.0
         while True:
@@ -1263,6 +1601,8 @@ def _solve_batch(
                 new, _ = _dopri_step(derivatives, state, hi)
                 h = hi
             new[:-2] = [max(v, 0.0) for v in new[:-2]]
+            if reflux:  # the content at its bubble point (ADR 0074)
+                new[-2] = boiling(new[:size])
             # what reacted in this step: the change of moles less what was dosed, and what left
             d_moles = [
                 b - a - s * h for a, b, s in zip(state[:size], new[:size], source, strict=True)
@@ -1285,7 +1625,11 @@ def _solve_batch(
                     warming = sum(c * (t_dose - new[-2]) for c, t_dose in sensible)
                     if absorbing:
                         warming += (new[absorb_at] - state[absorb_at]) / h
+                    if varying:  # the content's warming and the light it absorbs (ADR 0074)
+                        warming += _kinetic_rate(mix, names, state, new, h, regime)
                     cooling = max(cooling, released / h + warming + mixing)
+            if varying:
+                account(state, new, h, sensible, regime)
             previous = conversion(state, clock)
             clock += h
             progress = abs(conversion(new, clock) - previous)
@@ -1323,9 +1667,11 @@ def _solve_batch(
             at = base + nv if condensing else base
             return max(out, 0.0) + (sum(rates[at : at + nv]) if nv else 0.0)
         moles, t = state[:size], state[-2]
-        mult = mix.multipliers(volume_of(moles, t))
+        mult = mix.multipliers(volume_of(moles, t), moles)
         rates = mix.rates(moles, t, pressure_of(moles, t))
         extent = [mult[j] * rates[j] for j in range(m)]
+        if (factors := current[0].factors) is not None:  # ADR 0074
+            extent = [e * f for e, f in zip(extent, factors, strict=True)]
         leaving = [
             f * sum(max(nu[i][j] * extent[j], 0.0) for j in range(m))
             for i, f in zip(vented, vent_share, strict=True)
@@ -1372,7 +1718,11 @@ def _solve_batch(
     room0 = 0.0
     if ng:
         # the vessel: the charge's volume and the head space its pad fills, saturated (ADR 0071)
-        held0 = {names[i]: n0[i] for i in range(size) if names[i] not in mix.gone}
+        held0 = {
+            names[i]: n0[i]
+            for i in range(size)
+            if names[i] not in mix.gone and names[i] not in mix.solids
+        }
         y0 = sum(phase.saturation(held0, temperature, pressure).values()) if nv else 0.0
         room0 = sum(pad.values()) * R * temperature / ((1.0 - y0) * pressure)
         vessel = volume_of(n0, temperature) + room0
@@ -1387,31 +1737,55 @@ def _solve_batch(
     peak_vent = 0.0
     peak_vent_time = 0.0
     breaks = sorted({0.0, *(x for d in doses for a, b, _ in d.segments for x in (a, b))})
+    if extra_breaks and len(breaks) > 1:  # ADR 0074: split the dosing where a regime changes
+        breaks = sorted({*breaks, *(x for x in extra_breaks if x < breaks[-1])})
     passing_now = passing_rate((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else 0.0
     passing_by = passing_of((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else {}
     if ng:  # the head space's expelled gas at the start: the first segment's derivatives
         first = feeding((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else ([0.0] * size, [], 0)
-        active[:] = [make_derivatives(*first)]
+        active[:] = [
+            make_derivatives(*first, regime_of(0.0, breaks[1] if len(breaks) > 1 else None))
+        ]
     record(state, clock)
     zero = [0.0] * len(names)
     for a, b in zip(breaks, breaks[1:], strict=False):
         source, sensible, mixing = feeding((a + b) / 2)
         passing_now = passing_rate((a + b) / 2)
         passing_by = passing_of((a + b) / 2)
-        state, clock = run(state, clock, b, None, source, sensible, post=False, mixing=mixing)
+        state, clock = run(state, clock, b, None, source, sensible, False, mixing, regime_of(a, b))
     dosing_end = clock
     passing_now = 0.0
     passing_by = {}
     target = batch.target.conversion if batch.target else None
-    if not doses:
-        state, clock = run(state, clock, batch.time, target, zero, [], post=True)
+
+    def finish(t_end: float | None, target: float | None) -> None:
+        """The post-reaction to *t_end* s or the *target*, split where an ADR 0074 regime
+        changes (one run without them)."""
+        nonlocal state, clock
+        for x in extra_breaks:
+            if x <= clock + 1e-9 * max(clock, 1.0) or (t_end is not None and x >= t_end):
+                continue
+            state, clock = run(state, clock, x, target, zero, [], False, 0.0, regime_of(clock, x))
+            if target is not None and conversion(state, clock) >= target - 1e-12:
+                return
+        state, clock = run(
+            state, clock, t_end, target, zero, [], True, 0.0, regime_of(clock, t_end)
+        )
+
+    if uninitiated and not doses:
+        result.notes.append("every dose waits for the initiation: none accumulates uninitiated")
+    elif uninitiated:  # ADR 0074: until the initiation was due, or the last dose not waiting ends
+        stop = max([batch.initiation.time, dosing_end])
+        if stop > clock:
+            finish(stop, None)
+    elif not doses:
+        finish(batch.time, target)
     elif target is not None and conversion(state, clock) >= target:
         result.notes.append(
             f"the target conversion {target:g} of {key} is reached when the dosing ends"
         )
     elif batch.time is not None or target is not None:
-        t_end = clock + batch.time if batch.time is not None else None
-        state, clock = run(state, clock, t_end, target, zero, [], post=True)
+        finish(clock + batch.time if batch.time is not None else None, target)
     result.outlet = dict(zip(names, state[:size], strict=True))
     change = [b - a - d for a, b, d in zip(n0, state[:size], dosed, strict=True)]
     for k, i in enumerate(vented):  # what formed and left by the vent formed all the same
@@ -1511,8 +1885,12 @@ def _solve_batch(
             if dosed[i] > 0 and n in is_reactant and n0[i] + dosed[i] > 0
         }
     result.charge_temperature = charge_temperature
+    result.charged = {n: v for n, v in zip(names, n0, strict=True) if v > 0}
+    _kinetic_results(result, mix, batch, names, n0, state, moving, temperature)
     if not adiabatic:
         _heat_terms(result, known, unknown_heat, heat, temperature, doses, dose_capacity)
+        if result.heat_terms is not None and varying:
+            _moving_terms(result, moving, moving_missing, doses, dose_capacity, program, reflux)
         if result.heat_terms is not None:
             gas = sum(
                 c * (temperature - d.temperature)
@@ -1570,6 +1948,102 @@ def _solve_batch(
                 result.accumulation[-1],
             ]
     return result
+
+
+def _kinetic_rate(
+    mix: _Mixture,
+    names: Sequence[str],
+    state: Sequence[float],
+    new: Sequence[float],
+    h: float,
+    regime: Any,
+) -> float:
+    """kW the content's cooling duty changes by over a step of *h* s from *state* to *new*
+    (ADR 0074): less the heat its warming takes up, more the light it absorbs."""
+    size = len(names)
+    found = 0.0
+    t0, t1 = state[-2], new[-2]
+    if t1 != t0:
+        with contextlib.suppress(TankError):  # the heat terms say what is missing
+            found -= mix.capacity(dict(zip(names, new[:size], strict=True)), t1) * (t1 - t0) / h
+    if mix.light is not None and regime.lit:
+        found += mix.absorbed(new[:size])[1]
+    return found
+
+
+def _moving_terms(
+    result: TankResult,
+    moving: Mapping[str, float],
+    missing_now: Sequence[str],
+    doses: Sequence[Dose],
+    capacity: Sequence[float | None],
+    program: Any,
+    reflux: bool,
+) -> None:
+    """An isothermal batch's heat terms with a temperature that moves or a lamp (ADR 0074):
+    ``doses`` warmed to the temperature each met, ``content`` the content's sensible heat as
+    its temperature follows the programme or the bubble point, minus the ``light`` absorbed."""
+    lacking = [
+        f"the liquid_heat_capacity of dose {k + 1} (the batch's temperature moves)"
+        for k, c in enumerate(capacity)
+        if c is None
+    ]
+    if program is not None or reflux:
+        lacking += [f"the content's heat capacity: {m}" for m in missing_now]
+    if lacking:
+        result.heat_terms = None
+        result.heat_missing = lacking
+        return
+    terms = result.heat_terms or {}
+    if doses:
+        terms["doses"] = moving["doses"]
+    if program is not None or reflux:
+        terms["content"] = moving["content"]
+    if result.light:
+        terms["light"] = -moving["light"]
+
+
+def _kinetic_results(
+    result: TankResult,
+    mix: _Mixture,
+    batch: Any,
+    names: Sequence[str],
+    n0: Sequence[float],
+    state: Sequence[float],
+    moving: Mapping[str, float],
+    start: float,
+) -> None:
+    """The ADR 0074 terms of a run into *result*, each only where declared: the solid phase,
+    the light, a programme's or a reflux's temperatures."""
+    size = len(names)
+    for name in mix.solids:
+        i = names.index(name)
+        found: dict[str, Any] = {"start_kmol_h": n0[i], "end_kmol_h": max(state[i], 0.0)}
+        if name in mix.surfaces:
+            found["area_start_m2"] = mix.surfaces[name][0]
+            charged = mix.surfaces[name][1]
+            found["area_end_m2"] = mix.surfaces[name][0] * (max(state[i], 0.0) / charged) ** (
+                2.0 / 3.0
+            )
+        result.solids[name] = found
+    if mix.light is not None:
+        flux, power, light = mix.light
+        result.light = {
+            "power_kW": power,
+            "photons_kmol_s": flux,
+            "absorbed_share_end": mix.absorbed(state[:size])[1] / power if power else None,
+            "photons_absorbed_kmol_h": moving["photons"],
+            "absorbed_kJ_h": moving["light"],
+            "on": [list(w) for w in light.on] or None,
+        }
+    if getattr(batch, "program", None) is not None or batch.heat == "reflux":
+        hottest = max(p[1] for p in result.profile) if result.profile else start
+        result.temperatures = {
+            "mode": "reflux" if batch.heat == "reflux" else "program",
+            "start_K": start,
+            "end_K": state[-2],
+            "max_K": hottest,
+        }
 
 
 def _vapour_results(
@@ -1882,10 +2356,11 @@ def _solve_node(
                 Dose(
                     moles,
                     kelvin,
-                    dosing.segments(),
+                    node.batch.segments(dosing),  # after the initiation where it waits (ADR 0074)
                     through,
                     _solution(dosing, moles),
                     dict(heat.values) if heat is not None else {},
+                    dosing.after_initiation,
                 )
             )
     moles, kelvin, kpa = stream_moles(process, inlet, case)
@@ -2049,6 +2524,17 @@ def solve_moles(
             inputs |= vent_vapour.inputs(process, vent, phase)
         else:
             phase = vent_vapour.henry_phase(vent)
+    if kind != "cstr" and spec.heat == "reflux":  # its bubble point's data (ADR 0074)
+        inputs["reflux"] = {
+            n: [
+                c.vapour_pressure.model_dump(mode="json") if c.vapour_pressure else None,
+                c.normal_boiling_point,
+                c.heat_of_vaporization,
+            ]
+            if (c := comps.get(n)) is not None
+            else None
+            for n in names
+        }
     if doses:
         mixing = "dosing" not in duty_only(spec)  # the heat of solution: an outlet's input
         vapour = phase is not None and bool(getattr(phase, "volatile", None))
@@ -2075,29 +2561,71 @@ def solve_moles(
         if pad:
             inputs["head_space"] = dict(pad)  # only with a head space (ADR 0071)
         result = solve_batch(
-            reactions, moles, kelvin, kpa, spec, data, liquid, capacity, outlet_t, doses, phase, pad
+            reactions,
+            moles,
+            kelvin,
+            kpa,
+            spec,
+            data,
+            liquid,
+            capacity,
+            outlet_t,
+            doses,
+            phase,
+            pad,
+            comps,
         )
     return result, inputs
 
 
+def _charged_kinetics(
+    process: Any, node: Any, mix: _Mixture, reactions: list[Any], comps: Any, case: str
+) -> None:
+    """*mix* with batch *node*'s solid phase and light from its charge in *case* (ADR 0074),
+    as :func:`_solve_batch` sets them."""
+    from chemeascode.domains.process import batch_kinetics
+
+    inlets = [
+        s
+        for s in process.flowsheet.streams
+        if (ends := process.ends(s)) and ends[1] is not None and ends[1].node == node.id
+    ]
+    stream = tank_inlet(node, inlets)
+    if isinstance(stream, list):
+        stream = split_inlets(node, stream)[0]
+    charge, _, _ = stream_moles(process, stream, case)
+    _solid_phase(mix, node.batch, reactions, charge, (), comps)
+    light = node.batch.light
+    if light is not None:
+        watts = light.power * mix.volume_flow(charge, 0.0, 0.0)
+        mix.light = (batch_kinetics.photon_flux(watts, light.wavelength), watts / 1000.0, light)
+
+
 def vent_gas_rate(
-    process: Any, node: Any, moles: Mapping[str, float], temperature: float, pressure: float
+    process: Any,
+    node: Any,
+    moles: Mapping[str, float],
+    temperature: float,
+    pressure: float,
+    case: str | None = None,
 ) -> float:
     """kmol/s of the vent's gas forming in the vented batch or semi-batch *node* with *moles*
     (kmol by component, the batch's basis) in it at *temperature* K and *pressure* kPa(a): the
     share ``f_g`` of what each reaction forms of each vent component ``g``, every reaction at
     its rate law (the thermal screening's gas release at the MTSR, ADR 0058). The dosing has
-    stopped: no dosed gas passes through. Raises TankError (a ValueError of a rate law too)."""
-    return sum(vent_gas_rates(process, node, list(moles))(moles, temperature, pressure).values())
+    stopped: no dosed gas passes through. With *case*, a surface rate's particles and the light
+    come from its charge (ADR 0074). Raises TankError (a ValueError of a rate law too)."""
+    found = vent_gas_rates(process, node, list(moles), case)(moles, temperature, pressure)
+    return sum(found.values())
 
 
 def vent_gas_rates(
-    process: Any, node: Any, names: Sequence[str]
+    process: Any, node: Any, names: Sequence[str], case: str | None = None
 ) -> Callable[[Mapping[str, float], float, float], dict[str, float]]:
     """:func:`vent_gas_rate` by vent component (kmol/s), for many contents over *names*: the
     mixture is built once (the screening's gas release over the batch, ADR 0069)."""
     shares = node.batch.vent.shares()
-    rates = extent_rates(process, node, names)
+    rates = extent_rates(process, node, names, case)
     reactions, _ = process.reactions_of(node.id)
 
     def gas(moles: Mapping[str, float], temperature: float, pressure: float) -> dict[str, float]:
@@ -2111,13 +2639,15 @@ def vent_gas_rates(
 
 
 def extent_rates(
-    process: Any, node: Any, names: Sequence[str]
+    process: Any, node: Any, names: Sequence[str], case: str | None = None
 ) -> Callable[[Mapping[str, float], float, float], dict[str, float]]:
     """A function of a content (kmol by component, the batch's basis), *temperature* K and
     *pressure* kPa(a) giving each reaction's rate of extent ``M_j r_j`` (kmol/s) in the liquid
     batch or semi-batch *node*, every reaction at its rate law; *names* the components the
     contents may hold. A vent's components that were never in the liquid are gone, as in the
-    run. Raises TankError (a ValueError of a rate law too)."""
+    run. With *case*, a solid phase's particles and the light are those of its charge in that
+    case (ADR 0074); without it a surface or photochemical rate law raises. Raises TankError (a
+    ValueError of a rate law too)."""
     from chemeascode.domains.process.liquid_phase import liquid_of
 
     vent = node.batch.vent
@@ -2142,6 +2672,9 @@ def extent_rates(
             if vent is not None
             else "the rates of a liquid batch: liquid-phase reactions only"
         )
+    batch = node.batch
+    if case is not None and (batch.solids or batch.light is not None):
+        _charged_kinetics(process, node, mix, reactions, comps, case)
 
     # an inert never dissolves (ADR 0071): none of it in the content's volume
     inerts = frozenset(getattr(vent, "inerts", None) or ()) & set(names)
@@ -2152,7 +2685,7 @@ def extent_rates(
         state = [max(moles.get(n, 0.0), 0.0) for n in names]
         try:
             volume = mix.volume_flow(dict(zip(names, state, strict=True)), temperature, pressure)
-            mult = mix.multipliers(volume)
+            mult = mix.multipliers(volume, state)
             found = mix.rates(state, temperature, pressure)
         except TankError:
             raise

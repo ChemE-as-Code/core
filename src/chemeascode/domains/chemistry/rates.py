@@ -15,6 +15,18 @@ liquid (:mod:`.liquid`) the mole fractions (``driving: mole_fraction``), the act
 constant ``K_j = A_j exp(-dH_j / (R T))``, and the factor ``(1 - Q/K)`` only with
 ``reverse: equilibrium`` (Q the reaction quotient on the basis K is written on: partial
 pressures in bar for a gas, the liquid's measure for a liquid). Pure Python.
+
+ADR 0074 adds two forms a liquid batch or semi-batch solves (:mod:`.process.stirred_tank`):
+
+- ``basis: surface`` (kmol/(m2 s)): the rate per m2 of the surface of the solid ``solid`` (a
+  component the batch carries as a solid phase, ``batch.solids``), which multiplies it in place
+  of the volume; ``reverse: equilibrium`` takes the solid's activity as 1 (it is no part of Q);
+- ``form: photochemical``: ``r = Phi(T) prod(c_i^a_i) q_a``, ``Phi`` the quantum yield (``k``:
+  ``A`` the quantum yield, mol per mol of photons absorbed, ``Ea`` of a chain's thermal steps)
+  and ``q_a`` the photons the content absorbs, kmol/(m3 s), from the batch's ``light`` (lamp
+  power, wavelength, Beer-Lambert absorption). The quantum yield of a reaction is the amount
+  that reacts per amount of photons absorbed (IUPAC, Braslavsky 2007, Pure Appl. Chem. 79,
+  293); a chain reaction's exceeds 1.
 """
 
 from __future__ import annotations
@@ -72,9 +84,19 @@ class RateUncertainty(Strict):
 class RateLaw(Strict):
     """The rate of one reaction (see the module docstring)."""
 
-    form: Literal["power_law", "lhhw"]
-    basis: Literal["catalyst_mass", "volume"] = Field(
-        description="catalyst_mass: kmol/(kg_cat s); volume: kmol/(m3 s)"
+    form: Literal["power_law", "lhhw", "photochemical"] = Field(
+        description="power_law, lhhw, or photochemical: k is the quantum yield, times the "
+        "photons the content absorbs, kmol/(m3 s), from the batch's light (ADR 0074)"
+    )
+    basis: Literal["catalyst_mass", "volume", "surface"] = Field(
+        description="catalyst_mass: kmol/(kg_cat s); volume: kmol/(m3 s); surface: kmol/(m2 s) "
+        "of the solid's surface (solid:, a batch's solid phase, ADR 0074)"
+    )
+    solid: str = Field(
+        default="",
+        description="basis: surface: the solid component whose surface the rate is per m2 of "
+        "(carried as a solid phase in batch.solids, with its particles' size).",
+        exclude_if=lambda value: not value,  # a rate law's dump stays as it was
     )
     driving: Literal["partial_pressure", "concentration", "mole_fraction", "activity"] = Field(
         description="partial_pressure: bar (gas); concentration: kmol/m3; mole_fraction, "
@@ -122,11 +144,23 @@ class RateLaw(Strict):
             raise ValueError("a power law has no adsorption terms or power; use form: lhhw")
         if self.form == "lhhw" and not self.adsorption:
             raise ValueError("an LHHW rate needs adsorption terms")
+        if (self.basis == "surface") != bool(self.solid):
+            raise ValueError("basis: surface names its solid (solid:), and solid: needs it")
+        if self.form == "photochemical" and (
+            self.adsorption or self.power != 1.0 or self.basis != "volume"
+        ):
+            raise ValueError(
+                "a photochemical rate is per m3 (basis: volume), with no adsorption terms or power"
+            )
+        if self.form == "photochemical" and self.reverse != "none":
+            raise ValueError("a photochemical rate has no reverse: equilibrium")
         return self
 
     def species(self) -> list[str]:
         """Every component id the rate law names."""
         names = list(self.orders)
+        if self.solid and self.solid not in names:
+            names.append(self.solid)
         for a in self.adsorption:
             names += [n for n in a.exponents if n not in names]
         return names
@@ -166,13 +200,16 @@ def rate(
     ln_k: float | None = None,
     liquid: Any = None,
     k_basis: str = "partial_pressure",
+    photons: float | None = None,
 ) -> float:
     """The rate (kmol/(kg s) or kmol/(m3 s), per extent as written) of an ideal gas of mole
     *fractions* at *temperature* K and *pressure* kPa, or of a *liquid* (a
     :class:`.liquid.Liquid`) of those mole fractions; *ln_k* (on *k_basis*, the basis of the
     reaction's equilibrium constant) is needed with ``reverse: equilibrium``. Raises ValueError
     when it is missing, when a species with a negative order is absent, and with ``reverse:
-    equilibrium`` when a reactant is absent (the reverse rate is then not defined by the law)."""
+    equilibrium`` when a reactant is absent (the reverse rate is then not defined by the law).
+    A photochemical law takes *photons*, the photons the content absorbs (kmol/(m3 s)); without
+    them it raises ValueError (ADR 0074)."""
     c = driving_forces(law, fractions, temperature, pressure, liquid)
     for n, a in law.orders.items():
         if a < 0 and c.get(n, 0.0) <= 0:
@@ -182,6 +219,13 @@ def rate(
             if b < 0 and c.get(n, 0.0) <= 0:
                 raise ValueError(f"{n} is absent, and its adsorption exponent {b:g} is negative")
     forward = law.k.k(temperature) * math.prod(c.get(n, 0.0) ** a for n, a in law.orders.items())
+    if law.form == "photochemical":
+        if photons is None:
+            raise ValueError(
+                "a photochemical rate needs the light the content absorbs (batch.light of a "
+                "liquid batch or semi-batch)"
+            )
+        forward *= photons
     if law.reverse == "equilibrium":
         if ln_k is None:
             raise ValueError("reverse: equilibrium needs the equilibrium constant")

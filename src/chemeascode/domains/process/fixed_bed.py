@@ -189,6 +189,11 @@ def solve_bed(
         activity = deactivation.activity(hours)
         notes.append(f"catalyst activity {activity:.4g} after {hours:g} h on stream")
 
+    if surface := [r.id for r in reactions if r.rate.basis == "surface"]:
+        raise BedError(
+            "the rate law(s) of " + ", ".join(surface) + " per m2 of a solid's surface: a "
+            "liquid batch's solid phase (batch.solids, ADR 0074), not a catalyst bed"
+        )
     intrinsic = [r.id for r in reactions if r.rate.scale == "intrinsic"]
     if intrinsic and transport_gap:
         raise BedError(
