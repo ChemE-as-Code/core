@@ -1,9 +1,11 @@
 """Batch rectification (``still.column``, ADR 0061): Diwekar's shortcut batch column on
 Fenske-Underwood-Gilliland against its limits and closed forms (one stage is Rayleigh's still,
 an infinite reflux the Fenske limit at alpha^N, Underwood's binary minimum reflux, the
-constant-distillate balance), against a rigorous plate-to-plate binary column as a bound, the
-purity end, the design by a minimum-reflux factor, the reboiler's and condenser's duties in
-cheme process propagate, the rules and the example plant."""
+constant-distillate balance), against a rigorous plate-to-plate binary column as a bound,
+against published worked examples (Diwekar, Malik and Madhavan 1987; Lotter and Diwekar 1997)
+and, with CHEME_DWSIM_TESTS=1, against DWSIM's rigorous column for a nearly ideal and a
+non-ideal pair (core#195), the purity end, the design by a minimum-reflux factor, the reboiler's
+and condenser's duties in cheme process propagate, the rules and the example plant."""
 
 import math
 import os
@@ -335,6 +337,321 @@ def test_a_forerun_then_a_main_cut_against_a_rigorous_ternary_batch():
     assert rigorous - short < 0.005
     # the forerun's C is overpredicted (A/B keys: Hengstebeck's one index for all), never under
     assert fore.moles["C"] / sum(fore.moles.values()) > cuts[0][2] / cuts[0].sum()
+
+
+# -- published worked examples (core#195) -------------------------------------------------------
+
+
+def _rigorous_binary_batch(charge, x0, reflux, stages, distilled, alpha, steps=50):
+    """The distillate's mean mole fraction of the light component and the still's after
+    *distilled* moles at constant *reflux*, the still charged with *charge* moles at *x0*, on the
+    plate-to-plate column of :func:`_plate_to_plate` (RK4 over the moles distilled)."""
+    n, h = np.array([charge * x0, charge * (1 - x0)]), distilled / steps
+
+    def rate(m):
+        xd = _plate_to_plate(m[0] / m.sum(), reflux, stages, alpha)
+        return -np.array([xd, 1 - xd])
+
+    for _ in range(steps):
+        k1 = rate(n)
+        k2 = rate(n + h / 2 * k1)
+        k3 = rate(n + h / 2 * k2)
+        k4 = rate(n + h * k3)
+        n = n + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+    return (charge * x0 - n[0]) / distilled, n[0] / n.sum()
+
+
+def _rigorous_batch(charge, alpha, reflux, stages, distilled, steps=25):
+    """The moles of each component distilled from *charge* (moles) at constant *reflux*, on the
+    multicomponent column of :func:`_rigorous_top` (RK4 over the moles distilled)."""
+    n, h = np.array(charge, float), distilled / steps
+
+    def rate(m):
+        return -_rigorous_top(m / m.sum(), alpha, reflux, stages)
+
+    for _ in range(steps):
+        k1 = rate(n)
+        k2 = rate(n + h / 2 * k1)
+        k3 = rate(n + h / 2 * k2)
+        k4 = rate(n + h * k3)
+        n = n + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+    return np.array(charge, float) - n
+
+
+#: U. M. Diwekar, R. K. Malik, K. P. Madhavan (1987) Optimal reflux rate policy determination
+#: for multicomponent batch distillation columns, Comput. Chem. Eng. 11, 629-637 (the authors'
+#: copy: https://www.vri-custom.org/pdfs/paper94.pdf). A binary at alpha 2.0, 1.0, N = 4 (3
+#: plates and the reboiler), V = 110 mol/h, T = 1 h (Table 1); J, the mol distilled in the hour,
+#: so that R = V T / J - 1. Each row: the case, the charge (mol) and its light mole fraction
+#: (Table 1), the stages, J of the short-cut and the distillate's mean mole fraction it gives
+#: (x_D*, Table 1: the constant-reflux J of Table 2 at N = 4, Table 4's for N = 4 to 20, which is
+#: case 1), J of the rigorous column and its mean (Table 3: at the short-cut's J; Table 4: at
+#: its own J for x_D* = 0.95). Case 7 is left out: at its printed J (36.283) the short-cut gives
+#: 0.916 and the rigorous column 0.933, against the printed 0.900 and 0.919; both are
+#: reproduced at J = 42.6 (0.900 and 0.920), and the variable reflux's J for 0.90 is 42.7
+#: against the printed 36.762: the printed J do not belong to case 7's inputs.
+DIWEKAR_1987 = [
+    ("1", 116.1, 0.715, 4, 20.081, 0.950, 20.081, 0.958),
+    ("2", 74.3, 0.420, 4, 4.545, 0.900, 4.545, 0.906),
+    ("3", 116.1, 0.580, 4, 12.234, 0.930, 12.234, 0.938),
+    ("4", 116.1, 0.487, 4, 2.935, 0.930, 2.935, 0.932),
+    ("5", 74.3, 0.715, 4, 18.162, 0.950, 18.162, 0.957),
+    ("6", 116.1, 0.715, 4, 29.966, 0.930, 29.966, 0.942),
+    ("table 4, N 4", 116.1, 0.715, 4, 20.262, 0.950, 26.00, 0.950),
+    ("table 4, N 6", 116.1, 0.715, 6, 36.50, 0.950, 40.59, 0.950),
+    ("table 4, N 10", 116.1, 0.715, 10, 46.70, 0.950, 46.90, 0.950),
+    ("table 4, N 20", 116.1, 0.715, 20, 49.10, 0.950, 49.20, 0.950),
+]
+
+
+def _binary_example(alpha, stages, ratio, boilup, end):
+    """A still with a column at constant reflux for the published binaries: the mol of the
+    papers as kmol (the shortcut is homogeneous in the amounts)."""
+    return _still(
+        {"stages": stages, "reflux": "constant", "ratio": ratio},
+        volatility={"model": "constant", "alpha": {"A": alpha, "B": 1.0}, "provenance": "assumed"},
+        boilup={"value": boilup, "unit": "kmol/h", "provenance": "assumed"},
+        end=end,
+    )
+
+
+@pytest.mark.parametrize(
+    "case, charge, x0, stages, j_short, xd_short, j_rigorous, xd_rigorous",
+    DIWEKAR_1987,
+    ids=[row[0] for row in DIWEKAR_1987],
+)
+def test_diwekars_binary_examples_at_constant_reflux(
+    case, charge, x0, stages, j_short, xd_short, j_rigorous, xd_rigorous
+):
+    """Diwekar, Malik and Madhavan (1987), Tables 1 to 4: at the paper's J (R = V T / J - 1)
+    the shortcut's cut holds the paper's short-cut mean within 1.5e-3 (it prints three
+    decimals; the largest gap is 1.2e-3), and is never purer than the rigorous column; the
+    plate-to-plate column here gives the paper's rigorous mean within 2.5e-3 (largest 2.3e-3),
+    so the reference the ternary tests use is the paper's rigorous column too."""
+    feed = {"A": charge * x0, "B": charge * (1 - x0)}
+    spec = _binary_example(2.0, stages, 110 / j_short - 1, 110.0, {"time": 3600.0})
+    (cut,) = solve_still(spec, feed, None, {}, None).cuts
+    distilled = sum(cut.moles.values())
+    assert distilled == pytest.approx(j_short, rel=1e-9)  # (R + 1) moles boil up per mole
+    short = cut.moles["A"] / distilled
+    assert short == pytest.approx(xd_short, abs=1.5e-3)
+    rigorous, _ = _rigorous_binary_batch(charge, x0, 110 / j_short - 1, stages, j_short, 2.0)
+    assert short <= rigorous
+    mean, _ = _rigorous_binary_batch(charge, x0, 110 / j_rigorous - 1, stages, j_rigorous, 2.0)
+    assert mean == pytest.approx(xd_rigorous, abs=2.5e-3)
+
+
+@pytest.mark.parametrize("case", range(6))
+def test_diwekars_binary_examples_at_variable_reflux(case):
+    """Diwekar, Malik and Madhavan (1987), Table 2: holding x_D* for the hour
+    (``constant_distillate``) distils the paper's variable-reflux J within 1 % (largest gap
+    0.6 %; J is the sensitive output: the paper puts 25 % in J against 0.2 % in x_D)."""
+    _, charge, x0, _, _, xd, _, _ = DIWEKAR_1987[case]
+    j_variable = [20.247, 4.482, 12.276, 2.956, 18.230, 30.211][case]
+    spec = _still(
+        {
+            "stages": 4,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "A", "mole_fraction": xd},
+            "maximum_ratio": 1e4,
+        },
+        boilup={"value": 110.0, "unit": "kmol/h", "provenance": "assumed"},
+        end={"time": 3600.0},
+    )
+    result = solve_still(spec, {"A": charge * x0, "B": charge * (1 - x0)}, None, {}, None)
+    (cut,) = result.cuts
+    distilled = sum(cut.moles.values())
+    assert cut.moles["A"] / distilled == pytest.approx(xd, rel=1e-9)
+    assert distilled == pytest.approx(j_variable, rel=0.01)
+    assert not [n for n in result.notes if "maximum reflux" in n]
+
+
+def test_lotter_and_diwekars_rectifier_bounds_the_shortcut():
+    """S. P. Lotter, U. M. Diwekar (1997) Shortcut models and feasibility considerations for
+    emerging batch distillation columns, Ind. Eng. Chem. Res. 36, 760-770, Table 4 (the
+    authors' copy: https://www.vri-custom.org/pdfs/paper59.pdf): an equimolar binary at alpha
+    1.7, 1.0, R 4, Nt 8, a vapour rate of 50 mol/h for 3 h (30 mol of distillate), simulated
+    rigorously (MultiBatchDS): a mean distillate of 0.9194 and a still of 0.3202, which put the
+    charge at 100 mol (the balance gives 99.98). Nt counts the plates above the still: on 9
+    stages in all the plate-to-plate column gives 0.9195 and 0.3202 (on 8, 0.9045). The
+    shortcut at the same stages and reflux is not purer, and within 0.02 (0.9023)."""
+    rigorous, still = _rigorous_binary_batch(100.0, 0.5, 4.0, 9, 30.0, 1.7)
+    assert rigorous == pytest.approx(0.9194, abs=5e-4)
+    assert still == pytest.approx(0.3202, abs=5e-4)
+    spec = _binary_example(1.7, 9, 4.0, 50.0, {"time": 3 * 3600.0})
+    result = solve_still(spec, {"A": 50.0, "B": 50.0}, None, {}, None)
+    (cut,) = result.cuts
+    assert sum(cut.moles.values()) == pytest.approx(30.0, rel=1e-9)
+    short = cut.moles["A"] / 30.0
+    assert 0.9194 - 0.02 < short < 0.9194
+
+
+def test_diwekars_quaternary_example_is_not_reproducible_from_its_printed_inputs():
+    """Diwekar, Malik and Madhavan (1987), Table 5 (a quaternary, alpha 2.0/1.5/1.0/0.5,
+    equimolar, F = 200 mol, V = 110 mol/h, T = 1 h, x_D* = 0.90; at constant reflux J =
+    24.7137 at N = 8 and 20.4296 at N = 10) is no qualification: a rigorous column at the
+    printed J, R = V T / J - 1, gives far less than 0.90 of component 1, and so does the
+    shortcut, below it (and the printed J falls from 8 to 10 stages, where more stages give
+    more distillate at the same purity). Kept so that the reason stays checked."""
+    alpha = {"A": 2.0, "B": 1.5, "C": 1.0, "D": 0.5}
+    charge = dict.fromkeys(alpha, 50.0)
+    for stages, j in ((8, 24.7137), (10, 20.4296)):
+        reflux = 110 / j - 1
+        spec = _still(
+            {"stages": stages, "reflux": "constant", "ratio": reflux},
+            volatility={"model": "constant", "alpha": alpha, "provenance": "assumed"},
+            boilup={"value": 110.0, "unit": "kmol/h", "provenance": "assumed"},
+            end={"time": 3600.0},
+        )
+        (cut,) = solve_still(spec, charge, None, {}, None).cuts
+        short = cut.moles["A"] / sum(cut.moles.values())
+        cut_rigorous = _rigorous_batch(
+            list(charge.values()), list(alpha.values()), reflux, stages, j
+        )
+        rigorous = cut_rigorous[0] / j
+        assert short <= rigorous < 0.8
+
+
+# -- against DWSIM's rigorous column (core#195) -------------------------------------------------
+
+dwsim_tests = pytest.mark.skipif(
+    os.environ.get("CHEME_DWSIM_TESTS") != "1",
+    reason="needs DWSIM (set CHEME_DWSIM_TESTS=1 with the docker image or a local install)",
+)
+
+#: The pairs (light, heavy CAS) in DWSIM's NRTL (its database's parameters) at 101.325 kPa(a):
+#: methanol and water, non-ideal without an azeotrope, and benzene and toluene, nearly ideal.
+RECTIFIED_PAIRS = {
+    "methanol-water": ("67-56-1", "7732-18-5"),
+    "benzene-toluene": ("71-43-2", "108-88-3"),
+}
+#: The still's light mole fraction (the feed's), and the stages (the still included) and reflux.
+RECTIFIED_POINTS = [(x, n, r) for x in (0.1, 0.3, 0.5) for n, r in ((5, 2.0), (8, 1.0), (10, 3.0))]
+P_RECTIFIED = 101325.0
+
+
+def _saturated(x):
+    return {
+        "pressure_Pa": P_RECTIFIED,
+        "mass_flow_kg_s": 1.0,
+        "mole_fractions": {"L": x, "H": 1 - x},
+        "vapor_fraction": 0.0,
+    }
+
+
+def _rectifiers(light, heavy):
+    """A DWSIM model of one continuous column per point: the still's stages and a total
+    condenser (a stage to DWSIM), fed at the reboiler (the still) with its saturated liquid at 1
+    kg/s, the bottoms 99 % of it by mass. Above the reboiler such a column is the batch column
+    at the instant its still holds the bottoms' composition; DWSIM's column balances energy, so
+    the molar overflow is not held constant."""
+    compounds = [{"id": "L", "cas": light}, {"id": "H", "cas": heavy}]
+    streams, units = [], []
+    for i, (x, stages, reflux) in enumerate(RECTIFIED_POINTS):
+        c = f"C{i}"
+        streams += [
+            {"id": f"{c}F", "kind": "material", "feed": _saturated(x)},
+            *({"id": f"{c}{s}", "kind": "material", "feed": None} for s in ("D", "B")),
+            *({"id": f"{c}{q}", "kind": "energy", "feed": None} for q in ("QR", "QC")),
+        ]
+        spec = {
+            "stages": stages + 1,
+            "feed_stages": [stages + 1],
+            "condenser_pressure_Pa": P_RECTIFIED,
+            "reboiler_pressure_Pa": P_RECTIFIED,
+            "condenser": "total",
+            "reboiler": True,
+            "condenser_spec": {
+                "type": "Stream_Ratio",
+                "value": reflux,
+                "unit": "",
+                "component": None,
+            },
+            "reboiler_spec": {
+                "type": "Product_Mass_Flow_Rate",
+                "value": 0.99 * 3600.0,
+                "unit": "kg/h",
+                "component": None,
+            },
+            "side_draws": [],
+        }
+        units.append(
+            {
+                "id": c,
+                "type": "distillation_column",
+                "inlets": [f"{c}F"],
+                "outlets": [f"{c}D", f"{c}B"],
+                "roles": ["distillate", "bottoms"],
+                "energies": {"reboiler": f"{c}QR", "condenser": f"{c}QC"},
+                "spec": spec,
+            }
+        )
+    model = {"compounds": compounds, "property_package": "NRTL", "recycles": []}
+    return model | {"streams": streams, "units": units}
+
+
+@pytest.fixture(scope="module")
+def rectified():
+    """Per pair and point: the still's (bottoms') and DWSIM's distillate's light mole fraction,
+    and the relative volatility at the still's and at the distillate's bubble point (DWSIM's
+    incipient vapour of each composition as a saturated liquid)."""
+    from chemeascode.integrations import dwsim
+
+    found = {}
+    for pair, (light, heavy) in RECTIFIED_PAIRS.items():
+        model = _rectifiers(light, heavy)
+        out = dwsim.solve(model)
+        assert out["converged"], out["messages"][:5]
+        x = {}
+        for i in range(len(RECTIFIED_POINTS)):
+            x[f"B{i}"] = out["streams"][f"C{i}B"]["mole_fractions"]["L"]
+            x[f"D{i}"] = out["streams"][f"C{i}D"]["mole_fractions"]["L"]
+        bubbles = [{"id": k, "kind": "material", "feed": _saturated(v)} for k, v in x.items()]
+        points = dwsim.solve(model | {"streams": bubbles, "units": []}, details=True)["streams"]
+
+        def alpha(key, points=points, x=x):
+            y = points[key]["incipient"]["mole_fractions"]["L"]
+            return (y / x[key]) / ((1 - y) / (1 - x[key]))
+
+        found[pair] = [
+            (x[f"B{i}"], x[f"D{i}"], alpha(f"B{i}"), alpha(f"D{i}"), stages, reflux)
+            for i, (_, stages, reflux) in enumerate(RECTIFIED_POINTS)
+        ]
+    return found
+
+
+def _shortcut_top(x, alpha, stages, reflux):
+    """The shortcut's distillate over a binary still holding *x* at a constant *alpha*."""
+    spec = Column.model_validate(
+        {"stages": stages, "reflux": "constant", "ratio": reflux, "provenance": "assumed"}
+    )
+    phase = _Phase(["L", "H"], [True, True], "constant", [alpha, 1.0], [None, None], None, [0, 0])
+    return _Column(spec, phase, ["L", "H"], [x, 1 - x]).top([x, 1 - x]).distillate[0]
+
+
+@dwsim_tests
+def test_a_dwsim_column_bounds_the_shortcut_for_a_nearly_ideal_pair(rectified):
+    """Benzene and toluene: the shortcut at the still's relative volatility (2.40 to 2.50 at
+    these points; 2.46 to 2.59 at the top) is not purer than DWSIM's column (to 2e-3: DWSIM's
+    molar overflow is not constant) and within 0.06 of it, as the plate-to-plate bound."""
+    for x, xd, still, _, stages, reflux in rectified["benzene-toluene"]:
+        short = _shortcut_top(x, still, stages, reflux)
+        assert short <= xd + 2e-3
+        assert xd - short < 0.06
+
+
+@dwsim_tests
+def test_a_dwsim_column_and_the_shortcut_for_a_non_ideal_pair(rectified):
+    """Methanol and water: methanol's relative volatility falls from 3.7 to 6.7 at the still to
+    2.4 to 3.0 at the top. The shortcut takes the still's for the whole column and is then purer
+    than DWSIM's column at most points, by up to 0.02 (it is no bound for a non-ideal liquid);
+    at the column's smallest relative volatility (the top's) it is never purer."""
+    gaps = []
+    for x, xd, still, top, stages, reflux in rectified["methanol-water"]:
+        assert top < still
+        gaps.append(_shortcut_top(x, still, stages, reflux) - xd)
+        assert _shortcut_top(x, top, stages, reflux) <= xd
+    assert 0.01 < max(gaps) < 0.025
 
 
 def test_gilliland_just_above_the_minimum_reflux_is_infinite_stages_not_a_division():
