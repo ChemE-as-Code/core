@@ -142,7 +142,9 @@
   - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
     library entries with a crystallizer, filter or dryer gave the same results as the base for
     `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,
-    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative.
+    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative; only the generator code
+    hash that `cheme.generated-version` names changes (schema.py and model.py are generator
+    modules).
 
 ### Fixed
 
