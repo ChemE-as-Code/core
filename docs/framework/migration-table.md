@@ -47,10 +47,11 @@ these items: each still breaks a layer rule today.
 
 ## Generator fingerprint
 
-`process.provenance.generator_fingerprint()` hashes every `*.py` in `domains/process/` by name
-and content. A change there makes every generated BFD/PFD report `cheme.generated-version`
-(a warning) until `cheme process build` is run. The examples and test data in this
-repository were rebuilt in C1.
+`process.provenance.generator_fingerprint()` hashes the sheet-drawing modules of
+`domains/process/` (`GENERATOR_MODULES`) by name and content, and the fields propagate and
+simulate write (`STALE_FIELD_DATA`, ADR 0067) by value. A change there makes every generated
+BFD/PFD report `cheme.generated-version` (a warning) until `cheme process build` is run. The
+examples and test data in this repository were rebuilt in C1.
 
 ## Python modules
 

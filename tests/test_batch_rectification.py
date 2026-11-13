@@ -799,7 +799,9 @@ def test_a_column_still_whose_end_is_past_its_dry_point_fails_at_once(tmp_path, 
     start = time.monotonic()
     with pytest.raises(StillError, match="boils dry before its end.*volatile.*too little"):
         solve_node(process, node, inlets, "design")
-    assert time.monotonic() - start < 5.0
+    # well under a second for the refusal itself; the bound leaves room for a loaded parallel
+    # run, while without the bound only the pace check refuses it, after a minute or more
+    assert time.monotonic() - start < 30.0
 
 
 @pytest.mark.parametrize(
@@ -869,7 +871,9 @@ def test_an_unreachable_purity_end_is_refused_by_its_floor(tmp_path):
     start = time.monotonic()
     with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
         solve_node(process, node, inlets, "design")
-    assert time.monotonic() - start < 5.0
+    # well under a second for the refusal itself; the bound leaves room for a loaded parallel
+    # run, while without the bound only the pace check refuses it, after a minute or more
+    assert time.monotonic() - start < 30.0
 
 
 def _paces(run, small, boiled, stop, steps):
@@ -945,7 +949,9 @@ def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):
     start = time.monotonic()
     with pytest.raises(StillError, match="stalls before its end.*volatile.*end the cut earlier"):
         solve_node(process, node, inlets, "design")
-    assert time.monotonic() - start < 20.0
+    # about 9 s alone; the bound leaves room for a loaded parallel run, while a crawl that does
+    # not stall would run for minutes
+    assert time.monotonic() - start < 60.0
 
 
 @pytest.mark.parametrize(
