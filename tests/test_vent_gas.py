@@ -620,6 +620,9 @@ def test_a_henry_gas_without_a_boiling_point_and_at_the_bubble_point(tmp_path):
     row = entry.dissolved_release["components"]["X"]
     assert row["why"] == HENRY_GAS and row["boiling_point_K"] is None
     assert row["stripped_kmol_s"] > 0
+    # the default MTT names it too, with no boiling point (ADR 0071)
+    assert entry.mtt_left_out == {"X": HENRY_GAS}
+    assert [n for n in entry.notes if n.startswith("MTT: left out") and "X" in n]
     ws = _henry_plant(
         tmp_path / "b",
         boiling=", normal_boiling_point: 350",
@@ -628,6 +631,88 @@ def test_a_henry_gas_without_a_boiling_point_and_at_the_bubble_point(tmp_path):
     (entry,) = screen(ws.root).entries
     assert "X" in entry.bubble_point["left_out"]
     assert not [m for m in entry.missing if "X" in m.replace(",", " ").split()]
+
+
+VP = ", vapour_pressure: {a: 15.0, b: 4000, form: ln, pressure_unit: kPa, provenance: assumed}"
+
+
+def _dosed_henry_plant(tmp_path, latent="", absorption=""):
+    """The padded semi-batch with a vent.vapour.henry gas X that is also dosed (S2 carries X,
+    90 % absorbed), X boiling at 350 K (above T_p, 300 K) with *latent* in materials.yaml, A
+    and B volatile, hazard.mtt_from: bubble-point; the vent with *absorption*. Propagated."""
+    vent = HEAD.replace(
+        "vapour: {}",
+        "vapour: {henry: {X: {points: [[300, 200]], provenance: assumed}}}" + absorption,
+    )
+    ws = _gas_plant(tmp_path, vent=vent)
+    _edit(
+        ws,
+        "flowsheet",
+        ("hazard: {td24: 390, ", "hazard: {td24: 390, mtt_from: bubble-point, "),
+        ("values: {S: 1.0}", "values: {S: 0.7, A: 0.2, X: 0.1}"),
+        ("values: {A: 1.0}", "values: {X: 1.0}"),
+        ("{stream: S2, time: 3600}", "{stream: S2, time: 3600, absorbed: 0.9}"),
+    )
+    _edit(
+        ws,
+        "materials",
+        *(
+            (
+                f"{{id: {n}, name: {n}, formula: {f}, molar_mass: {m}, liquid_molar_volume: 0.1,\n"
+                "     liquid_heat_capacity: 150, normal_boiling_point: 400}",
+                f"{{id: {n}, name: {n}, formula: {f}, molar_mass: {m}, liquid_molar_volume: 0.1,\n"
+                f"     liquid_heat_capacity: 150, normal_boiling_point: 400{VP}}}",
+            )
+            for n, f, m in (("A", "C2H4O", 44.05), ("B", "C2H4", 28.05))
+        ),
+        (
+            "templates:\n",
+            "  - {id: X, name: X, formula: HCl, molar_mass: 36.46, liquid_molar_volume: 0.1,\n"
+            f"     liquid_heat_capacity: 150, normal_boiling_point: 350{latent}}}\ntemplates:\n",
+        ),
+        ("{id: liquid, components: [A, B, S, G]}", "{id: liquid, components: [A, B, S, G, X]}"),
+        ("{id: gas, components: [G, S, N]}", "{id: gas, components: [A, B, G, S, N, X]}"),
+    )
+    assert not [m for level, m in _found(ws) if level == "error"]
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written >= 2
+    return ws
+
+
+def test_a_dosed_henry_gas_is_left_out_of_the_bubble_point(tmp_path):
+    """Integration review of 1.12.0: a vent.vapour.henry gas that is also dosed kept the
+    reason "dosed gas", so hazard.mtt_from: bubble-point took it (boiling at 350 K, above T_p)
+    for a Raoult liquid and lost the MTT for want of its vapour_pressure. The Henry gas is a
+    dissolved gas whatever its boiling point, dosed or not (ADR 0071)."""
+    from chemeascode.domains.safety.reaction_hazards import HENRY_GAS, screen
+
+    (entry,) = screen(_dosed_henry_plant(tmp_path).root).entries
+    assert entry.mtt is not None and entry.mtt_basis.startswith("bubble point")
+    assert "X" in entry.bubble_point["left_out"]
+    assert not [m for m in entry.missing if "bubble point needs" in m]
+    assert entry.dissolved_release["components"]["X"]["why"] == HENRY_GAS
+
+
+def test_the_boil_up_asks_a_henry_gas_for_its_heat_of_absorption(tmp_path):
+    """Integration review of 1.12.0: a content boiling at the MTSR with a Henry gas X in its
+    vapour: the gas's latent heat is its heat of desorption, -vent.heat_of_absorption (ADR
+    0071), so the missing entry names that field, not heat_of_vaporization (which X has in
+    materials.yaml and which does not count for it); given, only A's heat_of_vaporization is
+    asked for."""
+    from chemeascode.domains.safety.reaction_hazards import screen
+
+    latent = ", heat_of_vaporization: 20000"
+    (entry,) = screen(_dosed_henry_plant(tmp_path / "a", latent=latent).root).entries
+    (boil,) = [m for m in entry.missing if m.startswith("the boil-up at the MTSR")]
+    assert boil == (
+        "the boil-up at the MTSR: heat_of_vaporization of A; vent.heat_of_absorption of X "
+        "(its heat of desorption, vent.vapour.henry)"
+    )
+    absorption = ", heat_of_absorption: {values: {X: -20000}, provenance: assumed}"
+    ws = _dosed_henry_plant(tmp_path / "b", latent=latent, absorption=absorption)
+    (entry,) = screen(ws.root).entries
+    (boil,) = [m for m in entry.missing if m.startswith("the boil-up at the MTSR")]
+    assert boil == "the boil-up at the MTSR: heat_of_vaporization of A"
 
 
 def test_a_vent_of_inerts_only_reports_the_boil_up(tmp_path):

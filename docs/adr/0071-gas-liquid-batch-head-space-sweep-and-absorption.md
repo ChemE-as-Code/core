@@ -102,10 +102,13 @@ Options considered:
   boiling at the MTSR still boils up through it: with `vapour`, such a vent reports
   `gas_release.boils` and `boil_up` (ADR 0069) and the `cheme.reactor-hazard-vent` warning, and
   nothing else of a gas release. A `vapour.henry` gas is a gas held in solution in the
-  screening too: the gas release carries it at `H x / P` (the vent's own K-values), and the
-  default MTT and `hazard.mtt_from: bubble-point` leave it out whatever its share of the liquid
-  or its boiling point, naming it in `mtt_left_out` and `dissolved_release` (with what the gas
-  release strips of it), with or without a `normal_boiling_point`.
+  screening too, dosed or not: the gas release carries it at `H x / P` (the vent's own
+  K-values), and the default MTT and `hazard.mtt_from: bubble-point` leave it out whatever its
+  share of the liquid or its boiling point, naming it in `mtt_left_out` and `dissolved_release`
+  (with what the gas release strips of it), with or without a `normal_boiling_point`. A
+  content boiling at the MTSR with it in its vapour takes its heat of desorption,
+  `-heat_of_absorption`, for its latent heat there too: without it the boil-up is left unsized
+  and `missing` asks for its `vent.heat_of_absorption` (not its `heat_of_vaporization`).
 - **Rules** (`cheme.process-reactor`, errors): an inert or degassing gas undeclared; an inert
   in a reaction; a head space's pad that is no material inlet of the step, or that carries
   more than the inerts; a vent stream whose template lacks an inert. New rule
@@ -118,12 +121,15 @@ Options considered:
   heat stream out) runs to, against the `melting_point` of each component its distillate's
   cuts carry at 1 mol% or more (a trace freezes out far below its pure melting point).
 - **Unchanged behaviour**: a vent without `inerts`, `head_space`, `heat_of_absorption` and
-  `vapour.henry`, and a component without `melting_point`, solves, propagates, fingerprints,
-  reports and screens as in 1.11.0. The twelve batch entries of the process library (acetyl-
+  `vapour.henry`, and a component without `melting_point`, solves, propagates, fingerprints and
+  reports as in 1.11.0, and screens as in 1.11.0 apart from ADR 0069's changes (the `-vent`
+  comparison with the largest release over the batch, the new JSON keys such as
+  `dissolved_release`). The fifteen batch entries of the process library (acetyl-
   chloride-1, benzyl-bromide-1, benzoyl-chloride-1, iodomethane-1, methyltriphenylphosphonium-
   bromide-1, p-toluenesulfonyl-chloride-1, benzyl-chloroformate-1, sodium-azide-1,
   copper-i-chloride-1, di-tert-butyl-dicarbonate-1, potassium-tert-butoxide-1,
-  carbon-tetrabromide-1) give `propagate --check` clean and the same `process reactors`,
+  carbon-tetrabromide-1, methylmagnesium-bromide-1, n-bromosuccinimide-1,
+  phosphorus-tribromide-1) give `propagate --check` clean and the same `process reactors`,
   `reactor-hazards` and `recipe` output on 1.11.0 and on this change (the release as a whole
   changes `reactor-hazards` for vented semi-batches as ADR 0069 describes). `GENERATOR_VERSION` is
   unchanged; the process generator's code changed, so every BFD/PFD needs `cheme process build`

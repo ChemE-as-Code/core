@@ -1462,7 +1462,18 @@ def _boil_up(
     norm = sum(y.values()) or 1.0
     y = {n: v / norm for n, v in y.items() if v > 0}
     if lack := sorted(n for n in y if not phase.heat_of_vaporization.get(n)):
-        entry.missing.append("the boil-up at the MTSR: heat_of_vaporization of " + ", ".join(lack))
+        # a degassing gas's latent heat is its heat of desorption, -vent.heat_of_absorption
+        # (ADR 0071): the materials' heat_of_vaporization does not stand in for it
+        liquids = [n for n in lack if n not in phase.degassing]
+        gases = [n for n in lack if n in phase.degassing]
+        parts = ["heat_of_vaporization of " + ", ".join(liquids)] if liquids else []
+        if gases:
+            parts.append(
+                "vent.heat_of_absorption of "
+                + ", ".join(gases)
+                + " (its heat of desorption, vent.vapour.henry)"
+            )
+        entry.missing.append("the boil-up at the MTSR: " + "; ".join(parts))
         return
     every, _ = process.reactions_of(item.id)
     if lack := [r.id for r in every if r.heat_of_reaction is None]:
@@ -1538,8 +1549,9 @@ def _left_out(item: Any, gases: list[str]) -> dict[str, str]:
         found |= dict.fromkeys(item.batch.vent.components, "vent component")
         found |= dict.fromkeys(item.batch.vent.inerts, "vent inert")  # ADR 0071
         # a gas held in solution that degasses by Henry's law (ADR 0071): a dissolved gas
-        # whatever its share of the liquid or its boiling point
-        found |= {n: HENRY_GAS for n in _henry_gases(item) if n not in found}
+        # whatever its share of the liquid or its boiling point, dosed or not (the schema keeps
+        # it apart from the vent's components and inerts, so only a dosed gas's reason yields)
+        found |= dict.fromkeys(_henry_gases(item), HENRY_GAS)
     return found
 
 
@@ -1661,6 +1673,9 @@ def _default_mtt(
     out: dict[str, str] = {}
     dissolved = _dissolved(moles, comps, pressure, t_p, left_out)
     for n in moles:
+        if left_out.get(n) == HENRY_GAS:  # named with or without a boiling point (ADR 0071)
+            out[n] = HENRY_GAS
+            continue
         at = _boiling_at(comps.get(n), n, pressure)
         if at is None:
             continue

@@ -120,9 +120,11 @@ COLUMN_ASSUMPTIONS = (
 PROFILE_POINTS = 50
 #: Relative error per step of the integration.
 TOLERANCE = 1e-9
-#: a boil-up that boils off less than STALL_SHARE of the charge (and feed) in each of
-#: STALL_STEPS accepted steps in a row makes no progress: a still (a column's above all) that
-#: creeps on near empty, its error control keeping the step far above the boils-dry floor
+#: a step that boils off less than STALL_SHARE of the charge (and feed) is a small one; after
+#: STALL_STEPS small steps in a row the pace of that run is checked: a still (a column's above
+#: all) that creeps on near empty, its error control keeping the step far above the boils-dry
+#: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
+#: does reach it (slowly, on a trace the column enriches) carries on.
 STALL_SHARE = 1e-6
 STALL_STEPS = 500
 #: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual)
@@ -838,13 +840,22 @@ def solve_still(
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
         steps = stalled = 0
+        # where the last run of small steps began: kmol boiled up and the stop's value
+        mark = (boiled, stop(state, boiled) if stop is not None else None)
+
+        def stalls() -> StillError:
+            left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
+            return StillError(
+                f"the still's boil-up stalls before its end: after {steps} steps "
+                f"{left:.4g} kmol of volatile content is left (of {total0 + total_feed:.4g} "
+                f"kmol charged and fed), boiling off too slowly to reach the end within "
+                f"{MAX_STEPS} steps (the integration crawls near empty, on a trace the column "
+                f"enriches); end the cut earlier (distilled, residue or temperature)"
+            )
+
         while True:
-            if stalled >= STALL_STEPS or steps >= MAX_STEPS:
-                raise StillError(
-                    f"the still boils dry before its end (its boil-up makes no progress: "
-                    f"{sum(state[:k]):.4g} kmol left of {total0 + total_feed:.4g} kmol after "
-                    f"{steps} steps)"
-                )
+            if steps >= MAX_STEPS:
+                raise stalls()
             h = min(h, target - boiled)
             if h <= 1e-14 * (total0 + total_feed):
                 if end is not None and boiled >= end * (1 - 1e-12):
@@ -899,12 +910,26 @@ def solve_still(
             record(state)
             if feeding:
                 mixing(h, before, result.profile[-1][2])
+            now = stop(state, boiled) if stop is not None else None
             # the step ends where the stop was found (core#198: re-evaluating it there, as a
             # bubble point converged to a tolerance from another guess, can fall just short)
-            if crossed or (stop is not None and stop(state, boiled) >= -1e-15):
+            if crossed or (now is not None and now >= -1e-15):
                 return
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
+            if stalled == 0:
+                mark = (boiled, now)
+            elif stalled >= STALL_STEPS:
+                # a run of small steps: does its pace (in kmol boiled up, or in the stop's
+                # value) reach the end within the steps left? If not, the still stalls.
+                left = MAX_STEPS - steps
+                reach = (boiled - mark[0]) / stalled * left >= target - boiled
+                if not reach and now is not None and mark[1] is not None:
+                    reach = (now - mark[1]) / stalled * left >= -now
+                if not reach:
+                    raise stalls()
+                stalled = 0
+                mark = (boiled, now)
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
 

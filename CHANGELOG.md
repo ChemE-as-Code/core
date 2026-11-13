@@ -83,7 +83,8 @@
   was only checked before. `cheme.process-recovery` (validate) checks the declaration.
 - `recipe.batch_for_rate`: the batch size whose cycle makes a rate, `batch = rate x
   cycle(batch)`, with the cycle's dependence on the batch (jacket, dosing, still, filter and
-  dryer times).
+  dryer times); each secant step stays within a factor 2 of the batches tried, so a rate the
+  recipe cannot make does not extrapolate to a batch its units cannot run.
 - `examples/process-design-spec`: an isomerisation loop with a component separator, its fresh
   feed solved for 8000 t/a of isobutane and its purge for 10 wt% propane in the reactor feed,
   against the closed form (`tests/test_design_spec.py`).
@@ -103,14 +104,17 @@
   the head space (`vent.head_space`); `reactor-hazards` leaves inerts and the pad out of the
   content, gives a vent of inerts only no formed-gas release at the MTSR (a content boiling at
   the MTSR still reports its boil-up, `gas_release.boils` and `boil_up`, ADR 0069), and takes a
-  `vapour.henry` gas at `H x / P` in the gas release, as a dissolved gas left out of the default
-  MTT and the bubble point whatever its share or boiling point, named in `dissolved_release`;
+  `vapour.henry` gas at `H x / P` in the gas release, as a dissolved gas (dosed or not) left out
+  of the default MTT and the bubble point whatever its share or boiling point, named in
+  `mtt_left_out` and `dissolved_release` with or without a `normal_boiling_point`; a boil-up
+  at the MTSR that carries it asks for its `vent.heat_of_absorption` (its heat of desorption,
+  its latent heat there), not its `heat_of_vaporization`;
   `cheme.process-reactor`
   checks the inerts, the pad and the degassing gases. Shown on scratch copies of
   acetyl-chloride-1 (L-3: the head space as the vapour's carrier) and
   methyltriphenylphosphonium-bromide-1 (L-3: the nitrogen sweep stripping the methyl bromide).
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
-  twelve batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
+  fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
 
 ### Fixed
@@ -126,12 +130,13 @@
   still asks volatility data only of a component its charge holds.
 - A batch column still that runs near empty before an end at a time no longer hangs: its error
   control kept the step far above the boils-dry floor, so it crept on without end (1.11.0 hung
-  on the batch-rectification example with its product cut ended at 10 h). A boil-up that
-  boils off less than 1e-6 of the charge in each of 500 steps in a row, or a phase past 20000
-  steps, is now the still boiling dry (`cheme.process-still-unsolved`, in under 2 s there).
-  `recipe.batch_for_rate`'s secant step stays within a factor 2 of the batches tried, so a rate
-  the recipe cannot make no longer extrapolates to a batch its still cannot run (`cheme
-  validate` and `cheme process recipe` hung on such a plant).
+  on the batch-rectification example with its product cut ended at 10 h, or at 2.495 h). After
+  500 steps in a row that each boil off less than 1e-6 of the charge, the still checks the pace
+  of that run: if at that pace (in kmol boiled up, or in the end's own measure) the end is not
+  reached within 20000 steps, the boil-up stalls (`cheme.process-still-unsolved`, in a few
+  seconds there, naming the volatile kmol left and the hint to end the cut earlier). A slow
+  tail that does reach its end (an end at 2.49 h there, on the PCL3 trace the column enriches)
+  solves as in 1.11.0.
 
 ### Changed
 

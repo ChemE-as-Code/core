@@ -759,28 +759,52 @@ def test_the_still_condensers_freezing_check(tmp_path):
     assert not found(melting(_copy(tmp_path / "e"), {"ACCL": 290}))
 
 
-def test_a_column_still_that_runs_dry_before_a_time_end_fails_at_once(tmp_path):
-    """The example's product cut ended at 10 h, long after the still runs dry: the column's
-    error control kept the step far above the boils-dry floor, so the still crept on near
-    empty without end (core 1.11.0 hung). The boil-up's lack of progress is the still boiling
-    dry: StillError within a few seconds."""
-    import time
-
-    from chemeascode.domains.process.batch_still import StillError, inlets_of, solve_node
+def _ended(tmp_path, end):
+    """The example with its product cut ended at *end*: its still's node and inlets."""
+    from chemeascode.domains.process.batch_still import inlets_of
 
     ws = _copy(
         tmp_path,
         lambda text: text.replace(
             "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}",
-            "{outlet: product, end: {time: 36000}}",
+            f"{{outlet: product, end: {end}}}",
         ),
     )
     process, _ = load(ws.root)
     node = process.nodes["ST1"]
+    return process, node, inlets_of(process, node)
+
+
+@pytest.mark.parametrize("hours", [10, 2.495])
+def test_a_column_still_that_runs_dry_before_a_time_end_fails_at_once(tmp_path, hours):
+    """The example's product cut ended at 10 h, long after the still runs dry: the column's
+    error control kept the step far above the boils-dry floor, so the still crept on near
+    empty without end (core 1.11.0 hung, and so did an end at 2.495 h). A run of small steps
+    whose pace does not reach the end within the step budget stalls: StillError within a few
+    seconds, naming the volatile content left and the remedy."""
+    import time
+
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    process, node, inlets = _ended(tmp_path, f"{{time: {hours * 3600:g}}}")
     start = time.monotonic()
-    with pytest.raises(StillError, match="boils dry before its end .*no progress"):
-        solve_node(process, node, inlets_of(process, node), "design")
+    with pytest.raises(StillError, match="stalls before its end.*volatile.*end the cut earlier"):
+        solve_node(process, node, inlets, "design")
     assert time.monotonic() - start < 20.0
+
+
+@pytest.mark.parametrize("end", ["{time: 8964}", "{distilled: 0.9967}"])
+def test_a_column_still_slow_but_progressing_near_empty_reaches_its_end(tmp_path, end):
+    """Integration review of 1.12.0: an end at 2.49 h (or 99.67 % distilled) is reached on a
+    tail where explicit Dopri5 takes tiny steps on the PCL3 trace the column enriches (about
+    2e-7 kmol a step, every one below the small-step share). The pre-1.12.0 code solved it
+    (residue 0.01446 kmol); the stall guard refused it as boiling dry after 500 small steps.
+    At its pace the end is within the step budget, so it solves as before."""
+    from chemeascode.domains.process.batch_still import solve_node
+
+    process, node, inlets = _ended(tmp_path, end)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(0.01445, abs=2e-4)
 
 
 def test_a_still_boilup_no_cut_uses_does_not_count(tmp_path):

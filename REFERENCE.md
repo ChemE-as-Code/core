@@ -1247,7 +1247,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   release at the MTSR (with `vapour`, a content boiling at the MTSR still reports its boil-up,
   `gas_release.boils` and `boil_up`, and the `-vent` warning); it takes a `vapour.henry` gas at
   `H x / P` in the gas release and leaves it out of the default MTT and the bubble point as a
-  dissolved gas whatever its share or boiling point (`mtt_left_out`, `dissolved_release`).
+  dissolved gas (dosed or not) whatever its share or boiling point (`mtt_left_out`,
+  `dissolved_release`, with or without a `normal_boiling_point`); a boil-up at the MTSR that
+  carries it asks for its `heat_of_absorption` (its heat of desorption), not its
+  `heat_of_vaporization`.
   `cheme.process-reactor` adds: an inert or degassing gas undeclared, an
   inert in a reaction, a pad that is no material inlet of the step or carries more than the
   inerts, a vent template lacking an inert. `cheme.process-condenser-freezing` (warning): a
