@@ -7,6 +7,7 @@ cheme process propagate, the rules and the example plant."""
 
 import math
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -830,29 +831,36 @@ def test_a_time_end_past_the_dry_point_at_the_highest_reflux_is_refused_at_once(
 
 @pytest.mark.parametrize("column", [None, {"stages": 5, "reflux": "constant", "ratio": 3}])
 @pytest.mark.parametrize("basis", ["mole", "mass"])
-def test_a_purity_end_below_its_floor_is_refused_at_once_and_one_above_it_solves(column, basis):
+def test_a_purity_end_below_its_floor_is_refused_once_the_floor_rises_past_it(column, basis):
     """A cut's mean share of its key falls no lower than its key over the cut and all the
     other volatile content left (the key no longer distilling, the rest joining the cut): with
-    50 kmol each of A and B no cut taken from the start falls below 0.5 A. An end below that
-    floor is refused ("too little to reach it") once the cut holds some of the key, not by the
-    boils-dry floor at the end of the boil-up; one just above it solves, to its fraction."""
+    50 kmol each of A and B no cut taken from the start falls below 0.5 A. That floor rises
+    from 0 as the cut fills, so an end below 0.5 is refused ("too little to reach it") once the
+    floor passes it, not at the first step (core review of 1.12.0: the docs said "at once"),
+    and a lower end sooner (more volatile content left), but not by the boils-dry floor at the
+    end of the boil-up; one just above it solves, to its fraction."""
     from chemeascode.domains.process.batch_still import StillError
 
     def still(fraction):
         return _still(column, end={"purity": {"key": "A", "fraction": fraction}, "basis": basis})
 
+    left = []
     for fraction in (0.4, 0.499):
-        with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        with pytest.raises(
+            StillError, match="boils dry before its end.*too little to reach it"
+        ) as e:
             solve_still(still(fraction), CHARGE, None, COMPS, None)
+        left.append(float(re.search(r"\(([\d.e+-]+) kmol of volatile", str(e.value)).group(1)))
+    assert 100 > left[0] > left[1] > 1
     cut = solve_still(still(0.5005), CHARGE, None, COMPS, None).cuts[0]
     assert cut.moles["A"] / sum(cut.moles.values()) == pytest.approx(0.5005, rel=1e-8)
 
 
-def test_an_unreachable_purity_end_is_refused_at_once(tmp_path):
+def test_an_unreachable_purity_end_is_refused_by_its_floor(tmp_path):
     """Integration review of 1.12.0: the example's product cut ended at a purity of 0.5 ACCL
     is never reached (1.9 % of the charge's volatile content is not ACCL, so the cut stays
     above 0.98): it relied on the pace check alone and was refused after 34040 steps, some
-    90 s at the 10^6-step horizon. Its floor refuses it at once."""
+    90 s at the 10^6-step horizon. Its floor refuses it in the first 6 % distilled."""
     import time
 
     from chemeascode.domains.process.batch_still import StillError, solve_node
@@ -862,6 +870,62 @@ def test_an_unreachable_purity_end_is_refused_at_once(tmp_path):
     with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
         solve_node(process, node, inlets, "design")
     assert time.monotonic() - start < 5.0
+
+
+def _paces(run, small, boiled, stop, steps):
+    """Drive a run of the still's pace check over steps 1..*steps* (small(s), boiled(s),
+    stop(s)); the steps at which it does not reach its end."""
+    return [
+        s
+        for s in range(1, steps + 1)
+        if not run.reaches(small(s), s, boiled(s), stop(s), [1.0], [True])
+    ]
+
+
+@pytest.mark.parametrize("delay", [0, 1])
+def test_a_runs_kmol_pace_is_over_all_its_steps(delay):
+    """A run of small steps boiling 1 kmol each (the stop not evaluated) reaches a target of
+    MAX_STEPS kmol exactly within the step horizon, one more is not: the pace divides the kmol
+    boiled since the run's mark by all its steps, from the advance's first step (delay 0) or
+    after a large one (delay 1)."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    steps = STALL_STEPS + delay
+    for target, stalls in ((MAX_STEPS, []), (MAX_STEPS + 1, [steps])):
+        run = _Run(0.0, [1.0], float(target))
+        assert _paces(run, lambda s: s > delay, float, lambda s: None, steps) == stalls
+
+
+@pytest.mark.parametrize("delay", [0, 1])
+def test_a_runs_stop_pace_is_over_the_steps_since_its_value_was_taken(delay):
+    """A run of small steps whose stop rises by 1 each, boiling next to nothing: at that pace
+    an end MAX_STEPS steps away is reached within the step horizon, one a step further is not.
+    From the advance's first step (delay 0) the stop's first value is taken at step 1, so the
+    run's 500 steps span 499 intervals of it; after a large step (delay 1) its 500 steps span
+    500 (core review of 1.12.0: neither the old divisor nor any off by one was tested)."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    steps = STALL_STEPS + delay
+    for end, stalls in ((MAX_STEPS, []), (MAX_STEPS + 1, [steps])):
+        run = _Run(0.0, [1.0], 1.0)
+        stop = lambda s, end=end: float(s - end)  # noqa: E731
+        assert _paces(run, lambda s: s > delay, lambda s: s * 1e-12, stop, steps) == stalls
+
+
+def test_a_runs_stop_pace_after_a_pace_check_is_over_the_next_run():
+    """After a run passes its pace check the next run is measured from that step: the stop
+    rising by 2 a step over the first 500 steps, then by 1, reaches an end 500 + MAX_STEPS
+    away at step 1000 (500 steps, 500 intervals), one a step further is not."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    n = STALL_STEPS
+    for end, stalls in ((MAX_STEPS + n, []), (MAX_STEPS + n + 1, [2 * n])):
+        run = _Run(0.0, [1.0], 1.0)
+
+        def stop(s, end=end):
+            return float((2 * s if s <= n else s + n) - end)
+
+        assert _paces(run, lambda s: True, lambda s: s * 1e-12, stop, 2 * n) == stalls
 
 
 def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):

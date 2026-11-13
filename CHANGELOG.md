@@ -134,16 +134,18 @@
   control kept the step far above the boils-dry floor, so it crept on without end (1.11.0 hung
   on the batch-rectification example with its product cut ended at 10 h, which the still never
   reaches: it boils dry at about 2.5016 h, 99.835 % distilled). An end past the most its value
-  can still rise before the still boils dry is refused at once ("boils dry before its end",
-  naming the volatile kmol left): a share distilled by the volatile content left (by mole, or
-  its mass), a time by the volatile kmol left times the most s per kmol of any vapour of them
-  (the largest latent heat for kW, the heaviest for kg/h, 2000 K for m3/h) at the highest
-  reflux, a purity by the cut's key over the cut and all the other volatile content left (an
-  end at 0.5 ACCL there was refused only by the pace check below, after 34040 steps and some
-  90 s). No step towards an end within that bound changes. A reachable end the integration
-  only crawls towards is checked after 500 steps in a row that each boil off less than 1e-6 of
-  the charge: if at that run's pace (in kmol boiled up, or in the end's own measure, from the
-  run's first step) the end is not reached within 10^6 steps, the boil-up stalls
+  can still rise before the still boils dry is refused at the first step that shows it ("boils
+  dry before its end", naming the volatile kmol left): a share distilled by the volatile
+  content left (by mole, or its mass), a time by the volatile kmol left times the most s per
+  kmol of any vapour of them (the largest latent heat for kW, the heaviest for kg/h, 2000 K
+  for m3/h) at the highest reflux, a purity by the cut's key over the cut and all the other
+  volatile content left (a floor that rises from 0 as the cut fills, so a purity end below it
+  is refused only once the floor passes it: an end at 0.5 ACCL there with 5 % distilled,
+  before only by the pace check below, after 34040 steps and some 90 s). No step towards
+  an end within that bound changes. A reachable end the integration only crawls towards is
+  checked after 500 steps in a row that each boil off less than 1e-6 of the charge: if at
+  that run's pace (in kmol boiled up, or in the end's own measure, from the run's first step)
+  the end is not reached within 10^6 steps, the boil-up stalls
   (`cheme.process-still-unsolved`, with the hint to end the cut earlier; 2.495 h there, which
   1.11.0 did not solve in 15 minutes, after 55492 steps and 2 to 3 minutes), and no phase
   takes more than 10^6 steps. A run in which a volatile component falls 1000-fold is progress,

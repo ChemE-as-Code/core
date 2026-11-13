@@ -125,7 +125,8 @@ TOLERANCE = 1e-9
 #: all) that creeps on near empty, its error control keeping the step far above the boils-dry
 #: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
 #: does reach it (slowly, on a trace the column enriches) carries on. An end past the most
-#: the still can reach before it boils dry (distilled, time or purity) is refused at once.
+#: the still can reach before it boils dry (distilled, time or purity) is refused at the first
+#: step that bound falls short of it (a purity's floor rises from 0 as its cut fills).
 STALL_SHARE = 1e-6
 #: a component's share of the charge (and feed) below which it is gone
 NEGLIGIBLE = 1e-100
@@ -657,6 +658,59 @@ class _Column:
         return Top(xd, t, self.ratio, c1, True, light, heavy)
 
 
+class _Run:
+    """The pace check of one advance: its last run of small steps (each boiling off less than
+    STALL_SHARE of the charge and feed), where that run began (kmol boiled up, the stop's
+    value and the step it was taken at, and the still's content) and how many steps it has."""
+
+    def __init__(self, boiled: float, content: list[float], target: float) -> None:
+        self.target = target
+        self.stalled = 0
+        # the stop is not evaluated before the advance's first step (a bubble point's guess
+        # would move the solution): a run from there takes the first one the loop evaluates
+        self.mark: tuple[float, float | None, int, list[float]] = (boiled, None, 0, content)
+
+    def reaches(
+        self,
+        small: bool,
+        steps: int,
+        boiled: float,
+        now: float | None,
+        content: list[float],
+        volatile: list[bool],
+    ) -> bool:
+        """After the *steps*-th accepted step (*small* or not), at *boiled* kmol with the stop
+        at *now*: False when a run of STALL_STEPS small steps would not, at its pace (in kmol
+        boiled up towards the target, or in the stop's value towards 0), reach the end within
+        MAX_STEPS steps in all, and no volatile component fell 1000-fold in it."""
+        self.stalled = self.stalled + 1 if small else 0
+        if self.stalled == 0:
+            self.mark = (boiled, now, steps, content)
+        elif self.mark[1] is None and now is not None:
+            # a run from the advance's first step: its stop's value is the first one evaluated
+            self.mark = (self.mark[0], now, steps, self.mark[3])
+        if self.stalled < STALL_STEPS:
+            return True
+        start, value, at, before = self.mark
+        left = MAX_STEPS - steps
+        # each pace is over the steps since its mark: kmol boiled up over all the run's
+        # steps, the stop's value over those since it was taken
+        reach = (boiled - start) / self.stalled * left >= self.target - boiled
+        if not reach and now is not None and value is not None:
+            reach = (now - value) / max(steps - at, 1) * left >= -now
+        if not reach:
+            # a trace the column enriches, cleared at the explicit method's stability limit,
+            # holds the step small until it is gone: progress, not a stall
+            reach = any(
+                v and a > 0 and b < 1e-3 * a
+                for a, b, v in zip(before, content, volatile, strict=True)
+            )
+        if reach:
+            self.stalled = 0
+            self.mark = (boiled, now, steps, content)
+        return reach
+
+
 def solve_still(
     spec: Any,
     charge: Mapping[str, float],
@@ -868,12 +922,8 @@ def solve_still(
         cap = boiled + available + (limit if feeding and limit is not None else 0.0)
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
-        steps = stalled = 0
-        # where the last run of small steps began: kmol boiled up, the stop's value and the
-        # step it was taken at (the stop is not evaluated before the advance's first step: a
-        # bubble point's guess would move the solution; a run from there takes the first one
-        # the loop evaluates), and the still's content
-        mark: tuple[float, float | None, int, list[float]] = (boiled, None, 0, state[:k])
+        steps = 0
+        run = _Run(boiled, state[:k], target)
 
         def stalls() -> StillError:
             left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
@@ -938,7 +988,7 @@ def solve_still(
             # enriches, left at 1e-300 kmol, would keep the explicit step at its stability limit
             new[:k] = [v if v > NEGLIGIBLE * (total0 + total_feed) else 0.0 for v in new[:k]]
             steps += 1
-            stalled = stalled + 1 if h < STALL_SHARE * (total0 + total_feed) else 0
+            small = h < STALL_SHARE * (total0 + total_feed)
             boiled += h
             state = new
             before = result.profile[-1][2]
@@ -963,30 +1013,8 @@ def solve_still(
                     )
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
-            if stalled == 0:
-                mark = (boiled, now, steps, state[:k])
-            elif mark[1] is None and now is not None:
-                # a run of small steps from the advance's first step: its stop's value is the
-                # first one evaluated (the stop is not evaluated before the first step)
-                mark = (mark[0], now, steps, mark[3])
-            if stalled >= STALL_STEPS:
-                # a run of small steps: does its pace (in kmol boiled up, or in the stop's
-                # value) reach the end within the steps left? If not, the still stalls.
-                left = MAX_STEPS - steps
-                reach = (boiled - mark[0]) / stalled * left >= target - boiled
-                if not reach and now is not None and mark[1] is not None:
-                    reach = (now - mark[1]) / max(steps - mark[2], 1) * left >= -now
-                if not reach:
-                    # a trace the column enriches, cleared at the explicit method's stability
-                    # limit, holds the step small until it is gone: progress, not a stall
-                    reach = any(
-                        v and a > 0 and b < 1e-3 * a
-                        for a, b, v in zip(mark[3], state[:k], volatile, strict=True)
-                    )
-                if not reach:
-                    raise stalls()
-                stalled = 0
-                mark = (boiled, now, steps, state[:k])
+            if not run.reaches(small, steps, boiled, now, state[:k], volatile):
+                raise stalls()
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
 

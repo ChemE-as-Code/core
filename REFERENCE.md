@@ -1399,12 +1399,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     the boil-ups the still runs at count (a still's own `boilup` that every cut replaces, with
     no feed, is not used: no unit or heat_of_vaporization check, no hours in a fingerprint).
     An end at a share distilled, a time or a purity that the still cannot reach before it
-    boils dry is an error at once ("boils dry before its end"): at most the volatile content
-    left is still distilled (by mole, or its mass), in at most its kmol times the most s per
-    kmol of any vapour of it (the largest heat of vaporization for kW, the heaviest molar mass
-    for kg/h, 2000 K for m3/h) times R + 1 at the highest reflux (`ratio`, or
-    `maximum_ratio`), and a cut's mean share of its purity key falls no lower than its key over
-    the cut and all the other volatile content left (by mole, or by mass). A still
+    boils dry is an error at the first step that shows it, without waiting for the pace
+    check below ("boils dry before its end"): at most the volatile content left is still
+    distilled (by mole, or its mass), in at most its kmol times the most s per kmol of any
+    vapour of it (the largest heat of vaporization for kW, the heaviest molar mass for kg/h,
+    2000 K for m3/h) times R + 1 at the highest reflux (`ratio`, or `maximum_ratio`), and a
+    cut's mean share of its purity key falls no lower than its key over the cut and all the
+    other volatile content left (by mole, or by mass). That floor rises from 0 as the cut
+    fills, so a purity end below it is refused only once the floor passes it, not at the
+    cut's first step (a 50/50 binary's cut without a column at 0.4 of its light component with
+    45 % of the volatile content left, at 0.499 with 3 %). A still
     whose boil-up crawls near empty (a column on a trace it enriches, before an end next to
     its dry point) is checked after 500 small steps in a row: if at that pace its end is not
     reached within 10^6 steps in all, it stalls (`cheme.process-still-unsolved`: the volatile
