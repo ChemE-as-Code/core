@@ -473,9 +473,11 @@
           },
           "heat": {
             "default": "isothermal",
+            "description": "isothermal (at the outlet's temperature, or a program), adiabatic, or reflux: a liquid held at its bubble point at the vessel's pressure, its vapour condensed and returned (ADR 0074).",
             "enum": [
               "isothermal",
-              "adiabatic"
+              "adiabatic",
+              "reflux"
             ],
             "title": "Heat",
             "type": "string"
@@ -519,6 +521,50 @@
             "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
             "title": "Heat Up",
             "type": "boolean"
+          },
+          "initiation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Initiation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An induction period: the rate laws held back until the reaction initiates (ADR 0074)."
+          },
+          "program": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/TemperatureProgram"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch's temperature programme: {points: [(s, K)]} (ADR 0074)."
+          },
+          "solids": {
+            "additionalProperties": {
+              "$ref": "#/$defs/SolidPhase"
+            },
+            "description": "Component -> its solid phase: carried out of the liquid, with its particles for a surface rate law (ADR 0074).",
+            "title": "Solids",
+            "type": "object"
+          },
+          "light": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Light"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The light of photochemical rate laws: lamp power, wavelength, absorber (ADR 0074)."
           },
           "provenance": {
             "enum": [
@@ -1849,6 +1895,12 @@
             "title": "Start",
             "type": "number"
           },
+          "after_initiation": {
+            "default": false,
+            "description": "The dose waits for the reaction to initiate (batch.initiation, ADR 0074): its start counts from the initiation, as a feed interlocked on a positive initiation.",
+            "title": "After Initiation",
+            "type": "boolean"
+          },
           "absorbed": {
             "anyOf": [
               {
@@ -2492,6 +2544,54 @@
         "title": "ImposedYield",
         "type": "object"
       },
+      "Initiation": {
+        "additionalProperties": false,
+        "description": "A reaction that initiates only after an induction period (ADR 0074; a Grignard\nformation on a passivated metal): before ``time`` the ``reactions``' rate laws run at\n``factor`` of their rate (0: not at all), from then on at their own. A dose with\n``after_initiation`` waits for it.",
+        "properties": {
+          "time": {
+            "description": "s after the charge the reaction initiates",
+            "exclusiveMinimum": 0,
+            "title": "Time",
+            "type": "number"
+          },
+          "factor": {
+            "default": 0.0,
+            "description": "The rate laws' share of their rate before it.",
+            "exclusiveMaximum": 1,
+            "minimum": 0,
+            "title": "Factor",
+            "type": "number"
+          },
+          "reactions": {
+            "description": "The reactions it holds back (default: every reaction of the step).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "provenance"
+        ],
+        "title": "Initiation",
+        "type": "object"
+      },
       "Layout": {
         "additionalProperties": false,
         "properties": {
@@ -2511,6 +2611,104 @@
           }
         },
         "title": "Layout",
+        "type": "object"
+      },
+      "Light": {
+        "additionalProperties": false,
+        "description": "The light of a photochemical batch or semi-batch (ADR 0074): ``power`` W of radiant power\nat ``wavelength`` entering the content per m3 of the charge, of which the content absorbs\n``1 - 10^(-epsilon c l)`` (Beer-Lambert, decadic: the ``absorber``'s concentration, its\n``absorptivity`` and the ``path_length``), or all of it without an absorber. The photons\nabsorbed drive the photochemical rate laws; the power absorbed heats the content. The lamp\nis on in the ``on`` windows (default: throughout).",
+        "properties": {
+          "power": {
+            "description": "W into the content per m3 of the charge",
+            "exclusiveMinimum": 0,
+            "title": "Power",
+            "type": "number"
+          },
+          "wavelength": {
+            "description": "nm (monochromatic, or the band's centre)",
+            "exclusiveMinimum": 0,
+            "title": "Wavelength",
+            "type": "number"
+          },
+          "absorber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The component that absorbs the light; none: all of it.",
+            "title": "Absorber"
+          },
+          "absorptivity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2/kmol: the absorber's decadic molar absorption coefficient (one L/(mol cm) is 100 m2/kmol).",
+            "title": "Absorptivity"
+          },
+          "path_length": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m: the light's path",
+            "title": "Path Length"
+          },
+          "on": {
+            "description": "(s, s) windows the lamp is on, after the charge; default: throughout.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "On",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "power",
+          "wavelength",
+          "provenance"
+        ],
+        "title": "Light",
         "type": "object"
       },
       "Link": {
@@ -3193,6 +3391,66 @@
           }
         },
         "title": "SelectivityUncertainty",
+        "type": "object"
+      },
+      "SolidPhase": {
+        "additionalProperties": false,
+        "description": "A component a liquid batch or semi-batch carries as a solid phase (ADR 0074): out of the\nliquid's composition (its mole fractions, concentrations and activities), its volume ``n M\n/ density`` in the content's, its ``liquid_heat_capacity`` (materials.yaml) in the content's\nheat capacity. A rate law per m2 of its surface (``basis: surface``) takes its particles at\nthe charge, of ``diameter`` (equal spheres) or ``specific_area``, shrinking as they react\n(``A = A_0 (n / n_0)^(2/3)``, the particles' number constant).",
+        "properties": {
+          "density": {
+            "description": "kg/m3 of the solid (not the bulk's)",
+            "exclusiveMinimum": 0,
+            "title": "Density",
+            "type": "number"
+          },
+          "diameter": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m: of the particles charged, taken as equal spheres",
+            "title": "Diameter"
+          },
+          "specific_area": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2/kg of the particles charged (instead of diameter)",
+            "title": "Specific Area"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "density",
+          "provenance"
+        ],
+        "title": "SolidPhase",
         "type": "object"
       },
       "SolidSeparation": {
@@ -4495,6 +4753,51 @@
           }
         },
         "title": "TearGuess",
+        "type": "object"
+      },
+      "TemperatureProgram": {
+        "additionalProperties": false,
+        "description": "An isothermal batch or semi-batch held to a temperature programme (ADR 0074): ``points``\nof (s after the charge, K), the first at 0 s, the content's temperature linear between\nthem and held at the last after it; e.g. a dose at one temperature and the post-reaction at\nanother.",
+        "properties": {
+          "points": {
+            "description": "(time s, temperature K) pairs, the first at 0 s.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Points",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "points",
+          "provenance"
+        ],
+        "title": "TemperatureProgram",
         "type": "object"
       },
       "Terminal": {
