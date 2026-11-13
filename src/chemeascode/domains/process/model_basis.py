@@ -698,33 +698,81 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
 
         moisture = dryer.residual_moisture
         sourced = _sourced(moisture)
+        assumptions = list(DRYER_ASSUMPTIONS)
+        detail = (
+            f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
+            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
+            + ("" if sourced else " (not given with a source: assumed)")
+        )
+        if dryer.selectivity == "raoult":  # ADR 0072
+            assumptions[1] = (
+                "the volatiles kept are what an open evaporation of an ideal cake liquid at the "
+                "drying temperature leaves (Raoult's law, Antoine vapour pressures)"
+            )
+            detail += "; volatiles kept by their vapour pressures"
+        if dryer.sublimation is not None:
+            assumptions.append(
+                "the vapour leaves saturated with the subliming solids at the dryer's pressure "
+                "(an upper bound of the sublimation loss)"
+            )
+            detail += "; sublimation of " + ", ".join(dryer.sublimation.components)
+        if dryer.condenser is not None:
+            assumptions.append(
+                "the vacuum condenser: an ideal condensate in equilibrium with the gas to the "
+                "pump at its temperature and the dryer's pressure, no leaked air"
+            )
+            detail += f"; vacuum condenser at {dryer.condenser.temperature:g} K"
         return UnitBasis(
             node.id,
             "separator",
             "residual-moisture",
             False,
             sourced,
-            detail=f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
-            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
-            + ("" if sourced else " (not given with a source: assumed)"),
+            detail=detail,
             sources=[moisture.source] if sourced else [],
-            assumptions=list(DRYER_ASSUMPTIONS),
+            assumptions=assumptions,
             limitations=["specified moisture: no drying curve or sorption isotherm", outside],
         )
     sep = node.solid_separation
     if sep is not None:
         sourced = _sourced(sep)
+        assumptions = list(SEPARATION_ASSUMPTIONS)
+        detail = (
+            f"filter or centrifuge: solid recovery {sep.solid_recovery:g}, cake liquid "
+            f"{sep.cake_liquid.value:g} ({sep.cake_liquid.basis})"
+            + ("" if sourced else " (not given with a source: assumed)")
+        )
+        if sep.second_liquid is not None:  # ADR 0072
+            held = sep.second_liquid.cake_liquid
+            detail += (
+                f"; second liquid {', '.join(sep.second_liquid.components)}, cake liquid "
+                f"{held.value:g} ({held.basis})"
+            )
+            assumptions[-1] = (
+                "two liquids: each divides with its own composition between cake and filtrate, "
+                "the second at its own cake liquid"
+            )
+        if sep.wash is not None:
+            detail += f"; displacement wash, efficiency {sep.wash.efficiency:g}"
+            assumptions[-1] = (
+                "a displacement wash: the unwashed cake's liquor stays by R = (1 - E)^n (n the "
+                "mass wash ratio), the washed cake holds its cake liquid, the rest of it wash"
+            )
+            if sep.wash.dissolution is not None:
+                detail += f" dissolving {sep.wash.dissolution.crystal}"
+                assumptions.append(
+                    "the wash leaves the cake at its stated approach to the crystals' solubility "
+                    "in it (saturation 1: an upper bound of the loss)"
+                )
         return UnitBasis(
             node.id,
             "separator",
             "solid-split",
             False,
             sourced,
-            detail=f"filter or centrifuge: solid recovery {sep.solid_recovery:g}, cake liquid "
-            f"{sep.cake_liquid.value:g} ({sep.cake_liquid.basis})"
-            + ("" if sourced else " (not given with a source: assumed)"),
+            detail=detail,
             sources=[sep.source] if sourced else [],
-            assumptions=list(SEPARATION_ASSUMPTIONS),
+            assumptions=assumptions,
             limitations=["specified separation: no filtration or centrifuge model", outside],
         )
     spec = node.crystallizer
@@ -748,7 +796,23 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     if spec.basis == "solubility":
         sol = spec.solubility
         basis, predictive = "solubility-equilibrium", True
-        if sol.points:
+        if sol.transfer is not None:  # ADR 0072
+            ((t0, _),) = sol.points
+            t = spec.temperature
+            detail = (
+                f"saturated mother liquor at {t:g} K, one solubility point at {t0:g} K carried "
+                f"there (van 't Hoff, heat of solution {sol.transfer.heat_of_solution:g} kJ/kmol, "
+                f"{sol.transfer.provenance}): not at the operating conditions"
+            )
+            if not _sourced(sol.transfer):
+                lacking.append("transfer")
+            elif sol.transfer.source not in sources:
+                sources.append(sol.transfer.source)
+            limitations.append(
+                "one solubility point carried to the operating temperature (an ideal solution, a "
+                "constant heat of solution): not measured there"
+            )
+        elif sol.points:
             low, high = sol.points[0][0], sol.points[-1][0]
             t = spec.temperature
             detail = f"saturated mother liquor at {t:g} K, solubility data {low:g}-{high:g} K"
@@ -784,6 +848,10 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         detail += f"; spectators {', '.join(spec.spectators)} ({how})"
         if sol is not None and sol.measured_in == "pure_solvent" and salting is None:
             lacking.append("a solubility in the mixed liquor")
+        if sol is not None and sol.liquor is not None:  # ADR 0072
+            detail += "; the solved liquor compared with the data's"
+        if spec.second_liquid is not None:
+            detail += f"; second liquid {', '.join(spec.second_liquid.components)}"
         assumptions += LIQUOR_ASSUMPTIONS
         limitations.append(
             "mixed liquor: the solubility data hold at the liquor composition their source "

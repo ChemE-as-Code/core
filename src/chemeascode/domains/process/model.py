@@ -292,6 +292,7 @@ class Process:
         (no reactions; it is no reactor)."""
         return any(
             getattr(self.nodes[other], "crystallizer", None) is not None
+            or bool(_solid_phase_changes(self.nodes[other]))
             for other in self.nodes
             if other == node_id
             or (self.kinds.get(other) in ("block", "step") and self.within(other, node_id))
@@ -691,6 +692,18 @@ def _reactive_balance(
             )
 
 
+def _solid_phase_changes(item: Any) -> list[tuple[str, str, str]]:
+    """(name, solid, dissolved or vapour component) of a cake wash's dissolution and a dryer's
+    sublimation (ADR 0072) in block or step *item*."""
+    sep = getattr(item, "solid_separation", None)
+    dissolution = getattr(getattr(sep, "wash", None), "dissolution", None)
+    found = [("dissolution", dissolution.crystal, dissolution.solute)] if dissolution else []
+    sublimation = getattr(getattr(item, "dryer", None), "sublimation", None)
+    for solid, into in (sublimation.components if sublimation is not None else {}).items():
+        found.append((f"sublimation:{solid}", solid, into))
+    return found
+
+
 def _crystallizations(process: Process, node: str) -> list[Reaction]:
     """One reversible phase change ``<step>:crystallization`` per crystallizer in *node* (the
     solute, and the hydrate's solvent, into the crystal), so that a reactive balance explains a
@@ -700,11 +713,22 @@ def _crystallizations(process: Process, node: str) -> list[Reaction]:
 
     found: list[Reaction] = []
     for other, item in process.nodes.items():
-        spec = getattr(item, "crystallizer", None)
-        if spec is None or not (
+        if not (
             other == node
             or (process.kinds.get(other) in ("block", "step") and process.within(other, node))
         ):
+            continue
+        for name, solid, into in _solid_phase_changes(item):  # ADR 0072
+            found.append(
+                Reaction(
+                    id=f"{other}:{name}",
+                    stoichiometry={solid: -1.0, into: 1.0},
+                    reversible=True,
+                    kind="phase-change",
+                )
+            )
+        spec = getattr(item, "crystallizer", None)
+        if spec is None:
             continue
         try:
             form = form_of(process, spec)

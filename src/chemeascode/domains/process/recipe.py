@@ -862,7 +862,7 @@ def _solids_time(
     filter *op.from_*, of one batch in the unit procedure's *vessel*. Raises _Reference, or
     ValueError when it cannot be calculated."""
     from chemeascode.domains.process import dryer as drying
-    from chemeascode.domains.process.crystallization import separate_node
+    from chemeascode.domains.process.crystallization import filter_node, separate_node
     from chemeascode.domains.process.solids import solid_components
 
     node = process.nodes.get(op.from_ or "")
@@ -878,15 +878,25 @@ def _solids_time(
     sep = getattr(node, "solid_separation", None)
     if sep is None or sep.filtration is None:
         raise _Reference(f"{op.from_} is no solid_separation with filtration:")
-    ports, _ = separate_node(process, node, _one_inlet(process, node), case)
+    if sep.wash is None:
+        ports, _ = separate_node(process, node, _one_inlet(process, node), case)
+        washed = None
+    else:  # ADR 0072: the slurry's filtrate by Ruth, then the wash's at the final rate
+        inlets = [s for s in _inlets(process, node.id) if s.kind == "material"]
+        ports, _, washed = filter_node(process, node, inlets, case)
     hours = batch_hours(process, recipe, case)
-    cake, filtrate = ports[sep.outlets["cake"]], ports[sep.outlets["filtrate"]]
+    cake = ports[sep.outlets["cake"]]
+    filtrate = washed["filtrate"] if washed is not None else ports[sep.outlets["filtrate"]]
     solid = sum(v for n, v in cake.items() if n in solid_components(process)) * hours
     volume = drying.filtrate_volume(process, filtrate, sep.filtration) * hours
     area = sep.filtration.area or (drying.filter_area(vessel.diameter) if vessel else None)
     if area is None:
         raise ValueError("no filter area: give filtration.area or the unit procedure's vessel")
-    return drying.ruth_hours(sep.filtration, solid, volume, area)
+    found = drying.ruth_hours(sep.filtration, solid, volume, area)
+    if washed is not None:
+        wash = drying.filtrate_volume(process, washed["wash_filtrate"], sep.filtration) * hours
+        found += drying.wash_hours(sep.filtration, solid, wash, area)
+    return found
 
 
 @dataclass

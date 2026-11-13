@@ -22,12 +22,34 @@ the dried product and the vapour:
   given ``drying_time``;
 - **filtration time** (a recipe's ``filter`` ``from:`` a ``solid_separation:`` with
   ``filtration:``): Ruth's constant-pressure cake filtration, ``t = mu (alpha M V / (2 A^2) +
-  R_m V / A) / dP``, M the dry solid of one batch's cake, V its filtrate's volume.
+  R_m V / A) / dP``, M the dry solid of one batch's cake, V its filtrate's volume; a cake wash
+  (ADR 0072) then passes its filtrate at the final filtration rate, ``t_w = mu V_w (alpha M /
+  A^2 + R_m / A) / dP``.
+
+ADR 0072 adds, each only where the dryer asks for it:
+
+- **selective drying** (``selectivity: raoult``): the cake liquid evaporates as an open
+  (Rayleigh) evaporation of an ideal liquid at the drying temperature, ``dn_i / n_i = (P_i /
+  P_j) dn_j / n_j`` (Raoult's law: the non-volatile components lower every volatile alike), so
+  ``n_i = n_i0 f^(P_i / P_max)``, with ``f`` found so that the volatiles kept are the residual
+  moisture; each volatile's Antoine ``vapour_pressure``;
+- **sublimation** (``sublimation:``): the vapour leaves saturated with each subliming solid at
+  the dryer's ``pressure`` P, ``n_j = n_vap P_j / (P - sum P_j)`` (``P_j`` the solid's
+  sublimation pressure, its ``vapour_pressure``; an upper bound of the loss), the sublimate
+  counted in the vapour as the component it maps to, its heat in the duty;
+- **cooling** (``cooling:``): the product cooled to its discharge temperature and the vessel's
+  metal back to ``vessel_temperature`` (the next batch heats it from there), ``Q_c = m_p cp_p
+  (T - T_p) + C_v (T - T_v) / h_batch``; propagate then writes the outlets' temperatures;
+- **the vacuum condenser** (``condenser:``): the vapour cooled to ``T_c`` at the dryer's
+  pressure, an ideal condensate in equilibrium with what passes (Rachford-Rice with ``K_i =
+  P_i(T_c) / P``), its duty ``Q = sum c_i lambda_i + sum v_i cp (T - T_c)`` (what condenses at
+  the drying temperature's latent heat, all of the vapour cooled as liquid, what passes
+  re-evaporated at the same latent heat, as a vent condenser's, ADR 0062).
 
 Not modelled (and so never claimed): drying curves (no falling-rate period: the rate is a
-mean over the drying), the moisture's equilibrium with the vapour or the solid (no sorption
-isotherm), the vacuum's boiling point, the condenser, heat losses beyond the efficiency,
-agitation power, compressible cakes, washing efficiency.
+mean over the drying), the moisture's equilibrium with the solid (no sorption isotherm), a
+non-ideal cake liquid, the vacuum's boiling point, leaked air in the condenser, a sublimate's
+deposit in it, heat losses beyond the efficiency, agitation power, compressible cakes.
 """
 
 from __future__ import annotations
@@ -36,8 +58,10 @@ import math
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from chemeascode.domains.chemistry.formulas import parse_formula
 from chemeascode.domains.process import FLOWSHEET_FILE
 from chemeascode.foundation.findings import Finding
+from chemeascode.foundation.provenance import NOT_INPUTS
 from chemeascode.foundation.yamlsource import _yaml_line
 
 #: kJ/(kmol K)
@@ -66,10 +90,15 @@ def pitzer_latent_heat(critical: Any, molar_mass: float, temperature: float) -> 
 
 
 def dry_mass(
-    mass: dict[str, float], volatiles: list[str], moisture: Any
+    mass: dict[str, float],
+    volatiles: list[str],
+    moisture: Any,
+    pressures: dict[str, float] | None = None,
 ) -> tuple[dict[str, float], dict[str, float]]:
     """(product, vapour) kg/h by component of drying *mass* to *moisture*
-    (:class:`~.schema.ResidualMoisture`); DryerError when the cake is already drier."""
+    (:class:`~.schema.ResidualMoisture`); DryerError when the cake is already drier. The
+    volatiles kept have the inlet's ratio, or with *pressures* (kPa of each volatile at the
+    drying temperature) what an open evaporation of an ideal liquid leaves (:func:`kept_by`)."""
     solid = sum(v for n, v in mass.items() if n not in volatiles)
     wet = sum(v for n, v in mass.items() if n in volatiles)
     if solid <= 0:
@@ -81,10 +110,74 @@ def dry_mass(
             f"the cake holds {wet:.6g} kg/h of volatiles, less than the residual moisture "
             f"leaves ({kept:.6g} kg/h): nothing to dry"
         )
-    share = min(kept / wet, 1.0) if wet > 0 else 0.0
-    product = {n: (v * share if n in volatiles else v) for n, v in mass.items()}
-    vapour = {n: v * (1 - share) for n, v in mass.items() if n in volatiles}
+    if pressures is not None:
+        share = kept_by({n: v for n, v in mass.items() if n in volatiles}, pressures, kept)
+    else:
+        share = dict.fromkeys(volatiles, min(kept / wet, 1.0) if wet > 0 else 0.0)
+    product = {n: (v * share[n] if n in volatiles else v) for n, v in mass.items()}
+    vapour = {n: v * (1 - share[n]) for n, v in mass.items() if n in volatiles}
     return product, vapour
+
+
+def kept_by(wet: dict[str, float], pressures: dict[str, float], kept: float) -> dict[str, float]:
+    """The share of each volatile in *wet* (kg) that an open (Rayleigh) evaporation of an ideal
+    liquid at constant temperature leaves when *kept* kg of them remain: ``n_i / n_i0 = f^(P_i
+    / P_max)`` (*pressures* kPa), ``f`` by bisection. DryerError when the volatiles that do not
+    evaporate (no vapour pressure there) are more than *kept*."""
+    top = max((pressures[n] for n in wet), default=0.0)
+    if top <= 0:
+        raise DryerError("no volatile has a vapour pressure at the drying temperature")
+    alpha = {n: pressures[n] / top for n in wet}
+
+    def left(f: float) -> float:
+        return sum(v * f ** alpha[n] if alpha[n] > 0 else v for n, v in wet.items())
+
+    if left(0.0) > kept * (1 + 1e-12) + 1e-12:
+        raise DryerError(
+            "the volatiles without a vapour pressure at the drying temperature are more than "
+            "the residual moisture: they cannot dry"
+        )
+    low, high = 0.0, 1.0
+    for _ in range(200):
+        mid = (low + high) / 2
+        if mid <= low or mid >= high:
+            break
+        if left(mid) > kept:
+            high = mid
+        else:
+            low = mid
+    f = (low + high) / 2
+    return {n: f ** alpha[n] if alpha[n] > 0 else 1.0 for n in wet}
+
+
+def flash(vapour: dict[str, float], k: dict[str, float]) -> dict[str, float]:
+    """kmol (or kmol/h) of each component of *vapour* that passes a condenser where ``K_i``
+    (*k*) is its vapour over liquid mole fraction, an ideal condensate and no inert gas
+    (Rachford-Rice, ``sum z_i (K_i - 1) / (1 + b (K_i - 1)) = 0``): all condenses below the
+    bubble point (``sum z_i K_i <= 1``), nothing above the dew point (``sum z_i / K_i <= 1``)."""
+    total = sum(vapour.values())
+    if total <= 0:
+        return dict.fromkeys(vapour, 0.0)
+    z = {n: v / total for n, v in vapour.items()}
+    if sum(z[n] * k[n] for n in z) <= 1.0:
+        return dict.fromkeys(vapour, 0.0)
+    if all(k[n] > 0 for n in z) and sum(z[n] / k[n] for n in z) <= 1.0:
+        return dict(vapour)
+
+    def f(b: float) -> float:
+        return sum(z[n] * (k[n] - 1.0) / (1.0 + b * (k[n] - 1.0)) for n in z)
+
+    low, high = 0.0, 1.0
+    for _ in range(200):
+        mid = (low + high) / 2
+        if mid <= low or mid >= high:
+            break
+        if f(mid) > 0:
+            low = mid
+        else:
+            high = mid
+    b = (low + high) / 2
+    return {n: total * k[n] * z[n] * b / (1.0 + b * (k[n] - 1.0)) for n in z}
 
 
 @dataclass
@@ -102,6 +195,13 @@ class DryerResult:
     latent_heat: dict[str, tuple[float, str]] = field(default_factory=dict)
     energy: dict[str, Any] | None = None
     batch_hours: float | None = None  # of flows one batch makes (process/recipe.yaml)
+    #: ADR 0072, each left out of the entry when the dryer does not ask for it: solid -> kg/h
+    #: sublimed (in ``vapour`` as the component it maps to), the cooling after drying, the
+    #: vacuum condenser, and notes (a vapour pressure used outside its range)
+    sublimed: dict[str, float] = field(default_factory=dict)
+    cooling: dict[str, Any] | None = None
+    condenser: dict[str, Any] | None = None
+    notes: list[str] = field(default_factory=list)
 
     @property
     def moisture(self) -> float:
@@ -131,6 +231,9 @@ class DryerResult:
             if self.batch_hours
             else None
         )
+        for name in ("sublimed", "cooling", "condenser", "notes"):
+            if not found[name]:
+                del found[name]  # a dryer without them reports as in 1.12.0
         return found
 
 
@@ -169,8 +272,11 @@ def energy_balance(
     missing: list[str],
     inlet_temperature: float | None,
     batch_hours: float | None,
+    sublimed: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    """The dryer's duty (kW, heat supplied) with its terms, or what is missing."""
+    """The dryer's duty (kW, heat supplied) with its terms, or what is missing. With
+    ``cooling.vessel_temperature`` the vessel is heated from there; *sublimed* (kg/h by solid)
+    takes its ``sublimation.heat`` (ADR 0072)."""
     data = spec.energy
     missing = list(missing)
     t_in = data.inlet_temperature or inlet_temperature
@@ -178,15 +284,24 @@ def energy_balance(
         missing.append("the wet cake's temperature (energy.inlet_temperature or the inlet's)")
     if data.vessel_heat_capacity is not None and not batch_hours:
         missing.append("the batch (process/recipe.yaml) for the vessel's heat per batch")
+    heats = spec.sublimation.heat if spec.sublimation is not None else {}
+    if lacking := sorted(n for n, kg in (sublimed or {}).items() if kg and n not in heats):
+        missing.append("sublimation.heat of " + ", ".join(lacking))
     if missing:
         return {"duty_kW": None, "duty_kJ_h": None, "missing": missing}
     assert t_in is not None
     dt = spec.temperature - t_in
     sensible = inlet_kg_h * data.heat_capacity * dt
     evaporation = sum(kg * latent[n][0] for n, kg in vapour.items() if kg)
-    vessel = (data.vessel_heat_capacity or 0.0) * dt / batch_hours if batch_hours else 0.0
-    total = (sensible + evaporation + vessel) / data.efficiency
-    return {
+    t_vessel = (spec.cooling.vessel_temperature if spec.cooling else None) or t_in
+    vessel = (
+        (data.vessel_heat_capacity or 0.0) * (spec.temperature - t_vessel) / batch_hours
+        if batch_hours
+        else 0.0
+    )
+    sublimation = sum(kg * heats[n] for n, kg in (sublimed or {}).items() if kg)
+    total = (sensible + evaporation + vessel + sublimation) / data.efficiency
+    found = {
         "duty_kW": total / 3600.0,
         "duty_kJ_h": total,
         "sensible_kJ_h": sensible,
@@ -200,6 +315,100 @@ def energy_balance(
         "the volatiles evaporated at it, the vessel heated once per batch, over the "
         "efficiency; the vapour's superheat and the heats of desorption not included",
     }
+    if spec.sublimation is not None:  # ADR 0072: only where asked for
+        found["sublimation_kJ_h"] = sublimation
+    if spec.cooling is not None:
+        found["vessel_from_K"] = t_vessel
+    return found
+
+
+def cooling_duty(
+    spec: Any, product_kg_h: float, inlet_temperature: float | None, batch_hours: float | None
+) -> dict[str, Any]:
+    """The heat (kW, removed) of cooling the product to its discharge temperature and the
+    vessel's metal back for the next batch (:class:`~.schema.DryerCooling`, ADR 0072), or what
+    is missing."""
+    data = spec.cooling
+    energy = spec.energy
+    capacity = energy.vessel_heat_capacity if energy is not None else None
+    t_in = (energy.inlet_temperature if energy is not None else None) or inlet_temperature
+    t_vessel = data.vessel_temperature or t_in
+    missing = []
+    if capacity is not None and t_vessel is None:
+        missing.append("the vessel's temperature (cooling.vessel_temperature or the cake's)")
+    if capacity is not None and not batch_hours:
+        missing.append("the batch (process/recipe.yaml) for the vessel's heat per batch")
+    t_product = data.product_temperature or spec.temperature
+    found: dict[str, Any] = {
+        "product_temperature_K": t_product,
+        "vessel_temperature_K": t_vessel,
+        "missing": missing,
+    }
+    if missing:
+        return found | {"duty_kW": None, "duty_kJ_h": None}
+    product = product_kg_h * (data.heat_capacity or 0.0) * (spec.temperature - t_product)
+    vessel = (
+        capacity * (spec.temperature - (t_vessel or 0.0)) / batch_hours
+        if capacity is not None and batch_hours
+        else 0.0
+    )
+    total = product + vessel
+    return found | {
+        "duty_kW": total / 3600.0,
+        "duty_kJ_h": total,
+        "product_kJ_h": product,
+        "vessel_kJ_h": vessel,
+        "basis": "the dried product cooled in the vessel at a constant heat capacity, the "
+        "vessel's metal (energy.vessel_heat_capacity) cooled back once per batch",
+    }
+
+
+def condense_vapour(
+    process: Any, spec: Any, vapour: dict[str, float], latent: dict[str, tuple[float, str]]
+) -> dict[str, Any]:
+    """The vacuum condenser (:class:`~.schema.DryerCondenser`, ADR 0072) on the volatiles'
+    *vapour* (kg/h): what condenses and what passes (``condensate_kg_h``, ``gas_kg_h``), its
+    duty (kW, removed) or what is missing, and notes."""
+    data = spec.condenser
+    comps = process.components()
+    pressure = spec.pressure
+    found: dict[str, Any] = {"temperature_K": data.temperature, "pressure_kPa": pressure}
+    missing = []
+    names = [n for n, kg in vapour.items() if kg]
+    curves = {n: getattr(comps.get(n), "vapour_pressure", None) for n in names}
+    masses = {n: getattr(comps.get(n), "molar_mass", None) for n in names}
+    if lacking := [n for n in names if curves[n] is None or not masses[n]]:
+        missing.append("the vapour_pressure and molar_mass of " + ", ".join(lacking))
+        return found | {"duty_kW": None, "duty_kJ_h": None, "missing": missing, "notes": []}
+    notes = [
+        f"the condenser at {data.temperature:g} K is outside the vapour_pressure range of {n}"
+        for n in names
+        if not curves[n].covers(data.temperature)
+    ]
+    kmol = {n: vapour[n] / masses[n] for n in names}
+    k = {n: curves[n].kpa(data.temperature) / pressure for n in names}
+    passing = {n: v * masses[n] for n, v in flash(kmol, k).items()}
+    condensed = {n: vapour[n] - passing[n] for n in names}
+    found |= {"condensate_kg_h": condensed, "gas_kg_h": passing, "notes": notes}
+    if lacking := [n for n, kg in condensed.items() if kg > 0 and n not in latent]:
+        missing.append("the latent heat of " + ", ".join(lacking))
+        return found | {"duty_kW": None, "duty_kJ_h": None, "missing": missing}
+    condensation = sum(kg * latent[n][0] for n, kg in condensed.items() if kg > 0)
+    cooled = (
+        sum(vapour[n] for n in names) * data.heat_capacity * (spec.temperature - data.temperature)
+    )
+    total = condensation + cooled
+    return found | {
+        "duty_kW": total / 3600.0,
+        "duty_kJ_h": total,
+        "condensation_kJ_h": condensation,
+        "cooling_kJ_h": cooled,
+        "missing": [],
+        "basis": "an ideal condensate in equilibrium with the gas to the vacuum pump at the "
+        "condenser's temperature and the dryer's pressure (Raoult's law, no leaked air); the "
+        "latent heat at the drying temperature, the vapour cooled as liquid at a constant heat "
+        "capacity",
+    }
 
 
 def _inlet_mass(process: Any, inlet: Any, case: str) -> dict[str, float]:
@@ -209,6 +418,64 @@ def _inlet_mass(process: Any, inlet: Any, case: str) -> dict[str, float]:
     if flows.components is None:
         raise DryerError(f"inlet {inlet.id}: no flow per component ({', '.join(flows.missing)})")
     return flows.components
+
+
+def _pressures(process: Any, names: list[str], temperature: float, notes: list[str]) -> dict:
+    """kPa of each component's ``vapour_pressure`` at *temperature*; DryerError without one."""
+    comps = process.components()
+    curves = {n: getattr(comps.get(n), "vapour_pressure", None) for n in names}
+    if lacking := [n for n, c in curves.items() if c is None]:
+        raise DryerError("no vapour_pressure (materials.yaml) of " + ", ".join(lacking))
+    for n, curve in curves.items():
+        if not curve.covers(temperature):
+            notes.append(f"{temperature:g} K is outside the vapour_pressure range of {n}")
+    return {n: c.kpa(temperature) for n, c in curves.items()}
+
+
+def _sublime(
+    process: Any,
+    spec: Any,
+    mass: dict[str, float],
+    pressures: dict[str, float] | None,
+    notes: list[str],
+) -> tuple[dict[str, float], dict[str, float], dict[str, float]]:
+    """(product, vapour, kg/h sublimed by solid): the dried cake when the vapour leaves
+    saturated with the subliming solids (``n_j = n_vap P_j / (P - sum P_j)``), by successive
+    substitution on what sublimes (it lowers the product the moisture is a share of)."""
+    comps = process.components()
+    solids = spec.sublimation.components
+    sub = _pressures(process, list(solids), spec.temperature, notes)
+    rest = spec.pressure - sum(sub.values())
+    if rest <= 0:
+        raise DryerError(
+            f"the solids' sublimation pressure {sum(sub.values()):.6g} kPa reaches the dryer's "
+            f"{spec.pressure:g} kPa(a): the product would sublime whole"
+        )
+    masses = {n: getattr(comps.get(n), "molar_mass", None) for n in [*solids, *spec.volatiles]}
+    if lacking := [n for n, m in masses.items() if not m]:
+        raise DryerError("no molar_mass of " + ", ".join(lacking))
+    removed = dict.fromkeys(solids, 0.0)
+    tolerance = 1e-13 * max(sum(mass.values()), 1e-9)
+    for _ in range(200):
+        reduced = {n: v - removed.get(n, 0.0) for n, v in mass.items()}
+        product, vapour = dry_mass(reduced, spec.volatiles, spec.residual_moisture, pressures)
+        kmol = sum(kg / masses[n] for n, kg in vapour.items())
+        new = {j: kmol * sub[j] / rest * masses[j] for j in solids}
+        if beyond := [j for j, kg in new.items() if kg > mass.get(j, 0.0)]:
+            raise DryerError(
+                "the vapour would carry more of " + ", ".join(beyond) + " than the cake holds"
+            )
+        change = max(abs(new[j] - removed[j]) for j in solids)
+        removed = new
+        if change <= tolerance:
+            break
+    else:
+        raise DryerError("the sublimation did not converge in 200 iterations")
+    reduced = {n: v - removed.get(n, 0.0) for n, v in mass.items()}
+    product, vapour = dry_mass(reduced, spec.volatiles, spec.residual_moisture, pressures)
+    for solid, into in solids.items():
+        vapour[into] = vapour.get(into, 0.0) + removed[solid]
+    return product, vapour, removed
 
 
 def solve_node(
@@ -221,30 +488,54 @@ def solve_node(
 
     spec = node.dryer
     mass = _inlet_mass(process, inlet, case)
-    product, vapour = dry_mass(mass, spec.volatiles, spec.residual_moisture)
+    notes: list[str] = []
+    pressures = None
+    if spec.selectivity == "raoult":
+        pressures = _pressures(process, list(spec.volatiles), spec.temperature, notes)
+    sublimed: dict[str, float] = {}
+    if spec.sublimation is not None:
+        product, vapour, sublimed = _sublime(process, spec, mass, pressures, notes)
+    else:
+        product, vapour = dry_mass(mass, spec.volatiles, spec.residual_moisture, pressures)
+    volatile = {n: v for n, v in vapour.items() if n in spec.volatiles}
     kept = sum(v for n, v in product.items() if n in spec.volatiles)
     result = DryerResult(
         sum(mass.values()),
         sum(v for n, v in product.items() if n not in spec.volatiles),
         kept,
-        sum(vapour.values()),
+        sum(volatile.values()),
         product,
         vapour,
         spec.temperature,
         batch_hours=batch_hours,
+        sublimed=sublimed,
+        notes=notes,
     )
+    t_in = _temperature_of(process, inlet, case)
+    latent: dict[str, tuple[float, str]] = {}
+    missing: list[str] = []
+    if spec.energy is not None or spec.condenser is not None:
+        latent, missing = latent_heats(process, spec, volatile)
     if spec.energy is not None:
-        latent, missing = latent_heats(process, spec, vapour)
         result.latent_heat = latent
         result.energy = energy_balance(
-            spec,
-            result.inlet_kg_h,
-            vapour,
-            latent,
-            missing,
-            _temperature_of(process, inlet, case),
-            batch_hours,
+            spec, result.inlet_kg_h, volatile, latent, missing, t_in, batch_hours, sublimed
         )
+    if spec.cooling is not None:
+        result.cooling = cooling_duty(spec, sum(product.values()), t_in, batch_hours)
+    if spec.condenser is not None:
+        result.condenser = condense_vapour(process, spec, volatile, latent)
+        result.notes += result.condenser.pop("notes", [])
+        if any(sublimed.values()):
+            result.notes.append(
+                "the sublimate passes the condenser uncounted (its deposit there is not modelled)"
+            )
+        if "condensate" in spec.outlets and "condensate_kg_h" not in result.condenser:
+            raise DryerError(
+                "the condenser's condensate needs "
+                + "; ".join(result.condenser["missing"])
+                + " (materials.yaml)"
+            )
     moisture = spec.residual_moisture
     extra = {
         "dryer": {
@@ -253,12 +544,51 @@ def solve_node(
             "outlets": dict(spec.outlets),
         }
     }
+    # ADR 0072: only what the dryer asks for, so that other dryers' fingerprints stay
+    for name in ("pressure", "selectivity", "sublimation", "cooling", "condenser"):
+        dumped = spec.model_dump(mode="json", include={name})
+        if dumped:
+            extra["dryer"][name] = dumped[name]
+    used = [
+        *(spec.volatiles if spec.selectivity == "raoult" or spec.condenser else []),
+        *(spec.sublimation.components if spec.sublimation else []),
+    ]
+    comps = process.components()
+    if used:
+        extra["vapour_pressure"] = {
+            n: vp.model_dump(mode="json", exclude=NOT_INPUTS)
+            for n in dict.fromkeys(used)
+            if (vp := getattr(comps.get(n), "vapour_pressure", None)) is not None
+        }
     return result, extra
 
 
 def node_outlets(spec: Any, result: DryerResult) -> dict[str, dict[str, float]]:
-    """Outlet port -> kg/h by component."""
-    return {spec.outlets["product"]: result.product, spec.outlets["vapour"]: result.vapour}
+    """Outlet port -> kg/h by component; with a ``condensate`` outlet the vapour port takes
+    what passes the condenser (and the sublimate)."""
+    found = {spec.outlets["product"]: result.product, spec.outlets["vapour"]: result.vapour}
+    if "condensate" in spec.outlets and result.condenser is not None:
+        condensed = result.condenser["condensate_kg_h"]
+        found[spec.outlets["vapour"]] = {
+            n: v - condensed.get(n, 0.0) for n, v in result.vapour.items()
+        }
+        found[spec.outlets["condensate"]] = dict(condensed)
+    return found
+
+
+def outlet_temperatures(spec: Any) -> dict[str, float]:
+    """Outlet port -> K that ``cheme process propagate`` writes (ADR 0072): with ``cooling:``
+    or ``condenser:`` only, the product at its discharge temperature (else the drying
+    temperature), the vapour at the drying temperature (past a condenser with a condensate
+    outlet: the condenser's), the condensate at the condenser's."""
+    if spec.cooling is None and spec.condenser is None:
+        return {}
+    product = (spec.cooling.product_temperature if spec.cooling else None) or spec.temperature
+    found = {spec.outlets["product"]: product, spec.outlets["vapour"]: spec.temperature}
+    if "condensate" in spec.outlets:
+        found[spec.outlets["vapour"]] = spec.condenser.temperature
+        found[spec.outlets["condensate"]] = spec.condenser.temperature
+    return found
 
 
 def _recipe_hours(process: Any, case: str) -> float | None:
@@ -274,12 +604,15 @@ def _recipe_hours(process: Any, case: str) -> float | None:
         return None
 
 
-def _heat_duty(process: Any, node: Any, port: str, case: str) -> tuple[str, float] | None:
-    """(stream id, kW) of the energy stream into *node*'s *port* in *case*, when it has one."""
+def _heat_duty(
+    process: Any, node: Any, port: str, case: str, out: bool = False
+) -> tuple[str, float] | None:
+    """(stream id, kW) of the energy stream into *node*'s *port* (*out*: from it) in *case*,
+    when it has one."""
     from chemeascode.domains.process.schema import DUTY_UNITS
 
     for stream in process.flowsheet.streams:
-        end = process.ends(stream)[1]
+        end = process.ends(stream)[0 if out else 1]
         if stream.kind != "energy" or end is None or (end.node, end.port) != (node.id, port):
             continue
         state = stream.state.get(case)
@@ -300,16 +633,23 @@ def dryer_entry(
     outlet, propagate does not write it)."""
     result, _ = solve_node(process, node, inlet, case, _recipe_hours(process, case))
     differ = []
-    energy = node.dryer.energy
-    duty = (result.energy or {}).get("duty_kW")
-    if energy is not None and energy.port is not None and duty is not None:
-        given = _heat_duty(process, node, energy.port, case)
-        tol = process.flowsheet.tolerance
+    spec = node.dryer
+    tol = process.flowsheet.tolerance
+    # the heat in (energy.port), and (ADR 0072) the cooling's and the condenser's heat out
+    for data, part, out in (
+        (spec.energy, result.energy, False),
+        (spec.cooling, result.cooling, True),
+        (spec.condenser, result.condenser, True),
+    ):
+        duty = (part or {}).get("duty_kW")
+        if data is None or data.port is None or duty is None:
+            continue
+        given = _heat_duty(process, node, data.port, case, out)
         if given is not None and abs(given[1] - duty) > 1e-6 + tol.rel * max(
             abs(given[1]), abs(duty)
         ):
             differ.append(f"{given[0]} duty: {given[1]:.6g} kW written, {duty:.6g} model")
-    return node_outlets(node.dryer, result), result.entry(), differ
+    return node_outlets(spec, result), result.entry(), differ
 
 
 def solution_lines(sol: dict[str, Any]) -> list[str]:
@@ -331,6 +671,32 @@ def solution_lines(sol: dict[str, Any]) -> list[str]:
         )
         for n, heat in sol["latent_heat"].items():
             lines.append(f"  latent heat of {n}: {heat['kJ_kg']:.6g} kJ/kg ({heat['basis']})")
+    for solid, kg in (sol.get("sublimed") or {}).items():
+        lines.append(f"  sublimed {kg:.6g} kg/h of {solid} (the vapour saturated with it)")
+    if cooling := sol.get("cooling"):
+        lines.append(
+            "  cooling "
+            + (
+                f"{cooling['duty_kW']:.6g} kW (product to {cooling['product_temperature_K']:g} K "
+                f"{cooling['product_kJ_h']:.6g}, vessel to {cooling['vessel_temperature_K']:g} K "
+                f"{cooling['vessel_kJ_h']:.6g} kJ/h)"
+                if cooling["duty_kW"] is not None
+                else "? (" + "; ".join(cooling["missing"]) + ")"
+            )
+        )
+    if condenser := sol.get("condenser"):
+        condensed = sum((condenser.get("condensate_kg_h") or {}).values())
+        lines.append(
+            f"  condenser at {condenser['temperature_K']:g} K, {condenser['pressure_kPa']:g} "
+            "kPa(a): "
+            + (
+                f"{condensed:.6g} kg/h condensed, {condenser['duty_kW']:.6g} kW"
+                if condenser["duty_kW"] is not None
+                else "? (" + "; ".join(condenser["missing"]) + ")"
+            )
+        )
+    for note in sol.get("notes", []):
+        lines.append(f"  note: {note}")
     batch = sol["per_batch"]
     if batch:
         lines.append(
@@ -369,6 +735,18 @@ def ruth_hours(filtration: Any, solid_kg: float, filtrate_m3: float, area: float
     dp = filtration.pressure_difference * 1e3
     cake = filtration.specific_cake_resistance * solid_kg * filtrate_m3 / (2 * area**2)
     medium = filtration.medium_resistance * filtrate_m3 / area
+    return mu * (cake + medium) / dp / 3600.0
+
+
+def wash_hours(filtration: Any, solid_kg: float, wash_m3: float, area: float) -> float:
+    """h to pass *wash_m3* of wash filtrate through the cake of *solid_kg* at the pressure and
+    the filtrate's viscosity of *filtration*: at the final filtration rate of Ruth's equation,
+    ``dV/dt = A dP / (mu (alpha M / A + R_m))``, so ``t_w = mu V_w (alpha M / A^2 + R_m / A) /
+    dP`` (ADR 0072)."""
+    mu = filtration.viscosity * 1e-3
+    dp = filtration.pressure_difference * 1e3
+    cake = filtration.specific_cake_resistance * solid_kg * wash_m3 / area**2
+    medium = filtration.medium_resistance * wash_m3 / area
     return mu * (cake + medium) / dp / 3600.0
 
 
@@ -448,13 +826,38 @@ def rules(process: Any) -> list[Finding]:
         material = [p for p in node.ports if p.kind == "material"]
         outs = [p.id for p in material if p.direction == "out"]
         mapped = list(spec.outlets.values())
-        if sorted(mapped) != sorted(outs) or len(set(mapped)) != 2:
+        if sorted(mapped) != sorted(outs) or len(set(mapped)) != len(spec.outlets):
             add(
                 "error",
-                "dryer outlets must be its two material outlet ports",
+                "dryer outlets must be its "
+                + (
+                    "material outlet ports"
+                    if "condensate" in spec.outlets
+                    else "two material outlet ports"
+                ),
                 [*loc, "outlets"],
-                "outlets: {product: PORT, vapour: PORT}",
+                "outlets: {product: PORT, vapour: PORT}"
+                + (" and condensate: PORT" if "condensate" in spec.outlets else ""),
             )
+        sublimation = spec.sublimation
+        for solid, into in (sublimation.components if sublimation is not None else {}).items():
+            if solid not in solids or into not in comps or into in solids:
+                add(
+                    "error",
+                    f"dryer sublimation {solid} -> {into}: a solid component into a component "
+                    "that is not solid",
+                    [*loc, "sublimation", "components"],
+                    "map each subliming solid (phase: solid) to the component its vapour is",
+                )
+            elif comps[solid].formula and parse_formula(comps[solid].formula) != parse_formula(
+                comps[into].formula
+            ):
+                add(
+                    "error",
+                    f"dryer sublimation {solid} -> {into}: not the same formula",
+                    [*loc, "sublimation", "components"],
+                    "a sublimate's vapour is the same substance",
+                )
         if len([p for p in material if p.direction == "in"]) != 1:
             add(
                 "error",
@@ -471,16 +874,35 @@ def rules(process: Any) -> list[Finding]:
                     [*loc, "energy", "latent_heat"],
                     "key latent_heat by the volatiles' component ids",
                 )
-        if energy is not None and energy.port is not None:
-            port = next((p for p in node.ports if p.id == energy.port), None)
-            if port is None or port.kind != "energy" or port.direction != "in":
+        for part, data, direction in (
+            ("energy", energy, "in"),
+            ("cooling", spec.cooling, "out"),
+            ("condenser", spec.condenser, "out"),
+        ):
+            if data is None or data.port is None:
+                continue
+            port = next((p for p in node.ports if p.id == data.port), None)
+            if port is None or port.kind != "energy" or port.direction != direction:
                 add(
                     "error",
-                    f"dryer energy.port {energy.port} is no energy inlet port",
-                    [*loc, "energy", "port"],
-                    "name the port the heating stream enters",
+                    f"dryer {part}.port {data.port} is no energy "
+                    + ("inlet" if direction == "in" else "outlet")
+                    + " port",
+                    [*loc, part, "port"],
+                    "name the port the heating stream enters"
+                    if direction == "in"
+                    else "name the port the heat removed leaves by (cooling water, brine)",
                 )
-        parts = ("residual_moisture", "energy", "drying_rate", "drying_time", "cake_density")
+        parts = (
+            "residual_moisture",
+            "energy",
+            "drying_rate",
+            "drying_time",
+            "cake_density",
+            "sublimation",
+            "cooling",
+            "condenser",
+        )
         for part in parts:
             value = getattr(spec, part)
             if value is not None and value.provenance == "given" and not value.source.strip():
