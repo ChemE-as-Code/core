@@ -531,7 +531,9 @@ def test_a_partly_absorbed_gas_dose_in_a_plant(tmp_path):
     path.write_text(
         MATERIALS.replace("{id: gas, components: [G]}", "{id: gas, components: [A, G]}")
     )
-    assert not _messages(ws)
+    # A has no ideal-gas data: its warming as it passes through is left out (ADR 0073)
+    (warning,) = _messages(ws)
+    assert "the gas A of the dose S2 passes through to the vent without ideal_gas" in warning
     process, _ = load(ws.root)
     run(ws, process, "design", write=True)
     process, found = load(ws.root)

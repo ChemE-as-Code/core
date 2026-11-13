@@ -1115,8 +1115,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `parallel` units, its ordered operations charge, heat, dose, react, cool, transfer, distil,
   filter, dry, clean, hold or other, each with a `duration` or, for dose and react, `from:` a
   batch or semi-batch step's model; for distil, `from:` a still step's boil-up time (ADR 0055);
-  for dry and filter, `from:` a dryer or a filter with `filtration:` (ADR 0057); a unit
-  procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's
+  for dry and filter, `from:` a dryer or a filter with `filtration:` (ADR 0057); for transfer,
+  `from:` the semi-batch whose dose takes what the unit makes, that dose's time (ADR 0073); a
+  unit procedure gives `unit:` or `units:`, several steps in one vessel). It gives each unit's
   occupancy, the cycle time (the bottleneck), the batches per year, one batch's timeline (a unit starts at the previous one's `transfer`, or at
   its `start`) and the batch-size stream's year-average rate; `--svg` draws one batch as a
   Gantt chart (light and dark). `validate` reports `cheme.recipe-*`: `-schema`, `-reference`,
@@ -1129,8 +1130,31 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   operation with `temperatures: [start, end]` gets its time from the jacket; `datasheets fill`
   writes a batch reactor's volume and peak duty from it (ADR 0052). A `unit:` that is a block,
   or `units:`, holding one batch or semi-batch step sizes the vessel from that step (ADR 0057;
-  1.7.0 gave `cheme.recipe-reference` for a block); several such steps are
-  `cheme.recipe-reference` (name one as `unit:`). A filter or dryer in the same vessel takes
+  1.7.0 gave `cheme.recipe-reference` for a block). Several such steps one after the other in
+  one vessel (a one-pot sequence, ADR 0073; 1.12.0 gave `cheme.recipe-reference`) size it from
+  the largest content of any of them, check the jacket against each step's peak duty at that
+  step's own charge (`vessels[].steps`, the vessel's own fields the step with the least
+  margin; `cheme.recipe-jacket` names the step), time a `heat` or `cool` with `temperatures` on
+  the content of the batch step its next `from:` operation names (that step's charge when none
+  of its operations came before, else its end; after the last, that step's end; with no
+  operation `from:` any of them, the first step's charge before every `dose` and `react`, the
+  last step's end after them, and between them a `cheme.recipe-duration` error), report
+  each vented step's vent, and give `datasheets fill` each step's own peak duty. Another step
+  of the vessel that takes in more for one batch than the batch steps' content (a conversion
+  step adding a second portion) is `cheme.recipe-vessel` (warning); `vessel.size_from: steps`
+  sizes the vessel from it too, and a given `vessel.volume` is checked against it at its fill
+  fraction instead. `vessel.jacket.shortest_dosing: true` reports, for each
+  semi-batch step of the vessel, the shortest dosing whose peak duty the jacket removes at the
+  charge (`dosing`: the declared and the shortest h from the first dose's start to the last
+  dose's end, the peak and the removable kW, or why there is none, such as a coolant not colder
+  than the process): the dosing schedule stretched in time from the first dose's start (every
+  dose's segments and lag behind the first; the wait before it, the shares and the
+  post-reaction kept), its factor bracketed from the declared schedule and bisected to 1e-4
+  between 1e-3 and 1e3 times; the model keeps its declared dosing. A step coupled to another by
+  a vent names it (`coupled`) with the pair's shortest dosing, the larger of the two (`pair`).
+  `cheme.recipe-coupling` (warning): a dose fed by another batch step's vent whose operation
+  does not start in one batch when the generator's dose (or reaction) operation does. A filter
+  or dryer in the same vessel takes
   its plate and heated area (`vessel.heated_area`, else the jacket's area, else the shell and
   bottom the dryer's wet cake wets) from it. `vessel.metal_heat_capacity` (kJ/K, ADR 0063)
   counts the vessel's steel in the `heat` and `cool` times (`C + C_m`) and adds the term `vessel
@@ -1185,8 +1209,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   peak rate) and reports the gas release at the MTSR against `hazard.vent_capacity`. `cheme.process-reactor`: the vent stream no outlet of the step or its only one,
   more than two outlets, an undeclared vent component, a vented batch on gas-phase reactions,
   a vent stream whose template lacks a vent component or a passing dose's component, (warning)
-  one formed by no reaction, a dose with `absorbed` below 1 and no vent. `process simulate`
-  does not couple a vented batch.
+  one formed by no reaction, a dose with `absorbed` below 1 and no vent, (warning, ADR 0073) a
+  dose's gas that passes through (a dose with `absorbed` below 1, a vent's inerts) without
+  `ideal_gas` data, whose warming to the vessel's temperature is then left out.
+  `cheme.process-coupled-dosing` (ADR 0073): a semi-batch dose fed by another batch or
+  semi-batch step's vent (directly or through steps with one material inlet each) on another
+  schedule than the generator's dosing (its one dose's segments, its doses' window, or a
+  batch's 0 to `time`) is a warning; where the generator solves, an info gives the largest
+  difference between the share of its vent gas that has left and the share the dose has fed,
+  over the batch (both clocks from the charge). `process simulate` does not couple a vented
+  batch.
   The vent may say more (ADR 0062; a vent without these keys solves as in 1.9.0):
   `vapour: {components, activity, source}` saturates the gas with the liquid's volatile
   components at the vessel's temperature and pressure (Raoult, each component's Antoine

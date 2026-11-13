@@ -112,7 +112,9 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0062](0062-vent-vapour-condenser-and-gas-solubility.md) | A batch's vent carries the liquid's vapour, with a partial vent condenser and a Henry split | Proposed | 2026-11-06 |
 | [0063](0063-heats-of-solution-heat-up-and-vessel-metal.md) | Heats of solution and mixing, the heat-up of the charge and of the vessel's metal | Proposed | 2026-11-06 |
 | [0064](0064-feos-pc-saft-as-an-optional-property-backend.md) | feos (PC-SAFT) as an optional property backend, first for liquid water-methanol density | Proposed | 2026-11-06 |
+| [0067](0067-generator-fingerprint-covers-the-stale-field-data.md) | The generator fingerprint covers the stale-field data, not the stale-value code | Proposed | 2026-11-12 |
 | [0068](0068-batch-still-phases-cut-conditions-and-heat-up-time.md) | Batch still: components in a phase of their own, a cut's own pressure and boil-up, the heat-up's time; an end at a temperature that stops where found | Proposed | 2026-11-12 |
 | [0069](0069-thermal-screening-beyond-the-largest-reaction.md) | Thermal screening beyond the largest reaction: the network, every dose, the release over the batch, the content's boiling | Proposed | 2026-11-12 |
 | [0070](0070-design-specifications-and-component-separators.md) | Propagate solves feeds and splits for design specifications (with the tears, Newton-Broyden) and component separators from their split | Proposed | 2026-11-12 |
 | [0071](0071-gas-liquid-batch-head-space-sweep-and-absorption.md) | Gas-liquid batch: inerts, a head space, degassing, the heat of absorption and the vent condenser's freezing | Proposed | 2026-11-12 |
+| [0073](0073-dosing-time-from-the-jacket-coupled-and-one-pot-vessels.md) | Dosing against the jacket, coupled vessels and one-pot vessels over several batch steps | Proposed | 2026-11-13 |
