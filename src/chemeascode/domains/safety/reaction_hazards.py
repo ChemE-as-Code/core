@@ -1341,7 +1341,10 @@ def _over_batch(
             if (
                 heats is not None
                 and share > 0
-                and all(phase.heat_of_vaporization.get(n) for n, y in ys.items() if y > 0)
+                and latent > 0  # not with an endothermic absorption outweighing the rest
+                and all(
+                    phase.heat_of_vaporization.get(n) is not None for n, y in ys.items() if y > 0
+                )
             ):
                 heat = max(sum(heats[r.id] * xi[r.id] for r in every), 0.0)
                 ceiling = {n: heat / latent * y for n, y in ys.items() if y > 0}
@@ -1461,7 +1464,7 @@ def _boil_up(
     y = _saturation(phase, moles, t_b, pressure)
     norm = sum(y.values()) or 1.0
     y = {n: v / norm for n, v in y.items() if v > 0}
-    if lack := sorted(n for n in y if not phase.heat_of_vaporization.get(n)):
+    if lack := sorted(n for n in y if phase.heat_of_vaporization.get(n) is None):
         # a degassing gas's latent heat is its heat of desorption, -vent.heat_of_absorption
         # (ADR 0071): the materials' heat_of_vaporization does not stand in for it
         liquids = [n for n in lack if n not in phase.degassing]
@@ -1486,6 +1489,24 @@ def _boil_up(
         return
     heat = sum(-r.heat_of_reaction.value * rates[r.id] for r in every) * scale  # kW
     latent = sum(v * phase.heat_of_vaporization[n] for n, v in y.items())  # kJ/kmol
+    if latent <= 0:
+        # a degassing gas's latent heat is -vent.heat_of_absorption, which may be negative (an
+        # endothermic absorption): a vapour taking no heat to form has no boil-up
+        gases = [n for n in y if n in phase.degassing and phase.heat_of_vaporization[n] <= 0]
+        liquids = [n for n in y if n not in phase.degassing and phase.heat_of_vaporization[n] <= 0]
+        parts = ["heat_of_vaporization of " + ", ".join(liquids)] if liquids else []
+        if gases:
+            parts.append(
+                "vent.heat_of_absorption of "
+                + ", ".join(gases)
+                + ": an endothermic absorption, its desorption releases heat"
+            )
+        entry.missing.append(
+            "the boil-up at the MTSR: the vapour's latent heat is not positive ("
+            + "; ".join(parts)
+            + ")"
+        )
+        return
     vapour = max(heat, 0.0) / latent
     gas["boil_up"] = {
         "temperature_K": t_b,

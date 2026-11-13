@@ -108,7 +108,9 @@
   of the default MTT and the bubble point whatever its share or boiling point, named in
   `mtt_left_out` and `dissolved_release` with or without a `normal_boiling_point`; a boil-up
   at the MTSR that carries it asks for its `vent.heat_of_absorption` (its heat of desorption,
-  its latent heat there), not its `heat_of_vaporization`;
+  its latent heat there), not its `heat_of_vaporization`, and one whose vapour's latent heat
+  is not positive (an endothermic absorption, a positive `heat_of_absorption`, outweighing the
+  liquids') is left unsized with `missing` saying why, not a negative boil-up;
   `cheme.process-reactor`
   checks the inerts, the pad and the degassing gases. Shown on scratch copies of
   acetyl-chloride-1 (L-3: the head space as the vapour's carrier) and
@@ -134,9 +136,14 @@
   500 steps in a row that each boil off less than 1e-6 of the charge, the still checks the pace
   of that run: if at that pace (in kmol boiled up, or in the end's own measure) the end is not
   reached within 20000 steps, the boil-up stalls (`cheme.process-still-unsolved`, in a few
-  seconds there, naming the volatile kmol left and the hint to end the cut earlier). A slow
-  tail that does reach its end (an end at 2.49 h there, on the PCL3 trace the column enriches)
-  solves as in 1.11.0.
+  seconds there, naming the volatile kmol left and the hint to end the cut earlier). A run in
+  which a volatile component falls 1000-fold is progress, and an amount below 1e-100 of the
+  charge and feed is gone: a light key a forerun strips to traces, which the column enriches
+  and which held the explicit step at its stability limit until it underflowed, no longer
+  stalls the next cut. A slow tail that reaches its end within 20000 steps (an end at 2.49 h
+  there, on the PCL3 trace the column enriches) solves as in 1.11.0; one that needs more is
+  now refused with the same error (2.492 h there, which 1.11.0 solved in about 51000 steps and
+  two minutes): end the cut earlier.
 
 ### Changed
 

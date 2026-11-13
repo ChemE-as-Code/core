@@ -108,7 +108,11 @@ Options considered:
   (with what the gas release strips of it), with or without a `normal_boiling_point`. A
   content boiling at the MTSR with it in its vapour takes its heat of desorption,
   `-heat_of_absorption`, for its latent heat there too: without it the boil-up is left unsized
-  and `missing` asks for its `vent.heat_of_absorption` (not its `heat_of_vaporization`).
+  and `missing` asks for its `vent.heat_of_absorption` (not its `heat_of_vaporization`). An
+  endothermic absorption (a positive `heat_of_absorption`) gives a negative latent heat; when
+  it outweighs the liquids' and the vapour's latent heat is not positive, the boil-up is left
+  unsized with `missing` saying so, and the screening's heat ceiling on the vapour a formed
+  gas strips is not applied.
 - **Rules** (`cheme.process-reactor`, errors): an inert or degassing gas undeclared; an inert
   in a reaction; a head space's pad that is no material inlet of the step, or that carries
   more than the inerts; a vent stream whose template lacks an inert. New rule

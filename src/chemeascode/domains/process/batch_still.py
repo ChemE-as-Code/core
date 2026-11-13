@@ -126,6 +126,8 @@ TOLERANCE = 1e-9
 #: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
 #: does reach it (slowly, on a trace the column enriches) carries on.
 STALL_SHARE = 1e-6
+#: a component's share of the charge (and feed) below which it is gone
+NEGLIGIBLE = 1e-100
 STALL_STEPS = 500
 #: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual)
 MAX_STEPS = 20000
@@ -841,7 +843,8 @@ def solve_still(
         h = max(target - boiled, 1e-12) / 100.0
         steps = stalled = 0
         # where the last run of small steps began: kmol boiled up and the stop's value
-        mark = (boiled, stop(state, boiled) if stop is not None else None)
+        # (the stop is not evaluated for it: a bubble point's guess would move the solution)
+        mark: tuple[float, float | None, list[float]] = (boiled, None, state[:k])
 
         def stalls() -> StillError:
             left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
@@ -902,6 +905,9 @@ def solve_still(
                     peak = max(peak, (new[k + 1] - state[k + 1]) / dt)
             if feeding:
                 fed[:] = [a + share * h for a, share in zip(fed, feed_share, strict=True)]
+            # an amount far below the error control's resolution is gone: a trace the column
+            # enriches, left at 1e-300 kmol, would keep the explicit step at its stability limit
+            new[:k] = [v if v > NEGLIGIBLE * (total0 + total_feed) else 0.0 for v in new[:k]]
             steps += 1
             stalled = stalled + 1 if h < STALL_SHARE * (total0 + total_feed) else 0
             boiled += h
@@ -910,6 +916,8 @@ def solve_still(
             record(state)
             if feeding:
                 mixing(h, before, result.profile[-1][2])
+            if crossed:
+                return
             now = stop(state, boiled) if stop is not None else None
             # the step ends where the stop was found (core#198: re-evaluating it there, as a
             # bubble point converged to a tolerance from another guess, can fall just short)
@@ -918,7 +926,7 @@ def solve_still(
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
             if stalled == 0:
-                mark = (boiled, now)
+                mark = (boiled, now, state[:k])
             elif stalled >= STALL_STEPS:
                 # a run of small steps: does its pace (in kmol boiled up, or in the stop's
                 # value) reach the end within the steps left? If not, the still stalls.
@@ -927,9 +935,16 @@ def solve_still(
                 if not reach and now is not None and mark[1] is not None:
                     reach = (now - mark[1]) / stalled * left >= -now
                 if not reach:
+                    # a trace the column enriches, cleared at the explicit method's stability
+                    # limit, holds the step small until it is gone: progress, not a stall
+                    reach = any(
+                        v and a > 0 and b < 1e-3 * a
+                        for a, b, v in zip(mark[2], state[:k], volatile, strict=True)
+                    )
+                if not reach:
                     raise stalls()
                 stalled = 0
-                mark = (boiled, now)
+                mark = (boiled, now, state[:k])
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
 

@@ -807,6 +807,109 @@ def test_a_column_still_slow_but_progressing_near_empty_reaches_its_end(tmp_path
     assert sum(result.residue.values()) == pytest.approx(0.01445, abs=2e-4)
 
 
+def test_a_light_key_the_column_clears_to_nothing_does_not_stall():
+    """Integration review of 1.12.0: a forerun to a purity end strips A to 1e-17 kmol; the
+    column's gain (alpha^stages, about 1e13) and Underwood's pole at A held explicit Dopri5 at
+    its stability limit (4e-10 kmol a step) for some 1850 steps until A underflowed, and the
+    main cut then ended within 140 steps. The pace check projected the slow run linearly and
+    refused the cut (after 4596 steps, 20.09 kmol left), which the pre-1.12.0 code solved. An
+    amount below 1e-100 of the charge is now gone (no longer a pole), and a run of small steps
+    in which a volatile component falls 1000-fold is progress."""
+    spec = Still.model_validate(
+        {
+            "volatility": {
+                "model": "constant",
+                "alpha": {"A": 10.1435, "B": 4.5999, "C": 1.0},
+                "provenance": "assumed",
+            },
+            "boilup": {"value": 10.0, "unit": "kmol/h", "provenance": "assumed"},
+            "column": {
+                "stages": 13,
+                "reflux": "constant_distillate",
+                "distillate": {"key": "A", "mole_fraction": 0.9166},
+                "maximum_ratio": 32,
+                "provenance": "assumed",
+            },
+            "cuts": [
+                {"outlet": "forerun", "end": {"purity": {"key": "A", "fraction": 0.8479}}},
+                {"outlet": "main", "end": {"distilled": 0.51892}},
+            ],
+            "outlets": {"residue": "bottom"},
+            "provenance": "assumed",
+        }
+    )
+    result = solve_still(spec, {"A": 42.46695, "B": 0.0029449, "C": 25.86294}, None, {}, None)
+    assert result.residue["C"] == pytest.approx(18.248, abs=1e-3)
+    assert result.time == pytest.approx(70791.2, abs=0.1)
+
+
+def test_the_stall_guard_leaves_a_bubble_point_still_as_it_was():
+    """Integration review of 1.12.0: the stall guard evaluated the stop at the start of each
+    cut and again on the step that crossed it, which moved the bubble point's warm start and
+    shifted a Raoult still's cuts by 2e-8 (2.21443518 kmol for 2.21443523). It evaluates the
+    stop where the code before it did, so the cuts are the same to the last digits."""
+    from chemeascode.domains.process.schema import Component
+
+    def comp(name, vp, mw, latent):
+        spec = {"id": name, "name": name, "molar_mass": mw, "heat_of_vaporization": latent}
+        if vp:
+            spec["vapour_pressure"] = vp | {"provenance": "given", "source": "x"}
+        return Component.model_validate(spec)
+
+    comps = {
+        "A": comp(
+            "A",
+            {"a": 4.72583, "b": 1660.652, "c": -1.461, "temperature_range": [287.7, 354.07]},
+            78.11,
+            30720,
+        ),
+        "B": comp(
+            "B",
+            {"a": 4.07827, "b": 1343.943, "c": -53.773, "temperature_range": [308.52, 384.66]},
+            92.14,
+            33180,
+        ),
+        "P": comp("P", None, 128.0, None),
+    }
+    ends = [
+        {"time": 1800},
+        {"distilled": 0.15},
+        {"distilled": 0.2, "basis": "mass"},
+        {"purity": {"key": "A", "fraction": 0.98}},
+        {"residue": {"key": "A", "mole_fraction": 1e-3}},
+        {"temperature": 383.0},
+    ]
+    spec = _still(
+        {
+            "stages": 10,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "A", "mole_fraction": 0.99},
+            "maximum_ratio": 20,
+        },
+        volatility={"model": "raoult", "provenance": "assumed", "source": "x"},
+        pressure=101.325,
+        nonvolatile=["P"],
+        end=None,
+        cuts=[{"outlet": f"c{i}", "end": e} for i, e in enumerate(ends)],
+        outlets={"residue": "bottom"},
+    )
+    result = solve_still(spec, {"A": 30.0, "B": 40.0, "P": 30.0}, None, comps, 101.325)
+    cuts = [sum(c.moles.values()) for c in result.cuts]
+    assert cuts == pytest.approx(
+        [
+            1.371064070398571,
+            13.628935929601434,
+            10.223928853946878,
+            2.214435232211436,
+            6.607246939555203,
+            0.0,
+        ],
+        rel=1e-11,
+        abs=1e-12,
+    )
+    assert result.time == pytest.approx(126937.04774572354, rel=1e-12)
+
+
 def test_a_still_boilup_no_cut_uses_does_not_count(tmp_path):
     """Every cut with its own boil-up in 1/h, the still's own (150 kW) unused: the outlets do
     not depend on the hours of flows, so the recipe's batch size on the product cut is no

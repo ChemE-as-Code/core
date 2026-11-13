@@ -636,10 +636,11 @@ def test_a_henry_gas_without_a_boiling_point_and_at_the_bubble_point(tmp_path):
 VP = ", vapour_pressure: {a: 15.0, b: 4000, form: ln, pressure_unit: kPa, provenance: assumed}"
 
 
-def _dosed_henry_plant(tmp_path, latent="", absorption=""):
+def _dosed_henry_plant(tmp_path, latent="", absorption="", liquids=""):
     """The padded semi-batch with a vent.vapour.henry gas X that is also dosed (S2 carries X,
     90 % absorbed), X boiling at 350 K (above T_p, 300 K) with *latent* in materials.yaml, A
-    and B volatile, hazard.mtt_from: bubble-point; the vent with *absorption*. Propagated."""
+    and B volatile (with *liquids* in materials.yaml), hazard.mtt_from: bubble-point; the vent
+    with *absorption*. Propagated."""
     vent = HEAD.replace(
         "vapour: {}",
         "vapour: {henry: {X: {points: [[300, 200]], provenance: assumed}}}" + absorption,
@@ -661,7 +662,7 @@ def _dosed_henry_plant(tmp_path, latent="", absorption=""):
                 f"{{id: {n}, name: {n}, formula: {f}, molar_mass: {m}, liquid_molar_volume: 0.1,\n"
                 "     liquid_heat_capacity: 150, normal_boiling_point: 400}",
                 f"{{id: {n}, name: {n}, formula: {f}, molar_mass: {m}, liquid_molar_volume: 0.1,\n"
-                f"     liquid_heat_capacity: 150, normal_boiling_point: 400{VP}}}",
+                f"     liquid_heat_capacity: 150, normal_boiling_point: 400{VP}{liquids}}}",
             )
             for n, f, m in (("A", "C2H4O", 44.05), ("B", "C2H4", 28.05))
         ),
@@ -713,6 +714,34 @@ def test_the_boil_up_asks_a_henry_gas_for_its_heat_of_absorption(tmp_path):
     (entry,) = screen(ws.root).entries
     (boil,) = [m for m in entry.missing if m.startswith("the boil-up at the MTSR")]
     assert boil == "the boil-up at the MTSR: heat_of_vaporization of A"
+
+
+def test_an_endothermic_absorption_gives_no_negative_boil_up(tmp_path):
+    """Integration review of 1.12.0: the boil-up divides the reactions' heat by the vapour's
+    latent heat, a Henry gas's being -vent.heat_of_absorption. A positive heat_of_absorption
+    (an endothermic absorption, which the schema allows) outweighing the liquids' made it
+    negative, and the boil-up came out at -6129 m3/h, unflagged. The boil-up is now missing
+    and says why; an exothermic absorption still gives a positive one."""
+    from chemeascode.domains.safety.reaction_hazards import screen
+
+    latent = ", heat_of_vaporization: 20000"
+    liquids = ", heat_of_vaporization: 30000"
+    absorption = ", heat_of_absorption: {values: {X: 200000}, provenance: assumed}"
+    ws = _dosed_henry_plant(tmp_path / "a", latent, absorption, liquids)
+    (entry,) = screen(ws.root).entries
+    assert "boil_up" not in (entry.gas_release or {})
+    (boil,) = [m for m in entry.missing if m.startswith("the boil-up at the MTSR")]
+    assert boil == (
+        "the boil-up at the MTSR: the vapour's latent heat is not positive "
+        "(vent.heat_of_absorption of X: an endothermic absorption, its desorption releases heat)"
+    )
+    absorption = ", heat_of_absorption: {values: {X: -20000}, provenance: assumed}"
+    ws = _dosed_henry_plant(tmp_path / "b", latent, absorption, liquids)
+    (entry,) = screen(ws.root).entries
+    assert not [m for m in entry.missing if m.startswith("the boil-up at the MTSR")]
+    boil_up = entry.gas_release["boil_up"]
+    assert boil_up["vapour_kmol_s"] > 0 and boil_up["vapour_m3_h"] > 0
+    assert all(v > 0 for v in boil_up["by_component_kmol_s"].values())
 
 
 def test_a_vent_of_inerts_only_reports_the_boil_up(tmp_path):
