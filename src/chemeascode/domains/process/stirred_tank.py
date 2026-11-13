@@ -913,12 +913,15 @@ def _solve_batch(
     # kJ/kmol each volatile component takes in as it leaves the solution again (ADR 0063): minus
     # its doses' heat of solution, the mean over all of it that enters the liquid (the charged
     # share released none), so only what the doses brought in gives back its heat
+    # the charge's own heat of solution (ADR 0075, ``batch.heat_of_solution``): kJ/kmol of
+    # what dissolves as it is charged; its share leaves with the vapour as a dose's does
+    charged_heat = getattr(getattr(batch, "heat_of_solution", None), "values", None) or {}
     demix = []
     for i in volatile:
         entered = n0[i] + dosed[i]
         bound = sum(
             a[i] * d.solution_by.get(names[i], 0.0) for d, a in zip(doses, dose_moles, strict=True)
-        )
+        ) + n0[i] * charged_heat.get(names[i], 0.0)
         demix.append(-bound / entered if entered > 0 else 0.0)
 
     def vapour_rates(
@@ -1521,11 +1524,14 @@ def _solve_batch(
             )
             if gas:
                 result.heat_terms["vent gas"] = gas
-            if any(d.solution is not None for d in doses):
+            if any(d.solution is not None for d in doses) or charged_heat:
                 # every dose has mixed in by the end: its whole heat of solution (ADR 0063),
-                # less that of what the vent's vapour took off the liquid again (ADR 0062)
-                result.heat_terms["solution"] = -sum(d.solution or 0.0 for d in doses) + sum(
-                    a * h for a, h in zip(gone_by_gas, demix, strict=True)
+                # with the charge's as it dissolved (ADR 0075), less that of what the vent's
+                # vapour took off the liquid again (ADR 0062)
+                result.heat_terms["solution"] = (
+                    -sum(d.solution or 0.0 for d in doses)
+                    + sum(n0[i] * charged_heat.get(n, 0.0) for i, n in enumerate(names))
+                    + sum(a * h for a, h in zip(gone_by_gas, demix, strict=True))
                 )
             if absorbing:
                 # a formed gas's dissolved share released its heat of absorption (ADR 0071)
@@ -1974,8 +1980,15 @@ def duty_only(spec: Any) -> dict[str, Any]:
     exclude (ADR 0063): the charge's heat-up, and an isothermal batch's heats of solution
     (held at its temperature: an adiabatic batch's outlet temperature takes them). They are in
     the duty's fingerprint (:func:`.duties.batch_duty`). A vent condenser's ``energy_port``
-    (ADR 0062) only picks the stream its duty is written on."""
-    found: dict[str, Any] = {"heat_up": True}
+    (ADR 0062) only picks the stream its duty is written on. ADR 0075's charged heat of
+    solution, agitator power and heat-up port (an isothermal batch's only) change the duty
+    alone too."""
+    found: dict[str, Any] = {
+        "heat_up": True,
+        "heat_up_port": True,
+        "heat_of_solution": True,
+        "agitator_power": True,
+    }
     if getattr(spec, "heat", None) == "isothermal" and getattr(spec, "dosing", None):
         found["dosing"] = {"__all__": {"heat_of_solution": True}}
     if getattr(getattr(spec, "vent", None), "condenser", None) is not None:

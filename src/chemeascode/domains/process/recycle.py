@@ -55,7 +55,7 @@ COMPOSITION_SUM = 1e-3
 #: What a node declares that no sweep reads, left out of the tear fingerprint
 #: (:func:`loop_inputs`): names and links, the drawing symbol, the thermal screening (ADR 0058)
 #: and the energy stream a model duty goes on (ADR 0059, written after the loop converged).
-NOT_SWEPT = frozenset({"title", "links", "symbol", "hazard", "energy_port"})
+NOT_SWEPT = frozenset({"title", "links", "symbol", "hazard", "energy_port", "vessel_metal"})
 
 
 @dataclass
@@ -340,7 +340,10 @@ def _not_swept(node: Any) -> dict[str, Any]:
     changes only its duty (ADR 0063: a batch's or still's ``heat_up``, an isothermal batch's
     heats of solution; the energy ports a duty is written on: a still's ``condenser_port``,
     ADR 0061, and a vent condenser's ``energy_port``, ADR 0062), which is in the duty's own
-    fingerprint, or only the recipe's time (a still's ``heat_up_time``, ADR 0068)."""
+    fingerprint, or only the recipe's time (a still's ``heat_up_time``, ADR 0068); ADR 0075's
+    sensible rise, heat loss and agitator power of a still, and a conversion step's
+    ``vessel_metal``."""
+    from chemeascode.domains.process.batch_still import STILL_DUTY_ONLY
     from chemeascode.domains.process.stirred_tank import duty_only
 
     found: dict[str, Any] = dict.fromkeys(NOT_SWEPT, True)
@@ -348,7 +351,7 @@ def _not_swept(node: Any) -> dict[str, Any]:
         found["batch"] = duty_only(node.batch)
     if getattr(node, "still", None) is not None:
         # as batch_still.solve_node
-        found["still"] = {"heat_up": True, "heat_up_time": True, "condenser_port": True}
+        found["still"] = dict.fromkeys(STILL_DUTY_ONLY, True)
     return found
 
 

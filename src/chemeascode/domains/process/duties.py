@@ -35,6 +35,14 @@ ADR 0063 adds terms: a dose's heat of solution (``solution``), the charge's heat
 or still with ``heat_up`` (``charge heat-up``), and ``vessel metal`` where the step runs in a
 recipe vessel with ``metal_heat_capacity`` (:func:`with_metal`).
 
+ADR 0075 adds a charged solid's heat of solution (``batch.heat_of_solution``, in ``solution``),
+the agitator's power (``agitation``, a batch's or a still's ``agitator_power``), a still's
+``sensible rise`` while it boils and its ``heat losses`` (``sensible_heat``, ``heat_loss``), a
+conversion step's ``vessel metal`` (``vessel_metal``), a batch's heat-up on its own stream
+(``batch.heat_up_port``: the terms ``charge heat-up`` and ``vessel metal`` there, the rest on the
+model's stream) and a recipe heat or cool operation's heat on the stream it names
+(:func:`.recipe.stream_heats`, written by propagate).
+
 ADR 0062 adds, for a batch or semi-batch whose vent carries the liquid's vapour, the term
 ``vent vapour`` of its duty and its vent condenser's duty (:func:`vent_condenser_duty`) on the
 condenser's own stream (``batch.vent.condenser.energy_port``). Two different condensers have
@@ -244,6 +252,9 @@ def target(process: Any, node: Any) -> tuple[Target | None, str]:
     vent_port = vent_condenser_port(node)
     if vent_port is not None:
         ends = [e for e in ends if e[1] != vent_port]
+    heat_up_port = getattr(getattr(node, "batch", None), "heat_up_port", None)
+    if heat_up_port is not None:  # the heat-up's own stream (ADR 0075)
+        ends = [e for e in ends if e[1] != heat_up_port]
     spec = getattr(node, "still", None)
     if spec is not None and (spec.condenser_port is not None or spec.column is not None):
         condenser, _ = still_condenser_target(process, node)
@@ -348,6 +359,13 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     ]
     if solutions:  # the duty's, not an isothermal batch's outlets (their fingerprint)
         duty.inputs["heat_of_solution"] = solutions
+    charged = getattr(node.batch, "heat_of_solution", None)
+    if charged is not None:  # ADR 0075: the charge's, as it dissolved
+        duty.inputs["charge_heat_of_solution"] = charged.model_dump(mode="json", exclude=NOT_INPUTS)
+        duty.basis += "; the charged components' heat of solution as they dissolve"
+    power = getattr(node.batch, "agitator_power", None)
+    if power is not None and _agitation(process, case, duty, power, result.time):
+        return duty
     if not getattr(node.batch, "heat_up", False):
         # the model holds the batch at its temperature from the start: neither the content's
         # heat-up nor the metal's is in its duty (the recipe's heat operation holds both)
@@ -355,6 +373,65 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     duty.inputs["heat_up"] = True
     temperatures = (getattr(result, "charge_temperature", None), result.temperature)
     return with_metal(process, node, case, duty, temperatures)
+
+
+def _agitation(process: Any, case: str | None, duty: ModelDuty, power: Any, seconds: float) -> bool:
+    """*duty* with the term ``agitation`` (ADR 0075): the agitator's *power* (kW) over the
+    model's *seconds* per batch ends as heat in the content, over the batch's hours of flows
+    (process/recipe.yaml). False when added; True when *duty* is left not known (no recipe,
+    or its batch's hours not known)."""
+    from chemeascode.domains.process.recipe import hours_per_batch
+
+    try:
+        hours = hours_per_batch(process, case) if process is not None and case else None
+    except ValueError as failure:
+        _unknown(duty, f"the batch's hours for the agitator's power: {failure}")
+        return True
+    if not hours:
+        _unknown(duty, "the batch's hours of flows (process/recipe.yaml) for the agitator's power")
+        return True
+    term = -power.value * seconds / (hours * 3600.0)
+    duty.terms_kW["agitation"] = term
+    duty.heat_kW += term
+    duty.basis += f"; the agitator's {power.value:g} kW over the model's {seconds / 3600:.4g} h"
+    duty.inputs["agitator_power"] = {"kW": power.value, "hours": hours}
+    return False
+
+
+#: The terms of a batch's duty that go on its ``heat_up_port`` stream (ADR 0075).
+HEAT_UP_TERMS = ("charge heat-up", "vessel metal")
+
+
+def split_heat_up(duty: ModelDuty) -> tuple[ModelDuty, ModelDuty]:
+    """*duty* of a batch with ``heat_up_port`` (ADR 0075) as (the rest, on its energy_port or
+    one heat stream; the charge's heat-up and the vessel's metal, on the heat-up port's)."""
+    if duty.heat_kW is None:
+        missing = list(duty.missing)
+        return duty, ModelDuty(duty.node, "heat-up", None, basis=duty.basis, missing=missing)
+    up = {k: v for k, v in duty.terms_kW.items() if k in HEAT_UP_TERMS}
+    rest = {k: v for k, v in duty.terms_kW.items() if k not in HEAT_UP_TERMS}
+    basis = "the charge heated from its inlet temperature to the batch's"
+    if "vessel metal" in up:
+        basis += ", with the vessel's metal"
+    first = ModelDuty(
+        duty.node, duty.model, sum(rest.values()), rest, duty.basis, inputs=dict(duty.inputs)
+    )
+    first.basis += "; the heat-up on its own stream (heat_up_port)"
+    second = ModelDuty(duty.node, "heat-up", sum(up.values()), up, basis, inputs=dict(duty.inputs))
+    return first, second
+
+
+def heat_up_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream a batch's heat-up goes on (``batch.heat_up_port``, ADR 0075), or None
+    and why ('' without the port)."""
+    port = getattr(getattr(node, "batch", None), "heat_up_port", None)
+    if port is None:
+        return None, ""
+    at = [e for e in _energy_ends(process, node) if e[1] == port]
+    if not at:
+        return None, f"no energy stream at its heat_up_port {port}"
+    stream, _, into, _ = at[0]
+    return Target(stream, port, into, "batch.heat_up_port"), ""
 
 
 def _metal_left_out(
@@ -426,6 +503,8 @@ def still_duty(node: Any, result: Any, process: Any = None, case: str | None = N
                 n: getattr(comps.get(n), "liquid_heat_capacity", None)
                 for n in sorted({*result.charge, *result.fed})
             }
+    if lacking := _still_extras(node.still, result, duty, process):
+        return _unknown(duty, lacking)
     if getattr(getattr(node.still, "volatility", None), "model", None) == "constant":
         # no temperature modelled (ADR 0063): the boil-up's duty, the metal left out
         return _metal_left_out(
@@ -439,6 +518,41 @@ def still_duty(node: Any, result: Any, process: Any = None, case: str | None = N
         charged = result.charge_temperature
         start = charged if charged is None or start is None else min(charged, start)
     return with_metal(process, node, case, duty, (start, end))
+
+
+def _still_extras(spec: Any, result: Any, duty: ModelDuty, process: Any) -> str:
+    """ADR 0075's terms of a still's *duty*: the content's ``sensible rise`` while it boils
+    (``sensible_heat``), the ``heat losses`` over the boil-up (``heat_loss``) and the
+    ``agitation`` its agitator's power puts in over the boil-up's time (``agitator_power``),
+    each over the batch's hours of flows; what is missing ('' when nothing is)."""
+    per_hour = result.hours * 3600.0
+    if getattr(spec, "sensible_heat", False):
+        if result.sensible_rise is None:
+            return f"the content's sensible rise (still.sensible_heat): {result.sensible_missing}"
+        duty.terms_kW["sensible rise"] = result.sensible_rise / per_hour
+        duty.basis += "; the content's sensible heat as its bubble point rises while it boils"
+        duty.inputs["sensible_heat"] = True
+        if process is not None:
+            comps = process.components()
+            duty.inputs["sensible_heat_capacity"] = {
+                n: getattr(comps.get(n), "liquid_heat_capacity", None)
+                for n in sorted({*result.charge, *result.fed})
+            }
+    loss = getattr(spec, "heat_loss", None)
+    if loss is not None and result.heat_loss is not None:
+        duty.terms_kW["heat losses"] = result.heat_loss / per_hour
+        duty.basis += (
+            f"; heat lost over the boil-up, UA {loss.ua:g} W/K to {loss.ambient_temperature:g} K"
+        )
+        duty.inputs["heat_loss"] = loss.model_dump(mode="json", exclude=NOT_INPUTS)
+    power = getattr(spec, "agitator_power", None)
+    if power is not None:
+        duty.terms_kW["agitation"] = -power.value * result.time / per_hour
+        duty.basis += f"; the agitator's {power.value:g} kW over the boil-up's time"
+        duty.inputs["agitator_power"] = power.value
+    if {"sensible rise", "heat losses", "agitation"} & set(duty.terms_kW):
+        duty.heat_kW = sum(duty.terms_kW.values())
+    return ""
 
 
 def still_condenser_duty(node: Any, result: Any) -> ModelDuty:
@@ -619,7 +733,8 @@ def conversion_duty(process: Any, node: Any, case: str) -> tuple[ModelDuty, dict
         extra["phases"] = phases
         duty.terms_kW = {"enthalpy": h_out - h_in}
         duty.basis = IDEAL_GAS_BASIS
-        return _less_work(duty, work, others), extra
+        duty = _less_work(duty, work, others)
+        return _conversion_metal(process, node, case, duty, ins, outs, moles, temps), extra  # type: ignore[arg-type]
     if lacking := [r.id for r in reactions if r.heat_of_reaction is None]:
         duty.missing = ["the heat_of_reaction of " + ", ".join(lacking)]
         return duty, {}
@@ -671,7 +786,50 @@ def conversion_duty(process: Any, node: Any, case: str) -> tuple[ModelDuty, dict
     extra["phases"] = phases
     duty.terms_kW = {"reaction": reaction / 3600.0, "sensible": sensible / 3600.0}
     duty.basis = CONVERSION_BASIS + (f" ({t_r:g} K)" if abs(t_r - 298.15) > 1e-9 else "")
-    return _less_work(duty, work, others), extra
+    duty = _less_work(duty, work, others)
+    return _conversion_metal(process, node, case, duty, ins, outs, moles, temps), extra  # type: ignore[arg-type]
+
+
+def _conversion_metal(
+    process: Any,
+    node: Any,
+    case: str,
+    duty: ModelDuty,
+    ins: list[Any],
+    outs: list[Any],
+    moles: dict[str, dict[str, float]],
+    temps: dict[str, float],
+) -> ModelDuty:
+    """A conversion step's *duty* with ``vessel_metal`` (ADR 0075): the recipe vessel's metal
+    follows the content from its inlets' to its outlets' temperature (each side's mean by heat
+    capacity); unchanged without it."""
+    if not getattr(node, "vessel_metal", False):
+        return duty
+    start = _mixed_temperature(process, ins, case, moles, temps)
+    end = _mixed_temperature(process, outs, case, moles, temps)
+    return with_metal(process, node, case, duty, (start, end))
+
+
+def _mixed_temperature(
+    process: Any,
+    streams: list[Any],
+    case: str,
+    moles: dict[str, dict[str, float]],
+    temps: dict[str, float],
+) -> float | None:
+    """K: the mean temperature of *streams*, weighted by their heat capacities (as
+    :func:`_sensible` takes them, at each stream's temperature); one stream's own, or None
+    when a heat capacity is not known."""
+    if len({temps[s.id] for s in streams}) == 1:
+        return temps[streams[0].id]
+    total = weighted = 0.0
+    for s in streams:
+        heat, lacking = _sensible(process, s, case, moles[s.id], temps[s.id], temps[s.id] + 1.0)
+        if lacking:
+            return None
+        total += heat
+        weighted += heat * temps[s.id]
+    return weighted / total if total > 0 else None
 
 
 def _phase_changes(
@@ -731,14 +889,22 @@ def duty_text(duty: ModelDuty) -> str:
 
 
 def report_entry(
-    process: Any, node: Any, case: str, duty: ModelDuty, vent_condenser: bool = False
+    process: Any,
+    node: Any,
+    case: str,
+    duty: ModelDuty,
+    vent_condenser: bool = False,
+    heat_up: bool = False,
 ) -> dict[str, Any]:
     """*duty* as ``cheme process reactors`` reports it: the model's duty and its energy stream
     (the stream's duty now, and what the model gives it in the stream's direction); with
-    *vent_condenser*, a batch's vent condenser's on its own stream (ADR 0062)."""
+    *vent_condenser*, a batch's vent condenser's on its own stream (ADR 0062); with *heat_up*,
+    a batch's heat-up on its ``heat_up_port`` stream (ADR 0075)."""
     found = duty.entry()
     if vent_condenser:
         goal, why = vent_condenser_target(process, node)
+    elif heat_up:
+        goal, why = heat_up_target(process, node)
     else:
         goal, why = target(process, node)
     found["stream"] = None
@@ -794,6 +960,28 @@ def rules(process: Any) -> list[Any]:
     nodes = [("steps", i, n) for i, n in enumerate(fs.steps)]
     nodes += [("blocks", i, n) for i, n in enumerate(fs.blocks)]
     for key, index, node in nodes:
+        warm = getattr(getattr(node, "batch", None), "heat_up_port", None)
+        if warm is not None:  # ADR 0075
+            port = next((p for p in node.ports if p.id == warm), None)
+            if port is None or port.kind != "energy" or warm == node.energy_port:
+                findings.append(
+                    Finding(
+                        FLOWSHEET_FILE,
+                        "error",
+                        "cheme.process-energy-port",
+                        f"{node.id}: batch.heat_up_port {warm} is no energy port of it"
+                        if warm != node.energy_port
+                        else f"{node.id}: batch.heat_up_port {warm} is its energy_port too",
+                        line=_yaml_line(
+                            process.flowsheet_doc, [key, index, "batch", "heat_up_port"]
+                        ),
+                        ids=[node.id],
+                        hint="name the energy port of the heat-up's own stream (steam), apart "
+                        "from the energy_port of the rest of the model's duty",
+                    )
+                )
+        if getattr(node, "vessel_metal", False):  # ADR 0075
+            findings += _vessel_metal_rules(process, node, [key, index, "vessel_metal"])
         port_id = getattr(node, "energy_port", None)
         if port_id is None:
             continue
@@ -827,6 +1015,49 @@ def rules(process: Any) -> list[Any]:
     return findings + duty_rules(process)
 
 
+def _vessel_metal_rules(process: Any, node: Any, at: list[Any]) -> list[Any]:
+    """``vessel_metal`` (ADR 0075) on a node that is no conversion step, or in no recipe vessel
+    with ``metal_heat_capacity`` (warnings: it changes nothing)."""
+    from chemeascode.domains.process import FLOWSHEET_FILE
+    from chemeascode.domains.process.recipe import vessel_metal
+    from chemeascode.foundation.findings import Finding
+    from chemeascode.foundation.yamlsource import _yaml_line
+
+    if duty_model(node) != "conversion":
+        why = "it is no conversion step (a batch, still or crystallizer takes the metal itself)"
+    elif vessel_metal(process, node.id) is None:
+        why = "no recipe vessel with metal_heat_capacity holds it"
+    else:
+        return []
+    return [
+        Finding(
+            FLOWSHEET_FILE,
+            "warning",
+            "cheme.process-duty",
+            f"{node.id}: vessel_metal, but {why}",
+            line=_yaml_line(process.flowsheet_doc, at),
+            ids=[node.id],
+            hint="vessel_metal is for a conversion step in a unit procedure's vessel with "
+            "metal_heat_capacity (process/recipe.yaml); remove it",
+        )
+    ]
+
+
+def _recipe_streams(process: Any, taken: dict[str, list[Any]]) -> dict[str, list[Any]]:
+    """The energy streams recipe operations write their heat on (``stream:``, ADR 0075) that no
+    model's duty goes on (*taken*), as :func:`duty_rules` groups them."""
+    from chemeascode.domains.process.recipe import load_recipe
+
+    recipe = load_recipe(process.root)[0]
+    streams = {s.id: s for s in process.flowsheet.streams if s.kind == "energy"}
+    found: dict[str, list[Any]] = {}
+    for up in recipe.unit_procedures if recipe is not None else ():
+        for op in up.operations:
+            if op.stream in streams and op.stream not in taken:
+                found.setdefault(op.stream, [streams[op.stream]])
+    return found
+
+
 def duty_rules(process: Any) -> list[Any]:
     """``cheme.process-duty`` warnings of ``cheme validate``, as ``cheme process propagate``
     gives them: a given or assumed duty the model differs from beyond the flowsheet's relative
@@ -848,10 +1079,11 @@ def duty_rules(process: Any) -> list[Any]:
         if duty_model(node) is not None:
             # the jacket's or reboiler's, a still's condenser's (ADR 0061) and a vent
             # condenser's (ADR 0062): each on its own stream
-            for find in (target, still_condenser_target, vent_condenser_target):
+            for find in (target, still_condenser_target, vent_condenser_target, heat_up_target):
                 goal, _ = find(process, node)
                 if goal is not None:
                     goals.setdefault(goal.stream.id, []).append(goal.stream)
+    goals |= _recipe_streams(process, goals)
     cases = [fs.default_case()] if any(len(g) > 1 for g in goals.values()) else []
     for group in goals.values():
         stream = group[0]

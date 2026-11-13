@@ -897,6 +897,7 @@ def _swept(
         for node in nodes
         for c in _duty(work, node, case, at[node.id], beds, solutions, solved_inputs, found)
     ]
+    candidates += _recipe_duties(work, case, found)
     _put_duties(work, candidates, put, found)
     for node in nodes:
         kind = kinds[node.id]
@@ -991,6 +992,9 @@ def _duty(
     vent_cold, vent_why = (
         duties.vent_condenser_target(work, node) if model in ("batch", "semibatch") else (None, "")
     )
+    warm, warm_why = (
+        duties.heat_up_target(work, node) if model in ("batch", "semibatch") else (None, "")
+    )
     label = f"{node.id} ({model})"
     if goal is None and why:
         found.duties.append(
@@ -1023,12 +1027,22 @@ def _duty(
                 "info",
             )
         )
-    if goal is None and still_cold is None and vent_cold is None:
+    if warm is None and warm_why:
+        found.duties.append(
+            (
+                node.id,
+                "info",
+                f"{node.id} (heat-up): its duty is not written: {warm_why}",
+                "set batch.heat_up_port: to the port of the heat-up's energy stream",
+                "info",
+            )
+        )
+    if goal is None and still_cold is None and vent_cold is None and warm is None:
         return []
     ins = [s for s, _ in ends[0]]
     outs = [s for s, _ in ends[1]]
     used = list(ins)
-    stream_id = (goal or still_cold or vent_cold).stream.id  # type: ignore[union-attr]
+    stream_id = (goal or still_cold or vent_cold or warm).stream.id  # type: ignore[union-attr]
     try:
         if model in ("batch", "semibatch"):
             result, inputs = beds.get(node.id), solved_inputs.get(node.id)
@@ -1066,6 +1080,11 @@ def _duty(
         return []
     found.model_duties[node.id] = duty
     offers = []  # (the stream's target, the duty, the label, the rule): each once
+    if model in ("batch", "semibatch") and getattr(node.batch, "heat_up_port", None):
+        # the heat-up on its own stream, the rest on the model's (ADR 0075)
+        duty, heating = duties.split_heat_up(duty)
+        if warm is not None:
+            offers.append((warm, heating, f"{node.id} (heat-up)", "heat-up"))
     if goal is not None:
         offers.append((goal, duty, label, model))
     if still_cold is not None:  # a batch still's condenser (ADR 0061)
@@ -1078,6 +1097,35 @@ def _duty(
     candidates = []
     for to, what, name, rule in offers:
         candidate = _candidate(work, node, case, to, what, name, rule, used, inputs, found)
+        if candidate is not None:
+            candidates.append(candidate)
+    return candidates
+
+
+def _recipe_duties(work: Process, case: str, found: Derivation) -> list[_Candidate]:
+    """The heat of each recipe ``heat`` or ``cool`` operation with a ``stream`` (ADR 0075) on
+    that stream: compared where it has a given or assumed duty, reported where it is not
+    known, else the candidates :func:`_put_duties` writes."""
+    from chemeascode.domains.process import duties
+    from chemeascode.domains.process.recipe import stream_heats
+
+    candidates = []
+    for heat in stream_heats(work, case):
+        node = work.nodes[heat.node]
+        label = f"{heat.procedure}.{heat.operation} (recipe heat)"
+        duty = duties.ModelDuty(
+            heat.node,
+            "recipe heat",
+            heat.heat_kW,
+            dict(heat.terms_kW),
+            "the recipe's heat-up or cool-down: the content and the vessel's metal",
+            [heat.missing] if heat.heat_kW is None else [],
+            heat.inputs,
+        )
+        goal = duties.Target(heat.stream, heat.port, heat.into, "recipe operation stream")
+        candidate = _candidate(
+            work, node, case, goal, duty, label, "recipe heat", heat.used, {}, found
+        )
         if candidate is not None:
             candidates.append(candidate)
     return candidates
