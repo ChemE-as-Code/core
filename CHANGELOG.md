@@ -23,6 +23,21 @@
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `props.py`.
+- The generator fingerprint (`generator_sha256`) also covers the fields a BFD/PFD can leave
+  blank as stale: what `cheme process propagate` and `cheme process simulate` write and the
+  source their values carry (`propagate.WRITTEN` and `SOURCE`, `simulation.translate.WRITTEN`
+  and `SOURCE`), hashed by value (ADR 0067, core#202). Adding or removing such a field marks
+  the sheets `cheme.generated-version`; editing the code that derives the values or decides
+  whether one is stale (`propagate.py`, `recycle.py`, `duties.py`, `simulation/translate.py`)
+  still does not, so as not to mark every library sheet outdated on each such edit. The
+  fingerprint changes with this release: every BFD/PFD needs `cheme process build` once (only
+  the `generator_sha256` in its provenance comment changes); the core examples and the viewer's
+  API fixtures are regenerated.
+- 1.11.0 said that editing the stream table marks the sheets outdated. That holds for
+  `pfd_sheet.py`, which draws the table (and the finding is `cheme.generated-version`), not for
+  the code above that decides which of its values are stale. `cheme validate` does not catch
+  such a change either, since it rebuilds generated P&IDs, not BFD/PFD sheets; `cheme process
+  build` does, and says "written" for a sheet it changed.
 
 ## 1.11.0 (2026-11-06)
 

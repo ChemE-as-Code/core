@@ -143,9 +143,10 @@ version, or the new path first and the removal in the next major.
    module; `tests/test_old_paths.py` checks that the removed top-level names stay removed.
 3. Add a row to [migration-table.md](migration-table.md) and a CHANGELOG entry, since plant
    repositories' generator scripts may import the old path.
-4. Anything under `domains/process/*.py` changes `generator_fingerprint()`. Rebuild the examples
-   (`uv run --directory examples/<example> cheme process build`) and commit the sheets;
-   only `generator_sha256` changes.
+4. A move that changes a file in `process.provenance.GENERATOR_MODULES` (an import line is
+   enough) or moves a module named in `STALE_FIELD_DATA` changes `generator_fingerprint()`.
+   Rebuild the examples (`uv run --directory examples/<example> cheme process build`) and
+   commit the sheets; only `generator_sha256` changes.
 
 ## Releases and versions
 
