@@ -213,6 +213,9 @@ class TankResult:
     #: semi-batch: kmol (per hour of charge) of each dosed reactant charged and dosed, the
     #: liquid's share of a dosed gas (the denominator of its accumulation, ADR 0069)
     dosed_reactants: dict[str, float] = field(default_factory=dict, repr=False)
+    #: vented, every accepted step: (time s, kmol left by the vent so far, the batch's basis),
+    #: what another vessel's dose of the vent stream is compared with (ADR 0073)
+    vent_profile: list[tuple[float, float]] = field(default_factory=list, repr=False)
 
 
 @dataclass
@@ -1333,10 +1336,22 @@ def _solve_batch(
         _, past, _, _ = vapour_rates(moles, t, gas_flows_of(leaving)) if nv else ([], [], 0, 0)
         return sum(leaving) + passing_now + sum(past)
 
+    def vent_left(state: list[float], clock: float) -> float:
+        """kmol that has left by the vent by *clock*: the totals of what :func:`vent_rate`
+        gives at each moment (ADR 0073)."""
+        at = base + nv if condensing else base
+        vapour = sum(state[at : at + nv]) if nv else 0.0
+        if ng:
+            return sum(state[head_at + ng : head_at + 2 * ng]) + vapour
+        through = sum(d.fed(clock) * sum(d.passing.values()) for d in doses)
+        return sum(state[size : size + len(vented)]) + through + vapour
+
     def record(state: list[float], clock: float) -> None:
         nonlocal peak_vent, peak_vent_time
         moles, t = state[:size], state[-2]
         result.profile.append((clock, t, pressure_of(moles, t), conversion(state, clock)))
+        if vent is not None:
+            result.vent_profile.append((clock, vent_left(state, clock)))
         if vent is not None and (rate_now := vent_rate(state)) > peak_vent:
             peak_vent, peak_vent_time = rate_now, clock
         if not doses:

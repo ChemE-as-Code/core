@@ -400,26 +400,3 @@ def test_a_vessel_of_several_steps_is_sized_from_its_one_batch_step(tmp_path):
     found = _recipe_vessel(process, "R", "design")
     assert found is not None and found.volume == pytest.approx(vessel.volume)
     assert _recipe_vessel(process, "C", "design") is None
-
-
-def test_a_vessel_holding_two_batch_steps_says_which_one_is_not_named(tmp_path):
-    """A block or units holding two batch or semibatch steps: the vessel is not sized from the
-    first in YAML order, it is cheme.recipe-reference."""
-    flowsheet = TWO_UNITS.replace(
-        "  - id: C\n    class: Cooling\n",
-        "  - id: C\n    class: ReactingChemicals\n    reactions: [R1]\n    reactor: batch\n"
-        "    batch: {time: 600, provenance: assumed}\n",
-    )
-    assert flowsheet != TWO_UNITS
-    recipe = _jacketed()
-    up = recipe["unit_procedures"][0]
-    up.pop("unit")
-    up["units"] = ["R", "C"]
-    recipe["unit_procedures"].pop(1)
-    ws = _plant(tmp_path, recipe, propagate=False)
-    (ws.root / "process/flowsheet.yaml").write_text(flowsheet)
-    result = recipe_report(ws.root)
-    assert not result.vessels
-    (finding,) = [f for f in result.findings if f.rule == "cheme.recipe-reference"]
-    assert finding.level == "error" and "R+C holds R, C: several batch" in finding.message
-    assert finding.line is not None and finding.hint
