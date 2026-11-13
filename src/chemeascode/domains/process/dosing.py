@@ -2,8 +2,9 @@
 allows, vessels coupled by a dose, and a dosed gas passing through without ideal-gas data.
 
 - **The shortest dosing** (:func:`shortest_factor`, :func:`peak_at`): a semi-batch's dosing
-  schedule stretched in time by a factor ``s`` (every dose's start and segments; the shares and
-  the post-reaction kept), its peak cooling duty for one batch ``Q(s)`` from the model, and the
+  schedule stretched in time by a factor ``s`` from its first dose's start (every dose's
+  segments and lag behind the first; the wait before it, the shares and the post-reaction
+  kept), its peak cooling duty for one batch ``Q(s)`` from the model, and the
   smallest ``s`` with ``Q(s) <= U A (T - T_coolant)`` of the recipe vessel's jacket at the
   charge. ``Q(s)`` falls as the dosing slows for a reaction the dosing controls, so the factor
   is bracketed by halving or doubling from the declared schedule (``s = 1``) and bisected in
@@ -11,7 +12,8 @@ allows, vessels coupled by a dose, and a dosed gas passing through without ideal
   jacket that removes the peak at the smallest factor does not limit the dosing, and one that
   removes it at no factor up to the largest cannot be helped by dosing more slowly (the
   charge's own reaction, the post-reaction). The recipe reports it (``vessel.jacket.
-  shortest_dosing``); the model keeps the declared dosing.
+  shortest_dosing``) as the dosing time from the first dose's start to the last's end
+  (:func:`dosing_time`); the model keeps the declared dosing.
 - **Coupled vessels** (:func:`couplings`, ``cheme.process-coupled-dosing``): a semi-batch dose
   fed by another batch or semi-batch step's vent, directly or through steps with one material
   inlet each. Its dosing schedule is compared with the generator's: a semi-batch generator's
@@ -48,13 +50,22 @@ SCALE_TOLERANCE = 1e-4
 TRACE_DEPTH = 10
 
 
+def dosing_time(node: Any) -> float:
+    """s of semi-batch *node*'s dosing: from its first dose's start to its last dose's end (the
+    schedule :func:`stretched` stretches)."""
+    batch = node.batch
+    return batch.dosing_end() - min((d.start for d in batch.dosing), default=0.0)
+
+
 def stretched(node: Any, factor: float) -> Any:
-    """Batch step *node* with its dosing schedule stretched in time by *factor*: every dose's
-    start, time and profile durations (the shares, the post-reaction and the rest kept)."""
+    """Batch step *node* with its dosing schedule stretched in time by *factor* from its first
+    dose's start: every dose's time and profile durations and its start's lag behind the first
+    (the wait before the first dose, the shares, the post-reaction and the rest kept)."""
+    first = min((d.start for d in node.batch.dosing), default=0.0)
     doses = [
         dose.model_copy(
             update={
-                "start": dose.start * factor,
+                "start": first + (dose.start - first) * factor,
                 "time": dose.time * factor if dose.time is not None else None,
                 "profile": [(duration * factor, share) for duration, share in dose.profile],
             }

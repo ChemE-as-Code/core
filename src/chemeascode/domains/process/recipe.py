@@ -42,12 +42,13 @@ what one batch gives off, for sizing the off-gas line and scrubber.
 
 ADR 0073: a vessel may hold several batch or semi-batch steps one after the other (a one-pot
 sequence): it is sized from the largest content of any of them, its jacket checked against each
-step's peak duty at that step's charge (``VesselResult.steps``), a jacket time takes the content
-of the batch step its operation comes before (the charge before that step's first operation from
-its model; after the last, the last's end), and each vented step reports its vent. With
-``vessel.size_from: steps`` what each other step takes in for one batch (a conversion step that
-adds a second portion) counts too. ``vessel.jacket.shortest_dosing`` reports the shortest
-dosing of each semi-batch step whose peak duty the jacket removes (:mod:`.dosing`). A
+step's peak duty at that step's charge (``VesselResult.steps``), a jacket time takes the content of
+the batch step its operation comes before (the charge before that step's first operation from its
+model; after the last, the last's end; without any such operation, by the operations' kinds), and
+each vented step reports its vent. With ``vessel.size_from: steps`` what each other step takes in
+for one batch (a conversion step that adds a second portion) counts too.
+``vessel.jacket.shortest_dosing`` reports the shortest dosing of each semi-batch step whose peak
+duty the jacket removes (:mod:`.dosing`), and of a step coupled to another by a vent the pair's. A
 ``transfer`` may take ``from:`` the semi-batch whose dose takes what the unit makes: that dose's
 time.
 
@@ -70,7 +71,8 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction; another
   step of a batch step's vessel that takes in more than the batch the vessel is sized from
-  (ADR 0073; ``vessel.size_from: steps`` sizes it from every step);
+  (ADR 0073; ``vessel.size_from: steps`` sizes it from every step), or, in a given vessel,
+  more than its fill fraction holds;
 - ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
   ``U A (T - T_coolant)`` of the jacket at the charge (the smallest wetted area), for each batch
   step of the vessel; info without a coolant temperature;
@@ -440,16 +442,20 @@ class VentResult:
 class DosingLimit:
     """The shortest dosing of a semi-batch step its vessel's jacket allows (ADR 0073,
     ``vessel.jacket.shortest_dosing``): its schedule stretched in time until the peak duty of
-    one batch equals what the jacket removes at the charge."""
+    one batch equals what the jacket removes at the charge. A step coupled to another by a vent
+    (:func:`.dosing.couplings`) doses with it: ``coupled`` names it, ``pair`` is the larger of
+    the two shortest dosings."""
 
     procedure: str
     unit: str  # the semi-batch step
-    declared: float  # h: when its last dose ends, as declared
+    declared: float  # h: from its first dose's start to its last dose's end, as declared
     removable: float | None  # kW: U A (T - T_coolant) at its charge
-    shortest: float | None = None  # h; None: see reason
+    shortest: float | None = None  # h, the same span; None: see reason
     peak_duty: float | None = None  # kW at the shortest (at the declared dosing without one)
     runs: int = 0  # models solved
     reason: str = ""
+    coupled: str | None = None  # the step whose vent it doses, or that doses its vent
+    pair: float | None = None  # h: the coupled pair's shortest dosing; None: not both known
 
 
 @dataclass
@@ -786,12 +792,24 @@ def _jacketed_step(ops: list[Operation], j: int, tanks: list[str]) -> tuple[str,
     """Of a vessel of several batch steps *tanks* (ADR 0073): the step whose content operation
     *j* of *ops* heats or cools, and whether that is its charge. The step of the next operation
     from: one of them, its charge when none of its operations came before; after the last such
-    operation, the end of its step (else of the last step)."""
+    operation, the end of its step. Without an operation from: any of them, by the kinds: the
+    first step's charge before every dose and react, the last step's end after them; raises
+    ValueError between them (which step's content is not known)."""
     following = next((o.from_ for o in ops[j + 1 :] if o.from_ in tanks), None)
     if following is not None:
         return following, not any(o.from_ == following for o in ops[:j])
     previous = next((o.from_ for o in reversed(ops[:j]) if o.from_ in tanks), None)
-    return previous or tanks[-1], False
+    if previous is not None:
+        return previous, False
+    reacting = ("dose", "react")
+    if not any(o.kind in reacting for o in ops[j + 1 :]):
+        return tanks[-1], False
+    if not any(o.kind in reacting for o in ops[:j]):
+        return tanks[0], True
+    raise ValueError(
+        f"no operation names one of {', '.join(tanks)} in from:, so the batch step whose "
+        "content it heats or cools between the doses and reactions is not known"
+    )
 
 
 def _other_steps(
@@ -861,16 +879,22 @@ def _dosing_limit(
     """The shortest dosing of semibatch step *step* whose peak duty the jacket of *vessel* (its
     figures for *step*) removes at the charge (ADR 0073, :func:`.dosing.shortest_factor`);
     None for a step that is no semibatch."""
-    from chemeascode.domains.process.dosing import peak_at, shortest_factor
+    from chemeascode.domains.process.dosing import dosing_time, peak_at, shortest_factor
     from chemeascode.domains.process.stirred_tank import TankError
 
     node = process.nodes.get(step)
     if getattr(node, "reactor", None) != "semibatch" or node.batch is None:
         return None
-    declared = node.batch.dosing_end() / 3600.0
+    declared = dosing_time(node) / 3600.0
     found = DosingLimit(up.id, step, declared, vessel.removable)
     if vessel.removable is None:
         found.reason = "no vessel.jacket.coolant_temperature"
+        return found
+    if vessel.removable <= 0:  # no dosing time helps a jacket that removes nothing
+        found.reason = (
+            f"the coolant at {vessel.coolant_temperature:g} K is not colder than the process at "
+            f"{vessel.process_temperature:g} K: the jacket removes no heat"
+        )
         return found
     if node.batch.heat != "isothermal":
         found.reason = "an adiabatic semi-batch has no cooling duty"
@@ -1353,7 +1377,23 @@ def evaluate(
                 working = max(own, others[0])
             elif several:
                 working = own
-            if (
+            given = up.vessel.volume
+            if others is not None and up.vessel.size_from != "steps" and given is not None:
+                # a given vessel is sized from nothing: the larger intake against its fill
+                held = given * up.vessel.fill_fraction
+                if others[0] > own and others[0] > held * (1 + 1e-9):
+                    add(
+                        "warning",
+                        "vessel",
+                        f"{up.id}: {others[1]} takes in {others[0]:.4g} m3 per batch, more than "
+                        f"the batch steps' {own:.4g} m3: {others[0] / given:.2%} of the given "
+                        f"{given:g} m3 vessel of {up.label} (fill fraction "
+                        f"{up.vessel.fill_fraction:g})",
+                        [*at, "vessel", "volume"],
+                        "a larger vessel, a smaller batch or more parallel units",
+                        [up.id, others[1]],
+                    )
+            elif (
                 others is not None
                 and up.vessel.size_from != "steps"
                 and others[0] > own * (1 + TOLERANCE)
@@ -1394,7 +1434,20 @@ def evaluate(
                 heated = content
                 before = not dosed and any(o.kind == "dose" for o in up.operations)
                 if contents:  # several batch steps: the one it comes before (ADR 0073)
-                    step, before = _jacketed_step(up.operations, j, tanks)
+                    try:
+                        step, before = _jacketed_step(up.operations, j, tanks)
+                    except ValueError as failure:
+                        failed = True
+                        add(
+                            "error",
+                            "duration",
+                            f"{up.id}.{op.id}: no {op.kind} time: {failure}",
+                            [*at, "operations", j, "temperatures"],
+                            "name the batch step of the vessel's dose and react operations in "
+                            "their from:, or give the duration",
+                            [up.id],
+                        )
+                        continue
                     heated = contents[step]
                 if heated is None:
                     continue
@@ -1514,6 +1567,7 @@ def evaluate(
         result.vents += _vents(process, recipe, up, case)
         clock_end = max(clock_end, clock)
     _coupling_findings(process, recipe, result, add)
+    _coupled_limits(process, result)
     if failed:
         return result
     slowest = max(result.units, key=lambda u: u.cycle)
@@ -1537,6 +1591,22 @@ def evaluate(
     if check_basis:
         _basis(process, recipe, result, case, add)
     return result
+
+
+def _coupled_limits(process: Any, result: RecipeResult) -> None:
+    """ADR 0073: the shortest dosing of a step coupled to another by a vent (its generator or
+    its absorber, :func:`.dosing.couplings`) holds only for the pair dosing together: each
+    names the other, with the larger of the two where both are known."""
+    from chemeascode.domains.process.dosing import couplings
+
+    limits = {d.unit: d for d in result.dosing}
+    for c in couplings(process):
+        made, dosed = limits.get(c.generator.id), limits.get(c.absorber.id)
+        both = [d.shortest for d in (made, dosed) if d is not None and d.shortest is not None]
+        for own, other in ((made, c.absorber.id), (dosed, c.generator.id)):
+            if own is not None:
+                own.coupled = other
+                own.pair = max(both) if len(both) == 2 else None
 
 
 def _coupling_findings(process: Any, recipe: Recipe, result: RecipeResult, add: Any) -> None:
@@ -1911,6 +1981,15 @@ def recipe_text(result: RecipeResult) -> str:
                 f"against {d.removable:.4g} kW removed at the charge)"
                 if d.shortest is not None
                 else f"none: {d.reason} (declared {d.declared:.4g} h)"
+            )
+            + (
+                f"; it doses with {d.coupled} (a vent coupling): the pair no shorter than "
+                f"{d.pair:.4g} h"
+                if d.coupled is not None and d.pair is not None
+                else f"; it doses with {d.coupled} (a vent coupling), whose shortest dosing is "
+                "not known"
+                if d.coupled is not None
+                else ""
             )
         )
     for q in result.heats:

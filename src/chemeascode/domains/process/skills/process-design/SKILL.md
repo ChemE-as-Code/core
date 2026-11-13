@@ -149,10 +149,12 @@ dryer. A one-pot sequence of batch or semi-batch steps (one dosing, then another
 vessel) is one unit procedure too: the vessel is sized from the largest content and its jacket
 checked for each step (ADR 0073); do not split a pot into vessels for the tool. A later step that
 adds a second portion (a conversion step) takes the warning `cheme.recipe-vessel` when it
-overfills: set `vessel.size_from: steps`. A `transfer` into the next vessel's dose takes
+overfills: set `vessel.size_from: steps` (a given `vessel.volume` is checked against it at
+its fill fraction). A `transfer` into the next vessel's dose takes
 `from:` that semi-batch step, not a duration copied from it. For a dosing limited by the
 jacket, set `vessel.jacket.shortest_dosing: true`: `cheme process recipe` reports the shortest
-dosing the cooling allows, which you write into `batch.dosing` (with that source) yourself. A
+dosing the cooling allows, which you write into `batch.dosing` (with that source) yourself;
+for vessels coupled by a vent, the pair's (`pair`) into both. A
 vessel whose vent doses another must dose on the generator's schedule
 (`cheme.process-coupled-dosing`); its info says how closely the gas follows the dose. A
 separator with a known split (a sieve dryer, a decanter, a scrubber) gives

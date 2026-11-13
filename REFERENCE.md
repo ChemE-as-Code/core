@@ -1136,16 +1136,22 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   step's own charge (`vessels[].steps`, the vessel's own fields the step with the least
   margin; `cheme.recipe-jacket` names the step), time a `heat` or `cool` with `temperatures` on
   the content of the batch step its next `from:` operation names (that step's charge when none
-  of its operations came before, else its end; after the last, the last step's end), report
+  of its operations came before, else its end; after the last, that step's end; with no
+  operation `from:` any of them, the first step's charge before every `dose` and `react`, the
+  last step's end after them, and between them a `cheme.recipe-duration` error), report
   each vented step's vent, and give `datasheets fill` each step's own peak duty. Another step
   of the vessel that takes in more for one batch than the batch steps' content (a conversion
   step adding a second portion) is `cheme.recipe-vessel` (warning); `vessel.size_from: steps`
-  sizes the vessel from it too. `vessel.jacket.shortest_dosing: true` reports, for each
+  sizes the vessel from it too, and a given `vessel.volume` is checked against it at its fill
+  fraction instead. `vessel.jacket.shortest_dosing: true` reports, for each
   semi-batch step of the vessel, the shortest dosing whose peak duty the jacket removes at the
-  charge (`dosing`: the declared and the shortest h, the peak and the removable kW, or why
-  there is none): the dosing schedule stretched in time (every dose's start and segments, the
-  shares and the post-reaction kept), its factor bracketed from the declared schedule and
-  bisected to 1e-4 between 1e-3 and 1e3 times; the model keeps its declared dosing.
+  charge (`dosing`: the declared and the shortest h from the first dose's start to the last
+  dose's end, the peak and the removable kW, or why there is none, such as a coolant not colder
+  than the process): the dosing schedule stretched in time from the first dose's start (every
+  dose's segments and lag behind the first; the wait before it, the shares and the
+  post-reaction kept), its factor bracketed from the declared schedule and bisected to 1e-4
+  between 1e-3 and 1e3 times; the model keeps its declared dosing. A step coupled to another by
+  a vent names it (`coupled`) with the pair's shortest dosing, the larger of the two (`pair`).
   `cheme.recipe-coupling` (warning): a dose fed by another batch step's vent whose operation
   does not start in one batch when the generator's dose (or reaction) operation does. A filter
   or dryer in the same vessel takes

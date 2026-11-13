@@ -103,6 +103,32 @@ def test_the_shortest_dosing_says_why_there_is_none(tmp_path):
     assert "none: no vessel.jacket.coolant_temperature" in recipe_text(result)
 
 
+def test_the_shortest_dosing_keeps_the_wait_before_the_first_dose(tmp_path):
+    """A dosed only, nothing reacts before it: a wait before the dose leaves the peak and the
+    shortest dosing time as they are; only the dose's time stretches, not the wait."""
+    ws = plain._plant(tmp_path, _shortest_recipe())
+    flowsheet = ws.root / "process/flowsheet.yaml"
+    flowsheet.write_text(
+        flowsheet.read_text().replace(
+            "dosing: [{stream: S2, time: 3600}]", "dosing: [{stream: S2, time: 3600, start: 1800}]"
+        )
+    )
+    (late,) = recipe_report(ws.root).dosing
+    (prompt,) = recipe_report(plain._plant(tmp_path / "prompt", _shortest_recipe()).root).dosing
+    assert late.declared == pytest.approx(1.0)  # from the dose's start to its end
+    assert late.shortest == pytest.approx(prompt.shortest, rel=2 * SCALE_TOLERANCE)
+    assert late.peak_duty == pytest.approx(prompt.peak_duty, rel=1e-3)
+
+
+def test_a_jacket_that_removes_no_heat_has_no_shortest_dosing_without_a_run(tmp_path):
+    result = recipe_report(plain._plant(tmp_path, _shortest_recipe(coolant=320.0)).root)
+    (limit,) = result.dosing
+    assert limit.shortest is None and limit.runs == 0
+    assert limit.reason == (
+        "the coolant at 320 K is not colder than the process at 300 K: the jacket removes no heat"
+    )
+
+
 # -- a vessel over several steps ----------------------------------------------------------------
 
 #: R (semi-batch) then C, a batch of R's outlet, in one vessel
@@ -180,6 +206,45 @@ def test_a_vessel_over_two_batch_steps_is_sized_and_checked_for_each(tmp_path):
     for step in ("R", "C"):
         own = batch_vessel(process, recipe, evaluated, step)
         assert own.peak_duty == pytest.approx(contents[step].peak_duty, rel=1e-12)
+
+
+def test_a_jacket_time_without_from_takes_the_content_by_the_operations_kinds(tmp_path):
+    """No operation names R or C in from:: a heat-up before every dose and reaction takes the
+    first step's charge, a cool-down after them the last step's end; one between them is not
+    known (an error, not the last step's end)."""
+    from chemeascode.domains.process.recipe import _content_of, load_recipe
+
+    recipe = _one_pot(coolant=280.0)
+    operations = recipe["unit_procedures"][0]["operations"]
+    for op in operations:
+        if op.pop("from", None):
+            op["duration"] = plain._hours(1.0)
+    operations[-1]["temperatures"] = [300.0, 290.0]
+    ws = _two_batches(tmp_path, recipe)
+    (warm,) = [f for f in recipe_report(ws.root).findings if f.level == "error"]
+    assert warm.rule == "cheme.recipe-duration" and "UP1.warm: no heat time" in warm.message
+    assert warm.line is not None and "from:" in warm.hint
+    del operations[3]
+    (ws.root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    result = recipe_report(ws.root)
+    assert not [f for f in result.findings if f.level == "error"]
+    process, _ = load(ws.root)
+    loaded, _, _ = load_recipe(ws.root)
+    first, last = (_content_of(process, loaded, s, "design") for s in ("R", "C"))
+    (vessel,) = result.vessels
+    d = vessel.diameter
+    bottom = math.pi * d**2 / 4
+
+    def hours(capacity, volume, medium, start, end):
+        ua = 0.4 * (math.pi * d * volume / bottom + bottom)
+        return capacity / ua * math.log((medium - start) / (medium - end)) / 3600
+
+    times = {s.operation: s.end - s.start for s in result.steps}
+    heat = hours(first.charge_capacity, first.charge_volume, 350, 290, 300)
+    assert times["heat"] == pytest.approx(heat, rel=1e-9)
+    cool = hours(last.end_capacity, last.end_volume, 280, 300, 290)
+    assert times["cool"] == pytest.approx(cool, rel=1e-9)
+    assert first.charge_capacity < last.end_capacity  # the charge, not the end: shorter
 
 
 def test_each_vented_step_of_a_vessel_reports_its_vent(tmp_path):
@@ -265,6 +330,21 @@ def test_a_step_that_takes_in_more_than_the_batch_is_a_finding_or_sizes_the_vess
     assert vessel.working_volume == pytest.approx(4.05, rel=1e-6)
     assert vessel.volume == pytest.approx(6.3)  # 4.05 / 0.8 = 5.06, rounded up to R10
     assert not [f for f in result.findings if f.rule == "cheme.recipe-vessel"]
+    # a given vessel is sized from nothing: the intake against its fill fraction
+    del recipe["unit_procedures"][0]["vessel"]["size_from"]
+    for volume, warned in ((10.0, False), (5.0, True)):
+        recipe["unit_procedures"][0]["vessel"]["volume"] = volume
+        (ws.root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+        given = recipe_report(ws.root)
+        assert given.vessels[0].working_volume == pytest.approx(2.7, rel=1e-6)  # as before
+        found = [f for f in given.findings if f.rule == "cheme.recipe-vessel"]
+        assert bool(found) is warned, volume
+    (finding,) = found
+    assert finding.message == (
+        "UP1: C takes in 4.05 m3 per batch, more than the batch steps' 2.7 m3: 81.00% of the "
+        "given 5 m3 vessel of R+C (fill fraction 0.8)"
+    )
+    assert finding.line is not None and "sized from" not in finding.message
     # the jacket is still checked against R's peak, at R's charge in the larger vessel
     d = vessel.diameter
     bottom = math.pi * d**2 / 4
@@ -478,6 +558,60 @@ def test_the_recipe_starts_coupled_doses_together(tmp_path):
     assert finding.level == "warning"
     assert "the dose of R2 starts at 0.5 h, but R, whose vent it doses, starts at 1 h" in (
         finding.message
+    )
+
+
+def test_the_shortest_dosing_of_coupled_vessels_names_the_pairs(tmp_path):
+    """R's vent doses R2: R alone could dose faster than R2's jacket takes the gas, so each
+    reports the other and the pair's shortest dosing, the larger of the two."""
+
+    def jacketed(coolant, shortest=True):
+        jacket = {"u": 400, "coolant_temperature": coolant, "provenance": "assumed"}
+        return {"jacket": jacket | {"shortest_dosing": shortest}, "provenance": "assumed"}
+
+    recipe = {
+        "schema": "cheme/recipe/v1",
+        "kind": "recipe",
+        "batch_size": {"value": 100.0, "unit": "kg", "stream": "S6", "provenance": "assumed"},
+        "hours_per_year": {"value": 8000, "provenance": "assumed"},
+        "unit_procedures": [
+            {
+                "id": "MAKE",
+                "unit": "R",
+                "vessel": jacketed(280.0),
+                "operations": [{"id": "dose", "kind": "dose", "from": "R"}],
+            },
+            {
+                "id": "TAKE",
+                "unit": "R2",
+                "start": {"after": "MAKE", "operation": "dose"},
+                "vessel": jacketed(295.0),
+                "operations": [{"id": "dose", "kind": "dose", "from": "R2"}],
+            },
+        ],
+    }
+    ws = _coupled(tmp_path, recipe=recipe)
+    process, _ = load(ws.root)
+    run(ws, process, "design", write=True)
+    result = recipe_report(ws.root)
+    made, dosed = result.dosing
+    assert (made.unit, made.coupled, dosed.unit, dosed.coupled) == ("R", "R2", "R2", "R")
+    assert made.shortest < dosed.shortest  # R2's jacket sets the pair's
+    assert made.pair == dosed.pair == dosed.shortest
+    text = recipe_text(result)
+    assert (
+        f"it doses with R2 (a vent coupling): the pair no shorter than {dosed.shortest:.4g} h"
+        in (text)
+    )
+    assert json.loads(json.dumps(result.as_dict()))["dosing"][0]["pair"] == dosed.shortest
+    # R2's jacket without the option: R's names R2, whose shortest dosing is not known
+    recipe["unit_procedures"][1]["vessel"] = jacketed(295.0, shortest=False)
+    (ws.root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe))
+    result = recipe_report(ws.root)
+    (made,) = result.dosing
+    assert made.coupled == "R2" and made.pair is None
+    assert "it doses with R2 (a vent coupling), whose shortest dosing is not known" in (
+        recipe_text(result)
     )
 
 

@@ -121,17 +121,25 @@
 - Dosing and vessels (ADR 0073, core#184 part A; `domains/process/dosing.py`):
   - `vessel.jacket.shortest_dosing: true` in `process/recipe.yaml`: `cheme process recipe`
     reports (`dosing`) the shortest dosing of each semi-batch step in the vessel whose peak
-    duty the jacket removes at the charge, the dosing schedule stretched in time and the model
-    solved at each trial (bracketed from the declared schedule, bisected to 1e-4). The model
-    keeps its declared dosing. On a scratch copy of sodium-azide-1 this is R-102 9.34 h and
-    R-101 2.41 h, against the 10 h declared (D-010 found 10 h by hand).
+    duty the jacket removes at the charge, the dosing schedule stretched in time from the first
+    dose's start (the wait before it kept) and the model solved at each trial (bracketed from
+    the declared schedule, bisected to 1e-4). The time is from the first dose's start to the
+    last dose's end. The model keeps its declared dosing. A coolant not colder than the process
+    gives the reason without a run. Vessels coupled by a vent name each other (`coupled`) with
+    the pair's shortest dosing, the larger of the two (`pair`). On a scratch copy of
+    sodium-azide-1 this is R-102 9.34 h and R-101 2.41 h, so 9.34 h for the pair, against the
+    10 h declared (D-010 found 10 h by hand).
   - A unit procedure over several batch or semi-batch steps in one vessel (a one-pot
     sequence, 1.12.0's `cheme.recipe-reference`). The vessel is sized from the largest content
     of any of them, and the jacket is checked against each step's peak at its own charge
-    (`vessels[].steps`). Jacket times take the content of the batch step that comes next, each
-    vented step reports its vent, and `datasheets fill` gives each step its own peak duty.
+    (`vessels[].steps`). Jacket times take the content of the batch step that comes next (with
+    no operation `from:` the steps, by the operations' kinds; between the doses and reactions,
+    a `cheme.recipe-duration` error), each vented step reports its vent, and `datasheets fill`
+    gives each step its own peak duty.
   - `vessel.size_from: steps`: the vessel is sized from what every other step of the unit
-    procedure takes in for one batch too (a conversion step adding a second portion).
+    procedure takes in for one batch too (a conversion step adding a second portion). Without
+    it, such a step taking in more than the batch is `cheme.recipe-vessel` (warning); in a
+    given `vessel.volume`, only where it exceeds the volume times the fill fraction.
   - A `transfer` operation `from:` the semi-batch whose dose takes what the unit makes: that
     dose's time. On a scratch copy of p-toluenesulfonyl-chloride-1 this gives Q101's 4.0 h,
     the hand value.
@@ -214,11 +222,13 @@
 - Library effect of ADR 0073 (`process propagate --check`, `recipe`, `reactors`,
   `reactor-hazards`, `stills`, `crystallizers --json` and the process and recipe findings of
   `validate`, on the 17 batch entries of the process library and
-  tert-butyldimethylsilyl-chloride-1, against the base at rel 1e-9): no number changes. New
+  tert-butyldimethylsilyl-chloride-1, `propagate --check` and `validate` on all 106 entries too,
+  against the base at rel 1e-9): no number changes. New
   findings only:
   - p-toluenesulfonyl-chloride-1: `cheme.recipe-vessel` (warning). R102 takes in 3.202 m3 per
-    batch, more than R101's 2.044 m3 that the vessel is sized from (its L-1; the given 4 m3
-    holds it), so `process recipe` exits 1.
+    batch, more than the 2.044 m3 of the batch steps, 80.04 % of the given 4 m3 vessel: just
+    over its fill fraction 0.8 (its L-1 gives the 4 m3 for this portion, 78 % full by the
+    entry's own 3.11 m3), so `process recipe` exits 1.
   - sodium-azide-1: `cheme.process-reactor` (warning), MEONO passing R-102 without ideal-gas
     data (its L-9). Also `cheme.process-coupled-dosing` (info): R-102's dose follows R-101's
     gas to within 0.00665 (its L-11).
