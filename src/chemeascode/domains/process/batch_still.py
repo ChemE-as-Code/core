@@ -125,7 +125,7 @@ TOLERANCE = 1e-9
 #: all) that creeps on near empty, its error control keeping the step far above the boils-dry
 #: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
 #: does reach it (slowly, on a trace the column enriches) carries on. An end past the most
-#: the still can reach before it boils dry (distilled, or time) is refused at once.
+#: the still can reach before it boils dry (distilled, time or purity) is refused at once.
 STALL_SHARE = 1e-6
 #: a component's share of the charge (and feed) below which it is gone
 NEGLIGIBLE = 1e-100
@@ -868,11 +868,12 @@ def solve_still(
         cap = boiled + available + (limit if feeding and limit is not None else 0.0)
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
-        steps = stalled = first = 0
-        # where the last run of small steps began: kmol boiled up and the stop's value
-        # (the stop is not evaluated for it: a bubble point's guess would move the solution),
-        # and in a run from the advance's first step, the step its stop's value was first known
-        mark: tuple[float, float | None, list[float]] = (boiled, None, state[:k])
+        steps = stalled = 0
+        # where the last run of small steps began: kmol boiled up, the stop's value and the
+        # step it was taken at (the stop is not evaluated before the advance's first step: a
+        # bubble point's guess would move the solution; a run from there takes the first one
+        # the loop evaluates), and the still's content
+        mark: tuple[float, float | None, int, list[float]] = (boiled, None, 0, state[:k])
 
         def stalls() -> StillError:
             left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
@@ -963,30 +964,29 @@ def solve_still(
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
             if stalled == 0:
-                mark = (boiled, now, state[:k])
+                mark = (boiled, now, steps, state[:k])
             elif mark[1] is None and now is not None:
                 # a run of small steps from the advance's first step: its stop's value is the
                 # first one evaluated (the stop is not evaluated before the first step)
-                mark = (mark[0], now, mark[2])
-                first = stalled
+                mark = (mark[0], now, steps, mark[3])
             if stalled >= STALL_STEPS:
                 # a run of small steps: does its pace (in kmol boiled up, or in the stop's
                 # value) reach the end within the steps left? If not, the still stalls.
                 left = MAX_STEPS - steps
                 reach = (boiled - mark[0]) / stalled * left >= target - boiled
                 if not reach and now is not None and mark[1] is not None:
-                    reach = (now - mark[1]) / max(stalled - first, 1) * left >= -now
+                    reach = (now - mark[1]) / max(steps - mark[2], 1) * left >= -now
                 if not reach:
                     # a trace the column enriches, cleared at the explicit method's stability
                     # limit, holds the step small until it is gone: progress, not a stall
                     reach = any(
                         v and a > 0 and b < 1e-3 * a
-                        for a, b, v in zip(mark[2], state[:k], volatile, strict=True)
+                        for a, b, v in zip(mark[3], state[:k], volatile, strict=True)
                     )
                 if not reach:
                     raise stalls()
-                stalled = first = 0
-                mark = (boiled, now, state[:k])
+                stalled = 0
+                mark = (boiled, now, steps, state[:k])
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
 
@@ -1086,7 +1086,38 @@ def solve_still(
         if end.time is not None:
             most = most_seconds_per_mole()
             return (lambda s, left: left * most) if math.isfinite(most) else None
+        if end.purity is not None:
+            return purity_floor(end)
         return None
+
+    def purity_floor(end: Any) -> Callable[[list[float], float], float] | None:
+        """The most a purity end's stop can rise: the cut's mean share of the key can fall no
+        lower than its key over the cut and all the other volatile content left (the key no
+        longer distilling, all the rest joining the cut), by mole or by mass. inf while the
+        cut is empty; a share of 1e-6 more is left to the integration's error."""
+        key = end.purity.key
+        if key not in names:
+            return None
+        i = names.index(key)
+        start = list(removed)
+        weight = [m or 0.0 for m in mw] if end.basis == "mass" else [1.0] * k
+
+        def rise(s: list[float], _left: float) -> float:
+            cut = [
+                (a + f - x - r) * w
+                for a, f, x, r, w in zip(n0, fed, s[:k], start, weight, strict=True)
+            ]
+            total = sum(cut)
+            if total <= 1e-12 * (total0 + total_feed) or cut[i] <= 0:
+                return math.inf
+            others = sum(
+                x * w
+                for j, (x, w, v) in enumerate(zip(s[:k], weight, volatile, strict=True))
+                if v and j != i
+            )
+            return cut[i] / total - cut[i] / (total + others) + 1e-6
+
+        return rise
 
     for port, end, cut_pressure, cut_boilup in stages:
         changed = cut_pressure != phase.pressure

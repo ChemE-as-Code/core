@@ -138,7 +138,9 @@
   naming the volatile kmol left): a share distilled by the volatile content left (by mole, or
   its mass), a time by the volatile kmol left times the most s per kmol of any vapour of them
   (the largest latent heat for kW, the heaviest for kg/h, 2000 K for m3/h) at the highest
-  reflux. No step towards an end within that bound changes. A reachable end the integration
+  reflux, a purity by the cut's key over the cut and all the other volatile content left (an
+  end at 0.5 ACCL there was refused only by the pace check below, after 34040 steps and some
+  90 s). No step towards an end within that bound changes. A reachable end the integration
   only crawls towards is checked after 500 steps in a row that each boil off less than 1e-6 of
   the charge: if at that run's pace (in kmol boiled up, or in the end's own measure, from the
   run's first step) the end is not reached within 10^6 steps, the boil-up stalls

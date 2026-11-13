@@ -54,8 +54,9 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   column still with a time end past its dry point crept on near empty without end, its error
   control holding the step far above the boils-dry floor.) After each step the integrator
   bounds how far the end's value can still rise before the still boils dry: the volatile kmol
-  left (distilled by mole), their mass (by mass), or their kmol times the most s per kmol of
-  any vapour of them at the highest reflux (a time). An end beyond it is refused at once; no
+  left (distilled by mole), their mass (by mass), their kmol times the most s per kmol of any
+  vapour of them at the highest reflux (a time), or, for a purity, down to the cut's key over
+  the cut and all the other volatile content left. An end beyond it is refused at once; no
   step changes. A run of 500 steps that each boil off less than 1e-6 of the charge is checked
   for pace (kmol boiled up, or the end's value, from the run's first evaluated step): one
   that does not reach the end within 10^6 steps stalls, and no phase takes more. The horizon
@@ -111,8 +112,10 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   99.9 % distilled; core 1.11.0 hung) is refused at its first steps. A reachable end the
   integration crawls towards (2.495 h there, unsolved by 1.11.0 in 15 minutes) is refused
   after some 55000 steps, 2 to 3 minutes; one whose pace never falls runs up to 10^6 steps
-  (some 40 minutes) before it is refused. The bound covers only ends at a share distilled or
-  at a time: a temperature, purity or residue end past the dry point relies on the pace check.
+  (some 40 minutes) before it is refused. The bound covers ends at a share distilled, a time
+  or a purity (the example's product cut at 0.5 ACCL: refused at once, not after 34040 steps
+  and some 90 s): a temperature or residue end past the dry point relies on the pace check (a
+  nonvolatile component's bubble point rises without a simple bound as the still empties).
 - An end at a temperature can replace a residue key set by hand to reach a temperature
   (di-tert-butyl-dicarbonate-1 D-006). A still whose end was reached by the old second
   evaluation solves to the same values within the bubble point's tolerance.

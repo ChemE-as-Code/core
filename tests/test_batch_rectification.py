@@ -828,6 +828,42 @@ def test_a_time_end_past_the_dry_point_at_the_highest_reflux_is_refused_at_once(
         assert sum(near.cuts[0].moles.values()) == pytest.approx(99, rel=1e-8)
 
 
+@pytest.mark.parametrize("column", [None, {"stages": 5, "reflux": "constant", "ratio": 3}])
+@pytest.mark.parametrize("basis", ["mole", "mass"])
+def test_a_purity_end_below_its_floor_is_refused_at_once_and_one_above_it_solves(column, basis):
+    """A cut's mean share of its key falls no lower than its key over the cut and all the
+    other volatile content left (the key no longer distilling, the rest joining the cut): with
+    50 kmol each of A and B no cut taken from the start falls below 0.5 A. An end below that
+    floor is refused ("too little to reach it") once the cut holds some of the key, not by the
+    boils-dry floor at the end of the boil-up; one just above it solves, to its fraction."""
+    from chemeascode.domains.process.batch_still import StillError
+
+    def still(fraction):
+        return _still(column, end={"purity": {"key": "A", "fraction": fraction}, "basis": basis})
+
+    for fraction in (0.4, 0.499):
+        with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+            solve_still(still(fraction), CHARGE, None, COMPS, None)
+    cut = solve_still(still(0.5005), CHARGE, None, COMPS, None).cuts[0]
+    assert cut.moles["A"] / sum(cut.moles.values()) == pytest.approx(0.5005, rel=1e-8)
+
+
+def test_an_unreachable_purity_end_is_refused_at_once(tmp_path):
+    """Integration review of 1.12.0: the example's product cut ended at a purity of 0.5 ACCL
+    is never reached (1.9 % of the charge's volatile content is not ACCL, so the cut stays
+    above 0.98): it relied on the pace check alone and was refused after 34040 steps, some
+    90 s at the 10^6-step horizon. Its floor refuses it at once."""
+    import time
+
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    process, node, inlets = _ended(tmp_path, "{purity: {key: ACCL, fraction: 0.5}}")
+    start = time.monotonic()
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        solve_node(process, node, inlets, "design")
+    assert time.monotonic() - start < 5.0
+
+
 def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):
     """An end at 2.495 h is reachable (the still boils dry at about 2.5016 h), but the
     integration crawls towards it, its error control holding the step at about 1e-9 kmol by
