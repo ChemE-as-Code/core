@@ -34,9 +34,11 @@ Mostly engineering guidance. Core's calculations for this are:
   same step, at a constant reflux ratio or holding the distillate's purity up to a maximum
   reflux, on Diwekar's shortcut (Fenske-Underwood-Gilliland at each point of the batch). Collect
   the product cut with an `end: {purity: ...}`; `cheme process stills` gives its purity,
-  recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. The
-  shortcut is conservative: a rigorous column at the same stages and reflux gives a purer
-  distillate.
+  recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. For a
+  nearly ideal liquid the shortcut is conservative: a rigorous column at the same stages and
+  reflux gives a purer distillate. For a non-ideal liquid it is not (it takes the still's
+  relative volatility for the whole column): give `volatility: constant` at the distillate's
+  relative volatility, or check with a rigorous column in `cheme process simulate`.
 
 Arrangement:
 

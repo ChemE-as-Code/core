@@ -1463,10 +1463,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     column's `distillate` or `heavy_key` that is no or a non-volatile component, a purity key
     that is no component (errors). Qualified against Rayleigh (N = 1), the Fenske limit,
     Underwood's binary closed form, the constant-distillate balance and rigorous
-    plate-to-plate binary and ternary columns (a forerun and a main cut) as a bound
-    (`tests/test_batch_rectification.py`; Diwekar's published examples and DWSIM: core#195); worked
-    example `examples/process-batch-rectification`. One reflux policy for all cuts; the column
-    and its condenser are not sized.
+    plate-to-plate binary and ternary columns (a forerun and a main cut) as a bound, Diwekar,
+    Malik and Madhavan's (1987) binary examples (their short-cut's purity within 1.2e-3, its
+    variable-reflux distillate within 0.6 %, the rigorous column's purity reproduced by the
+    plate-to-plate reference) and Lotter and Diwekar's (1997) rectifier, and DWSIM's rigorous
+    column (`CHEME_DWSIM_TESTS=1`): not purer for benzene-toluene, but up to 0.02 purer for
+    methanol-water, whose relative volatility falls towards the top; at the top's relative
+    volatility never purer (`tests/test_batch_rectification.py`, ADR 0061's amendment). For a
+    non-ideal liquid give `volatility: constant` at the distillate's relative volatility for a
+    bound. Worked example `examples/process-batch-rectification`. One reflux policy for all
+    cuts; the column and its condenser are not sized.
 - **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal
   `reactor: batch` or `semibatch`, a `still:`, a `crystallizer:` with `energy:` and a
   conversion step (`reactions:` with conversions or a `selectivity:`) give the heat they
