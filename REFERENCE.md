@@ -1266,6 +1266,55 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `melting_point` of a component its distillate's cuts carry at 1 mol% or more. Not
   modelled: a pressure balance (the vessel stays at its stream pressure), mass-transfer limits,
   a content at its boiling point.
+  A liquid batch or semi-batch's kinetics may say more (ADR 0074, `domains/process/
+  batch_kinetics.py`; a batch without these keys solves as in 1.12.0):
+  `batch.initiation: {time, factor, reactions, provenance}` holds the `reactions` (default
+  every one) at `factor` of their rate (default 0) until `time` s after the charge, an
+  induction period; a dose with `after_initiation: true` counts its `start` from it (a feed
+  interlocked on a positive initiation; the recipe's dosing time includes the wait). A
+  semi-batch with an initiation also runs the uninitiated scenario: the initiation never
+  comes, the waiting doses never start, until the initiation was due or the last other dose
+  ends; `process reactors` gives `initiation` (`time_s`, `factor`, `reactions`,
+  `doses_waiting`, `uninitiated`: `until_s`, `max_accumulation`, `cooling_failure`) and
+  `reactor-hazards` its `initiation` (`max_accumulation`, `mtsr_K`, the worst moment's
+  cooling failure: what accumulated run to completion, every reaction of the model) with
+  `cheme.reactor-hazard-initiation` (warning: that MTSR above the MTT or the TD24; info
+  otherwise). `batch.program: {points: [[s, K]], provenance}` (isothermal only; the first point
+  at 0 s) moves the temperature linearly between its points and holds the last (dose at one
+  temperature, hold at another); `batch.heat: reflux` holds the liquid at its bubble point at
+  the vessel's pressure (Raoult's law over `vapour_pressure`, else `normal_boiling_point` and
+  `heat_of_vaporization`; a component with neither does not boil; `vent.vapour.activity` where
+  given), total reflux with no vapour hold-up; a given outlet temperature other than the
+  programme's end, or any at reflux, is refused, and reflux refuses `vent.vapour`,
+  `vent.head_space` and `heat_up`. Their duty adds `content` (the content's sensible heat as
+  its temperature moves) and takes `doses` warmed to the temperature each met; `process
+  reactors` gives `temperatures` (`mode`, `start_K`, `end_K`, `max_K`). `batch.solids: {id:
+  {density, diameter | specific_area, provenance}}` carries a component as a solid phase: out
+  of the liquid's mole fractions, concentrations and activities (a rate law with an order in
+  it is refused; a `reverse: equilibrium` takes its activity as 1, and a solid not there
+  neither reacts nor dissolves), its volume `n M / density` in the content's, its
+  `liquid_heat_capacity` in the content's heat capacity; a rate per m3 is then per m3 of the
+  liquid. A precipitate that forms as it reacts is carried this way. A rate law with `basis:
+  surface` and `solid: id` is per m2 of that solid's surface: its particles at the charge
+  (equal spheres of `diameter`, `6 / (density d)` m2/kg, or `specific_area`) shrink at a
+  constant number, `A = A_0 (n / n_0)^(2/3)`; a surface rate's solid must be charged, not
+  dosed (no population balance); a CSTR or fixed bed refuses it. `process reactors` gives
+  `solids` (`start_kmol_h`, `end_kmol_h`, `area_start_m2`, `area_end_m2`). A rate law with
+  `form: photochemical` (`basis: volume`, no reverse) is `r = Phi(T) prod(c_i^a_i) q_a`, `k`
+  the quantum yield (with `Ea` for a chain's thermal steps), `q_a` the photons the liquid
+  absorbs per m3 from `batch.light: {power, wavelength, absorber, absorptivity, path_length,
+  on, provenance}`: `power` W of radiant power entering per m3 of the charge at `wavelength`
+  nm, `q_0 = P lambda / (h c N_A)` (CODATA 2022), of which `1 - 10^(-epsilon c l)` is
+  absorbed (Beer-Lambert, decadic; `absorptivity` in m2/kmol, 100 times L/(mol cm); no
+  absorber: all of it), the lamp on in the `on` windows (default throughout); the absorbed
+  power heats the content (the duty's `light` term, the adiabatic balance, the peak cooling
+  duty); `process reactors` gives `light`. Without its light a photochemical rate is refused
+  (a CSTR, a fixed bed). The screening's gas release takes the particles and the light from
+  the charge in the case screened. `cheme.process-reactor` adds: an initiation naming a
+  reaction not of the step, a `batch.solids` component undeclared ((warning) not `phase:
+  solid`), a surface rate's solid not in `batch.solids`, a photochemical rate law without
+  `batch.light` ((warning) a light without one), an undeclared absorber, reflux, solids or a
+  light on reactions not all liquid-phase.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or

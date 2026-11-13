@@ -116,3 +116,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0069](0069-thermal-screening-beyond-the-largest-reaction.md) | Thermal screening beyond the largest reaction: the network, every dose, the release over the batch, the content's boiling | Proposed | 2026-11-12 |
 | [0070](0070-design-specifications-and-component-separators.md) | Propagate solves feeds and splits for design specifications (with the tears, Newton-Broyden) and component separators from their split | Proposed | 2026-11-12 |
 | [0071](0071-gas-liquid-batch-head-space-sweep-and-absorption.md) | Gas-liquid batch: inerts, a head space, degassing, the heat of absorption and the vent condenser's freezing | Proposed | 2026-11-12 |
+| [0074](0074-semi-batch-kinetics-initiation-solids-temperature-light.md) | Semi-batch kinetics: an initiation, a solid phase with a surface rate, a temperature programme or reflux, a photochemical rate | Proposed | 2026-11-13 |
