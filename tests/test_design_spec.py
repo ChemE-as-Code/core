@@ -755,3 +755,33 @@ def test_the_propagate_help_names_component_separators_and_specs():
         text = " ".join((doc or "").split())
         assert "recovery:" in text and "specs:" in text and "Newton-Broyden" in text
         assert "Other separators (without `recovery:`)" in text.replace("``", "`")
+
+
+def test_the_batch_for_a_rate_keeps_its_secant_near_the_batches_tried(jacketed, monkeypatch):
+    """A cycle that grows faster than the batch caps the rate: an unbounded secant step jumped
+    from the recipe's batch to a tiny one (a column still with a time end boils dry there and
+    hung). Each trial now stays within BATCH_STEP of the batches tried, and the search ends
+    with the most the batches made."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.process import recipe as R
+
+    process, _ = load(jacketed)
+    recipe, _, _ = R.load_recipe(jacketed)
+    tried: list[float] = []
+
+    def evaluate(process, trial, doc, case, check_basis=True):
+        batch = trial.batch_size.value
+        tried.append(batch)
+        # rect5 of the review: 1813 kg in 21.41 h, 7550 kg in 99.30 h
+        return SimpleNamespace(cycle_time=21.41 * (batch / 1813.0) ** 1.07, findings=[])
+
+    monkeypatch.setattr(R, "evaluate", evaluate)
+    start = recipe.model_copy(
+        update={"batch_size": recipe.batch_size.model_copy(update={"value": 1813.0})}
+    )
+    fit = R.batch_for_rate(process, start, 352.65, "design")
+    assert fit.batch is None and fit.best_rate is not None and fit.best_rate < 352.65
+    for k, batch in enumerate(tried[2:], start=2):
+        assert min(tried[:k]) / R.BATCH_STEP <= batch * (1 + 1e-12)
+        assert batch <= R.BATCH_STEP * max(tried[:k]) * (1 + 1e-12)

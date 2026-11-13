@@ -120,6 +120,13 @@ COLUMN_ASSUMPTIONS = (
 PROFILE_POINTS = 50
 #: Relative error per step of the integration.
 TOLERANCE = 1e-9
+#: a boil-up that boils off less than STALL_SHARE of the charge (and feed) in each of
+#: STALL_STEPS accepted steps in a row makes no progress: a still (a column's above all) that
+#: creeps on near empty, its error control keeping the step far above the boils-dry floor
+STALL_SHARE = 1e-6
+STALL_STEPS = 500
+#: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual)
+MAX_STEPS = 20000
 #: K: the still's temperature is searched below this.
 HOTTEST = 2000.0
 #: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
@@ -179,7 +186,7 @@ class StillResult:
     fed_temperature: float | None = None
     feed_heat_up: float | None = None
     #: with ``heat_up_time`` (ADR 0068): s per batch the heat terms besides the boil-up take
-    #: at the boil-up's mean heat input (None: not known, ``heat_up_time_missing`` why)
+    #: at the still's boil-up's heat input (None: not known, ``heat_up_time_missing`` why)
     heat_up_time: float | None = None
     heat_up_time_missing: str = ""
     #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
@@ -701,7 +708,7 @@ def solve_still(
         getattr(components.get(n), "heat_of_vaporization", None) if v else 0.0
         for n, v in zip(names, volatile, strict=True)
     ]
-    units = {b.unit for _, _, _, b in stages} | {spec.boilup.unit}
+    units = {b.unit for b in _boilups(spec)}  # the boil-ups used (ADR 0068)
     if "kW" in units and (gaps := [n for n, h in zip(names, latent, strict=True) if h is None]):
         raise StillError("a boil-up in kW needs the heat_of_vaporization of " + ", ".join(gaps))
     if "m3/h" in units and model != "raoult":
@@ -830,7 +837,14 @@ def solve_still(
         cap = boiled + available + (limit if feeding and limit is not None else 0.0)
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
+        steps = stalled = 0
         while True:
+            if stalled >= STALL_STEPS or steps >= MAX_STEPS:
+                raise StillError(
+                    f"the still boils dry before its end (its boil-up makes no progress: "
+                    f"{sum(state[:k]):.4g} kmol left of {total0 + total_feed:.4g} kmol after "
+                    f"{steps} steps)"
+                )
             h = min(h, target - boiled)
             if h <= 1e-14 * (total0 + total_feed):
                 if end is not None and boiled >= end * (1 - 1e-12):
@@ -877,6 +891,8 @@ def solve_still(
                     peak = max(peak, (new[k + 1] - state[k + 1]) / dt)
             if feeding:
                 fed[:] = [a + share * h for a, share in zip(fed, feed_share, strict=True)]
+            steps += 1
+            stalled = stalled + 1 if h < STALL_SHARE * (total0 + total_feed) else 0
             boiled += h
             state = new
             before = result.profile[-1][2]
@@ -1194,13 +1210,28 @@ def outlets_need_hours(spec: Any) -> bool:
     """Whether still *spec*'s outlets depend on the hours of flows per batch: an end at a time
     with a boil-up of the still (not a specific rate, 1/h). Otherwise the hours scale only its
     time and energy per batch."""
-    timed = any(e is not None and e.time is not None for _, e in spec.ends())
-    return timed and any(b.unit != "1/h" for b in _boilups(spec))
+    return any(b.unit != "1/h" for b in _timed_boilups(spec))
 
 
 def _boilups(spec: Any) -> list[Any]:
-    """Still *spec*'s boil-up and its cuts' own (ADR 0068)."""
-    return [spec.boilup, *(c.boilup for c in spec.cuts if getattr(c, "boilup", None) is not None)]
+    """The boil-ups still *spec* runs at (ADR 0068): its cuts' own, and its own where a cut has
+    none, without cuts or with a feed (an unused one counts for nothing)."""
+    return spec.boilups()
+
+
+def _timed_boilups(spec: Any) -> list[Any]:
+    """The boil-ups still *spec* runs at up to its last end at a time (which counts from the
+    start): its feed phase's and those of the cuts up to that end; none without such an end."""
+    stages = _stages(spec, None)
+    timed = [
+        i for i, (_, end, _, _) in enumerate(stages) if end is not None and end.time is not None
+    ]
+    if not timed:
+        return []
+    return [
+        *([spec.boilup] if spec.feed is not None else []),
+        *(b for *_, b in stages[: timed[-1] + 1]),
+    ]
 
 
 def _downstream(process: Any, node: Any) -> set[str]:
@@ -1331,8 +1362,8 @@ def solve_node(
                 port: b.model_dump(mode="json", include={"value", "unit"})
                 for port, b in own.items()
             }
-        units = {b.unit for b in _boilups(spec)}
-        if units != {"1/h"}:
+        units = {b.unit for b in _timed_boilups(spec)}  # the ones the outlets depend on
+        if units - {"1/h"}:
             inputs["hours"] = hours
         if "kW" in units:
             inputs["heat_of_vaporization"] = {
@@ -1409,15 +1440,17 @@ def _feed_heat_up(result: StillResult, comps: Mapping[str, Any], t_feed: float |
 def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> None:
     """``still.heat_up_time`` (ADR 0068): the heat terms of the still's duty besides the
     boil-up (the charge's and a swap's feed's heat-up, a recipe vessel's metal; ADR 0063) take
-    time at the boil-up's mean heat input, ``t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)``
-    (a boil-up in kW: its value), s per batch; or why it is not known. A term that gives heat
-    back takes no time. The metal (``C_m``, kJ/K) heats with the charge from its start to the
+    time at the still's own boil-up's heat input, ``t = (Q_whole - Q_boil-up) / (Q_boil-up /
+    t_boil)`` over the cuts that run at it (a boil-up in kW: its value; a cut's own boil-up, a
+    forerun the vacuum pump limits, limits its vapour, not the heating; every cut with its own:
+    over the whole boil-up), s per batch; or why it is not known. A term that gives heat back
+    takes no time. The metal (``C_m``, kJ/K) heats with the charge from its start to the
     still's first bubble point ``T_0``, then over the boil-up as far as the still ends above
     ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0, 0)]``; one that ends colder (a vacuum
     ramp) gives no time back."""
     from chemeascode.domains.process.duties import still_duty
 
-    rate = result.duty  # kW: the boil-up's mean heat input
+    rate = _heat_input(node.still, result)  # kW
     if rate is None or rate <= 0:
         result.heat_up_time_missing = "the boil-up's heat input (heat_of_vaporization)"
         return
@@ -1436,6 +1469,30 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
         start, end = metal["temperatures"]
         kj += metal["heat_capacity"] * (max(first - start, 0.0) + max(end - first, 0.0))
     result.heat_up_time = kj / rate
+
+
+def _heat_input(spec: Any, result: StillResult) -> float | None:
+    """kW: the heat input the still's heat-up takes (ADR 0068): its own boil-up in kW, else the
+    mean over the cuts collected at its own boil-up (their latent heat over their time); the
+    mean over the whole boil-up where every cut has its own, or a cut's heat is not known."""
+    own = {c.outlet for c in spec.cuts if c.boilup is not None}
+    if spec.cuts and spec.feed is None and len(own) == len(spec.cuts):
+        return result.duty  # the still's own boil-up is not used
+    if spec.boilup.unit == "kW":
+        return spec.boilup.value
+    if own:
+        energy = seconds = 0.0
+        before = 0.0
+        for cut in result.cuts:
+            if cut.outlet not in own:
+                if cut.energy is None:
+                    return result.duty
+                energy += cut.energy
+                seconds += cut.time - before
+            before = cut.time
+        if seconds > 0:
+            return energy / seconds
+    return result.duty
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
@@ -2159,8 +2216,8 @@ def report_text(report: StillReport) -> str:
             )
             if "heat_up_time_h" in sol:  # ADR 0068
                 lines.append(
-                    f"  heat-up {num(sol['heat_up_time_h'], ' h', '.4g')} at the boil-up's mean "
-                    f"heat input, {num(sol['time_h'], ' h', '.4g')} with the boil-up"
+                    f"  heat-up {num(sol['heat_up_time_h'], ' h', '.4g')} at the boil-up's heat "
+                    f"input, {num(sol['time_h'], ' h', '.4g')} with the boil-up"
                     + (
                         f"; missing {sol['heat_up_time_missing']}"
                         if "heat_up_time_missing" in sol

@@ -366,6 +366,55 @@ def test_the_heat_up_takes_time_at_the_boilups_heat_input():
     assert result.heat_up_time == pytest.approx(kj / 50.0, rel=1e-6)
 
 
+def test_a_forerun_the_vacuum_pump_limits_does_not_slow_the_heat_up():
+    """A still boiled up at 50 kW whose forerun the vacuum pump limits (its own boil-up in
+    m3/h): the heat-up takes the heater's 50 kW, not the mean over the cuts, which the slow
+    forerun pulls down. A still boiled up in kmol/h takes the mean of the cuts at its own
+    boil-up; one whose every cut has its own, the mean over the whole boil-up."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.process.batch_still import _heat_up, _heat_up_time
+
+    comps = dict(COMPONENTS)
+    comps["P"] = Component.model_validate(
+        {"id": "P", "name": "product", "molar_mass": 128.17, "liquid_heat_capacity": 200}
+    )
+    pump = {"value": 5.0, "unit": "m3/h", "provenance": "assumed"}
+
+    def timed(boilup, cuts):
+        spec = _raoult(
+            boilup=boilup,
+            heat_up=True,
+            heat_up_time=True,
+            end=None,
+            cuts=cuts,
+            outlets={"residue": "bottom"},
+        )
+        result = solve_still(spec, {"A": 8.0, "P": 2.0}, None, comps, P_ATM, hours=4.0)
+        result.charge_temperature = 300.0
+        _heat_up(result, comps)
+        _heat_up_time(None, SimpleNamespace(id="S", still=spec), result, "design")
+        return result
+
+    forerun = {"outlet": "c1", "end": {"distilled": 0.1}, "boilup": pump}
+    main = {"outlet": "c2", "end": {"distilled": 0.6}}
+    bubble = _boiling(BENZENE, P_ATM / 0.8)
+    kj = (8.0 * 136 + 2.0 * 200) * (bubble - 300.0) * 4.0
+    kw = timed({"value": 50.0, "unit": "kW", "provenance": "assumed"}, [forerun, main])
+    assert kw.duty < 50.0  # the forerun's few m3/h pull the mean down
+    assert kw.heat_up_time == pytest.approx(kj / 50.0, rel=1e-6)
+    molar = timed({"value": 20.0, "unit": "kmol/h", "provenance": "assumed"}, [forerun, main])
+    second = molar.cuts[1]
+    rate = second.energy / (second.time - molar.cuts[0].time)
+    assert molar.duty < rate
+    assert molar.heat_up_time == pytest.approx(kj / rate, rel=1e-9)
+    every = timed(
+        {"value": 50.0, "unit": "kW", "provenance": "assumed"},
+        [forerun, main | {"boilup": {"value": 20.0, "unit": "kmol/h", "provenance": "assumed"}}],
+    )
+    assert every.heat_up_time == pytest.approx(kj / every.duty, rel=1e-9)
+
+
 def _timed_plant(tmp_path, heat_up_time=True, metal=None):
     recipe = copy.deepcopy(still.RECIPE)
     if metal is not None:

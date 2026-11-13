@@ -505,7 +505,7 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         ],
     )
     stripped: dict[str, float] = {}
-    if model == "batch" and _forms_gas(item) and entry.mtsr is not None:
+    if model == "batch" and _releases(item) and entry.mtsr is not None:
         stripped = _gas(
             process,
             item,
@@ -661,7 +661,7 @@ def _screen_semibatch(
         ],
     )
     stripped: dict[str, float] = {}
-    if _forms_gas(item) and worst is not None and entry.mtsr is not None:
+    if _releases(item) and worst is not None and entry.mtsr is not None:
         stripped = _gas(
             process,
             item,
@@ -1117,6 +1117,13 @@ def _forms_gas(item: Any) -> bool:
     return _vented(item) and bool(item.batch.vent.components)
 
 
+def _releases(item: Any) -> bool:
+    """A vented batch the screening asks for a gas release: one that forms gas, or one with
+    ``vent.vapour`` whose content may boil at the MTSR (its boil-up leaves by the same vent,
+    ADR 0069), a vent of inerts only included (ADR 0071)."""
+    return _forms_gas(item) or (_vented(item) and item.batch.vent.vapour is not None)
+
+
 def _extent(reaction: Any, moles: dict[str, float]) -> float:
     """kmol: the extent of *reaction* run to completion of its limiting reactant in *moles*."""
     return min(
@@ -1175,10 +1182,15 @@ def _gas(
     ones from *moles*, or of a reaction consuming a product of the one setting the MTSR from the
     content after it. A semi-batch's *points* with their MTSR (*values*) give the largest
     release over the batch (ADR 0069). Returns the most of each volatile component the gas
-    strips off the liquid over the batch (kmol/s, the gas release's basis)."""
+    strips off the liquid over the batch (kmol/s, the gas release's basis). A vent of inerts
+    only (ADR 0071) forms no gas at a cooling failure, the dosing stopped: it keeps a gas
+    release only where its content boils at the MTSR (``boils``, ``boil_up``), with no
+    release over the batch."""
     from chemeascode.domains.chemistry.thermochemistry import R
     from chemeascode.domains.process.stirred_tank import TankError, vent_gas_rate
 
+    inerts_only = not item.batch.vent.components
+    missing = len(entry.missing)
     every, _ = process.reactions_of(item.id)
     by_id = {r.id: r for r in every}
     shares = item.batch.vent.shares()
@@ -1194,7 +1206,8 @@ def _gas(
         rate = vent_gas_rate(process, item, moles, temperature, pressure)
         rate_after = vent_gas_rate(process, item, after, temperature, pressure) if after else 0.0
     except TankError as failure:
-        entry.missing.append(f"the gas release at the MTSR: {failure}")
+        if not inerts_only:
+            entry.missing.append(f"the gas release at the MTSR: {failure}")
         return {}
     hours = _hours(process, case)
     # from the worst moment's content: the counted reactions (hazard.reactions, else all)
@@ -1230,9 +1243,12 @@ def _gas(
         "per_batch": bool(hours),
     }
     _vapour_laden(process, item, entry, gas, moles, temperature, pressure, scale)
+    if inerts_only and not gas.get("boils"):
+        del entry.missing[missing:]  # no gas release, so nothing it lacks
+        return {}
     stripped = (
         _over_batch(process, item, entry, gas, points, values, pressure, scale)
-        if points and values
+        if points and values and not inerts_only
         else {}
     )
     capacity = getattr(getattr(item, "hazard", None), "vent_capacity", None)
@@ -1249,18 +1265,14 @@ def _gas(
 
 
 def _saturation(phase: Any, moles: dict[str, float], t: float, p: float) -> dict[str, float]:
-    """``y_i = gamma_i x_i P_i^sat(t) / p`` of the vent's volatile components over *moles*."""
+    """``y_i = K_i x_i`` of the vent's volatile components over *moles*: ``K_i = gamma_i
+    P_i^sat(t) / p``, or ``H_i(t) / p`` of a gas that degasses by Henry's law (``vent.vapour.
+    henry``, ADR 0071), as the vent's own phase takes them."""
     total = sum(v for v in moles.values() if v > 0)
     if total <= 0:
         return {}
-    return {
-        n: phase.activity.get(n, 1.0)
-        * max(moles.get(n, 0.0), 0.0)
-        / total
-        * phase.vapour_pressure[n].kpa(t)
-        / p
-        for n in phase.volatile
-    }
+    k = phase.k_values(t, p)
+    return {n: k[n] * max(moles.get(n, 0.0), 0.0) / total for n in phase.volatile}
 
 
 def _over_batch(
@@ -1525,7 +1537,21 @@ def _left_out(item: Any, gases: list[str]) -> dict[str, str]:
     if _vented(item):
         found |= dict.fromkeys(item.batch.vent.components, "vent component")
         found |= dict.fromkeys(item.batch.vent.inerts, "vent inert")  # ADR 0071
+        # a gas held in solution that degasses by Henry's law (ADR 0071): a dissolved gas
+        # whatever its share of the liquid or its boiling point
+        found |= {n: HENRY_GAS for n in _henry_gases(item) if n not in found}
     return found
+
+
+#: why the default MTT and the bubble point leave out a ``vent.vapour.henry`` gas (ADR 0071)
+HENRY_GAS = "dissolved gas (vent.vapour.henry)"
+
+
+def _henry_gases(item: Any) -> list[str]:
+    """The gases a vented batch's ``vent.vapour.henry`` declares held in solution (ADR 0071)."""
+    if not _vented(item) or (vapour := item.batch.vent.vapour) is None:
+        return []
+    return list(vapour.henry)
 
 
 def boiling_point(normal: float, heat_of_vaporization: float, pressure: float) -> float:
@@ -1750,10 +1776,14 @@ def _bubble_mtt(
     t_p = entry.process_temperature
     # a gas held in solution does not follow Raoult's law: a vent component or dosed gas boiling
     # below T_p is left out, as a dissolved gas; one boiling above it is a volatile liquid
+    # a vent.vapour.henry gas (ADR 0071) is a gas held in solution whatever its boiling point
     out = {
         n: why
         for n, why in left_out.items()
-        if t_p is None or (at := _boiling_at(comps.get(n), n, pressure)) is None or at[0] < t_p
+        if why == HENRY_GAS
+        or t_p is None
+        or (at := _boiling_at(comps.get(n), n, pressure)) is None
+        or at[0] < t_p
     } | _dissolved(moles, comps, pressure, t_p, left_out)
     # a product a counted reaction forms (not in the charge or feed) boiling below T_p leaves as
     # it forms, a gas held in solution: left out as the default MTT leaves it out (ADR 0069)

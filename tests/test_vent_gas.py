@@ -534,3 +534,139 @@ def test_a_plain_batch_with_a_padded_head_space(tmp_path):
     process, _ = load(ws.root)
     (gas,) = evaluate(process, recipe).vents
     assert "N" in gas.kmol
+
+
+def _edit(ws, name, *pairs):
+    path = ws.root / f"process/{name}.yaml"
+    text = path.read_text()
+    for old, new in pairs:
+        assert old in text, (name, old)
+        text = text.replace(old, new)
+    path.write_text(text)
+
+
+def _henry_plant(tmp_path, share=0.10, boiling=", normal_boiling_point: 188", hazard=""):
+    """The padded semi-batch whose vent forms G and degasses a dissolved X (no Antoine
+    vapour_pressure) by ``vapour.henry`` (ADR 0071), X *share* of the charge, propagated."""
+    vent = HEAD.replace(
+        "vapour: {}", "vapour: {henry: {X: {points: [[300, 200]], provenance: assumed}}}"
+    )
+    ws = _gas_plant(tmp_path, vent=vent)
+    _edit(
+        ws,
+        "flowsheet",
+        ("values: {S: 1.0}", f"values: {{S: {1 - share:.6g}, X: {share:.6g}}}"),
+        *([("hazard: {td24: 390, ", f"hazard: {{td24: 390, {hazard}")] if hazard else []),
+    )
+    _edit(
+        ws,
+        "materials",
+        (
+            "templates:\n",
+            "  - {id: X, name: X, formula: HCl, molar_mass: 36.46, liquid_molar_volume: 0.1,\n"
+            f"     liquid_heat_capacity: 150{boiling}}}\ntemplates:\n",
+        ),
+        ("{id: liquid, components: [A, B, S, G]}", "{id: liquid, components: [A, B, S, G, X]}"),
+        ("{id: gas, components: [G, S, N]}", "{id: gas, components: [G, S, N, X]}"),
+    )
+    assert not [m for level, m in _found(ws) if level == "error"]
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written >= 3
+    return ws
+
+
+def test_the_screening_of_a_henry_gas(tmp_path):
+    """A vent.vapour.henry gas X (ADR 0071) in the thermal screening (ADR 0069): the gas
+    release carries it at its Henry constant (no KeyError for its missing vapour_pressure),
+    the default MTT leaves it out at 10 % of the liquid (a declared dissolved gas, not the
+    liquid boiling at 188 K) and the dissolved release names it, with what the gas strips."""
+    from chemeascode.domains.safety.reaction_hazards import HENRY_GAS, screen
+
+    ws = _henry_plant(tmp_path)
+    report = screen(ws.root)
+    (entry,) = report.entries
+    assert entry.mtt == 400.0 and entry.mtt_basis == "normal boiling point of A"
+    assert entry.mtt_left_out == {"X": HENRY_GAS}
+    over = entry.gas_release["largest_over_batch"]
+    assert over["by_component_kmol_s"]["X"] > 0
+    row = entry.dissolved_release["components"]["X"]
+    assert row["why"] == HENRY_GAS and row["stripped_kmol_s"] > 0
+    assert 0 < entry.gas_release["vapour_share"] < 1
+    dissolved = [f for f in report.findings if f.rule == "cheme.reactor-hazard-dissolved"]
+    assert dissolved and "X up to" in dissolved[0].message
+    assert not [
+        f for f in report.findings if f.rule == "cheme.reactor-hazard-class" and f.level != "info"
+    ]
+
+
+def test_the_screenings_saturation_takes_a_henry_gas_at_h_x_over_p():
+    """reaction_hazards._saturation: ``y_i = K_i x_i``, Raoult for S, ``H x / P`` for a
+    degassing gas X (which has no vapour_pressure)."""
+    from chemeascode.domains.safety.reaction_hazards import _saturation
+
+    henry = HenryConstant.model_validate({"points": [[300, 200]], "provenance": "assumed"})
+    phase = _phase(["S", "X"], {"S": _constant(50.0)}, degassing={"X": henry})
+    y = _saturation(phase, {"S": 0.9, "X": 0.1, "A": 0.0}, T, P)
+    assert y == pytest.approx({"S": 0.9 * 50.0 / P, "X": 0.1 * 200.0 / P}, rel=1e-12)
+
+
+def test_a_henry_gas_without_a_boiling_point_and_at_the_bubble_point(tmp_path):
+    """A Henry gas with no normal_boiling_point (a gas above its critical point) is still a
+    dissolved release; hazard.mtt_from: bubble-point leaves it out of the bubble point whatever
+    its boiling point (here 350 K, above T_p)."""
+    from chemeascode.domains.safety.reaction_hazards import HENRY_GAS, screen
+
+    (entry,) = screen(_henry_plant(tmp_path / "a", share=0.001, boiling="").root).entries
+    row = entry.dissolved_release["components"]["X"]
+    assert row["why"] == HENRY_GAS and row["boiling_point_K"] is None
+    assert row["stripped_kmol_s"] > 0
+    ws = _henry_plant(
+        tmp_path / "b",
+        boiling=", normal_boiling_point: 350",
+        hazard="mtt_from: bubble-point, ",
+    )
+    (entry,) = screen(ws.root).entries
+    assert "X" in entry.bubble_point["left_out"]
+    assert not [m for m in entry.missing if "X" in m.replace(",", " ").split()]
+
+
+def test_a_vent_of_inerts_only_reports_the_boil_up(tmp_path):
+    """A vent of inerts only with vapour (ADR 0071) forms no gas at a cooling failure, but a
+    content that boils at the MTSR boils up through it (ADR 0069): gas_release.boils and its
+    boil_up with the cheme.reactor-hazard-vent warning; below the boiling point no gas
+    release and no warning."""
+    from chemeascode.domains.safety.reaction_hazards import screen
+
+    vent = (
+        "vent: {stream: S4, inerts: [N], vapour: {}, head_space: {stream: SP, provenance: assumed}}"
+    )
+    found = {}
+    for heat in ("-100000", "-1000000"):
+        ws = _gas_plant(tmp_path / heat, vent=vent)
+        _edit(
+            ws,
+            "reactions",
+            ("{A: -1, B: 1, G: 1}", "{A: -1, B: 1}"),
+            ("value: -100000", f"value: {heat}"),
+        )
+        _edit(
+            ws,
+            "materials",
+            ("formula: C2H4, molar_mass: 28.05", "formula: C2H4O, molar_mass: 44.05"),
+            ("{id: liquid, components: [A, B, S, G]}", "{id: liquid, components: [A, B, S]}"),
+            ("{id: gas, components: [G, S, N]}", "{id: gas, components: [S, N]}"),
+        )
+        assert not [m for level, m in _found(ws) if level == "error"]
+        process, _ = load(ws.root)
+        run(ws, process, "design", write=True)
+        report = screen(ws.root)
+        (entry,) = report.entries
+        found[heat] = (entry, [f for f in report.findings if f.rule == "cheme.reactor-hazard-vent"])
+    entry, vents = found["-100000"]
+    assert entry.gas_release is None and not vents and not entry.missing
+    entry, vents = found["-1000000"]
+    gas = entry.gas_release
+    assert gas["boils"] and gas["rate_kmol_s"] == 0.0 and "largest_over_batch" not in gas
+    assert gas["boil_up"]["vapour_m3_h"] > 0 and entry.mtsr > gas["boil_up"]["temperature_K"]
+    (vent_finding,) = vents
+    assert vent_finding.level == "warning" and "boil-up at the bubble point" in vent_finding.message

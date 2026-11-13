@@ -97,8 +97,15 @@ Options considered:
   expelled), the reactor's model basis (`cheme maturity`) the assumptions
   (`vent_vapour.GAS_ASSUMPTIONS`), `process recipe` the inerts in the vent's peak and per batch. `reactor-hazards` leaves a vent's
   inerts and a head space's pad out of the content, the MTT and the gas release's volume (a
-  note says they pass through); a vent of inerts only (`components` empty) has no gas release
-  at the MTSR: the dosing stops at a cooling failure, and nothing forms.
+  note says they pass through); a vent of inerts only (`components` empty) has no formed-gas
+  release at the MTSR: the dosing stops at a cooling failure, and nothing forms. A content
+  boiling at the MTSR still boils up through it: with `vapour`, such a vent reports
+  `gas_release.boils` and `boil_up` (ADR 0069) and the `cheme.reactor-hazard-vent` warning, and
+  nothing else of a gas release. A `vapour.henry` gas is a gas held in solution in the
+  screening too: the gas release carries it at `H x / P` (the vent's own K-values), and the
+  default MTT and `hazard.mtt_from: bubble-point` leave it out whatever its share of the liquid
+  or its boiling point, naming it in `mtt_left_out` and `dissolved_release` (with what the gas
+  release strips of it), with or without a `normal_boiling_point`.
 - **Rules** (`cheme.process-reactor`, errors): an inert or degassing gas undeclared; an inert
   in a reaction; a head space's pad that is no material inlet of the step, or that carries
   more than the inerts; a vent stream whose template lacks an inert. New rule
@@ -117,7 +124,8 @@ Options considered:
   bromide-1, p-toluenesulfonyl-chloride-1, benzyl-chloroformate-1, sodium-azide-1,
   copper-i-chloride-1, di-tert-butyl-dicarbonate-1, potassium-tert-butoxide-1,
   carbon-tetrabromide-1) give `propagate --check` clean and the same `process reactors`,
-  `reactor-hazards` and `recipe` output on 1.11.0 and on this change. `GENERATOR_VERSION` is
+  `reactor-hazards` and `recipe` output on 1.11.0 and on this change (the release as a whole
+  changes `reactor-hazards` for vented semi-batches as ADR 0069 describes). `GENERATOR_VERSION` is
   unchanged; the process generator's code changed, so every BFD/PFD needs `cheme process build`
   once.
 

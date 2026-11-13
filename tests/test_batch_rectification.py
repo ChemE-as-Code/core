@@ -757,3 +757,64 @@ def test_the_still_condensers_freezing_check(tmp_path):
     # a coolant above the melting point, or no supply temperature: none
     assert not found(melting(_copy(tmp_path / "d", cold(295)), {"ACCL": 290}))
     assert not found(melting(_copy(tmp_path / "e"), {"ACCL": 290}))
+
+
+def test_a_column_still_that_runs_dry_before_a_time_end_fails_at_once(tmp_path):
+    """The example's product cut ended at 10 h, long after the still runs dry: the column's
+    error control kept the step far above the boils-dry floor, so the still crept on near
+    empty without end (core 1.11.0 hung). The boil-up's lack of progress is the still boiling
+    dry: StillError within a few seconds."""
+    import time
+
+    from chemeascode.domains.process.batch_still import StillError, inlets_of, solve_node
+
+    ws = _copy(
+        tmp_path,
+        lambda text: text.replace(
+            "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}",
+            "{outlet: product, end: {time: 36000}}",
+        ),
+    )
+    process, _ = load(ws.root)
+    node = process.nodes["ST1"]
+    start = time.monotonic()
+    with pytest.raises(StillError, match="boils dry before its end .*no progress"):
+        solve_node(process, node, inlets_of(process, node), "design")
+    assert time.monotonic() - start < 20.0
+
+
+def test_a_still_boilup_no_cut_uses_does_not_count(tmp_path):
+    """Every cut with its own boil-up in 1/h, the still's own (150 kW) unused: the outlets do
+    not depend on the hours of flows, so the recipe's batch size on the product cut is no
+    circle, and no heat_of_vaporization is asked for the unused kW boil-up (ADR 0068)."""
+    from chemeascode.domains.process.batch_still import outlets_need_hours
+
+    cuts = (
+        "{outlet: product, end: {time: 3600}, boilup: {value: 2, unit: 1/h, provenance: assumed}}",
+        "{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}, boilup: {value: 2, "
+        "unit: 1/h, provenance: assumed}}",
+    )
+    ws = _copy(
+        tmp_path,
+        lambda text: text.replace(
+            "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}", cuts[0]
+        ).replace("{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}}", cuts[1]),
+    )
+    recipe = ws.root / "process/recipe.yaml"
+    recipe.write_text(recipe.read_text().replace("unit: kg, stream: S1,", "unit: kg, stream: S2,"))
+    process, _ = load(ws.root)
+    spec = process.nodes["ST1"].still
+    assert spec.boilup.unit == "kW" and [b.unit for b in spec.boilups()] == ["1/h", "1/h"]
+    assert not outlets_need_hours(spec)
+    result = _propagate(ws, write=True)
+    assert not [f.format() for f in result.findings if f.level in ("error", "warning")]
+    assert result.written >= 5
+    # the still's own boil-up still counts with a feed or a cut without its own
+    timed = spec.model_copy(
+        update={"cuts": [spec.cuts[0], spec.cuts[1].model_copy(update={"boilup": None})]}
+    )
+    assert [b.unit for b in timed.boilups()] == ["kW", "1/h"] and not outlets_need_hours(timed)
+    first = spec.model_copy(
+        update={"cuts": [spec.cuts[0].model_copy(update={"boilup": None}), spec.cuts[1]]}
+    )
+    assert outlets_need_hours(first)

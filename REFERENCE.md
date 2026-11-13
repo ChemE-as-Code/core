@@ -1243,8 +1243,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   MTSR) and taken back by a degassing gas as it leaves (in its `vent vapour` term). `process
   reactors` adds the head space (`vent.head_space`: `vessel_m3`, `start_m3`, `end_m3`,
   `start_kmol`, `end_kmol`, `expelled_kmol`, per hour of charge), `reactor-hazards` leaves the
-  inerts and the pad out of the content and the MTT, and a vent of inerts only has no gas
-  release at the MTSR. `cheme.process-reactor` adds: an inert or degassing gas undeclared, an
+  inerts and the pad out of the content and the MTT, and a vent of inerts only has no formed-gas
+  release at the MTSR (with `vapour`, a content boiling at the MTSR still reports its boil-up,
+  `gas_release.boils` and `boil_up`, and the `-vent` warning); it takes a `vapour.henry` gas at
+  `H x / P` in the gas release and leaves it out of the default MTT and the bubble point as a
+  dissolved gas whatever its share or boiling point (`mtt_left_out`, `dissolved_release`).
+  `cheme.process-reactor` adds: an inert or degassing gas undeclared, an
   inert in a reaction, a pad that is no material inlet of the step or carries more than the
   inerts, a vent template lacking an inert. `cheme.process-condenser-freezing` (warning): a
   vent condenser's outlet temperature, or the `supply_temperature` of the utility its
@@ -1386,7 +1390,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - A residue end's direction is the target's: the key falls to a target below its share, or
     rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
     energy is its own. An end at a time with the recipe's batch-size stream downstream of the
-    still is circular and refused.
+    still is circular and refused, unless every boil-up up to that end is specific (1/h); only
+    the boil-ups the still runs at count (a still's own `boilup` that every cut replaces, with
+    no feed, is not used: no unit or heat_of_vaporization check, no hours in a fingerprint).
+    A still that makes no progress (a column creeping on near empty before a time end) boils
+    dry: an error, not a hang.
   - `still.heat_up: true` (raoult, ADR 0063) adds the charge heated from its inlet
     temperature to its bubble point to the duty (`charge heat-up`), and a swap's feed warmed
     from its inlet temperature to the still's as it mixes in (`feed heat-up`, the still's
@@ -1395,9 +1403,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     average; `energy_kWh_per_batch` stays the latent heat) and assumptions that say what the
     duty holds.
   - `still.heat_up_time: true` (raoult, ADR 0068): the duty's terms besides the boil-up (the
-    charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the boil-up's
-    mean heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` (a boil-up in kW: its
-    value); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
+    charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the still's own
+    boil-up's heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` over the cuts
+    collected at it (a boil-up in kW: its value; a cut's own boil-up, a forerun the vacuum pump
+    limits, limits the vapour, not the heating; every cut with its own: the mean over the whole
+    boil-up); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
     heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a

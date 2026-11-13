@@ -133,14 +133,17 @@ reactant without excess, no vent and no gas held in its liquid reports as in 1.1
   (its ideal liquid's 329.5 K).
 - Positive: a single linear programme gives both the network's heat and what of a reactant
   can still react; it is exact at a vertex and independent of the declaration order.
-- Negative: behaviour that changes for plants that do not use the new fields, fixes stated in
-  the CHANGELOG: a product boiling lowest now sets the default MTT; the `-vent` finding of a
-  vented semi-batch compares the largest release over the batch, so its level can rise (none
-  of the library's entries changes level; p-toluenesulfonyl-chloride-1 goes from 0.40 to 0.97 of
-  its vent). New JSON keys and text lines appear for semi-batches with several dosed reactants
-  or an excess, batches and semi-batches with a consecutive reaction, vented semi-batches and
-  reactors holding a dissolved or dosed gas, with a new info finding for the last. The MTT,
-  MTSR and class of every core example and library entry are those of 1.11.0.
+- Negative: behaviour that changes for plants that do not use the new fields, fixes stated in the
+  CHANGELOG: a product boiling lowest now sets the default MTT; the `-vent` finding of a vented
+  semi-batch compares the largest release over the batch, so its level can rise (none of the
+  library's entries changes level; the ratio quoted rises for p-toluenesulfonyl-chloride-1 R101 0.40
+  -> 0.97 and Q101 0.08 -> 0.09, sodium-azide-1 R101 0.59 -> 0.89, potassium-tert-butoxide-1 R101
+  0.67 -> 0.90 (the vapour of the early dosing), benzyl-bromide-1 0.66 -> 0.74, acetyl-chloride-1
+  0.008 -> 0.62, di-tert-butyl-dicarbonate-1 0 -> 0.49 and benzoyl-chloride-1 0.825 -> 0.826). New
+  JSON keys and text lines appear for semi-batches with several dosed reactants or an excess,
+  batches and semi-batches with a consecutive reaction, vented semi-batches and reactors holding a
+  dissolved or dosed gas, with a new info finding for the last. The MTT, MTSR and class of every
+  core example and library entry are those of 1.11.0.
 - Negative: the network runs every counted reaction forward to its most exothermic end, an
   upper bound: a side reaction counted with it adds its heat in full (keep it out with
   `hazard.reactions`); equilibrium and the rates are not used. The reactive share uses the

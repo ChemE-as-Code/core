@@ -288,8 +288,10 @@ still:
   capacity). A cut ending at a `temperature` per pressure step replaces a residue key set by
   hand.
 - `heat_up_time: true` gives the heat-up of the charge and the vessel's metal a time at the
-  boil-up's heat input, added to the recipe's `distil` from the still: do not also write a
-  hand `heat` operation for it.
+  still's own boil-up's heat input (not a pump-limited forerun's), added to the recipe's
+  `distil` from the still: do not also write a hand `heat` operation for it. A jacket that
+  heats at another rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a
+  `heat` with `temperatures` has no batch content on a still).
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time

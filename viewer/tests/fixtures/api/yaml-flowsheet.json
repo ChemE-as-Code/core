@@ -2880,7 +2880,7 @@
               }
             ],
             "default": null,
-            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature; ADR 0058).",
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components and inerts (and a head space's pad), a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature, or a vent.vapour.henry gas; ADR 0058, 0071), and counting a product a counted reaction forms in the liquid (ADR 0069); hazard.mtt_from: bubble-point takes the content's bubble point instead.",
             "title": "Mtt"
           },
           "reactions": {
@@ -2902,7 +2902,7 @@
               }
             ],
             "default": null,
-            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058), for a semi-batch the larger of that and its largest release over the batch, and with a content's boil-up where it boils at the MTSR (ADR 0069).",
             "title": "Vent Capacity"
           },
           "potential": {
@@ -4032,7 +4032,7 @@
           },
           "heat_up_time": {
             "default": false,
-            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the boil-up's mean heat input (a boil-up in kW: its value), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
+            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; every cut with its own boil-up: the mean over the boil-up), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
             "title": "Heat Up Time",
             "type": "boolean"
           },

@@ -870,8 +870,11 @@ class ReactionHazard(Strict):
         "pressure, a relief set temperature); default: the lowest boiling point of the "
         "liquid's components at the reactor's pressure (the normal boiling point at about "
         "atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving "
-        "out a batch's vent components, a dosed gas and dissolved gases (a minor share of the "
-        "liquid boiling below the process temperature; ADR 0058).",
+        "out a batch's vent components and inerts (and a head space's pad), a dosed gas and "
+        "dissolved gases (a minor share of the liquid boiling below the process temperature, "
+        "or a vent.vapour.henry gas; ADR 0058, 0071), and counting a product a counted "
+        "reaction forms in the liquid (ADR 0069); hazard.mtt_from: bubble-point takes the "
+        "content's bubble point instead.",
     )
     reactions: list[str] = Field(
         default_factory=list,
@@ -884,7 +887,9 @@ class ReactionHazard(Strict):
         default=None,
         gt=0,
         description="m3/h of gas the vent and its line pass at the vessel's pressure, from the "
-        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058), "
+        "for a semi-batch the larger of that and its largest release over the batch, and with "
+        "a content's boil-up where it boils at the MTSR (ADR 0069).",
         exclude_if=lambda value: value is None,
     )
     potential: Literal["largest", "network"] | None = Field(
@@ -1607,9 +1612,10 @@ class Still(Strict):
     heat_up_time: bool = Field(
         default=False,
         description="The still's heat terms besides the boil-up (heat_up: the charge's and a "
-        "swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the boil-up's "
-        "mean heat input (a boil-up in kW: its value), added to the still's time and to the "
-        "recipe's distil time from it (ADR 0068); default: energy only.",
+        "swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own "
+        "boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; "
+        "every cut with its own boil-up: the mean over the boil-up), added to the still's "
+        "time and to the recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
     column: Column | None = Field(
@@ -1646,8 +1652,7 @@ class Still(Strict):
         raoult = self.volatility.model == "raoult"
         if not raoult and any(c.pressure is not None for c in self.cuts):
             raise ValueError("a cut's pressure needs volatility raoult")
-        boilups = [self.boilup, *(c.boilup for c in self.cuts if c.boilup is not None)]
-        if not raoult and any(b.unit == "m3/h" for b in boilups):
+        if not raoult and any(b.unit == "m3/h" for b in self.boilups()):
             raise ValueError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
         if set(self.separate_phase) & set(self.volatility.alpha):
             raise ValueError("separate_phase: a component in a phase of its own is non-volatile")
@@ -1655,6 +1660,14 @@ class Still(Strict):
         if len(set(ports)) != len(ports):
             raise ValueError("cuts: each outlet once")
         return self
+
+    def boilups(self) -> list[Boilup]:
+        """The boil-ups the still runs at (ADR 0068): each cut's own, and the still's own
+        where a cut has none, without cuts, or with a feed (the swap's feed phase runs at it).
+        A still whose every cut has its own does not use its ``boilup``."""
+        own = [c.boilup for c in self.cuts if c.boilup is not None]
+        default = not self.cuts or self.feed is not None or len(own) < len(self.cuts)
+        return ([self.boilup] if default else []) + own
 
     def ends(self) -> list[tuple[str, StillEnd | None]]:
         """(outlet port, end) of each cut in turn; one cut without cuts:."""

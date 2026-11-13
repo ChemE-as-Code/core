@@ -1392,6 +1392,8 @@ _TRIAL_BATCH: ContextVar[float | None] = ContextVar("trial_batch", default=None)
 BATCH_ITERATIONS = 16
 #: :func:`batch_for_rate` closes ``batch = rate x cycle(batch)`` to this share of the batch.
 BATCH_TOLERANCE = 1e-6
+#: :func:`batch_for_rate`'s secant step stays within this factor of the batches tried.
+BATCH_STEP = 2.0
 
 
 @dataclass
@@ -1458,7 +1460,11 @@ def batch_for_rate(process: Any, recipe: Recipe, rate: float, case: str) -> Batc
             return fit
         if fb == fa:
             return fit
-        a, fa, b = b, fb, b - fb * (b - a) / (fb - fa)
+        # a secant step stays within a factor BATCH_STEP of the batches tried: an unbounded
+        # one extrapolates far from the recipe's batch, to one its units cannot run (a still
+        # that boils dry before a time end)
+        step = b - fb * (b - a) / (fb - fa)
+        a, fa, b = b, fb, min(max(step, min(a, b) / BATCH_STEP), BATCH_STEP * max(a, b))
     return fit
 
 

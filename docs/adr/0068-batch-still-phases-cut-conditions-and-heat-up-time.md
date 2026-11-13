@@ -63,7 +63,10 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   Solid components are not moved out by default, so a plant that does not use the field solves
   as before.
 - **`cuts[].pressure` and `cuts[].boilup`.** A cut is collected at its own pressure (volatility
-  raoult) and boil-up, else the still's. A vacuum ramp is a sequence of cuts, for example each
+  raoult) and boil-up, else the still's. Where every cut has its own boil-up and there is no
+  feed, the still's `boilup` is not used: it is not checked (its unit's data), and it does not
+  make an end at a time depend on the hours of flows. Only the boil-ups up to the last end at
+  a time decide that dependence. A vacuum ramp is a sequence of cuts, for example each
   ending at the same temperature. At a change of pressure the still's temperature steps to the
   new bubble point. The flash, or the heating, between is not in the time or the duty; a note
   names the step. Without a feed, the first cut's pressure is the still's from the start.
@@ -72,9 +75,12 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   column it is the boil-up's at the still.
 - **`still.heat_up_time: true`.** The heat terms of the still's duty besides the boil-up (the
   charge's and a swap's feed's heat-up, a recipe vessel's metal; ADR 0063) take time at the
-  boil-up's mean heat input: `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)`, which for a
-  boil-up in kW is its value. `cheme process stills` reports it (`heat_up_time_h`, `time_h`),
-  and a recipe `distil` operation `from:` the still takes the boil-up and this time together.
+  still's own boil-up's heat input: `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` over
+  the cuts collected at it, which for a boil-up in kW is its value. A cut's own boil-up (a
+  forerun the vacuum pump limits) limits the vapour, not the heating, so it does not slow the
+  heat-up; where every cut has its own, the mean over the whole boil-up stands in. `cheme
+  process stills` reports it (`heat_up_time_h`, `time_h`), and a recipe `distil` operation
+  `from:` the still takes the boil-up and this time together.
   A term that gives heat back takes no time. The metal heats with the charge from its start
   to the still's first bubble point `T_0`, then over the boil-up only as far as the still ends
   above `T_0`: `C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`. A vacuum ramp that ends colder
@@ -112,8 +118,10 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   whole pot, so a plant adding the field reviews its residue ends.
 - The pressure ramp is in steps: the flash cooling at each step and the sensible heat in
   between are not modelled, and neither is a ramp within a cut.
-- The heat-up's rate is the boil-up's mean heat input, not the jacket's: a still whose jacket
-  heats the charge faster or slower than it boils up gives the heat operation by hand (or the
-  recipe's `heat` with `temperatures` and a jacket) and leaves `heat_up_time` off.
+- The heat-up's rate is the boil-up's heat input, not the jacket's: a still whose jacket
+  heats the charge faster or slower than it boils up gives the heat operation by hand, as a
+  `duration` on the recipe's `heat`, and leaves `heat_up_time` off. A `heat` with
+  `temperatures` and a jacket has no batch content on a still and is refused
+  (cheme.recipe-reference).
 - Not covered (core#182 stays open for these): activities of a non-ideal liquid, a boil-up that
   follows the jacket's falling driving force, a reaction in a still.
