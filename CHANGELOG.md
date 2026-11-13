@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.12.0 (2026-11-13)
+
+Minor release for batch processes. The batch still handles components in a phase of their own,
+a cut's own pressure and boil-up, the heat-up time and an end at a temperature, and refuses an
+end it cannot reach before it boils dry (ADR 0068). The thermal screening covers every dose's
+accumulation, the largest gas release over the batch, the content's bubble point as an MTT and
+consecutive reactions (ADR 0069). `cheme process propagate` solves feeds and splits for design
+specifications and solves component separators from their recoveries (ADR 0070). Gas-liquid
+batches get inerts, a head space, an inert sweep, degassing, the heat of absorption and a
+freezing check of the vent condenser (ADR 0071). Also: feos (PC-SAFT) as an optional property
+backend (ADR 0064), and a generator fingerprint that covers the stale-field data (ADR 0067).
+Every BFD/PFD needs `cheme process build` once (only `generator_sha256` changes). Library
+results are unchanged except the vent ratios that `cheme.reactor-hazard-vent` quotes, listed
+under Changed.
 
 ### Added
 
@@ -161,6 +174,21 @@
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `props.py`, and `schema.py` (changed by ADRs 0068 to 0071) and `model.py` (changed by ADRs
   0070 and 0071); no drawn output changes.
+- The generator fingerprint (`generator_sha256`) also covers the fields a BFD/PFD can leave
+  blank as stale: what `cheme process propagate` and `cheme process simulate` write and the
+  source their values carry (`propagate.WRITTEN` and `SOURCE`, `simulation.translate.WRITTEN`
+  and `SOURCE`), hashed by value (ADR 0067, core#202). Adding or removing such a field marks
+  the sheets `cheme.generated-version`; editing the code that derives the values or decides
+  whether one is stale (`propagate.py`, `recycle.py`, `duties.py`, `simulation/translate.py`)
+  still does not, so as not to mark every library sheet outdated on each such edit. The
+  fingerprint changes with this release: every BFD/PFD needs `cheme process build` once (only
+  the `generator_sha256` in its provenance comment changes); the core examples and the viewer's
+  API fixtures are regenerated.
+- 1.11.0 said that editing the stream table marks the sheets outdated. That holds for
+  `pfd_sheet.py`, which draws the table (and the finding is `cheme.generated-version`), not for
+  the code above that decides which of its values are stale. `cheme validate` does not catch
+  such a change either, since it rebuilds generated P&IDs, not BFD/PFD sheets; `cheme process
+  build` does, and says "written" for a sheet it changed.
 - The default MTT counts a product a counted reaction forms in the liquid (at least 5 % of it
   once that reaction ran to completion, a vented product with the share the liquid keeps,
   boiling at or above `T_p`; ADR 0069): a fix where the product boils lowest (acetyl chloride's
