@@ -128,9 +128,14 @@
   column (NRTL): the shortcut is not purer for benzene-toluene, but up to 0.02 purer for
   methanol-water, whose relative volatility falls towards the top; at the top's relative
   volatility it is never purer. The skills `process-design` and `unit-ops-distillation` now
-  say that the shortcut is conservative for a nearly ideal liquid only, and to give a
-  non-ideal one `volatility: constant` at the distillate's relative volatility. No model change:
-  no library entry's result changes.
+  say that the shortcut is conservative at a constant relative volatility, and where it varies
+  along the column to give `volatility: constant` at its smallest along the column over the
+  run (the distillate's where it falls towards the top, the still's at the end of the cut where
+  it rises: a plate-to-plate column at alpha = 1.2 + x is leaner than the shortcut at the
+  distillate's, 0.653 against 0.784), or to check the column with `cheme process simulate`, one
+  stage more and fed above the reboiler (a feed at the reboiler is refused there; DWSIM gives
+  the reboiler-fed column's distillate within 1.5e-3). No model change: no library entry's
+  result changes.
 
 ### Fixed
 

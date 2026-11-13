@@ -4,8 +4,10 @@ an infinite reflux the Fenske limit at alpha^N, Underwood's binary minimum reflu
 constant-distillate balance), against a rigorous plate-to-plate binary column as a bound,
 against published worked examples (Diwekar, Malik and Madhavan 1987; Lotter and Diwekar 1997)
 and, with CHEME_DWSIM_TESTS=1, against DWSIM's rigorous column for a nearly ideal and a
-non-ideal pair (core#195), the purity end, the design by a minimum-reflux factor, the reboiler's
-and condenser's duties in cheme process propagate, the rules and the example plant."""
+non-ideal pair and the column cheme process simulate takes (core#195), a relative volatility
+varying along the column (which of them bounds the shortcut), the purity end, the design by a
+minimum-reflux factor, the reboiler's and condenser's duties in cheme process propagate, the
+rules and the example plant."""
 
 import math
 import os
@@ -539,23 +541,26 @@ def _saturated(x):
     }
 
 
-def _rectifiers(light, heavy):
+def _rectifiers(light, heavy, stills=None):
     """A DWSIM model of one continuous column per point: the still's stages and a total
     condenser (a stage to DWSIM), fed at the reboiler (the still) with its saturated liquid at 1
     kg/s, the bottoms 99 % of it by mass. Above the reboiler such a column is the batch column
     at the instant its still holds the bottoms' composition; DWSIM's column balances energy, so
-    the molar overflow is not held constant."""
+    the molar overflow is not held constant. With *stills* (the light mole fraction per point),
+    the column ``cheme process simulate`` takes instead, which refuses a feed at the reboiler:
+    one stage more, the still's liquid fed to the stage above the reboiler."""
     compounds = [{"id": "L", "cas": light}, {"id": "H", "cas": heavy}]
     streams, units = [], []
     for i, (x, stages, reflux) in enumerate(RECTIFIED_POINTS):
         c = f"C{i}"
+        x, extra = (x, 0) if stills is None else (stills[i], 1)
         streams += [
             {"id": f"{c}F", "kind": "material", "feed": _saturated(x)},
             *({"id": f"{c}{s}", "kind": "material", "feed": None} for s in ("D", "B")),
             *({"id": f"{c}{q}", "kind": "energy", "feed": None} for q in ("QR", "QC")),
         ]
         spec = {
-            "stages": stages + 1,
+            "stages": stages + 1 + extra,
             "feed_stages": [stages + 1],
             "condenser_pressure_Pa": P_RECTIFIED,
             "reboiler_pressure_Pa": P_RECTIFIED,
@@ -633,11 +638,17 @@ def _shortcut_top(x, alpha, stages, reflux):
 def test_a_dwsim_column_bounds_the_shortcut_for_a_nearly_ideal_pair(rectified):
     """Benzene and toluene: the shortcut at the still's relative volatility (2.40 to 2.50 at
     these points; 2.46 to 2.59 at the top) is not purer than DWSIM's column (to 2e-3: DWSIM's
-    molar overflow is not constant) and within 0.06 of it, as the plate-to-plate bound."""
-    for x, xd, still, _, stages, reflux in rectified["benzene-toluene"]:
+    molar overflow is not constant) and within 0.06 of it, as the plate-to-plate bound. The
+    relative volatility rises towards the top, so the still's is the column's smallest; at the
+    top's the shortcut is purer at some points (by up to 0.027): the top's is no bound here."""
+    gaps = []
+    for x, xd, still, top, stages, reflux in rectified["benzene-toluene"]:
+        assert still < top
         short = _shortcut_top(x, still, stages, reflux)
         assert short <= xd + 2e-3
         assert xd - short < 0.06
+        gaps.append(_shortcut_top(x, top, stages, reflux) - xd)
+    assert 0.02 < max(gaps) < 0.03
 
 
 @dwsim_tests
@@ -652,6 +663,74 @@ def test_a_dwsim_column_and_the_shortcut_for_a_non_ideal_pair(rectified):
         gaps.append(_shortcut_top(x, still, stages, reflux) - xd)
         assert _shortcut_top(x, top, stages, reflux) <= xd
     assert 0.01 < max(gaps) < 0.025
+
+
+@dwsim_tests
+@pytest.mark.parametrize("pair", RECTIFIED_PAIRS)
+def test_the_column_simulate_takes_is_the_reboiler_fed_one(rectified, pair):
+    """``cheme process simulate`` refuses a feed at the reboiler, so the skills check a still's
+    column there with one stage more and the still's liquid fed to the stage above the reboiler
+    (the feed stage then holds nearly the still's liquid): its distillate is the reboiler-fed
+    column's within 2e-3 (the largest gap 1.4e-3, benzene-toluene at 10 stages and R 3)."""
+    from chemeascode.integrations import dwsim
+
+    points = rectified[pair]
+    out = dwsim.solve(_rectifiers(*RECTIFIED_PAIRS[pair], stills=[p[0] for p in points]))
+    assert out["converged"], out["messages"][:5]
+    for i, (_, xd, *_) in enumerate(points):
+        assert out["streams"][f"C{i}D"]["mole_fractions"]["L"] == pytest.approx(xd, abs=2e-3)
+
+
+# -- a relative volatility varying along the column (core#195) ----------------------------------
+
+
+def _plate_to_plate_varying(xb, reflux, stages, alpha):
+    """``_plate_to_plate`` at a relative volatility *alpha(x)* of the stage's liquid: each
+    stage's liquid found from its vapour by bisection."""
+
+    def liquid(y):
+        lo, hi = 0.0, 1.0
+        for _ in range(100):
+            mid = (lo + hi) / 2
+            a = alpha(mid)
+            lo, hi = (mid, hi) if a * mid / (1 + (a - 1) * mid) < y else (lo, mid)
+        return (lo + hi) / 2
+
+    def bottom(xd):
+        y = xd
+        for j in range(stages):
+            x = liquid(y)
+            if j == stages - 1:
+                return x
+            y = reflux / (reflux + 1) * x + xd / (reflux + 1)
+        return x
+
+    lo, hi = xb, 1.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if bottom(mid) > xb else (mid, hi)
+    return (lo + hi) / 2
+
+
+@pytest.mark.parametrize(
+    "alpha", [lambda x: 1.2 + x, lambda x: 2.2 - x], ids=["rising to the top", "falling"]
+)
+def test_the_smallest_relative_volatility_along_the_column_bounds_the_shortcut(alpha):
+    """The skills' advice for a liquid whose relative volatility varies along the column: the
+    shortcut at the smallest along it is not purer than a plate-to-plate column at the varying
+    one (the still's where it rises towards the top, a negative deviation from Raoult's law;
+    the distillate's where it falls, as methanol-water), and at the largest it can be purer
+    (rising: 0.784, 0.867 and 0.966 against the column's 0.653, 0.835 and 0.818), so the
+    distillate's is no bound where the relative volatility rises."""
+    excess = []
+    for xb, stages, reflux in ((0.3, 8, 3.0), (0.5, 5, 2.0), (0.3, 10, 5.0)):
+        rigorous = _plate_to_plate_varying(xb, reflux, stages, alpha)
+        still, top = alpha(xb), alpha(rigorous)
+        assert _shortcut_top(xb, min(still, top), stages, reflux) <= rigorous
+        excess.append(_shortcut_top(xb, max(still, top), stages, reflux) - rigorous)
+    if alpha(1.0) > alpha(0.0):
+        assert min(excess) > 0.025
+    assert max(excess) > 0.03
 
 
 def test_gilliland_just_above_the_minimum_reflux_is_infinite_stages_not_a_division():

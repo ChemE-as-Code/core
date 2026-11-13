@@ -34,11 +34,16 @@ Mostly engineering guidance. Core's calculations for this are:
   same step, at a constant reflux ratio or holding the distillate's purity up to a maximum
   reflux, on Diwekar's shortcut (Fenske-Underwood-Gilliland at each point of the batch). Collect
   the product cut with an `end: {purity: ...}`; `cheme process stills` gives its purity,
-  recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. For a
-  nearly ideal liquid the shortcut is conservative: a rigorous column at the same stages and
-  reflux gives a purer distillate. For a non-ideal liquid it is not (it takes the still's
-  relative volatility for the whole column): give `volatility: constant` at the distillate's
-  relative volatility, or check with a rigorous column in `cheme process simulate`.
+  recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. At a
+  constant relative volatility the shortcut is conservative: a rigorous column at the same
+  stages and reflux gives a purer distillate. It takes the still's relative volatility for the
+  whole column, so where that varies it is a bound at the smallest along the column over the
+  run: give `volatility: constant` at it (the distillate's where it falls towards the top,
+  as for methanol-water; the still's at the end of the cut where it rises, as on the light
+  side of a maximum-boiling azeotrope), or check with a rigorous column in `cheme process
+  simulate` (a feed at the reboiler is refused there: give the column one stage more and feed
+  the still's saturated liquid to the stage above the reboiler, nearly all of it leaving as
+  bottoms).
 
 Arrangement:
 

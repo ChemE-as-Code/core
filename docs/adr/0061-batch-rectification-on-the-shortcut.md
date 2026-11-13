@@ -242,16 +242,34 @@ amounts and compositions) are used, with their table in the tests.
   R 3, the shortcut at the relative volatility of DWSIM's incipient vapour at the still:
   - benzene and toluene (nearly ideal, alpha 2.40 to 2.50 at the still, 2.46 to 2.59 at the
     top): the shortcut is not purer (to 1.5e-3, at 8 stages and R 1, near the minimum reflux;
-    DWSIM's molar overflow is not constant) and within 0.053;
+    DWSIM's molar overflow is not constant) and leaner by up to 0.053. Here the relative
+    volatility rises towards the top, and at the top's the shortcut is purer by up to 0.027
+    (0.542 against 0.515 at x_B 0.096, 10 stages, R 3): the still's is the column's smallest;
   - methanol and water (non-ideal, no azeotrope: alpha 3.7 to 6.7 at the still, 2.4 to 3.0 at
-    the top): the shortcut is purer than DWSIM at most points, by up to 0.020 (0.718 against
-    0.698 at x_B 0.09, 8 stages, R 1; 0.981 against 0.962 at x_B 0.29, 5 stages, R 2). It is no
-    bound for a liquid whose relative volatility falls towards the top. At the top's relative
-    volatility (the column's smallest) it is never purer, often far leaner (0.38 against 0.89).
+    the top): the shortcut is purer than DWSIM at most points, by up to 0.020 (0.725 against
+    0.704 at x_B 0.096, 8 stages, R 1; 0.982 against 0.962 at x_B 0.295, 5 stages, R 2). It is
+    no bound for a liquid whose relative volatility falls towards the top. At the top's
+    relative volatility (the column's smallest) it is never purer, often far leaner (0.39
+    against 0.90 at x_B 0.095, 5 stages, R 2).
     Raoult's law (the still's `raoult`, thermo's vapour pressures; not in the tests) is no
     bound either: at x_B 0.5 it gives up to 0.017 more than DWSIM, at 0.09 up to 0.35 less.
-- Consequence: "the shortcut is conservative" holds for a constant relative volatility and a
-  nearly ideal liquid. For a non-ideal liquid give `volatility: constant` at the smallest
-  relative volatility along the column (at the distillate's composition) for a bound, or check
-  the column with `cheme process simulate` (a rigorous column at the still's composition); the
-  skills `process-design` and `unit-ops-distillation` say so.
+  - `cheme process simulate` refuses a feed at the reboiler (a feed stage between the
+    condenser's and the reboiler's). The column it takes instead, one stage more with the
+    still's saturated liquid fed to the stage above the reboiler (99 % of it the bottoms), gives
+    the reboiler-fed column's distillate within 1.5e-3 at all eighteen points: the feed stage
+    holds nearly the still's liquid, and the reboiler below it only boils its own small share.
+- **Plate to plate at a relative volatility varying along the column** (constant molar
+  overflow, alpha = 1.2 + x rising towards the top, 2.2 - x falling): the shortcut at the
+  smallest relative volatility along the column is never purer (it bounds the column at that
+  constant one, which separates less than the varying one). At the largest it is no bound: at
+  alpha = 1.2 + x the column gives 0.653, 0.835 and 0.818 (x_B 0.3, 8 stages, R 3; 0.5, 5, 2;
+  0.3, 10, 5) where the shortcut gives 0.784, 0.867 and 0.966 at the distillate's relative
+  volatility and 0.618, 0.790 and 0.748 at the still's.
+- Consequence: "the shortcut is conservative" holds for a constant relative volatility. Where
+  it varies along the column, give `volatility: constant` at its smallest along the column
+  over the run for a bound: the distillate's (at its purest) where it falls towards the top,
+  as for methanol-water, but the still's (at the end of the cut) where it rises, as for a
+  negative deviation from Raoult's law or the light side of a maximum-boiling azeotrope, where
+  the distillate's makes the cut purer than the column gives. Or check the column with `cheme
+  process simulate`, one stage more and fed above the reboiler as above. The skills
+  `process-design` and `unit-ops-distillation` say so.

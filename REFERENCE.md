@@ -1469,10 +1469,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     plate-to-plate reference) and Lotter and Diwekar's (1997) rectifier, and DWSIM's rigorous
     column (`CHEME_DWSIM_TESTS=1`): not purer for benzene-toluene, but up to 0.02 purer for
     methanol-water, whose relative volatility falls towards the top; at the top's relative
-    volatility never purer (`tests/test_batch_rectification.py`, ADR 0061's amendment). For a
-    non-ideal liquid give `volatility: constant` at the distillate's relative volatility for a
-    bound. Worked example `examples/process-batch-rectification`. One reflux policy for all
-    cuts; the column and its condenser are not sized.
+    volatility never purer (`tests/test_batch_rectification.py`, ADR 0061's amendment). Where
+    the relative volatility varies along the column give `volatility: constant` at its smallest
+    along the column over the run for a bound: the distillate's where it falls towards the top,
+    the still's at the end of the cut where it rises (there the distillate's is no bound).
+    Worked example `examples/process-batch-rectification`. One reflux policy for all cuts; the
+    column and its condenser are not sized.
 - **Model duties on energy streams** (ADR 0059, `domains/process/duties.py`): an isothermal
   `reactor: batch` or `semibatch`, a `still:`, a `crystallizer:` with `energy:` and a
   conversion step (`reactions:` with conversions or a `selectivity:`) give the heat they
