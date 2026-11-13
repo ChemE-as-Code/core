@@ -132,18 +132,25 @@
   still asks volatility data only of a component its charge holds.
 - A batch column still that runs near empty before an end at a time no longer hangs: its error
   control kept the step far above the boils-dry floor, so it crept on without end (1.11.0 hung
-  on the batch-rectification example with its product cut ended at 10 h, or at 2.495 h). After
-  500 steps in a row that each boil off less than 1e-6 of the charge, the still checks the pace
-  of that run: if at that pace (in kmol boiled up, or in the end's own measure) the end is not
-  reached within 20000 steps, the boil-up stalls (`cheme.process-still-unsolved`, in a few
-  seconds there, naming the volatile kmol left and the hint to end the cut earlier). A run in
-  which a volatile component falls 1000-fold is progress, and an amount below 1e-100 of the
-  charge and feed is gone: a light key a forerun strips to traces, which the column enriches
-  and which held the explicit step at its stability limit until it underflowed, no longer
-  stalls the next cut. A slow tail that reaches its end within 20000 steps (an end at 2.49 h
-  there, on the PCL3 trace the column enriches) solves as in 1.11.0; one that needs more is
-  now refused with the same error (2.492 h there, which 1.11.0 solved in about 51000 steps and
-  two minutes): end the cut earlier.
+  on the batch-rectification example with its product cut ended at 10 h, which the still never
+  reaches: it boils dry at about 2.5016 h, 99.835 % distilled). An end past the most its value
+  can still rise before the still boils dry is refused at once ("boils dry before its end",
+  naming the volatile kmol left): a share distilled by the volatile content left (by mole, or
+  its mass), a time by the volatile kmol left times the most s per kmol of any vapour of them
+  (the largest latent heat for kW, the heaviest for kg/h, 2000 K for m3/h) at the highest
+  reflux. No step towards an end within that bound changes. A reachable end the integration
+  only crawls towards is checked after 500 steps in a row that each boil off less than 1e-6 of
+  the charge: if at that run's pace (in kmol boiled up, or in the end's own measure, from the
+  run's first step) the end is not reached within 10^6 steps, the boil-up stalls
+  (`cheme.process-still-unsolved`, with the hint to end the cut earlier; 2.495 h there, which
+  1.11.0 did not solve in 15 minutes, after 55492 steps and 2 to 3 minutes), and no phase
+  takes more than 10^6 steps. A run in which a volatile component falls 1000-fold is progress,
+  and an amount below 1e-100 of the charge and feed is gone: a light key a forerun strips to
+  traces, which the column enriches and which held the explicit step at its stability limit
+  until it underflowed, no longer stalls the next cut. Slow tails solve as in 1.11.0, to the
+  same steps: 2.492 h there in 33116 steps (81 s), 99.7 % distilled in 45414 (114 s), 2.493 h
+  in 255217 (10 minutes), and a cut that begins in the tail (an offcut to 8964 s after a
+  product cut to 8962.5 s).
 
 ### Changed
 

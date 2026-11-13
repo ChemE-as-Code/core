@@ -124,13 +124,15 @@ TOLERANCE = 1e-9
 #: STALL_STEPS small steps in a row the pace of that run is checked: a still (a column's above
 #: all) that creeps on near empty, its error control keeping the step far above the boils-dry
 #: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
-#: does reach it (slowly, on a trace the column enriches) carries on.
+#: does reach it (slowly, on a trace the column enriches) carries on. An end past the most
+#: the still can reach before it boils dry (distilled, or time) is refused at once.
 STALL_SHARE = 1e-6
 #: a component's share of the charge (and feed) below which it is gone
 NEGLIGIBLE = 1e-100
 STALL_STEPS = 500
-#: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual)
-MAX_STEPS = 20000
+#: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual; an end
+#: next to the point where a column's still boils dry took 255217 in core 1.11.0)
+MAX_STEPS = 1_000_000
 #: K: the still's temperature is searched below this.
 HOTTEST = 2000.0
 #: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
@@ -767,6 +769,27 @@ def solve_still(
             return hours * 3600.0 * sum(yi * (m or 0.0) for yi, m in zip(y, mw, strict=True)) / rate
         return hours * (phase.latent_heat(y) or 0.0) / rate  # kW
 
+    def most_seconds_per_mole() -> float:
+        """An upper bound of the s of boil-up per kmol the still boils off, over any vapour of
+        its volatile components (the vapour's s per kmol, linear in its composition and at most
+        at HOTTEST, times at most R + 1): inf when there is none."""
+        boiled_per_mole = 1.0
+        if column is not None:
+            ratio = (
+                column.spec.maximum_ratio
+                if column.spec.reflux == "constant_distillate"
+                else column.ratio
+            )
+            boiled_per_mole = ratio + 1.0 if ratio is not None else math.inf
+        worst = 0.0
+        for i, v in enumerate(volatile):
+            if v:
+                y = [0.0] * k
+                y[i] = 1.0
+                worst = max(worst, seconds_per_mole(y, HOTTEST))
+        bound = worst * boiled_per_mole
+        return bound if bound > 0 and math.isfinite(bound) else math.inf
+
     def derivatives(feeding: bool) -> Callable[[list[float]], list[float]]:
         def f(state: list[float]) -> list[float]:
             y, t, boiled_per_mole, _ = top(state[:k])
@@ -829,11 +852,15 @@ def solve_still(
         result.profile.append((share, state[k], t, x_key))
 
     def advance(
-        feeding: bool, stop: Callable[[list[float], float], float] | None, limit: float | None
+        feeding: bool,
+        stop: Callable[[list[float], float], float] | None,
+        limit: float | None,
+        dry: Callable[[list[float], float], float] | None = None,
     ) -> None:
         """Boil up until *stop* (of the state and the kmol boiled up) is no longer negative,
         or *limit* kmol more are boiled up (feeding meanwhile with *feeding*). Raises
-        StillError when the still boils dry first."""
+        StillError when the still boils dry first. *dry* (of the state and the volatile kmol
+        left) bounds how far the stop's value can still rise before the still boils dry."""
         nonlocal state, boiled, peak
         f = derivatives(feeding)
         end = boiled + limit if limit is not None else None
@@ -841,9 +868,10 @@ def solve_still(
         cap = boiled + available + (limit if feeding and limit is not None else 0.0)
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
-        steps = stalled = 0
+        steps = stalled = first = 0
         # where the last run of small steps began: kmol boiled up and the stop's value
-        # (the stop is not evaluated for it: a bubble point's guess would move the solution)
+        # (the stop is not evaluated for it: a bubble point's guess would move the solution),
+        # and in a run from the advance's first step, the step its stop's value was first known
         mark: tuple[float, float | None, list[float]] = (boiled, None, state[:k])
 
         def stalls() -> StillError:
@@ -923,17 +951,31 @@ def solve_still(
             # bubble point converged to a tolerance from another guess, can fall just short)
             if crossed or (now is not None and now >= -1e-15):
                 return
+            # the most the stop's value can still rise before the still boils dry: an end
+            # beyond it is never reached (no step need be taken towards it)
+            if now is not None and dry is not None:
+                rest = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
+                if now + dry(state, rest) * (1 + 1e-6) + 1e-9 < 0:
+                    raise StillError(
+                        f"the still boils dry before its end ({rest:.4g} kmol of volatile "
+                        "content left, too little to reach it)"
+                    )
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
             if stalled == 0:
                 mark = (boiled, now, state[:k])
-            elif stalled >= STALL_STEPS:
+            elif mark[1] is None and now is not None:
+                # a run of small steps from the advance's first step: its stop's value is the
+                # first one evaluated (the stop is not evaluated before the first step)
+                mark = (mark[0], now, mark[2])
+                first = stalled
+            if stalled >= STALL_STEPS:
                 # a run of small steps: does its pace (in kmol boiled up, or in the stop's
                 # value) reach the end within the steps left? If not, the still stalls.
                 left = MAX_STEPS - steps
                 reach = (boiled - mark[0]) / stalled * left >= target - boiled
                 if not reach and now is not None and mark[1] is not None:
-                    reach = (now - mark[1]) / stalled * left >= -now
+                    reach = (now - mark[1]) / max(stalled - first, 1) * left >= -now
                 if not reach:
                     # a trace the column enriches, cleared at the explicit method's stability
                     # limit, holds the step small until it is gone: progress, not a stall
@@ -943,7 +985,7 @@ def solve_still(
                     )
                 if not reach:
                     raise stalls()
-                stalled = 0
+                stalled = first = 0
                 mark = (boiled, now, state[:k])
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
@@ -1031,6 +1073,21 @@ def solve_still(
 
         return stop
 
+    def dry_of(end: Any) -> Callable[[list[float], float], float] | None:
+        """The most the stop of *end* can rise from the still holding *s* until its *left*
+        volatile kmol are boiled off (None: no such bound; with the cut's boil-up set)."""
+        if end.distilled is not None and end.basis == "mole":
+            return lambda s, left: left / (total0 + total_feed)
+        if end.distilled is not None:
+            return lambda s, left: (
+                sum(x * (m or 0.0) for x, m, v in zip(s[:k], mw, volatile, strict=True) if v)
+                / mass0
+            )
+        if end.time is not None:
+            most = most_seconds_per_mole()
+            return (lambda s, left: left * most) if math.isfinite(most) else None
+        return None
+
     for port, end, cut_pressure, cut_boilup in stages:
         changed = cut_pressure != phase.pressure
         before = result.profile[-1][2]
@@ -1059,7 +1116,7 @@ def solve_still(
                     + (" (the feed is in)" if spec.feed is not None else "")
                 )
             else:
-                advance(False, stop, None)
+                advance(False, stop, None, dry_of(end))
         total_out = [a + f - x for a, f, x in zip(n0, fed, state[:k], strict=True)]
         moles = {n: max(t - r, 0.0) for n, t, r in zip(names, total_out, removed, strict=True)}
         removed = total_out

@@ -6,6 +6,7 @@ purity end, the design by a minimum-reflux factor, the reboiler's and condenser'
 cheme process propagate, the rules and the example plant."""
 
 import math
+import os
 import shutil
 from pathlib import Path
 
@@ -759,38 +760,146 @@ def test_the_still_condensers_freezing_check(tmp_path):
     assert not found(melting(_copy(tmp_path / "e"), {"ACCL": 290}))
 
 
-def _ended(tmp_path, end):
-    """The example with its product cut ended at *end*: its still's node and inlets."""
+PRODUCT = "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}"
+OFFCUT = "{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}}"
+
+
+def _ended(tmp_path, end, offcut=None):
+    """The example with its product cut ended at *end* (and its offcut at *offcut*): its
+    still's node and inlets."""
     from chemeascode.domains.process.batch_still import inlets_of
 
-    ws = _copy(
-        tmp_path,
-        lambda text: text.replace(
-            "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}",
-            f"{{outlet: product, end: {end}}}",
-        ),
-    )
-    process, _ = load(ws.root)
+    def edit(text):
+        assert PRODUCT in text and OFFCUT in text
+        text = text.replace(PRODUCT, f"{{outlet: product, end: {end}}}")
+        if offcut is not None:
+            text = text.replace(OFFCUT, f"{{outlet: offcut, end: {offcut}}}")
+        return text
+
+    process, _ = load(_copy(tmp_path, edit).root)
     node = process.nodes["ST1"]
     return process, node, inlets_of(process, node)
 
 
-@pytest.mark.parametrize("hours", [10, 2.495])
-def test_a_column_still_that_runs_dry_before_a_time_end_fails_at_once(tmp_path, hours):
-    """The example's product cut ended at 10 h, long after the still runs dry: the column's
-    error control kept the step far above the boils-dry floor, so the still crept on near
-    empty without end (core 1.11.0 hung, and so did an end at 2.495 h). A run of small steps
-    whose pace does not reach the end within the step budget stalls: StillError within a few
-    seconds, naming the volatile content left and the remedy."""
+@pytest.mark.parametrize("end", ["{time: 36000}", "{time: 9360}", "{distilled: 0.999}"])
+def test_a_column_still_whose_end_is_past_its_dry_point_fails_at_once(tmp_path, end):
+    """The example's still boils dry at about 9006 s (2.5016 h), 99.835 % distilled. Its
+    product cut ended at 10 h, 2.6 h or 99.9 % distilled is never reached: core 1.11.0 crept on
+    near empty without end (the column's error control kept the step far above the boils-dry
+    floor), and 1.12.0's first pace check refused it after some thousand steps. The most the
+    end's value can still rise before the still boils dry (the volatile content left, times at
+    most the s per kmol of any vapour of it at the highest reflux, for a time) is short of the
+    end: StillError at once, naming the volatile content left."""
     import time
 
     from chemeascode.domains.process.batch_still import StillError, solve_node
 
-    process, node, inlets = _ended(tmp_path, f"{{time: {hours * 3600:g}}}")
+    process, node, inlets = _ended(tmp_path, end)
+    start = time.monotonic()
+    with pytest.raises(StillError, match="boils dry before its end.*volatile.*too little"):
+        solve_node(process, node, inlets, "design")
+    assert time.monotonic() - start < 5.0
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        {"stages": 5, "reflux": "constant", "ratio": 3},
+        {
+            "stages": 5,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "A", "mole_fraction": 0.95},
+            "maximum_ratio": 3,
+        },
+    ],
+)
+def test_a_time_end_past_the_dry_point_at_the_highest_reflux_is_refused_at_once(column):
+    """A column boils up R + 1 kmol per kmol distilled: the time bound takes the reflux at its
+    highest (the ratio, or maximum_ratio while it holds a distillate). 100 kmol at 10 kmol/h and
+    R = 3 boil dry within 40 h: an end past it is refused at the first step, and with the
+    reflux fixed one just before it is reached."""
+    from chemeascode.domains.process.batch_still import StillError
+
+    bound = 100 * 3600 / 10.0 * 4
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        solve_still(_still(column, end={"time": bound * 1.001}), CHARGE, None, COMPS, None)
+    if column["reflux"] == "constant":
+        near = solve_still(_still(column, end={"time": bound * 0.99}), CHARGE, None, COMPS, None)
+        assert sum(near.cuts[0].moles.values()) == pytest.approx(99, rel=1e-8)
+
+
+def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):
+    """An end at 2.495 h is reachable (the still boils dry at about 2.5016 h), but the
+    integration crawls towards it, its error control holding the step at about 1e-9 kmol by
+    the column's Fenske index jittering next to the ACCL trace: core 1.11.0 found no result in
+    900 s. A run of small steps whose pace does not reach the end within the step horizon
+    stalls: at the default horizon (10^6 steps) after 55492 steps (2 to 3 minutes), here at
+    20000 after 3492 steps, within seconds."""
+    import time
+
+    from chemeascode.domains.process import batch_still
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
+    process, node, inlets = _ended(tmp_path, "{time: 8982}")
     start = time.monotonic()
     with pytest.raises(StillError, match="stalls before its end.*volatile.*end the cut earlier"):
         solve_node(process, node, inlets, "design")
     assert time.monotonic() - start < 20.0
+
+
+@pytest.mark.parametrize(
+    "offcut, residue, cut",
+    [
+        ("{time: 8964}", 0.014457776525169278, 0.0002609452952005986),
+        ("{distilled: 0.9968}", 0.013997659204490307, 0.0007210626158795884),
+    ],
+)
+def test_a_cut_that_begins_in_the_slow_tail_measures_its_ends_pace_from_its_first_step(
+    tmp_path, monkeypatch, offcut, residue, cut
+):
+    """Integration review of 1.12.0: the product cut ended at 8962.5 s leaves the offcut to
+    begin in the slow tail, every step of it small. The stop is not evaluated before an
+    advance's first step (a bubble point's guess would move the solution), so the first run of
+    small steps had no stop value to measure its pace by: it was refused after 500 steps,
+    although core 1.11.0 solves it (in 815 steps for 8964 s). The run's stop pace now counts
+    from its first evaluated step; at the 20000-step horizon it was refused at, it solves to
+    1.11.0's values."""
+    from chemeascode.domains.process import batch_still
+    from chemeascode.domains.process.batch_still import solve_node
+
+    monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
+    process, node, inlets = _ended(tmp_path, "{time: 8962.5}", offcut)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(residue, rel=1e-8)
+    assert [sum(c.moles.values()) for c in result.cuts] == pytest.approx(
+        [4.359549779581488, cut], rel=1e-6
+    )
+
+
+#: core 1.11.0's residue (kmol) of the example with its product cut ended at 8971.2 s, or at
+#: 99.7 % distilled
+SLOW_8971, SLOW_997 = 0.0132200607005656, 0.013122805504220172
+
+
+@pytest.mark.skipif(
+    os.environ.get("CHEME_SLOW_TESTS") != "1", reason="set CHEME_SLOW_TESTS=1 (some 3 minutes)"
+)
+@pytest.mark.parametrize(
+    "end, residue", [("{time: 8971.2}", SLOW_8971), ("{distilled: 0.997}", SLOW_997)]
+)
+def test_a_column_still_needing_tens_of_thousands_of_steps_solves_as_in_1_11_0(
+    tmp_path, end, residue
+):
+    """Integration review of 1.12.0: an end next to the dry point needs more accepted steps
+    than a fixed horizon of 20000 allowed (2.492 h: 33116 steps, 99.7 % distilled: 45414),
+    and 1.12.0 refused ends that core 1.11.0 solves. With the horizon at 10^6 steps (2.493 h,
+    255217 steps in 1.11.0, solves too) they solve to 1.11.0's values."""
+    from chemeascode.domains.process.batch_still import solve_node
+
+    process, node, inlets = _ended(tmp_path, end)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(residue, rel=1e-9)
 
 
 @pytest.mark.parametrize("end", ["{time: 8964}", "{distilled: 0.9967}"])

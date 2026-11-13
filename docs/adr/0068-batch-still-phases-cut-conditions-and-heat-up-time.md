@@ -50,6 +50,18 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
   not test the stop again at the same state. Every end (residue, distilled, time, temperature,
   purity) stops this way. A still that solved before gives the same cut to within that
   re-evaluation's tolerance.
+- **An end past the dry point is refused, a crawl is bounded.** (Integration of 1.12.0: a
+  column still with a time end past its dry point crept on near empty without end, its error
+  control holding the step far above the boils-dry floor.) After each step the integrator
+  bounds how far the end's value can still rise before the still boils dry: the volatile kmol
+  left (distilled by mole), their mass (by mass), or their kmol times the most s per kmol of
+  any vapour of them at the highest reflux (a time). An end beyond it is refused at once; no
+  step changes. A run of 500 steps that each boil off less than 1e-6 of the charge is checked
+  for pace (kmol boiled up, or the end's value, from the run's first evaluated step): one
+  that does not reach the end within 10^6 steps stalls, and no phase takes more. The horizon
+  is that large because the steps to an end next to the dry point do not converge as it
+  nears (the batch-rectification example: 1988 steps to 2.49 h, 33116 to 2.492 h, 255217 to
+  2.493 h, all solved by core 1.11.0); a smaller one refused ends 1.11.0 solves.
 - **Only a component the still holds needs volatility data.** `cheme validate` checks the
   components an inlet's composition carries at a non-zero amount (as before). A component the
   template of an inlet without a composition lists is now an info finding
@@ -95,6 +107,12 @@ operation), which a still's boil-up does not give; (2) the boil-up's own heat in
 
 ## Consequences
 
+- A still end past the dry point (the batch-rectification example's product cut at 10 h, or
+  99.9 % distilled; core 1.11.0 hung) is refused at its first steps. A reachable end the
+  integration crawls towards (2.495 h there, unsolved by 1.11.0 in 15 minutes) is refused
+  after some 55000 steps, 2 to 3 minutes; one whose pace never falls runs up to 10^6 steps
+  (some 40 minutes) before it is refused. The bound covers only ends at a share distilled or
+  at a time: a temperature, purity or residue end past the dry point relies on the pace check.
 - An end at a temperature can replace a residue key set by hand to reach a temperature
   (di-tert-butyl-dicarbonate-1 D-006). A still whose end was reached by the old second
   evaluation solves to the same values within the bubble point's tolerance.

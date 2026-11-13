@@ -1398,12 +1398,17 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     still is circular and refused, unless every boil-up up to that end is specific (1/h); only
     the boil-ups the still runs at count (a still's own `boilup` that every cut replaces, with
     no feed, is not used: no unit or heat_of_vaporization check, no hours in a fingerprint).
-    A still whose boil-up crawls near empty (a column on a trace it enriches, before a time
-    end) is checked after 500 small steps in a row: if at that pace its end is not reached
-    within 20000 steps in all, it stalls (`cheme.process-still-unsolved`: the volatile kmol
-    left, and to end the cut earlier): an error, not a hang. A volatile component falling
-    1000-fold in that run is progress, and an amount below 1e-100 of the charge and feed is
-    taken as gone.
+    An end at a share distilled or a time that the still cannot reach before it boils dry is
+    an error at once ("boils dry before its end"): at most the volatile content left is still
+    distilled (by mole, or its mass), in at most its kmol times the most s per kmol of any
+    vapour of it (the largest heat of vaporization for kW, the heaviest molar mass for kg/h,
+    2000 K for m3/h) times R + 1 at the highest reflux (`ratio`, or `maximum_ratio`). A still
+    whose boil-up crawls near empty (a column on a trace it enriches, before an end next to
+    its dry point) is checked after 500 small steps in a row: if at that pace its end is not
+    reached within 10^6 steps in all, it stalls (`cheme.process-still-unsolved`: the volatile
+    kmol left, and to end the cut earlier): an error, not a hang, though it can take minutes.
+    A volatile component falling 1000-fold in that run is progress, and an amount below 1e-100
+    of the charge and feed is taken as gone.
   - `still.heat_up: true` (raoult, ADR 0063) adds the charge heated from its inlet
     temperature to its bubble point to the duty (`charge heat-up`), and a swap's feed warmed
     from its inlet temperature to the still's as it mixes in (`feed heat-up`, the still's
