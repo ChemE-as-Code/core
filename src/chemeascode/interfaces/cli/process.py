@@ -811,13 +811,19 @@ def propagate(
 ) -> None:
     """Derive missing compositions and flows through steps their streams fully determine:
     pass-through steps (compressors, coolers, heaters, pumps, filters), mixers, splitters
-    (`split:` fractions per outlet port, else the mass balance remainder), and recycle loops
-    torn at the flowsheet's `tears:` (Wegstein or substitution, `convergence:`).
+    (`split:` fractions per outlet port, else the mass balance remainder), component
+    separators with `recovery:` (each component's fraction per outlet, ADR 0070), and recycle
+    loops torn at the flowsheet's `tears:` (Wegstein or substitution, `convergence:`).
+
+    Design specifications (`specs:`, ADR 0070) adjust a feed's flow or a splitter outlet's
+    fraction until a stream target is met, solved together with the tears (Newton-Broyden);
+    cheme.process-design-spec reports the variables and the targets reached.
 
     A batch or semi-batch, still, crystallizer or conversion step writes its year-average duty
     on its energy stream (`energy_port:`, else its one stream to a heating or cooling utility);
     a given duty is compared (cheme.process-duty, ADR 0059; validate compares it too). Other
-    separators and reactors are only checked, never solved. Derived values are `calculated`
+    separators (without `recovery:`) and reactors without conversions are only checked, never
+    solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1
     on a warning (stale propagated values, a duty that differs from its model). --json prints
     the run as an adapter result (cheme/adapter-result/v1) per case, same exit codes."""

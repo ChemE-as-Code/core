@@ -120,6 +120,20 @@ COLUMN_ASSUMPTIONS = (
 PROFILE_POINTS = 50
 #: Relative error per step of the integration.
 TOLERANCE = 1e-9
+#: a step that boils off less than STALL_SHARE of the charge (and feed) is a small one; after
+#: STALL_STEPS small steps in a row the pace of that run is checked: a still (a column's above
+#: all) that creeps on near empty, its error control keeping the step far above the boils-dry
+#: floor, and that would not reach its end within MAX_STEPS at that pace, stalls. One that
+#: does reach it (slowly, on a trace the column enriches) carries on. An end past the most
+#: the still can reach before it boils dry (distilled, time or purity) is refused at the first
+#: step that bound falls short of it (a purity's floor rises from 0 as its cut fills).
+STALL_SHARE = 1e-6
+#: a component's share of the charge (and feed) below which it is gone
+NEGLIGIBLE = 1e-100
+STALL_STEPS = 500
+#: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual; an end
+#: next to the point where a column's still boils dry took 255217 in core 1.11.0)
+MAX_STEPS = 1_000_000
 #: K: the still's temperature is searched below this.
 HOTTEST = 2000.0
 #: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
@@ -128,6 +142,8 @@ LEAST_LATENT = 2000.0
 #: A component below this share of the still's vapour is a trace to the column: with no key
 #: named, the light key is the most volatile component above it (ADR 0061).
 TRACE = 1e-2
+#: kPa m3/(kmol K): a boil-up in m3/h is the vapour's volume as an ideal gas (ADR 0068).
+GAS_CONSTANT = 8.314462618
 
 
 class StillError(ValueError):
@@ -147,6 +163,8 @@ class Cut:
     temperature: float | None
     energy: float | None
     vapour: dict[str, float]
+    #: kPa(a) of the still while the cut is collected (None: constant volatility)
+    pressure: float | None = None
 
 
 @dataclass
@@ -174,6 +192,10 @@ class StillResult:
     #: without a temperature), and with ``heat_up`` the kJ per batch that warm the feed to it
     fed_temperature: float | None = None
     feed_heat_up: float | None = None
+    #: with ``heat_up_time`` (ADR 0068): s per batch the heat terms besides the boil-up take
+    #: at the still's boil-up's heat input (None: not known, ``heat_up_time_missing`` why)
+    heat_up_time: float | None = None
+    heat_up_time_missing: str = ""
     #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
     column: dict[str, Any] | None = None
     #: the reflux ratio at each profile point (a column; else empty)
@@ -194,15 +216,28 @@ class _Phase:
     """How the still's vapour follows from its content: the components, the volatile ones and
     their data."""
 
-    def __init__(self, names, volatile, model, alpha, pressures, pressure, latent):
+    def __init__(self, names, volatile, model, alpha, pressures, pressure, latent, liquid=None):
         self.names = names
         self.volatile = volatile  # bool per component
+        #: bool per component: in the liquid (False: a phase of its own, ADR 0068)
+        self.liquid = liquid if liquid is not None else [True] * len(names)
         self.model = model
         self.alpha = alpha  # per component (constant)
         self.pressures = pressures  # VapourPressure per component (raoult)
         self.pressure = pressure  # kPa
         self.latent = latent  # kJ/kmol per component, None where not known
         self.guess = 350.0
+
+    def fractions(self, moles: list[float]) -> list[float]:
+        """The liquid's mole fractions of the still holding *moles*: a component in a phase of
+        its own (``separate_phase``, ADR 0068) is 0 and counts in no other's. Raises StillError
+        when the still or its liquid is empty."""
+        if sum(moles) <= 0:
+            raise StillError("the still is empty")
+        total = sum(n for n, inside in zip(moles, self.liquid, strict=True) if inside)
+        if total <= 0:
+            raise StillError("the still boils dry: nothing volatile is left (no liquid)")
+        return [n / total if inside else 0.0 for n, inside in zip(moles, self.liquid, strict=True)]
 
     def bubble(self, x: list[float]) -> float:
         """K: the still's bubble point, sum x_i P_i(T) = P: bracketed from the last one, then
@@ -259,10 +294,7 @@ class _Phase:
     def vapour(self, moles: list[float]) -> tuple[list[float], float | None]:
         """The vapour's mole fractions over the still holding *moles*, and its temperature K
         (raoult; None at a constant relative volatility)."""
-        total = sum(moles)
-        if total <= 0:
-            raise StillError("the still is empty")
-        x = [n / total for n in moles]
+        x = self.fractions(moles)
         if sum(xi for xi, v in zip(x, self.volatile, strict=True) if v) <= 1e-14:
             raise StillError("the still boils dry: nothing volatile is left")
         if self.model == "constant":
@@ -285,11 +317,7 @@ class _Phase:
         ``P_i(T) / P`` at the still's bubble point T (raoult); and T (None: constant)."""
         if self.model == "constant":
             return [a if v else 0.0 for a, v in zip(self.alpha, self.volatile, strict=True)], None
-        total = sum(moles)
-        if total <= 0:
-            raise StillError("the still is empty")
-        x = [n / total for n in moles]
-        t = self.bubble(x)
+        t = self.bubble(self.fractions(moles))
         return [
             vp.kpa(t) / self.pressure if vp is not None and self.volatile[i] else 0.0
             for i, vp in enumerate(self.pressures)
@@ -429,8 +457,7 @@ class _Column:
             raise StillError(f"the column's heavy key {spec.heavy_key} is not in the still")
         self.key = names.index(spec.distillate.key) if spec.distillate is not None else None
         alpha, _ = phase.volatilities(n0)
-        total = sum(n0)
-        x0 = [n / total for n in n0]
+        x0 = phase.fractions(n0)
         self.fixed: tuple[int, int] | None = None
         self.light, self.heavy = self.keys(alpha, x0)
         if spec.heavy_key is not None or self.key is not None:
@@ -597,10 +624,7 @@ class _Column:
     def top(self, moles: list[float]) -> Top:
         """The distillate, reflux ratio and Fenske index over the still holding *moles*."""
         spec = self.spec
-        total = sum(moles)
-        if total <= 0:
-            raise StillError("the still is empty")
-        x = [n / total for n in moles]
+        x = self.phase.fractions(moles)
         if sum(xi for xi, v in zip(x, self.phase.volatile, strict=True) if v) <= 1e-14:
             raise StillError("the still boils dry: nothing volatile is left")
         alpha, t = self.phase.volatilities(moles)
@@ -634,6 +658,59 @@ class _Column:
         return Top(xd, t, self.ratio, c1, True, light, heavy)
 
 
+class _Run:
+    """The pace check of one advance: its last run of small steps (each boiling off less than
+    STALL_SHARE of the charge and feed), where that run began (kmol boiled up, the stop's
+    value and the step it was taken at, and the still's content) and how many steps it has."""
+
+    def __init__(self, boiled: float, content: list[float], target: float) -> None:
+        self.target = target
+        self.stalled = 0
+        # the stop is not evaluated before the advance's first step (a bubble point's guess
+        # would move the solution): a run from there takes the first one the loop evaluates
+        self.mark: tuple[float, float | None, int, list[float]] = (boiled, None, 0, content)
+
+    def reaches(
+        self,
+        small: bool,
+        steps: int,
+        boiled: float,
+        now: float | None,
+        content: list[float],
+        volatile: list[bool],
+    ) -> bool:
+        """After the *steps*-th accepted step (*small* or not), at *boiled* kmol with the stop
+        at *now*: False when a run of STALL_STEPS small steps would not, at its pace (in kmol
+        boiled up towards the target, or in the stop's value towards 0), reach the end within
+        MAX_STEPS steps in all, and no volatile component fell 1000-fold in it."""
+        self.stalled = self.stalled + 1 if small else 0
+        if self.stalled == 0:
+            self.mark = (boiled, now, steps, content)
+        elif self.mark[1] is None and now is not None:
+            # a run from the advance's first step: its stop's value is the first one evaluated
+            self.mark = (self.mark[0], now, steps, self.mark[3])
+        if self.stalled < STALL_STEPS:
+            return True
+        start, value, at, before = self.mark
+        left = MAX_STEPS - steps
+        # each pace is over the steps since its mark: kmol boiled up over all the run's
+        # steps, the stop's value over those since it was taken
+        reach = (boiled - start) / self.stalled * left >= self.target - boiled
+        if not reach and now is not None and value is not None:
+            reach = (now - value) / max(steps - at, 1) * left >= -now
+        if not reach:
+            # a trace the column enriches, cleared at the explicit method's stability limit,
+            # holds the step small until it is gone: progress, not a stall
+            reach = any(
+                v and a > 0 and b < 1e-3 * a
+                for a, b, v in zip(before, content, volatile, strict=True)
+            )
+        if reach:
+            self.stalled = 0
+            self.mark = (boiled, now, steps, content)
+        return reach
+
+
 def solve_still(
     spec: Any,
     charge: Mapping[str, float],
@@ -657,8 +734,10 @@ def solve_still(
     if total0 <= 0:
         raise StillError("the charge is empty")
     model = spec.volatility.model
-    stays = set(spec.nonvolatile) | set(nonvolatile)
+    apart = set(getattr(spec, "separate_phase", ()))
+    stays = set(spec.nonvolatile) | set(nonvolatile) | apart
     volatile = [n not in stays for n in names]
+    liquid = [n not in apart for n in names]
     lacking = []
     if model == "constant":
         lacking = [
@@ -671,6 +750,8 @@ def solve_still(
                 + ": give it, or list the component in nonvolatile"
             )
     pressures = [getattr(components.get(n), "vapour_pressure", None) for n in names]
+    # the boil-up and the pressure of each cut (ADR 0068: a cut may have its own)
+    stages = _stages(spec, pressure)
     if model == "raoult":
         lacking = [
             n for n, v, vp in zip(names, volatile, pressures, strict=True) if v and vp is None
@@ -681,17 +762,19 @@ def solve_still(
                 + ", ".join(lacking)
                 + " in materials.yaml: give it (Antoine), or list it in nonvolatile"
             )
-        if pressure is None:
+        if any(p is None for _, _, p, _ in stages) or (spec.feed is not None and pressure is None):
             raise StillError("no pressure: give still.pressure or the charge's pressure")
     latent = [
         getattr(components.get(n), "heat_of_vaporization", None) if v else 0.0
         for n, v in zip(names, volatile, strict=True)
     ]
-    unit, rate = spec.boilup.unit, spec.boilup.value
-    if unit == "kW" and (gaps := [n for n, h in zip(names, latent, strict=True) if h is None]):
+    units = {b.unit for b in _boilups(spec)}  # the boil-ups used (ADR 0068)
+    if "kW" in units and (gaps := [n for n, h in zip(names, latent, strict=True) if h is None]):
         raise StillError("a boil-up in kW needs the heat_of_vaporization of " + ", ".join(gaps))
+    if "m3/h" in units and model != "raoult":
+        raise StillError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
     mw = [getattr(components.get(n), "molar_mass", None) for n in names]
-    needs_mass = unit == "kg/h" or any(
+    needs_mass = "kg/h" in units or any(
         e is not None and (e.distilled or e.purity) and e.basis == "mass" for _, e in spec.ends()
     )
     if needs_mass and (gaps := [n for n, m in zip(names, mw, strict=True) if not m]):
@@ -704,7 +787,11 @@ def solve_still(
         pressures,
         pressure,
         latent,
+        liquid,
     )
+    active = {"boilup": spec.boilup}  # the boil-up of the cut being collected
+    if spec.feed is None and stages:
+        phase.pressure = stages[0][2]  # the first cut's pressure from the start
     k = len(names)
     feed_share = [v / total_feed for v in z] if total_feed > 0 else [0.0] * k
     result = StillResult(dict(zip(names, n0, strict=True)), {}, {}, [], pressure, hours)
@@ -721,8 +808,11 @@ def solve_still(
         at = column.top(moles)
         return at.distillate, at.temperature, at.reflux + 1.0, at
 
-    def seconds_per_mole(y: list[float]) -> float:
-        """s per kmol (per hour of flows) boiled up from vapour *y*."""
+    def seconds_per_mole(y: list[float], t: float | None) -> float:
+        """s per kmol (per hour of flows) boiled up from vapour *y* at *t* K (raoult)."""
+        unit, rate = active["boilup"].unit, active["boilup"].value
+        if unit == "m3/h":  # the vapour's volume at the still's temperature and pressure
+            return hours * 3600.0 * GAS_CONSTANT * (t or 0.0) / (rate * phase.pressure)
         if unit == "1/h":
             return 3600.0 / (rate * total0)
         if unit == "kmol/h":
@@ -733,14 +823,35 @@ def solve_still(
             return hours * 3600.0 * sum(yi * (m or 0.0) for yi, m in zip(y, mw, strict=True)) / rate
         return hours * (phase.latent_heat(y) or 0.0) / rate  # kW
 
+    def most_seconds_per_mole() -> float:
+        """An upper bound of the s of boil-up per kmol the still boils off, over any vapour of
+        its volatile components (the vapour's s per kmol, linear in its composition and at most
+        at HOTTEST, times at most R + 1): inf when there is none."""
+        boiled_per_mole = 1.0
+        if column is not None:
+            ratio = (
+                column.spec.maximum_ratio
+                if column.spec.reflux == "constant_distillate"
+                else column.ratio
+            )
+            boiled_per_mole = ratio + 1.0 if ratio is not None else math.inf
+        worst = 0.0
+        for i, v in enumerate(volatile):
+            if v:
+                y = [0.0] * k
+                y[i] = 1.0
+                worst = max(worst, seconds_per_mole(y, HOTTEST))
+        bound = worst * boiled_per_mole
+        return bound if bound > 0 and math.isfinite(bound) else math.inf
+
     def derivatives(feeding: bool) -> Callable[[list[float]], list[float]]:
         def f(state: list[float]) -> list[float]:
-            y, _, boiled_per_mole, _ = top(state[:k])
+            y, t, boiled_per_mole, _ = top(state[:k])
             dn = [-yi + (feed_share[i] if feeding else 0.0) for i, yi in enumerate(y)]
             heat = phase.latent_heat(y) if energy_known else None
             return [
                 *dn,
-                seconds_per_mole(y) * boiled_per_mole,
+                seconds_per_mole(y, t) * boiled_per_mole,
                 hours * (heat or 0.0) * boiled_per_mole,
             ]
 
@@ -791,15 +902,19 @@ def solve_still(
                         f"({low:g}-{high:g} K)"
                     )
         share = boiled / (total0 + total_feed)
-        x_key = moles[ki] / total if ki is not None and total > 0 else 0.0
+        x_key = phase.fractions(moles)[ki] if ki is not None and total > 0 else 0.0
         result.profile.append((share, state[k], t, x_key))
 
     def advance(
-        feeding: bool, stop: Callable[[list[float], float], float] | None, limit: float | None
+        feeding: bool,
+        stop: Callable[[list[float], float], float] | None,
+        limit: float | None,
+        dry: Callable[[list[float], float], float] | None = None,
     ) -> None:
         """Boil up until *stop* (of the state and the kmol boiled up) is no longer negative,
         or *limit* kmol more are boiled up (feeding meanwhile with *feeding*). Raises
-        StillError when the still boils dry first."""
+        StillError when the still boils dry first. *dry* (of the state and the volatile kmol
+        left) bounds how far the stop's value can still rise before the still boils dry."""
         nonlocal state, boiled, peak
         f = derivatives(feeding)
         end = boiled + limit if limit is not None else None
@@ -807,7 +922,22 @@ def solve_still(
         cap = boiled + available + (limit if feeding and limit is not None else 0.0)
         target = min(end, cap) if end is not None else cap
         h = max(target - boiled, 1e-12) / 100.0
+        steps = 0
+        run = _Run(boiled, state[:k], target)
+
+        def stalls() -> StillError:
+            left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
+            return StillError(
+                f"the still's boil-up stalls before its end: after {steps} steps "
+                f"{left:.4g} kmol of volatile content is left (of {total0 + total_feed:.4g} "
+                f"kmol charged and fed), boiling off too slowly to reach the end within "
+                f"{MAX_STEPS} steps (the integration crawls near empty, on a trace the column "
+                f"enriches); end the cut earlier (distilled, residue or temperature)"
+            )
+
         while True:
+            if steps >= MAX_STEPS:
+                raise stalls()
             h = min(h, target - boiled)
             if h <= 1e-14 * (total0 + total_feed):
                 if end is not None and boiled >= end * (1 - 1e-12):
@@ -834,7 +964,8 @@ def solve_still(
             if err > TOLERANCE and h > 1e-12 * (total0 + total_feed):
                 h *= max(0.1, 0.9 * (TOLERANCE / err) ** 0.2)
                 continue
-            if stop is not None and stop(new, boiled + h) >= 0:
+            crossed = stop is not None and stop(new, boiled + h) >= 0
+            if crossed:
                 lo, hi = 0.0, h
                 for _ in range(80):
                     mid = (lo + hi) / 2
@@ -853,16 +984,37 @@ def solve_still(
                     peak = max(peak, (new[k + 1] - state[k + 1]) / dt)
             if feeding:
                 fed[:] = [a + share * h for a, share in zip(fed, feed_share, strict=True)]
+            # an amount far below the error control's resolution is gone: a trace the column
+            # enriches, left at 1e-300 kmol, would keep the explicit step at its stability limit
+            new[:k] = [v if v > NEGLIGIBLE * (total0 + total_feed) else 0.0 for v in new[:k]]
+            steps += 1
+            small = h < STALL_SHARE * (total0 + total_feed)
             boiled += h
             state = new
             before = result.profile[-1][2]
             record(state)
             if feeding:
                 mixing(h, before, result.profile[-1][2])
-            if stop is not None and stop(state, boiled) >= -1e-15:
+            if crossed:
                 return
+            now = stop(state, boiled) if stop is not None else None
+            # the step ends where the stop was found (core#198: re-evaluating it there, as a
+            # bubble point converged to a tolerance from another guess, can fall just short)
+            if crossed or (now is not None and now >= -1e-15):
+                return
+            # the most the stop's value can still rise before the still boils dry: an end
+            # beyond it is never reached (no step need be taken towards it)
+            if now is not None and dry is not None:
+                rest = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
+                if now + dry(state, rest) * (1 + 1e-6) + 1e-9 < 0:
+                    raise StillError(
+                        f"the still boils dry before its end ({rest:.4g} kmol of volatile "
+                        "content left, too little to reach it)"
+                    )
             if end is not None and boiled >= end * (1 - 1e-12):
                 return
+            if not run.reaches(small, steps, boiled, now, state[:k], volatile):
+                raise stalls()
             grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
             h *= max(grow, 1.0)
 
@@ -871,7 +1023,6 @@ def solve_still(
 
     record(state)
     start_t = result.profile[0][2]
-    ends = spec.ends()
     level = (spec.feed.down_to if spec.feed is not None else 1.0) * total0
     if spec.feed is not None:
         if spec.feed.mode == "constant_level":
@@ -915,10 +1066,17 @@ def solve_still(
         # ends in "boils dry before its end"), and rises to one above it while it rises (the
         # vapour leaner in it than the liquid). A key falling already below its target (a
         # swap's old solvent once the feed is in) has reached it.
-        x_now = state[i] / sum(state[:k])
+        x_now = phase.fractions(state[:k])[i]
         y, _ = phase.vapour(state[:k])
         sign = 1.0 if target > x_now and y[i] < x_now else -1.0
-        return lambda s, b: sign * (s[i] / sum(s[:k]) - target) if sum(s[:k]) > 0 else 1.0
+
+        def residue(s: list[float], b: float) -> float:
+            try:
+                return sign * (phase.fractions(s[:k])[i] - target)
+            except StillError:  # empty, or no liquid left
+                return 1.0
+
+        return residue
 
     def purity_stop(end: Any) -> Callable[[list[float], float], float]:
         """The cut's mean share of the key (since the cut began) falls to the fraction: an
@@ -943,7 +1101,68 @@ def solve_still(
 
         return stop
 
-    for port, end in ends:
+    def dry_of(end: Any) -> Callable[[list[float], float], float] | None:
+        """The most the stop of *end* can rise from the still holding *s* until its *left*
+        volatile kmol are boiled off (None: no such bound; with the cut's boil-up set)."""
+        if end.distilled is not None and end.basis == "mole":
+            return lambda s, left: left / (total0 + total_feed)
+        if end.distilled is not None:
+            return lambda s, left: (
+                sum(x * (m or 0.0) for x, m, v in zip(s[:k], mw, volatile, strict=True) if v)
+                / mass0
+            )
+        if end.time is not None:
+            most = most_seconds_per_mole()
+            return (lambda s, left: left * most) if math.isfinite(most) else None
+        if end.purity is not None:
+            return purity_floor(end)
+        return None
+
+    def purity_floor(end: Any) -> Callable[[list[float], float], float] | None:
+        """The most a purity end's stop can rise: the cut's mean share of the key can fall no
+        lower than its key over the cut and all the other volatile content left (the key no
+        longer distilling, all the rest joining the cut), by mole or by mass. inf while the
+        cut is empty; a share of 1e-6 more is left to the integration's error."""
+        key = end.purity.key
+        if key not in names:
+            return None
+        i = names.index(key)
+        start = list(removed)
+        weight = [m or 0.0 for m in mw] if end.basis == "mass" else [1.0] * k
+
+        def rise(s: list[float], _left: float) -> float:
+            cut = [
+                (a + f - x - r) * w
+                for a, f, x, r, w in zip(n0, fed, s[:k], start, weight, strict=True)
+            ]
+            total = sum(cut)
+            if total <= 1e-12 * (total0 + total_feed) or cut[i] <= 0:
+                return math.inf
+            others = sum(
+                x * w
+                for j, (x, w, v) in enumerate(zip(s[:k], weight, volatile, strict=True))
+                if v and j != i
+            )
+            return cut[i] / total - cut[i] / (total + others) + 1e-6
+
+        return rise
+
+    for port, end, cut_pressure, cut_boilup in stages:
+        changed = cut_pressure != phase.pressure
+        before = result.profile[-1][2]
+        phase.pressure, active["boilup"] = cut_pressure, cut_boilup
+        if changed:
+            record(state)  # the still at the cut's pressure
+            after = result.profile[-1][2]
+            result.notes.append(
+                f"cut {port} at {cut_pressure:.5g} kPa(a): the still "
+                + (
+                    f"steps from {before:.5g} to {after:.5g} K"
+                    if before is not None and after is not None
+                    else "changes its pressure"
+                )
+                + " (the flash or the heating between is not modelled)"
+            )
         if end is None:
             portions = spec.feed is not None and spec.feed.mode == "portions"
             if portions and sum(state[:k]) > level * (1 + 1e-12):
@@ -956,7 +1175,7 @@ def solve_still(
                     + (" (the feed is in)" if spec.feed is not None else "")
                 )
             else:
-                advance(False, stop, None)
+                advance(False, stop, None, dry_of(end))
         total_out = [a + f - x for a, f, x in zip(n0, fed, state[:k], strict=True)]
         moles = {n: max(t - r, 0.0) for n, t, r in zip(names, total_out, removed, strict=True)}
         removed = total_out
@@ -969,6 +1188,7 @@ def solve_still(
                 t,
                 state[k + 1] - energy_before if energy_known else None,
                 dict(zip(names, y, strict=True)),
+                phase.pressure,
             )
         )
         energy_before = state[k + 1]
@@ -1051,9 +1271,22 @@ def _profile_key(spec: Any, names: list[str], phase: _Phase, n0: list[float]) ->
         if end is not None and end.residue is not None:
             return end.residue.key
     y, _ = phase.vapour(n0)
-    total = sum(n0)
-    ratios = [(yi / (n / total) if n > 0 else 0.0) for yi, n in zip(y, n0, strict=True)]
+    x = phase.fractions(n0)
+    ratios = [(yi / xi if xi > 0 else 0.0) for yi, xi in zip(y, x, strict=True)]
     return names[max(range(len(names)), key=lambda i: ratios[i])]
+
+
+def _stages(spec: Any, pressure: float | None) -> list[tuple[str, Any, float | None, Any]]:
+    """(outlet port, end, kPa(a), boil-up) of each cut in turn: a cut's own pressure and
+    boil-up (ADR 0068), else the still's (*pressure*) and its ``boilup``."""
+    cuts = {c.outlet: c for c in spec.cuts}
+    found = []
+    for port, end in spec.ends():
+        cut = cuts.get(port)
+        own_p = getattr(cut, "pressure", None)
+        own_b = getattr(cut, "boilup", None)
+        found.append((port, end, own_p if own_p is not None else pressure, own_b or spec.boilup))
+    return found
 
 
 # -- in a flowsheet -----------------------------------------------------------------------------
@@ -1133,8 +1366,28 @@ def outlets_need_hours(spec: Any) -> bool:
     """Whether still *spec*'s outlets depend on the hours of flows per batch: an end at a time
     with a boil-up of the still (not a specific rate, 1/h). Otherwise the hours scale only its
     time and energy per batch."""
-    timed = any(e is not None and e.time is not None for _, e in spec.ends())
-    return timed and spec.boilup.unit != "1/h"
+    return any(b.unit != "1/h" for b in _timed_boilups(spec))
+
+
+def _boilups(spec: Any) -> list[Any]:
+    """The boil-ups still *spec* runs at (ADR 0068): its cuts' own, and its own where a cut has
+    none, without cuts or with a feed (an unused one counts for nothing)."""
+    return spec.boilups()
+
+
+def _timed_boilups(spec: Any) -> list[Any]:
+    """The boil-ups still *spec* runs at up to its last end at a time (which counts from the
+    start): its feed phase's and those of the cuts up to that end; none without such an end."""
+    stages = _stages(spec, None)
+    timed = [
+        i for i, (_, end, _, _) in enumerate(stages) if end is not None and end.time is not None
+    ]
+    if not timed:
+        return []
+    return [
+        *([spec.boilup] if spec.feed is not None else []),
+        *(b for *_, b in stages[: timed[-1] + 1]),
+    ]
 
 
 def _downstream(process: Any, node: Any) -> set[str]:
@@ -1225,6 +1478,8 @@ def solve_node(
         _heat_up(result, comps)
         if feed is not None:
             _feed_heat_up(result, comps, _temperature(process, feed, case))
+    if getattr(spec, "heat_up_time", False):
+        _heat_up_time(process, node, result, case)
     names = sorted({*moles, *(fed or {})})
     # the fingerprint holds what the outlets' flows and compositions depend on: not the
     # provenance and source texts, not the vapour pressures' fitted ranges (notes only), and
@@ -1235,6 +1490,8 @@ def solve_node(
             exclude={
                 "boilup": True,
                 "heat_up": True,  # the duty's, not the outlets'
+                "heat_up_time": True,  # the recipe's time, not the outlets'
+                "cuts": {"__all__": {"boilup": True}},  # below, with an end at a time
                 "provenance": True,
                 "source": True,
                 "volatility": _TEXTS,
@@ -1255,9 +1512,16 @@ def solve_node(
         }
     if any(e is not None and e.time is not None for _, e in spec.ends()):
         inputs["boilup"] = spec.boilup.model_dump(mode="json", include={"value", "unit"})
-        if spec.boilup.unit != "1/h":
+        own = {c.outlet: c.boilup for c in spec.cuts if getattr(c, "boilup", None) is not None}
+        if own:  # a cut's own boil-up (ADR 0068)
+            inputs["cut_boilups"] = {
+                port: b.model_dump(mode="json", include={"value", "unit"})
+                for port, b in own.items()
+            }
+        units = {b.unit for b in _timed_boilups(spec)}  # the ones the outlets depend on
+        if units - {"1/h"}:
             inputs["hours"] = hours
-        if spec.boilup.unit == "kW":
+        if "kW" in units:
             inputs["heat_of_vaporization"] = {
                 n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
             }
@@ -1329,6 +1593,64 @@ def _feed_heat_up(result: StillResult, comps: Mapping[str, Any], t_feed: float |
     result.feed_heat_up = capacity * (t_mix - t_feed) * result.hours
 
 
+def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> None:
+    """``still.heat_up_time`` (ADR 0068): the heat terms of the still's duty besides the
+    boil-up (the charge's and a swap's feed's heat-up, a recipe vessel's metal; ADR 0063) take
+    time at the still's own boil-up's heat input, ``t = (Q_whole - Q_boil-up) / (Q_boil-up /
+    t_boil)`` over the cuts that run at it (a boil-up in kW: its value; a cut's own boil-up, a
+    forerun the vacuum pump limits, limits its vapour, not the heating; every cut with its own:
+    over the whole boil-up), s per batch; or why it is not known. A term that gives heat back
+    takes no time. The metal (``C_m``, kJ/K) heats with the charge from its start to the
+    still's first bubble point ``T_0``, then over the boil-up as far as the still ends above
+    ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0, 0)]``; one that ends colder (a vacuum
+    ramp) gives no time back."""
+    from chemeascode.domains.process.duties import still_duty
+
+    rate = _heat_input(node.still, result)  # kW
+    if rate is None or rate <= 0:
+        result.heat_up_time_missing = "the boil-up's heat input (heat_of_vaporization)"
+        return
+    duty = still_duty(node, result, process, case)
+    if duty.heat_kW is None:
+        result.heat_up_time_missing = "; ".join(duty.missing) or "the still's duty"
+        return
+    # kJ per batch: each term on its own, none below zero (a term that gives heat back)
+    extra = sum(
+        max(v, 0.0) for name, v in duty.terms_kW.items() if name not in ("boil-up", "vessel metal")
+    )
+    kj = extra * result.hours * 3600.0
+    metal = duty.inputs.get("vessel_metal")
+    if metal is not None and result.temperatures is not None:
+        first = result.temperatures[0]  # K: the still's bubble point as its boil-up starts
+        start, end = metal["temperatures"]
+        kj += metal["heat_capacity"] * (max(first - start, 0.0) + max(end - first, 0.0))
+    result.heat_up_time = kj / rate
+
+
+def _heat_input(spec: Any, result: StillResult) -> float | None:
+    """kW: the heat input the still's heat-up takes (ADR 0068): its own boil-up in kW, else the
+    mean over the cuts collected at its own boil-up (their latent heat over their time); the
+    mean over the whole boil-up where every cut has its own, or a cut's heat is not known."""
+    own = {c.outlet for c in spec.cuts if c.boilup is not None}
+    if spec.cuts and spec.feed is None and len(own) == len(spec.cuts):
+        return result.duty  # the still's own boil-up is not used
+    if spec.boilup.unit == "kW":
+        return spec.boilup.value
+    if own:
+        energy = seconds = 0.0
+        before = 0.0
+        for cut in result.cuts:
+            if cut.outlet not in own:
+                if cut.energy is None:
+                    return result.duty
+                energy += cut.energy
+                seconds += cut.time - before
+            before = cut.time
+        if seconds > 0:
+            return energy / seconds
+    return result.duty
+
+
 #: Fields of a still's data that are text about it, not inputs of its outlets.
 _TEXTS = {"provenance", "source"}
 
@@ -1366,7 +1688,17 @@ def _present(process: Any, streams: list[Any]) -> set[str]:
     """The components *streams* carry: those with a non-zero value in a composition of theirs
     (any case). A stream without a composition in any case yet (not propagated) can carry its
     template's: a template shared by many streams lists components a still never receives."""
-    found: set[str] = set()
+    known, guessed = _carried(process, streams)
+    return known | guessed
+
+
+def _carried(process: Any, streams: list[Any]) -> tuple[set[str], set[str]]:
+    """The components *streams* carry, (known, guessed): known with a non-zero value in a
+    composition of theirs (any case; a component at 0 is not carried, core#214), guessed from
+    the template of a stream without a composition in any case yet (not propagated), which may
+    list components the still never receives (a vented gas written at 0)."""
+    known: set[str] = set()
+    guessed: set[str] = set()
     templates = process.templates()
     for s in streams:
         own = {
@@ -1378,8 +1710,116 @@ def _present(process: Any, streams: list[Any]) -> set[str]:
         }
         if not own and not any(getattr(st, "composition", None) for st in s.state.values()):
             template = templates.get(s.template or "")
-            own = set(template.components if template else [])
-        found |= own
+            guessed |= set(template.components if template else [])
+        known |= own
+    return known, guessed - known
+
+
+#: The least mole fraction of a distillate's component the condenser's freezing check counts:
+#: a trace freezes out far below its pure melting point.
+FREEZING_SHARE = 0.01
+
+
+def _condensed(process: Any, streams: list[Any]) -> set[str]:
+    """The components *streams* (the distillate's cuts) carry at a mole fraction of at least
+    :data:`FREEZING_SHARE` in a composition of theirs; their template's before one is given."""
+    found: set[str] = set()
+    templates = process.templates()
+    comps = process.components()
+    for s in streams:
+        given = [
+            comp
+            for state in s.state.values()
+            if (comp := getattr(state, "composition", None)) is not None
+        ]
+        if not given:
+            template = templates.get(s.template or "")
+            found |= set(template.components if template else [])
+        for comp in given:
+            values = dict(comp.values)
+            if comp.basis == "mass_fraction":
+                values = {
+                    n: v / mw
+                    for n, v in values.items()
+                    if (mw := getattr(comps.get(n), "molar_mass", None))
+                }
+            total = sum(values.values())
+            found |= {n for n, v in values.items() if total > 0 and v / total >= FREEZING_SHARE}
+    return found
+
+
+def _freezing(
+    process: Any, node: Any, spec: Any, loc: list[Any], volatile: list[str]
+) -> list[Finding]:
+    """ADR 0071, as for a vent condenser: the still's condenser (the energy stream on its
+    ``condenser_port``, by default a column's one heat stream out, to a cooling utility)
+    whose coolant's supply temperature (the coldest its tube wall can get) lies below the
+    melting point of a component the distillate carries (at a mole fraction of at least
+    :data:`FREEZING_SHARE`): the condensate may freeze and block the condenser. The pure
+    component's melting point."""
+    from chemeascode.foundation.units import to_kelvin
+
+    port = spec.condenser_port
+    outs = [p for p in node.ports if p.kind == "energy" and p.direction == "out"]
+    if port is None and spec.column is not None and len(outs) == 1:
+        port = outs[0].id  # as propagate defaults a column's condenser stream
+    if (
+        port is None
+        or port not in {p.id for p in outs}
+        or port == getattr(node, "energy_port", None)
+    ):
+        return []  # no condenser stream, or one the still's other rules refuse
+    fs = process.flowsheet
+    comps = process.components()
+    cuts = {p for p, _ in spec.ends()}
+    distillate = [
+        s
+        for s in fs.streams
+        if (start := process.ends(s)[0]) is not None
+        and start.node == node.id
+        and start.port in cuts
+    ]
+    carried = _condensed(process, distillate) if distillate else set(volatile)
+    melting = {
+        n: comps[n].melting_point
+        for n in volatile
+        if n in carried and n in comps and getattr(comps[n], "melting_point", None)
+    }
+    found: list[Finding] = []
+    if not melting:
+        return found
+    for s in fs.streams:
+        start, end = process.ends(s)
+        if s.kind != "energy" or start is None or start.node != node.id or end is None:
+            continue
+        if start.port != port:
+            continue
+        supply = getattr(
+            getattr(process.nodes.get(end.node), "utility", None), "supply_temperature", None
+        )
+        if supply is None:
+            continue
+        kelvin = to_kelvin(supply.value, supply.unit or fs.units.temperature)
+        if frozen := sorted(n for n, tm in melting.items() if kelvin < tm):
+            found.append(
+                Finding(
+                    FLOWSHEET_FILE,
+                    "warning",
+                    "cheme.process-condenser-freezing",
+                    f"{node.id}: the still's condenser, its coolant {end.node}'s supply at "
+                    f"{kelvin:g} K lies below the melting point of "
+                    + ", ".join(f"{n} ({melting[n]:g} K)" for n in frozen)
+                    + ": the distillate may freeze on the tubes and block the condenser",
+                    line=_yaml_line(
+                        process.flowsheet_doc,
+                        [*loc, "condenser_port" if spec.condenser_port else "column"],
+                    ),
+                    ids=[node.id, *frozen],
+                    hint="keep the coolant's supply above the distillate's melting point (a "
+                    "tempered coolant), or say why it cannot freeze (a mixture's lower freezing "
+                    "point) in DESIGN.md",
+                )
+            )
     return found
 
 
@@ -1478,16 +1918,17 @@ def rules(process: Any) -> list[Finding]:
                 node.id,
                 "one charge stream into the still, and the feed: stream named by its id",
             )
-        present = _present(process, inlets)
-        for name in spec.nonvolatile:
-            if name not in comps:
-                add(
-                    "error",
-                    f"{node.id}: nonvolatile {name} is not a component",
-                    [*loc, "nonvolatile"],
-                    node.id,
-                    f"declare {name} in process/materials.yaml, or remove it",
-                )
+        known, guessed = _carried(process, inlets)
+        for what in ("nonvolatile", "separate_phase"):
+            for name in getattr(spec, what):
+                if name not in comps:
+                    add(
+                        "error",
+                        f"{node.id}: {what} {name} is not a component",
+                        [*loc, what],
+                        node.id,
+                        f"declare {name} in process/materials.yaml, or remove it",
+                    )
         for name in spec.volatility.alpha:
             if name not in comps:
                 add(
@@ -1497,16 +1938,26 @@ def rules(process: Any) -> list[Finding]:
                     node.id,
                     f"declare {name} in process/materials.yaml, or remove it",
                 )
-        volatile = sorted(n for n in present if n not in spec.nonvolatile and n not in solids)
+        apart = set(spec.separate_phase)
+        stays = {*spec.nonvolatile, *apart, *solids}
+        volatile = sorted(n for n in known if n not in stays)
+        maybe = sorted(n for n in guessed if n not in stays)  # not propagated yet
+        alpha = spec.volatility.alpha
         if spec.volatility.model == "constant":
-            lacking = [n for n in volatile if n not in spec.volatility.alpha]
+
+            def has(n: str, alpha: dict[str, float] = alpha) -> bool:
+                return n in alpha
+
+            lacking = [n for n in volatile if not has(n)]
             what = "a relative volatility (volatility.alpha)"
             hint = "give alpha for each volatile component (to a common reference), or list it "
             hint += "in nonvolatile"
         else:
-            lacking = [
-                n for n in volatile if getattr(comps.get(n), "vapour_pressure", None) is None
-            ]
+
+            def has(n: str, alpha: dict[str, float] = alpha) -> bool:
+                return getattr(comps.get(n), "vapour_pressure", None) is not None
+
+            lacking = [n for n in volatile if not has(n)]
             what = "a vapour_pressure (materials.yaml)"
             hint = "give each volatile component its Antoine vapour_pressure with its source, "
             hint += "or list it in nonvolatile"
@@ -1518,14 +1969,25 @@ def rules(process: Any) -> list[Finding]:
                 node.id,
                 hint,
             )
+        if unknown := [n for n in maybe if not has(n)]:
+            # core#214: only a component the charge holds needs it; the template's may be at 0
+            add(
+                "info",
+                f"{node.id}: the still's inlet has no composition yet; its template lists "
+                f"{', '.join(unknown)} without {what}, needed only if the charge holds them",
+                [*loc, "volatility"],
+                node.id,
+                "run cheme process propagate: the still asks it of a component its charge holds",
+            )
+        in_kw = any(b.unit == "kW" for b in _boilups(spec))
         latent = [
             n for n in volatile if getattr(comps.get(n), "heat_of_vaporization", None) is None
         ]
         if latent:
             add(
-                "error" if spec.boilup.unit == "kW" else "info",
+                "error" if in_kw else "info",
                 f"{node.id}: no heat_of_vaporization of {', '.join(latent)}"
-                + (": the boil-up in kW is not known" if spec.boilup.unit == "kW" else ": no duty"),
+                + (": the boil-up in kW is not known" if in_kw else ": no duty"),
                 [*loc, "boilup"],
                 node.id,
                 "give heat_of_vaporization (kJ/kmol near the still's temperature) in "
@@ -1547,7 +2009,7 @@ def rules(process: Any) -> list[Finding]:
                         f"declare {name} in process/materials.yaml, or name a component of "
                         "the charge",
                     )
-                elif name is not None and (name in spec.nonvolatile or name in solids):
+                elif name is not None and name in stays:
                     add(
                         "error",
                         f"{node.id}: the column's {what} {name} is non-volatile",
@@ -1576,6 +2038,7 @@ def rules(process: Any) -> list[Finding]:
                     "the reboiler's heat comes in on energy_port, the condenser's leaves on "
                     "condenser_port: two streams",
                 )
+        findings += _freezing(process, node, spec, loc, volatile)
         for i, (_, end) in enumerate(spec.ends()):
             if end is not None and end.purity is not None and end.purity.key not in comps:
                 add(
@@ -1592,6 +2055,15 @@ def rules(process: Any) -> list[Finding]:
                     [*loc, *(["cuts", i, "end"] if spec.cuts else ["end"]), "residue"],
                     node.id,
                     "name a component of the charge",
+                )
+            elif end is not None and end.residue is not None and end.residue.key in apart:
+                add(
+                    "error",
+                    f"{node.id}: the end's residue key {end.residue.key} is in a phase of its "
+                    "own (separate_phase): it has no share of the liquid",
+                    [*loc, *(["cuts", i, "end"] if spec.cuts else ["end"]), "residue"],
+                    node.id,
+                    "name a component of the still's liquid",
                 )
     return findings
 
@@ -1722,6 +2194,24 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         ],
         "notes": result.notes,
     }
+    own = {c.outlet: c for c in spec.cuts if c.pressure is not None or c.boilup is not None}
+    for cut in entry["solution"]["cuts"]:  # a cut's own pressure and boil-up (ADR 0068)
+        if (given := own.get(cut["outlet"])) is not None:
+            cut["pressure_kPa"] = next(c.pressure for c in result.cuts if c.outlet == given.outlet)
+            boil = given.boilup or spec.boilup
+            cut["boilup"] = {"value": boil.value, "unit": boil.unit}
+    if spec.heat_up_time:  # ADR 0068
+        sol = entry["solution"]
+        sol["heat_up_time_h"] = (
+            result.heat_up_time / 3600.0 if result.heat_up_time is not None else None
+        )
+        sol["time_h"] = (
+            (result.time + result.heat_up_time) / 3600.0
+            if result.heat_up_time is not None
+            else None
+        )
+        if result.heat_up_time_missing:
+            sol["heat_up_time_missing"] = result.heat_up_time_missing
     if result.column is not None:
         sol = entry["solution"]
         sol["column"] = result.column
@@ -1880,6 +2370,16 @@ def report_text(report: StillReport) -> str:
                     else ""
                 )
             )
+            if "heat_up_time_h" in sol:  # ADR 0068
+                lines.append(
+                    f"  heat-up {num(sol['heat_up_time_h'], ' h', '.4g')} at the boil-up's heat "
+                    f"input, {num(sol['time_h'], ' h', '.4g')} with the boil-up"
+                    + (
+                        f"; missing {sol['heat_up_time_missing']}"
+                        if "heat_up_time_missing" in sol
+                        else ""
+                    )
+                )
             if "duty_terms_kW" in sol:  # the heat-up and the vessel's metal (ADR 0063)
                 terms = ", ".join(f"{k} {v:.6g}" for k, v in sol["duty_terms_kW"].items())
                 lines.append(
@@ -1936,6 +2436,10 @@ def report_text(report: StillReport) -> str:
                     extra = f", ends at {a['end_time_h']:.4g} h" + (
                         f", {a['end_temperature_K']:.5g} K" if a["end_temperature_K"] else ""
                     )
+                if "pressure_kPa" in a:  # its own pressure and boil-up (ADR 0068)
+                    b = a["boilup"]
+                    extra += f", at {num(a['pressure_kPa'], ' kPa(a)', '.5g')}, boil-up "
+                    extra += f"{b['value']:g} {b['unit']}"
                 if a.get("mass_fractions"):
                     extra += "; " + ", ".join(
                         f"{n} {x * 100:.4g} wt%" for n, x in a["mass_fractions"].items()

@@ -258,6 +258,15 @@ def _reactor_basis(
                 from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
 
                 assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
+            if vent is not None and (
+                vent.inerts
+                or vent.heat_of_absorption is not None
+                or vent.head_space is not None
+                or (vent.vapour is not None and vent.vapour.henry)
+            ):
+                from chemeascode.domains.process.vent_vapour import GAS_ASSUMPTIONS
+
+                assumptions += list(GAS_ASSUMPTIONS)  # inerts, head space, absorption (ADR 0071)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled
@@ -607,7 +616,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         if not _sourced(vol):
             lacking.append("ideal liquid (volatility assumed)")
         comps = process.components()
-        stays = set(spec.nonvolatile) | solid_components(process)
+        stays = set(spec.nonvolatile) | set(spec.separate_phase) | solid_components(process)
         for name in sorted(_present(process, inlets_of(process, node)) - stays):
             vp = getattr(comps.get(name), "vapour_pressure", None)
             if _sourced(vp):

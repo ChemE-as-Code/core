@@ -1,0 +1,6 @@
+name: process-design-spec
+description: A loop reactor whose feed and purge are solved for a product rate and an inert level (design specifications), with a component separator, by cheme process propagate (ADR 0070)
+stage: concept
+sheets:
+  - {id: BFD, kind: bfd, title: Block flow diagram}
+  - {id: PFD, kind: pfd, title: Process flow diagram}

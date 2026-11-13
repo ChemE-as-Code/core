@@ -43,6 +43,14 @@ whole runs of the batch, so the dissolved gas counts in the liquid's volume and
 concentrations as it forms. What was charged or dosed of ``g`` stays (the vent takes only what
 forms): a liquid that starts above its solubility stays there, with a note.
 
+**Degassing (ADR 0071).** A dissolved gas without a vapour pressure (``vapour.henry``) is
+carried like a vapour at ``y_g = H_g(T) x_g / P`` (Henry's law instead of Raoult's), so the gas
+through the vessel strips what was charged, dosed or formed of it; it never condenses (a vent
+condenser passes it as a gas), and its heat of absorption, where given, is its heat of
+desorption as it leaves. Any volatile component, by Raoult's law or Henry's, is degassed so:
+the vapour needs only a carrier, which a formed gas, a dose's inerts and the head space's gas
+(:mod:`.stirred_tank`) give.
+
 Pure Python, deterministic (ADR 0010).
 """
 
@@ -64,6 +72,20 @@ ASSUMPTIONS = (
     "condensate; the vent's gases do not dissolve in it",
     "a henry component: the liquid at the end saturated at the gas's partial pressure over it "
     "(Henry's law), the same dissolved share of what forms over the run",
+)
+
+#: What a vent's inerts, head space, degassing and heat of absorption take for granted (ADR
+#: 0071), reported beside :data:`ASSUMPTIONS` by a vent that declares them.
+GAS_ASSUMPTIONS = (
+    "the vent's inerts never dissolve: a dose's share of them passes straight through",
+    "the head space is well mixed, at the vessel's temperature and pressure, saturated with "
+    "the liquid's vapour; the gas it expels is the head space's; when it expands it draws back "
+    "gas from the vent line, none of it vapour; its own vapour is not in the balance, and its "
+    "inert left at the end leaves by the vent without vapour",
+    "a dissolved gas with vapour.henry degasses at Henry's law in an ideal dilute solution and "
+    "never condenses",
+    "a vent gas's heat of absorption is constant: released as the formed gas's dissolved share "
+    "forms, taken back as a degassing gas leaves",
 )
 
 #: Successive substitution of the Henry shares: at most this many runs of the batch.
@@ -93,6 +115,20 @@ class VentPhase:
     #: the condensate runs back into the vessel (else it leaves by a stream)
     returns: bool = True
     henry: Mapping[str, Any] = field(default_factory=dict)
+    #: ADR 0071: the dissolved gases that degas by Henry's law (``vapour.henry``), among
+    #: ``volatile``: carried at ``H x / P``, never condensed
+    degassing: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def condensable(self) -> list[str]:
+        """The volatile components a vent condenser condenses (not a degassing gas)."""
+        return [n for n in self.volatile if n not in self.degassing]
+
+    def _pressure(self, name: str, t: float) -> float:
+        """kPa: the Antoine vapour pressure, or a degassing gas's Henry constant, at *t* K."""
+        if name in self.degassing:
+            return self.degassing[name].kpa(t)[0]
+        return self.vapour_pressure[name].kpa(t)
 
     def saturation(self, liquid: Mapping[str, float], t: float, p: float) -> dict[str, float]:
         """The vapour's mole fraction ``y_i`` of each volatile component over the *liquid*
@@ -105,7 +141,7 @@ class VentPhase:
             n: self.activity.get(n, 1.0)
             * max(liquid.get(n, 0.0), 0.0)
             / total
-            * self.vapour_pressure[n].kpa(t)
+            * self._pressure(n, t)
             / p
             for n in self.volatile
         }
@@ -118,6 +154,11 @@ class VentPhase:
             )
         return found
 
+    def k_values(self, t: float, p: float) -> dict[str, float]:
+        """``K_i = gamma_i P_i^sat(T) / P`` (or ``H_i(T) / P`` of a degassing gas) of each
+        volatile component at *t* K and *p* kPa(a): ``y_i = K_i x_i``."""
+        return {n: self.activity.get(n, 1.0) * self._pressure(n, t) / p for n in self.volatile}
+
     def carried(self, liquid: Mapping[str, float], t: float, p: float) -> dict[str, float]:
         """kmol of each volatile component per kmol of non-condensable gas leaving the vessel:
         ``y_i / (1 - Y)``."""
@@ -126,9 +167,9 @@ class VentPhase:
         return {n: v / rest for n, v in y.items()}
 
     def condenser_k(self, p: float) -> dict[str, float]:
-        """``K_i = P_i^sat(T_c) / P`` of each volatile component (an ideal condensate)."""
+        """``K_i = P_i^sat(T_c) / P`` of each condensable component (an ideal condensate)."""
         assert self.condenser is not None
-        return {n: self.vapour_pressure[n].kpa(self.condenser) / p for n in self.volatile}
+        return {n: self.vapour_pressure[n].kpa(self.condenser) / p for n in self.condensable}
 
 
 def condense(gas: float, vapour: Mapping[str, float], k: Mapping[str, float]) -> dict[str, float]:
@@ -175,6 +216,9 @@ def condenser_heat(
     ideal-gas data: a minor term, as a dosed gas's warming in ADR 0054)."""
     assert phase.condenser is not None
     tc = phase.condenser
+    if phase.degassing:  # a degassing gas passes as a gas (ADR 0071)
+        gases = {**gases, **{n: v for n, v in evaporated.items() if n in phase.degassing}}
+        evaporated = {n: v for n, v in evaporated.items() if n not in phase.degassing}
     lacking = sorted(
         {n for n, v in condensed.items() if v > 0 and not phase.heat_of_vaporization.get(n)}
     )
@@ -209,10 +253,15 @@ def phase_of(process: Any, vent: Any, names: list[str], gas: Mapping[str, Any]) 
     component without a vapour_pressure."""
     comps = process.components()
     spec = vent.vapour
-    gases = set(vent.components)
+    gases = {*vent.components, *vent.inerts}
+    degassing = dict(spec.henry)
     if spec.components:
         volatile = list(spec.components)
-        if lack := [n for n in volatile if getattr(comps.get(n), "vapour_pressure", None) is None]:
+        if lack := [
+            n
+            for n in volatile
+            if n not in degassing and getattr(comps.get(n), "vapour_pressure", None) is None
+        ]:
             raise VentError(
                 "vent.vapour: no vapour_pressure (Antoine) for " + ", ".join(lack) + " in "
                 "materials.yaml"
@@ -221,15 +270,25 @@ def phase_of(process: Any, vent: Any, names: list[str], gas: Mapping[str, Any]) 
         volatile = [
             n
             for n in names
-            if n not in gases and getattr(comps.get(n), "vapour_pressure", None) is not None
+            if n not in gases
+            and n not in degassing
+            and getattr(comps.get(n), "vapour_pressure", None) is not None
         ]
+    volatile += [n for n in degassing if n not in volatile]
+    # a degassing gas's heat of desorption: minus its heat of absorption (ADR 0071)
+    absorption = vent.heat_of_absorption.values if vent.heat_of_absorption is not None else {}
     condenser = vent.condenser
     return VentPhase(
         volatile=volatile,
-        vapour_pressure={n: comps[n].vapour_pressure for n in volatile},
+        vapour_pressure={n: comps[n].vapour_pressure for n in volatile if n not in degassing},
         activity=dict(spec.activity),
         heat_of_vaporization={
-            n: getattr(comps.get(n), "heat_of_vaporization", None) for n in volatile
+            n: (
+                (-absorption[n] if n in absorption else None)
+                if n in degassing
+                else getattr(comps.get(n), "heat_of_vaporization", None)
+            )
+            for n in volatile
         },
         liquid_heat_capacity={
             n: getattr(comps.get(n), "liquid_heat_capacity", None) for n in volatile
@@ -238,6 +297,7 @@ def phase_of(process: Any, vent: Any, names: list[str], gas: Mapping[str, Any]) 
         condenser=condenser.temperature if condenser is not None else None,
         returns=condenser is None or condenser.returns == "vessel",
         henry=dict(vent.henry),
+        degassing=degassing,
     )
 
 
@@ -258,5 +318,6 @@ def inputs(process: Any, vent: Any, phase: VentPhase | None) -> dict[str, Any]:
                 "heat_of_vaporization": phase.heat_of_vaporization.get(n),
             }
             for n in phase.volatile
+            if n not in phase.degassing  # a degassing gas's constants are in the vent's dump
         }
     }

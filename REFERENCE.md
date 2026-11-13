@@ -116,7 +116,7 @@ cheme check                                   # engineering-step gates (checks/c
 cheme cause-effect                            # build/cause-effect.html + .csv
 cheme process build                           # BFD and PFD from process/materials.yaml + flowsheet.yaml
 cheme process streams [--md]                  # stream table with provenance, block balances
-cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors; recycles at tears:
+cheme process propagate --fill                # compositions/flows through mixers, splitters, reactors, separators (recovery:); recycles at tears:, feeds for specs:
 cheme process reactors                        # per reactor: extents, heats of reaction, ln(Q/K), duty
 cheme process crystallizers                   # per crystallizer/filter/dryer: basis, crystals, recovery, dry solid, moisture, duty
 cheme process stills                          # per batch still/solvent swap/column: cuts, residue, purity, recovery, reflux, boil-up time, duty per batch
@@ -912,7 +912,9 @@ Their source is two YAML files, schema `cheme/process/v1`:
   `streams` from port to port with a per-case `state` (pressure, temperature, flow, duty,
   composition, phase), `links` to the lists and sheets, `layout.bfd` / `layout.pfd` pins, and
   optionally `tears` and `convergence` (the recycle loops `process propagate` converges, ADR
-  0060). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
+  0060) and `specs` (design specifications: feeds or splits it solves for a stream target, ADR
+  0070); a block or step may give `recovery` (a component separator's specified split, ADR
+  0070). Each value carries `provenance: given | assumed | calculated` and, when given, a `source`.
   A value or composition may give an `uncertainty` (the LCA's shape, e.g. `{gsd2: 1.2}` or
   `{distribution: triangular, low: 0.9, high: 1.1}`); `cheme assess lca` samples a feed's or
   product's flow with it, and no calculated value's fingerprint includes it. An optional
@@ -1065,7 +1067,29 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   moment's content, or of a reaction consuming a product of the one setting the MTSR);
   `cheme.reactor-hazard-vent`
   warns without `hazard.vent_capacity` (m3/h) or above it, and is info within it. The pressure
-  of a blocked vent is not screened.
+  of a blocked vent is not screened. ADR 0069 (`domains/safety/reaction_network.py`):
+  `hazard.potential: network` takes dT_ad and the MTSR from the counted reactions as a network,
+  the largest heat forward extents of them together release from the content (a linear
+  programme: a consecutive reaction on a product adds its heat, of competing ones the more
+  exothermic takes the reactant); a batch or semi-batch with a consecutive pair reports it
+  without the choice (JSON `network`, a text line, a note where it is above the largest single
+  reaction's MTSR). A semi-batch gives each dosed reactant's largest accumulation and the share
+  of it the reactions can still consume (`accumulations`: `max`, `reactive_max`; a deliberate
+  excess is not reactive; with more than one dosed reactant or an excess). A vented
+  semi-batch's `gas_release.largest_over_batch` is the largest release over the batch, each
+  step's content at its MTSR with the liquid's vapour (at most what the reactions' heat there
+  evaporates, `heat_limited`), by component, and the `-vent` check
+  takes the larger of it and the release at the MTSR. A content boiling at the MTSR gets
+  `gas_release.boil_up`: its bubble point, the reactions' heat there and the vapour it boils
+  off (kmol/s, m3/h). `dissolved_release` gives the dosed and dissolved gases (and vent
+  components boiling below the MTSR) held in the liquid at their largest over the batch, kg per
+  batch, their boiling point against the MTSR and what the gas release strips of them
+  (`cheme.reactor-hazard-dissolved`, info). The default MTT counts a product a counted reaction
+  forms in the liquid (at least 5 % of it once formed, boiling at or above `T_p`);
+  `hazard.mtt_from: bubble-point` takes the MTT from the content's bubble point at the vessel's
+  pressure instead (Raoult's law over `vapour_pressure`, else `normal_boiling_point` and
+  `heat_of_vaporization`; the lower of the worst moment's content and that after the cooling
+  failure; dissolved gases left out; JSON `bubble_point`).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
   [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
@@ -1197,8 +1221,51 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   temperature (an isothermal batch: its liquid outlet's given temperature, which the model
   holds it at, else the charge's; a warning for an adiabatic one, at its charge's); (warning) a
   `vapour` with no volatile
-  component. The vent carries vapour only on the gas the reactions form and a passing dose: a
-  displaced head space or a sweep gas is not modelled.
+  component.
+  A gas-liquid batch may say more still (ADR 0071; a vent without these keys, a component
+  without `melting_point`, solves as in 1.11.0): `inerts: [N2]` are gases that never dissolve:
+  a dose's share of them passes straight through to the vent (a nitrogen sweep or purge dosed
+  with `start` and `time`, the nitrogen of a dosed air), each carrying the liquid's vapour like
+  a formed gas; `components` may then be empty (a vent of a sweep alone), and an inert in the
+  charge is refused. `head_space: {stream, provenance, source}` (needs `inerts`) pads the
+  vessel's head space by `stream`, an inlet of the step that carries only inerts (its kmol/h:
+  the head space's inert at the start); the vessel is the charge's volume plus that head space
+  at the start, saturated; the head space holds `(1 - Y) P (V_vessel - V) / (R T)` and expels,
+  vapour-laden, what a dose displaces, a rising vapour pressure or a warming pushes out, with
+  what forms and passes through; what it holds at the end leaves by the vent too (with the
+  next charge), and a liquid that fills the vessel is refused. A batch with a head space takes
+  one charge stream besides the pad. `vapour.henry: {gas: {points: [[K, kPa]], provenance}}`
+  degasses a dissolved gas with no Antoine `vapour_pressure` in `materials.yaml` (a dilute
+  solute such as HCl, or a gas above its critical point) at `y = H x / P`; it never condenses
+  (a vent condenser passes it as a gas). Any vapour component, by Raoult's law or Henry's, is stripped by whatever gas leaves, so a charged or dosed excess
+  degasses under a sweep. `heat_of_absorption: {values: {gas: kJ/kmol}, provenance}` (negative:
+  released) is released as a formed gas's dissolved share forms (`1 - fraction`, or its Henry
+  share: the duty's term `absorption`, the adiabatic balance, the peak cooling duty; not the
+  MTSR) and taken back by a degassing gas as it leaves (in its `vent vapour` term). `process
+  reactors` adds the head space (`vent.head_space`: `vessel_m3`, `start_m3`, `end_m3`,
+  `start_kmol`, `end_kmol`, `expelled_kmol`, per hour of charge), `reactor-hazards` leaves the
+  inerts and the pad out of the content and the MTT, and a vent of inerts only has no formed-gas
+  release at the MTSR (with `vapour`, a content boiling at the MTSR still reports its boil-up,
+  `gas_release.boils` and `boil_up`, and the `-vent` warning); it takes a `vapour.henry` gas at
+  `H x / P` in the gas release and leaves it out of the default MTT and the bubble point as a
+  dissolved gas (dosed or not) whatever its share or boiling point (`mtt_left_out`,
+  `dissolved_release`, with or without a `normal_boiling_point`); a boil-up at the MTSR that
+  carries it asks for its `heat_of_absorption` (its heat of desorption), not its
+  `heat_of_vaporization`; a vapour whose latent heat is not positive (an endothermic
+  absorption, a positive `heat_of_absorption`, outweighing the liquids') leaves the boil-up
+  unsized, with `missing` saying why.
+  `cheme.process-reactor` adds: an inert or degassing gas undeclared, an
+  inert in a reaction, a pad that is no material inlet of the step or carries more than the
+  inerts, a vent template lacking an inert. `cheme.process-condenser-freezing` (warning): a
+  vent condenser's outlet temperature, or the `supply_temperature` of the utility its
+  `energy_port` stream runs to, below a condensed component's `melting_point` (K, on the
+  component in `materials.yaml`; the pure component's, no freezing-point depression): keep both
+  above it (a tempered coolant) or say in DESIGN.md why the mixture cannot freeze. The rule
+  also checks a batch still's condenser: the `supply_temperature` of the utility its
+  `condenser_port` stream (by default a column's one heat stream out) runs to, below the
+  `melting_point` of a component its distillate's cuts carry at 1 mol% or more. Not
+  modelled: a pressure balance (the vessel stays at its stream pressure), mass-transfer limits,
+  a content at its boiling point.
 - **Liquid-phase reactions**: a reaction with `phase: liquid` takes its `equilibrium_constant`
   on `basis: mole_fraction`, `activity` (UNIFAC from the components' CAS numbers, extra
   `props`; `activity_model: ideal` in `reactions.yaml` for activity coefficients of 1) or
@@ -1282,10 +1349,22 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   Pa | mmHg, temperature_unit: K | degC, temperature_range}` in `materials.yaml`, by default
   the NIST form `log10(P/bar) = a - b/(T/K + c)`), or from a constant relative volatility
   (`{model: constant, alpha: {component: value}}`). `nonvolatile:` components (and solid
-  components) stay in the still.
+  components) stay in the still, counted in the liquid as dissolved solutes.
+  `separate_phase: [ids]` (ADR 0068) lists components in a phase of their own (a suspended
+  solid, an immiscible non-volatile liquid, a salt): they stay in the still and are left out of
+  the liquid's mole fractions (the bubble point, the vapour, a residue end's and the profile's
+  key fraction, a column's still liquid). A residue end on a still with it is the key's share
+  of the liquid, not of the pot.
   - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
-    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol) or 1/h (kmol of vapour
-    per hour per kmol of charge).
+    / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol), 1/h (kmol of vapour
+    per hour per kmol of charge) or m3/h (raoult, ADR 0068: the vapour's volume at the still's
+    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity).
+  - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
+    `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
+    cuts. At a change of pressure the still steps to the new bubble point (a note; the flash or
+    the heating between is not in the time or the duty). Without a feed the first cut's
+    pressure is the still's from the start. `process stills` gives `pressure_kPa` and `boilup`
+    for a cut with its own.
   - The still stops at `end:` (one of `distilled` with `basis: mole | mass`, `residue: {key,
     mole_fraction}`, `time` s of boil-up, `temperature` K, `purity: {key, fraction}` with
     `basis: mole | mass`: the cut's mean share of the key falls to the fraction, a product cut
@@ -1311,12 +1390,32 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `validate` reports `cheme.process-still`: ports, charge and feed, unknown components, and
     missing vapour pressures, relative volatilities or (for kW) heats of vaporization; without
     those otherwise it is info, no duty. The components it checks are those its inlets'
-    compositions carry (an inlet's template only while it has none). A `heat_of_vaporization`
+    compositions carry at a non-zero amount (an inlet's template, while it has none, only as an
+    info: needed only if the charge holds them). A `heat_of_vaporization`
     below 2000 kJ/kmol is a warning: NIST gives kJ/mol, times 1000.
   - A residue end's direction is the target's: the key falls to a target below its share, or
     rises to one above it; a target it never reaches is an error, not an empty cut. Each cut's
     energy is its own. An end at a time with the recipe's batch-size stream downstream of the
-    still is circular and refused.
+    still is circular and refused, unless every boil-up up to that end is specific (1/h); only
+    the boil-ups the still runs at count (a still's own `boilup` that every cut replaces, with
+    no feed, is not used: no unit or heat_of_vaporization check, no hours in a fingerprint).
+    An end at a share distilled, a time or a purity that the still cannot reach before it
+    boils dry is an error at the first step that shows it, without waiting for the pace
+    check below ("boils dry before its end"): at most the volatile content left is still
+    distilled (by mole, or its mass), in at most its kmol times the most s per kmol of any
+    vapour of it (the largest heat of vaporization for kW, the heaviest molar mass for kg/h,
+    2000 K for m3/h) times R + 1 at the highest reflux (`ratio`, or `maximum_ratio`), and a
+    cut's mean share of its purity key falls no lower than its key over the cut and all the
+    other volatile content left (by mole, or by mass). That floor rises from 0 as the cut
+    fills, so a purity end below it is refused only once the floor passes it, not at the
+    cut's first step (a 50/50 binary's cut without a column at 0.4 of its light component with
+    45 % of the volatile content left, at 0.499 with 3 %). A still
+    whose boil-up crawls near empty (a column on a trace it enriches, before an end next to
+    its dry point) is checked after 500 small steps in a row: if at that pace its end is not
+    reached within 10^6 steps in all, it stalls (`cheme.process-still-unsolved`: the volatile
+    kmol left, and to end the cut earlier): an error, not a hang, though it can take minutes.
+    A volatile component falling 1000-fold in that run is progress, and an amount below 1e-100
+    of the charge and feed is taken as gone.
   - `still.heat_up: true` (raoult, ADR 0063) adds the charge heated from its inlet
     temperature to its bubble point to the duty (`charge heat-up`), and a swap's feed warmed
     from its inlet temperature to the still's as it mixes in (`feed heat-up`, the still's
@@ -1324,6 +1423,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     whole energy per batch on the duty's basis (`total_energy_kWh_per_batch`, beside the year
     average; `energy_kWh_per_batch` stays the latent heat) and assumptions that say what the
     duty holds.
+  - `still.heat_up_time: true` (raoult, ADR 0068): the duty's terms besides the boil-up (the
+    charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the still's own
+    boil-up's heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` over the cuts
+    collected at it (a boil-up in kW: its value; a cut's own boil-up, a forerun the vacuum pump
+    limits, limits the vapour, not the heating; every cut with its own: the mean over the whole
+    boil-up); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
+    heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
+    takes no time; the metal is timed from its start to the still's first bubble point `T_0`
+    and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
+    vacuum ramp that ends below the charge still times the metal's heat-up.
+  - An end at a temperature (or any end) stops where the integrator found it (core#198: a
+    re-evaluation of the bubble point there could fall short and report a dry still). Only a
+    component the charge or the feed holds at a non-zero amount needs volatility data
+    (core#214); a component only an inlet's template lists (before propagate) is an info.
   - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
     boils (and the heat-up without `heat_up`), losses, constant level by volume. `process
     simulate` does not couple it.
@@ -1519,8 +1632,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   conversion) converts its fraction of each key component's inlet flow; a crystallizer or a
   filter (`crystallizer:`, `solid_separation:`, below) fills its outlets; a batch,
   semi-batch, still, crystallizer or conversion step writes its duty on its energy stream
-  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`). Other
-  separators, and reactors without conversions, are only checked, never solved. Values are
+  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`); a
+  component separator (`recovery:`, below) splits each component of its inlets by its given
+  fractions. Other separators, and reactors without conversions, are only checked, never
+  solved. Values are
   `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
   are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
   prints the run as an adapter result (`cheme/adapter-result/v1`, `cheme schema
@@ -1566,6 +1681,74 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     for Wegstein). Tears are declared, never chosen.
     `examples/process-purge-loop` is a loop reactor with a recycle split whose steady state is
     analytic (`tests/test_recycle.py`).
+  - **Component separators** (ADR 0070). A block or step without another model (reactions,
+    still, crystallizer, filter, dryer) and of a separating or generic class may give its split:
+
+    ```yaml
+    recovery:
+      outlets: {dry: {TBA: 0.99, H2O: 0.0074358}}   # outlet port -> component -> share of its inlet flow
+      provenance: assumed
+      source: "scripts/makeup_drying.py (D-004)"
+    ```
+
+    Each listed port takes its share of each component's inlet flow (all material inlets
+    together; a component it does not name: none); one material outlet may be left out and
+    takes the rest. Propagate writes the outlets' flows and compositions (`separator <node> from
+    <inlets>`); temperatures and pressures stay as given. The split is specified, not
+    predicted. `cheme validate` reports a `recovery:` that does not fit as `cheme.process-recovery`
+    (error): beside another model, on a mixer, splitter, pass-through or reactor class or on a
+    block with steps inside, a port that is no material outlet, two outlets left out, an
+    undeclared component, a fraction outside [0, 1], or a component's fractions summing beyond 1
+    (with every outlet listed: to other than 1).
+  - **Design specifications** (ADR 0070). `specs:` adjusts one variable per spec until a stream
+    target is met, solved together with the tears:
+
+    ```yaml
+    specs:
+      - id: rate
+        vary: {stream: S4, initial: 70, with: {S1: 1.89688, S3: 0.26124}}  # a feed; followers at fixed ratios
+        target: {stream: S24, quantity: annual, value: 1000, unit: t}         # hours: the recipe's
+        provenance: given
+        source: "design basis: 1000 t/a (D-002)"
+      - id: purge
+        vary: {node: X1, port: purge, initial: 0.1}                           # a splitter outlet
+        target: {stream: S2, component: C3, quantity: fraction, basis: mass, value: 0.1}
+        provenance: assumed
+    ```
+
+    `vary` is a feed stream's flow (`unit`, default `units.flow`; `low`, `high`; `with:` the
+    feeds that follow it, stream -> ratio, so charge ratios are kept) or the fraction of a
+    splitter's inlet to an outlet its `split:` leaves out (`low`/`high` within [0, 1]). The
+    varied flows must not be given or assumed: they are written `calculated`, source `spec <id>
+    (<target>)`. `target` is a stream's (or one `component`'s) `flow` (a flow unit), `annual`
+    amount (`t` or `kg` per year: the flow times `hours`, default the recipe's
+    `hours_per_year`), `ratio` to `per: {stream, component}` or `fraction` of the stream (`basis:
+    mole`, the default, or `mass`); `tolerance` is relative (default 1e-6), `cases` the cases it
+    holds in (default all). Propagate solves the tears' component flows and the variables
+    together by Newton's method with a finite-difference Jacobian kept current by Broyden's
+    update (the recycle's method then reads `broyden`); without tears, one sweep per step. The
+    values written come from one more sweep at six digits, so a target reads within the six
+    digits written. `cheme.process-design-spec` is info per spec met (the variable, a split's
+    fraction, the target reached, the sweeps), and a warning for one that cannot be met (the
+    target does not depend on the variable, has no value, lies beyond the bounds (a variable
+    held at a bound, or at a bound where the target no longer moves, such as a purge of 1 that
+    empties the loop torn after it), or is not met
+    in `convergence.max_iterations`): nothing that depends on the specs or the tears is then
+    written, and `--json` is `not-converged`. `cheme validate` reports a spec that cannot be
+    solved as declared as `cheme.process-spec` (error): an id or variable named twice, an
+    unknown case, stream, component or unit, a varied stream that is no feed, is a tear or has
+    a given or assumed flow, a split of no splitter or of a port its `split:` fixes, splits that
+    leave a splitter no outlet for the remainder (its `split:` and the specs of a case fix every
+    outlet), a split's `low`, `high` or `initial` above 1, an initial value outside the bounds, an annual target without hours, a flow target on its own
+    variable. In a batch plant the flowsheet holds year averages: a spec on the annual product
+    sets the flowsheet's rate, and the recipe's batch size must make it, `batch = rate x
+    cycle(batch)`, where the cycle depends on the batch (jacket and dosing times, a still, a
+    filter or a dryer). `cheme.recipe-basis` names the batch size that closes it and its cycle,
+    or, when the cycle grows about as fast as the batch, the most the batches tried made (the
+    train's capacity); set it in `process/recipe.yaml` and run `--fill` again.
+    `examples/process-design-spec` is a loop reactor with a component separator whose fresh
+    feed and purge are solved for a product rate and an inert level, against their closed form
+    (`tests/test_design_spec.py`).
 - **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
   vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
   process's property package (`property_method.package` in `materials.yaml`, else the package

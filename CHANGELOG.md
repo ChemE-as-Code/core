@@ -18,26 +18,173 @@
   `cheme process props` and the datasheet fill; `Package.enthalpy` and a `Result.enthalpy` of
   None for a package that claims no enthalpy (an exchanger duty from it is refused:
   `cheme.datasheet-fill-property-unsupported`).
+- Batch still (ADR 0068, core#182): `still.separate_phase: [ids]`, components in a phase of their
+  own (a suspended solid, a salt, an immiscible non-volatile liquid) left out of the liquid's mole
+  fractions for Raoult's law, the residue end and a column; `cuts[].pressure` and `cuts[].boilup`, a
+  cut's own pressure and boil-up (a vacuum ramp in steps, a forerun the vacuum pump limits), with a
+  note where the still steps to the new bubble point; a boil-up in `m3/h`, the vapour's volume at
+  the still's temperature and pressure; `still.heat_up_time: true`, the heat-up of the charge, a
+  swap's feed and the vessel's metal (ADR 0063) timed at the still's own boil-up's heat input (a
+  cut's own boil-up, a forerun the vacuum pump limits, does not slow it; every cut with its own: the
+  mean over the boil-up), in `cheme process stills` (`heat_up_time_h`, `time_h`) and in a recipe
+  `distil` operation `from:` the still (the metal timed to the still's first bubble point even where
+  a vacuum ramp ends it colder; `heat_up_time` is in neither the outlets' nor a tear's fingerprint).
+  A still's own `boilup` that every cut replaces (no feed) is not used: it is not checked, and it
+  does not make an end at a time circular with the recipe's batch size. A still that uses none of
+  them dumps, fingerprints and solves as before.
+- Thermal screening beyond the largest reaction (`cheme process reactor-hazards`, ADR 0069,
+  core#178; `domains/safety/reaction_network.py`):
+  - `hazard.potential: network`: dT_ad and the MTSR (every step, the profile, the worst moment)
+    from the counted reactions as a network, the largest heat forward extents of them together
+    release from the content (a linear programme, simplex with Bland's rule): a consecutive
+    reaction on a product adds its heat (copper(I) chloride: 46.0 K against the chlorination's
+    36.9 K). A batch or semi-batch with a consecutive pair among its counted reactions reports
+    it without the choice (JSON `network`, a text line, a note where it is above the largest
+    single reaction's MTSR). With a counted reaction's heat unknown and the known ones
+    releasing no heat together, the network leaves dT_ad, the MTSR and the class unset (named
+    under `-missing`), as without it.
+  - A semi-batch's accumulation of each dosed reactant and the share of it the reactions can
+    still consume (JSON `accumulations`: `max`, `time_s`, `reactive_max`, `reactive_time_s`;
+    with more than one dosed reactant, or where a deliberate excess is not reactive).
+  - A vented semi-batch's largest gas release over the batch (`gas_release.largest_over_batch`:
+    every step's content at its own MTSR, with the liquid's vapour, by component, and its ratio
+    to the vent capacity; the vapour at most what the reactions' heat there evaporates,
+    `heat_limited`), and a content boiling at the MTSR its boil-up at its bubble point
+    (`gas_release.boil_up`: the reactions' heat there over the vapour's latent heat, kmol/s and
+    m3/h).
+  - The dosed, dissolved and vented gases held in the liquid a cooling failure can release, at
+    their largest over the batch, kg per batch, with their boiling point against the MTSR and
+    what the gas release strips of them (JSON `dissolved_release`; new rule
+    `cheme.reactor-hazard-dissolved`, info).
+  - `hazard.mtt_from: bubble-point`: the MTT from the content's bubble point at the vessel's
+    pressure (Raoult's law over the components' `vapour_pressure`, else `normal_boiling_point`
+    and `heat_of_vaporization`), the lower of the worst moment's content and that after the
+    cooling failure (JSON `bubble_point`); a product boiling below `T_p` (a gas formed in a
+    closed vessel) does not boil there, as the default MTT leaves it out.
+  - `stirred_tank.extent_rates` and `vent_gas_rates` (the rates for many contents, the mixture
+    built once); `CoolingPoint.heats` and `.capacity`, `TankResult.dosed_reactants`.
+- Design specifications in `cheme process propagate` (`specs:` in `process/flowsheet.yaml`, ADR
+  0070, core#181 part 2): a feed stream's flow (with the feeds that follow it at fixed ratios,
+  `with:`, so charge ratios are kept) or a splitter outlet's fraction adjusted until a stream
+  target is met: a flow, an annual amount (default hours: the recipe's `hours_per_year`), a
+  ratio to another stream or component, or a component's fraction. They are solved together
+  with the tears of ADR 0060 by Newton's method with Broyden's update. The adjusted flows are
+  `calculated` (source `spec <id> (...)`) and fingerprinted on the specs and their upstream
+  inputs. `cheme.process-design-spec` (propagate) reports each spec met (info) or not met
+  (warning: target independent of its variable, beyond the bounds, no value, not met in the
+  iterations; nothing that depends on them is then written); `cheme.process-spec` (validate)
+  lists specs that cannot be solved as declared. On a scratch copy of the library's
+  potassium-tert-butoxide-1, the make-up holding the charge ratio and the feed for 1000 t/a
+  converge with the 0.995-gain alcohol loop in 3 iterations (8 sweeps), where Wegstein took 156
+  iterations for the loop alone with the make-up tuned by hand.
+- Component separators solved from their specified split (`recovery:` on a block or step, ADR
+  0070, core#181 part 3): per outlet port, the share of each component's inlet flow, one outlet
+  left out for the rest. Propagate writes the outlets' flows and compositions; such a separator
+  was only checked before. `cheme.process-recovery` (validate) checks the declaration.
+- `recipe.batch_for_rate`: the batch size whose cycle makes a rate, `batch = rate x
+  cycle(batch)`, with the cycle's dependence on the batch (jacket, dosing, still, filter and
+  dryer times); each secant step stays within a factor 2 of the batches tried, so a rate the
+  recipe cannot make does not extrapolate to a batch its units cannot run.
+- `examples/process-design-spec`: an isomerisation loop with a component separator, its fresh
+  feed solved for 8000 t/a of isobutane and its purge for 10 wt% propane in the reactor feed,
+  against the closed form (`tests/test_design_spec.py`).
+- Gas-liquid batch (ADR 0071, core#179): `batch.vent.inerts` (gases that never dissolve: a
+  dose's share passes straight through to the vent, carrying the liquid's vapour; a vent of a
+  sweep alone needs no `components`), `batch.vent.head_space: {stream, provenance}` (the
+  vessel's head space padded by an inlet of inerts; it expels its gas, vapour-laden, as a dose
+  displaces it, the vapour pressure rises or it warms, and its gas left at the end leaves by
+  the vent), `batch.vent.vapour.henry` (a dissolved gas without a vapour pressure degasses at
+  Henry's law and passes the vent condenser), so an inert sweep or purge degasses a dissolved,
+  unreacted charge or dose; `batch.vent.heat_of_absorption` (released by a formed gas's
+  dissolved share, the duty's term `absorption`; taken back by a degassing gas); a component's
+  `melting_point` and the rule `cheme.process-condenser-freezing` (warning: a vent condenser's
+  outlet or its coolant's supply below a condensate's melting point; a batch still's condenser,
+  its `condenser_port` coolant's supply below the melting point of a component its distillate
+  carries at 1 mol% or more; a cooler block that condenses is not checked). `process reactors` adds
+  the head space (`vent.head_space`); `reactor-hazards` leaves inerts and the pad out of the
+  content, gives a vent of inerts only no formed-gas release at the MTSR (a content boiling at
+  the MTSR still reports its boil-up, `gas_release.boils` and `boil_up`, ADR 0069), and takes a
+  `vapour.henry` gas at `H x / P` in the gas release, as a dissolved gas (dosed or not) left out
+  of the default MTT and the bubble point whatever its share or boiling point, named in
+  `mtt_left_out` and `dissolved_release` with or without a `normal_boiling_point`; a boil-up
+  at the MTSR that carries it asks for its `vent.heat_of_absorption` (its heat of desorption,
+  its latent heat there), not its `heat_of_vaporization`, and one whose vapour's latent heat
+  is not positive (an endothermic absorption, a positive `heat_of_absorption`, outweighing the
+  liquids') is left unsized with `missing` saying why, not a negative boil-up;
+  `cheme.process-reactor`
+  checks the inerts, the pad and the degassing gases. Shown on scratch copies of
+  acetyl-chloride-1 (L-3: the head space as the vapour's carrier) and
+  methyltriphenylphosphonium-bromide-1 (L-3: the nitrogen sweep stripping the methyl bromide).
+  A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
+  fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
+  0069 above describes.
+
+### Fixed
+
+- An end at a temperature failed with "the still boils dry before its end" for some
+  temperatures between two that solved (core#198): the integrator re-tested the stop at the
+  state its bisection had found, and the bubble point, converged there from another guess, could
+  fall about 1e-9 K short. A step whose stop is found now ends there. A still that solved
+  before gives the same cut within the bubble point's tolerance.
+- A component at zero amount in a still's charge and feed needs no vapour pressure (core#214):
+  `cheme validate` asked one of a component an inlet's template lists before propagate (an
+  error that stopped the plant); it is now an info finding (`cheme.process-still`), and the
+  still asks volatility data only of a component its charge holds.
+- A batch column still that runs near empty before an end at a time no longer hangs: its error
+  control kept the step far above the boils-dry floor, so it crept on without end (1.11.0 hung
+  on the batch-rectification example with its product cut ended at 10 h, which the still never
+  reaches: it boils dry at about 2.5016 h, 99.835 % distilled). An end past the most its value
+  can still rise before the still boils dry is refused at the first step that shows it ("boils
+  dry before its end", naming the volatile kmol left): a share distilled by the volatile
+  content left (by mole, or its mass), a time by the volatile kmol left times the most s per
+  kmol of any vapour of them (the largest latent heat for kW, the heaviest for kg/h, 2000 K
+  for m3/h) at the highest reflux, a purity by the cut's key over the cut and all the other
+  volatile content left (a floor that rises from 0 as the cut fills, so a purity end below it
+  is refused only once the floor passes it: an end at 0.5 ACCL there with 5 % distilled,
+  before only by the pace check below, after 34040 steps and some 90 s). No step towards
+  an end within that bound changes. A reachable end the integration only crawls towards is
+  checked after 500 steps in a row that each boil off less than 1e-6 of the charge: if at
+  that run's pace (in kmol boiled up, or in the end's own measure, from the run's first step)
+  the end is not reached within 10^6 steps, the boil-up stalls
+  (`cheme.process-still-unsolved`, with the hint to end the cut earlier; 2.495 h there, which
+  1.11.0 did not solve in 15 minutes, after 55492 steps and 2 to 3 minutes), and no phase
+  takes more than 10^6 steps. A run in which a volatile component falls 1000-fold is progress,
+  and an amount below 1e-100 of the charge and feed is gone: a light key a forerun strips to
+  traces, which the column enriches and which held the explicit step at its stability limit
+  until it underflowed, no longer stalls the next cut. Slow tails solve as in 1.11.0, to the
+  same steps: 2.492 h there in 33116 steps (81 s), 99.7 % distilled in 45414 (114 s), 2.493 h
+  in 255217 (10 minutes), and a cut that begins in the tail (an offcut to 8964 s after a
+  product cut to 8962.5 s).
 
 ### Changed
 
 - The committed example sheets are regenerated: the generator code fingerprint covers
-  `props.py`.
-- The generator fingerprint (`generator_sha256`) also covers the fields a BFD/PFD can leave
-  blank as stale: what `cheme process propagate` and `cheme process simulate` write and the
-  source their values carry (`propagate.WRITTEN` and `SOURCE`, `simulation.translate.WRITTEN`
-  and `SOURCE`), hashed by value (ADR 0067, core#202). Adding or removing such a field marks
-  the sheets `cheme.generated-version`; editing the code that derives the values or decides
-  whether one is stale (`propagate.py`, `recycle.py`, `duties.py`, `simulation/translate.py`)
-  still does not, so as not to mark every library sheet outdated on each such edit. The
-  fingerprint changes with this release: every BFD/PFD needs `cheme process build` once (only
-  the `generator_sha256` in its provenance comment changes); the core examples and the viewer's
-  API fixtures are regenerated.
-- 1.11.0 said that editing the stream table marks the sheets outdated. That holds for
-  `pfd_sheet.py`, which draws the table (and the finding is `cheme.generated-version`), not for
-  the code above that decides which of its values are stale. `cheme validate` does not catch
-  such a change either, since it rebuilds generated P&IDs, not BFD/PFD sheets; `cheme process
-  build` does, and says "written" for a sheet it changed.
+  `props.py`, and `schema.py` (changed by ADRs 0068 to 0071) and `model.py` (changed by ADRs
+  0070 and 0071); no drawn output changes.
+- The default MTT counts a product a counted reaction forms in the liquid (at least 5 % of it
+  once that reaction ran to completion, a vented product with the share the liquid keeps,
+  boiling at or above `T_p`; ADR 0069): a fix where the product boils lowest (acetyl chloride's
+  324.1 K, not PCl3's 349.1 K; benzoyl chloride's 471.0 K, not benzotrichloride's). No core
+  example or library entry changes its MTT: where a product boils lowest, they set `hazard.mtt`
+  by hand.
+- `cheme.reactor-hazard-vent` of a vented semi-batch compares the larger of the gas release at
+  the MTSR and the largest over the batch with `hazard.vent_capacity`, and names the latter
+  where it is larger (a fix: the release at the highest MTSR can be the smallest; none of the
+  library's entries changes level, the ratio quoted rises for p-toluenesulfonyl-chloride-1
+  R101 0.40 -> 0.97 and Q101 0.08 -> 0.09, sodium-azide-1 R101 0.59 -> 0.89,
+  potassium-tert-butoxide-1 R101 0.67 -> 0.90 (the vapour of the early dosing), benzyl-bromide-1
+  0.66 -> 0.74, acetyl-chloride-1 0.008 -> 0.62, di-tert-butyl-dicarbonate-1 0 -> 0.49 and
+  benzoyl-chloride-1 0.825 -> 0.826), its hint then naming the largest release over the batch
+  rather than the release at the MTSR. A content boiling at the MTSR names its boil-up in the
+  finding and the note.
+- `cheme.recipe-basis` (warning, unchanged level and rule) now names the batch size that closes
+  the recipe at the flowsheet's rate, with its cycle, or, when the cycle grows about as fast as
+  the batch, the most the batches tried made; its hint mentions a design specification. A plant
+  without a basis mismatch reports as before. Every other plant without `specs:` or
+  `recovery:` solves and fingerprints as without ADR 0070 (both fields are left out of a model
+  dump when absent).
+- ADR 0062's acetyl-chloride-1 figure is per acetyl chloride formed (0.0006 %), not per kmol
+  of the reaction's extent (0.0019 %).
 
 ## 1.11.0 (2026-11-06)
 

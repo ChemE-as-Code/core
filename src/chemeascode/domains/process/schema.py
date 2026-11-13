@@ -158,6 +158,14 @@ class Component(Strict):
         "boiling point; ADR 0058).",
         exclude_if=lambda value: value is None,
     )
+    melting_point: float | None = Field(
+        default=None,
+        gt=0,
+        description="K: the pure liquid's freezing point. A batch's vent condenser whose outlet "
+        "or coolant supply, or a batch still's condenser whose coolant supply, lies below it may "
+        "freeze shut (cheme.process-condenser-freezing, ADR 0071).",
+        exclude_if=lambda value: value is None,  # a component's dump stays as it was
+    )
     phase: Literal["solid"] | None = Field(
         default=None,
         description="solid: the component is a solid (a crystal, a hydrate with its water of "
@@ -490,63 +498,6 @@ class Dosing(Strict):
         return found
 
 
-class VentVapour(Strict):
-    """The vent gas leaves the vessel saturated with the liquid's volatile components at its
-    temperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each
-    component's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless
-    ``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``
-    kmol of vapour, ``Y = sum_i y_i``."""
-
-    components: list[str] = Field(
-        default_factory=list,
-        description="The volatile components the gas carries; default every component in the "
-        "liquid with a vapour_pressure (a vent component is a gas, never one of them).",
-        exclude_if=lambda value: not value,
-    )
-    activity: dict[str, float] = Field(
-        default_factory=dict,
-        description="Component -> a constant activity coefficient in the vessel's liquid, from "
-        "a source (default 1: an ideal liquid).",
-        exclude_if=lambda value: not value,
-    )
-    source: str = ""
-
-    @model_validator(mode="after")
-    def _positive(self) -> VentVapour:
-        if len(set(self.components)) != len(self.components):
-            raise ValueError("vent.vapour.components: each component once")
-        if any(g <= 0 for g in self.activity.values()):
-            raise ValueError("vent.vapour.activity: a coefficient above 0")
-        if self.components and (stray := sorted(set(self.activity) - set(self.components))):
-            raise ValueError(
-                "vent.vapour.activity of a component not in its components: " + ", ".join(stray)
-            )
-        return self
-
-
-class VentCondenser(Strict):
-    """A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to
-    ``temperature``, the non-condensables leave it saturated there over an ideal condensate
-    (a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel
-    (reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy
-    stream at ``energy_port`` (ADR 0059)."""
-
-    temperature: float = Field(gt=0, description="K: the gas and condensate leave at it.")
-    returns: str = Field(
-        default="vessel",
-        description="vessel (the condensate runs back into the liquid), or the outlet stream "
-        "of the step the condensate leaves by.",
-    )
-    energy_port: str | None = Field(
-        default=None,
-        description="The step's energy port whose stream takes the condenser's duty (the heat "
-        "it removes); none: the duty is reported, not written.",
-        exclude_if=lambda value: value is None,
-    )
-    provenance: Provenance
-    source: str = ""
-
-
 class HenryConstant(Strict):
     """A vent gas's solubility in the batch's liquid, Henry's law ``p_g = H x_g`` (kPa per mole
     fraction): ``points`` of (K, kPa); ln H is interpolated linearly in 1/T between them (one
@@ -582,6 +533,109 @@ class HenryConstant(Strict):
         return value, not low - 1e-9 <= kelvin <= high + 1e-9
 
 
+class VentVapour(Strict):
+    """The vent gas leaves the vessel saturated with the liquid's volatile components at its
+    temperature and pressure (ADR 0062): ``y_i = gamma_i x_i P_i^sat(T) / P`` (Raoult, each
+    component's Antoine ``vapour_pressure``; ``gamma_i`` 1, an ideal liquid, unless
+    ``activity`` gives a sourced constant), so each kmol of vent gas carries ``Y / (1 - Y)``
+    kmol of vapour, ``Y = sum_i y_i``."""
+
+    components: list[str] = Field(
+        default_factory=list,
+        description="The volatile components the gas carries; default every component in the "
+        "liquid with a vapour_pressure (a vent component is a gas, never one of them).",
+        exclude_if=lambda value: not value,
+    )
+    activity: dict[str, float] = Field(
+        default_factory=dict,
+        description="Component -> a constant activity coefficient in the vessel's liquid, from "
+        "a source (default 1: an ideal liquid).",
+        exclude_if=lambda value: not value,
+    )
+    henry: dict[str, HenryConstant] = Field(
+        default_factory=dict,
+        description="Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no "
+        "Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above "
+        "its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's "
+        "law; it never condenses in a vent condenser.",
+        exclude_if=lambda value: not value,  # a vapour's dump stays as in 1.10.0
+    )
+    source: str = ""
+
+    @model_validator(mode="after")
+    def _positive(self) -> VentVapour:
+        if len(set(self.components)) != len(self.components):
+            raise ValueError("vent.vapour.components: each component once")
+        if self.components and (stray := sorted(set(self.henry) - set(self.components))):
+            raise ValueError(
+                "vent.vapour.henry of a component not in its components: " + ", ".join(stray)
+            )
+        if both := sorted(set(self.henry) & set(self.activity)):
+            raise ValueError(
+                "vent.vapour: henry or activity for a component, not both: " + ", ".join(both)
+            )
+        if any(g <= 0 for g in self.activity.values()):
+            raise ValueError("vent.vapour.activity: a coefficient above 0")
+        if self.components and (stray := sorted(set(self.activity) - set(self.components))):
+            raise ValueError(
+                "vent.vapour.activity of a component not in its components: " + ", ".join(stray)
+            )
+        return self
+
+
+class VentCondenser(Strict):
+    """A partial condenser on the vent (ADR 0062): the vapour-laden gas is cooled to
+    ``temperature``, the non-condensables leave it saturated there over an ideal condensate
+    (a flash with the vent's gases as inerts), and the condensate ``returns`` to the vessel
+    (reflux), or leaves by an outlet stream of the step. Its duty goes on the step's energy
+    stream at ``energy_port`` (ADR 0059)."""
+
+    temperature: float = Field(gt=0, description="K: the gas and condensate leave at it.")
+    returns: str = Field(
+        default="vessel",
+        description="vessel (the condensate runs back into the liquid), or the outlet stream "
+        "of the step the condensate leaves by.",
+    )
+    energy_port: str | None = Field(
+        default=None,
+        description="The step's energy port whose stream takes the condenser's duty (the heat "
+        "it removes); none: the duty is reported, not written.",
+        exclude_if=lambda value: value is None,
+    )
+    provenance: Provenance
+    source: str = ""
+
+
+class HeadSpace(Strict):
+    """The vessel's head space (ADR 0071): the gas over the liquid, held at the vessel's
+    pressure and saturated with the liquid's vapour. Its inert gas (the pad) enters by
+    ``stream``, an inlet of the step that carries only ``vent.inerts`` (kmol/h of it: the head
+    space's inert at the start, on the batch's basis), so that the head space's volume follows
+    as ``V = n R T / ((1 - Y) P)`` and the vessel's as the liquid's plus that. As the liquid
+    grows (a dose displaces it), its vapour pressure rises or it warms, the head space expels
+    its gas, vapour-laden, by the vent; what is left of it at the end leaves by the vent too
+    (with the next charge or the purge, without vapour)."""
+
+    stream: str = Field(description="The inlet stream of the step that pads the head space.")
+    provenance: Provenance
+    source: str = ""
+
+
+class HeatOfAbsorption(Strict):
+    """The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol
+    dissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share
+    kept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas
+    that degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on
+    the gas basis."""
+
+    values: dict[str, float] = Field(
+        min_length=1, description="Vent gas -> kJ/kmol (J/mol) dissolved."
+    )
+    unit: Literal["kJ/kmol"] = "kJ/kmol"
+    provenance: Provenance
+    source: str = ""
+
+
 class Vent(Strict):
     """The gas a batch or semi-batch gives off (ADR 0054): the listed ``components`` leave the
     liquid as they form, by the outlet ``stream`` (the step's other outlet is the liquid). They
@@ -595,7 +649,15 @@ class Vent(Strict):
 
     stream: str = Field(description="The outlet stream of the step the gas leaves by.")
     components: list[str] = Field(
-        min_length=1, description="The components that leave the liquid as they form."
+        default_factory=list,
+        description="The components that leave the liquid as they form (at least one, or inerts).",
+    )
+    inerts: list[str] = Field(
+        default_factory=list,
+        description="Gases that never dissolve (ADR 0071): a dose's share of them passes "
+        "straight through to the vent (a sweep or purge gas, the nitrogen of a dosed air), "
+        "the head space holds them; each carries the liquid's vapour like a formed gas.",
+        exclude_if=lambda value: not value,  # a vent's fingerprint stays as in 1.10.0
     )
     fraction: dict[str, float] = Field(
         default_factory=dict,
@@ -619,11 +681,53 @@ class Vent(Strict):
         "energy_port} (ADR 0062; needs vapour).",
         exclude_if=lambda value: value is None,
     )
+    head_space: HeadSpace | None = Field(
+        default=None,
+        description="The vessel's head space, padded with inerts by an inlet stream: the gas "
+        "it expels carries the vapour (ADR 0071; needs inerts).",
+        exclude_if=lambda value: value is None,
+    )
+    heat_of_absorption: HeatOfAbsorption | None = Field(
+        default=None,
+        description="Of a vent gas that dissolves: released by a formed gas's dissolved share, "
+        "taken back by a gas that degasses (ADR 0071).",
+        exclude_if=lambda value: value is None,
+    )
 
     @model_validator(mode="after")
     def _shares(self) -> Vent:
+        if not self.components and not self.inerts:
+            raise ValueError("vent: give the components that form, or inerts, or both")
         if len(set(self.components)) != len(self.components):
             raise ValueError("vent.components: each component once")
+        if len(set(self.inerts)) != len(self.inerts):
+            raise ValueError("vent.inerts: each component once")
+        if both := sorted(set(self.inerts) & set(self.components)):
+            raise ValueError(
+                "vent: a component that forms or an inert, not both: " + ", ".join(both)
+            )
+        if self.head_space is not None and not self.inerts:
+            raise ValueError("vent.head_space holds inerts: give vent.inerts too")
+        if self.vapour is not None and (
+            both := sorted(set(self.vapour.components) & set(self.inerts))
+        ):
+            raise ValueError("vent.vapour.components: an inert is a gas: " + ", ".join(both))
+        if self.vapour is not None and (
+            both := sorted(set(self.vapour.henry) & {*self.components, *self.inerts})
+        ):
+            raise ValueError(
+                "vent.vapour.henry: a vent component or inert is no dissolved gas that "
+                "degasses (vent.henry keeps a formed gas dissolved): " + ", ".join(both)
+            )
+        if self.heat_of_absorption is not None:
+            degassing = set(self.vapour.henry) if self.vapour is not None else set()
+            if stray := sorted(
+                set(self.heat_of_absorption.values) - set(self.components) - degassing
+            ):
+                raise ValueError(
+                    "vent.heat_of_absorption of a component that neither forms nor degasses "
+                    "(vent.components, vent.vapour.henry): " + ", ".join(stray)
+                )
         if stray := sorted(set(self.fraction) - set(self.components)):
             raise ValueError("vent.fraction of a component not in components: " + ", ".join(stray))
         if any(not 0 < f <= 1 for f in self.fraction.values()):
@@ -766,8 +870,11 @@ class ReactionHazard(Strict):
         "pressure, a relief set temperature); default: the lowest boiling point of the "
         "liquid's components at the reactor's pressure (the normal boiling point at about "
         "atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving "
-        "out a batch's vent components, a dosed gas and dissolved gases (a minor share of the "
-        "liquid boiling below the process temperature; ADR 0058).",
+        "out a batch's vent components and inerts (and a head space's pad), a dosed gas and "
+        "dissolved gases (a minor share of the liquid boiling below the process temperature, "
+        "or a vent.vapour.henry gas; ADR 0058, 0071), and counting a product a counted "
+        "reaction forms in the liquid (ADR 0069); hazard.mtt_from: bubble-point takes the "
+        "content's bubble point instead.",
     )
     reactions: list[str] = Field(
         default_factory=list,
@@ -780,7 +887,27 @@ class ReactionHazard(Strict):
         default=None,
         gt=0,
         description="m3/h of gas the vent and its line pass at the vessel's pressure, from the "
-        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+        "vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058), "
+        "for a semi-batch the larger of that and its largest release over the batch, and with "
+        "a content's boil-up where it boils at the MTSR (ADR 0069).",
+        exclude_if=lambda value: value is None,
+    )
+    potential: Literal["largest", "network"] | None = Field(
+        default=None,
+        description="How the counted reactions' heat sets dT_ad and the MTSR: largest (the "
+        "default: each reaction alone run to completion, the largest counts) or network (the "
+        "largest heat any forward extents of the counted reactions together release from the "
+        "content: a consecutive reaction on a product counts, ADR 0069).",
+        exclude_if=lambda value: value is None,
+    )
+    mtt_from: Literal["boiling-points", "bubble-point"] | None = Field(
+        default=None,
+        description="The default MTT without mtt: boiling-points (the default: the lowest "
+        "boiling point of what boils in the liquid, ADR 0058) or bubble-point (the content's "
+        "bubble point at the vessel's pressure from the components' vapour_pressure, else "
+        "normal_boiling_point and heat_of_vaporization; the lower of the worst moment's "
+        "content and the content once the reaction setting the MTSR ran to completion, "
+        "ADR 0069).",
         exclude_if=lambda value: value is None,
     )
     provenance: Provenance
@@ -1267,12 +1394,13 @@ class Volatility(Strict):
 
 class Boilup(Strict):
     """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
-    its heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol
-    of vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)
-    times the distillate (ADR 0061)."""
+    its heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol
+    of vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's
+    temperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR
+    0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061)."""
 
     value: float = Field(gt=0)
-    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h"]
+    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h", "m3/h"]
     provenance: Provenance
     source: str = ""
 
@@ -1318,10 +1446,24 @@ class StillEnd(Strict):
 
 
 class StillCut(Strict):
-    """One distillate cut: its outlet port, collected until its ``end``."""
+    """One distillate cut: its outlet port, collected until its ``end``; at its own
+    ``pressure`` and ``boilup`` (ADR 0068: a vacuum ramp in steps, a forerun the vacuum pump
+    limits), else the still's."""
 
     outlet: str = Field(description="The step's outlet port the cut leaves by.")
     end: StillEnd
+    pressure: float | None = Field(
+        default=None,
+        gt=0,
+        description="kPa(a) of the still while this cut is collected (volatility raoult); "
+        "default: the still's.",
+        exclude_if=lambda value: value is None,  # a still's fingerprint stays as it was
+    )
+    boilup: Boilup | None = Field(
+        default=None,
+        description="The boil-up while this cut is collected; default: the still's.",
+        exclude_if=lambda value: value is None,
+    )
 
 
 class StillFeed(Strict):
@@ -1445,6 +1587,13 @@ class Still(Strict):
         default_factory=list,
         description="Components that stay in the still (solid components always do).",
     )
+    separate_phase: list[str] = Field(
+        default_factory=list,
+        description="Components in a phase of their own (a suspended solid, an immiscible "
+        "non-volatile liquid or salt): they stay in the still and do not count in the liquid's "
+        "mole fractions (Raoult's law, the residue end, the column), ADR 0068.",
+        exclude_if=lambda value: not value,  # a still's fingerprint stays as it was
+    )
     boilup: Boilup
     end: StillEnd | None = None
     cuts: list[StillCut] = Field(default_factory=list)
@@ -1458,6 +1607,15 @@ class Still(Strict):
         "(volatility raoult), and a swap's feed warmed to the still's temperature as it mixes "
         "in, in the still's duty and its whole energy per batch (ADR 0063); default: the "
         "boil-up's latent heat alone.",
+        exclude_if=lambda value: not value,  # a still's dump stays as it was
+    )
+    heat_up_time: bool = Field(
+        default=False,
+        description="The still's heat terms besides the boil-up (heat_up: the charge's and a "
+        "swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own "
+        "boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; "
+        "every cut with its own boil-up: the mean over the boil-up), added to the still's "
+        "time and to the recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
     column: Column | None = Field(
@@ -1489,10 +1647,27 @@ class Still(Strict):
             raise ValueError("an end at a temperature needs volatility raoult")
         if self.heat_up and self.volatility.model == "constant":
             raise ValueError("heat_up needs volatility raoult (the charge's bubble point)")
+        if self.heat_up_time and self.volatility.model == "constant":
+            raise ValueError("heat_up_time needs volatility raoult (a still's temperatures)")
+        raoult = self.volatility.model == "raoult"
+        if not raoult and any(c.pressure is not None for c in self.cuts):
+            raise ValueError("a cut's pressure needs volatility raoult")
+        if not raoult and any(b.unit == "m3/h" for b in self.boilups()):
+            raise ValueError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
+        if set(self.separate_phase) & set(self.volatility.alpha):
+            raise ValueError("separate_phase: a component in a phase of its own is non-volatile")
         ports = [c.outlet for c in self.cuts]
         if len(set(ports)) != len(ports):
             raise ValueError("cuts: each outlet once")
         return self
+
+    def boilups(self) -> list[Boilup]:
+        """The boil-ups the still runs at (ADR 0068): each cut's own, and the still's own
+        where a cut has none, without cuts, or with a feed (the swap's feed phase runs at it).
+        A still whose every cut has its own does not use its ``boilup``."""
+        own = [c.boilup for c in self.cuts if c.boilup is not None]
+        default = not self.cuts or self.feed is not None or len(own) < len(self.cuts)
+        return ([self.boilup] if default else []) + own
 
     def ends(self) -> list[tuple[str, StillEnd | None]]:
         """(outlet port, end) of each cut in turn; one cut without cuts:."""
@@ -1525,7 +1700,37 @@ class Energetic(Strict):
     )
 
 
-class Block(Node, Reacting, Solids, Distilling, Energetic):
+class Recovery(Strict):
+    """A component separator's specified split (ADR 0070): the share of each component's inlet
+    flow that leaves by each outlet. ``cheme process propagate`` solves the outlets from it."""
+
+    outlets: dict[str, dict[str, float]] = Field(
+        min_length=1,
+        description="Outlet port -> component -> fraction of that component's inlet flow (all "
+        "material inlets together) that leaves by the port; a component a listed port does not "
+        "name leaves none by it. One material outlet may be left out: it takes the rest.",
+    )
+    provenance: Provenance
+    source: str = Field(
+        default="",
+        description="Where the fractions come from (vendor data, a balance script, a DESIGN.md "
+        "decision).",
+    )
+
+
+class Separating(Strict):
+    """The specified split of a component separator (ADR 0070)."""
+
+    recovery: Recovery | None = Field(
+        default=None,
+        description="A separator (a Separating, Absorbing, Adsorbing ... step or a generic "
+        "ProcessStep, without another model): the outlets solved from the share of each "
+        "component's inlet flow to each outlet port.",
+        exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+
+
+class Block(Node, Reacting, Solids, Distilling, Energetic, Separating):
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
         default=None, description="The class's method where DEXPI has one (e.g. Compressing)."
@@ -1545,7 +1750,7 @@ class Block(Node, Reacting, Solids, Distilling, Energetic):
     )
 
 
-class Step(Node, Reacting, Solids, Distilling, Energetic):
+class Step(Node, Reacting, Solids, Distilling, Energetic, Separating):
     block: str
     class_: str = Field(default="ProcessStep", alias="class", description="DEXPI step class.")
     method: str | None = Field(
@@ -1798,6 +2003,129 @@ class Convergence(Strict):
     )
 
 
+class SpecVariable(Strict):
+    """What a design specification adjusts (ADR 0070): the flow of a feed stream, or the
+    fraction of a splitter's inlet that leaves by one of its outlets."""
+
+    stream: str | None = Field(
+        default=None,
+        description="A feed stream (from a feed terminal) whose flow is adjusted; its flow is "
+        "then written by cheme process propagate (calculated), never given or assumed.",
+    )
+    node: str | None = Field(
+        default=None,
+        description="A splitter (SplittingMaterial) whose outlet fraction is adjusted.",
+    )
+    port: str | None = Field(
+        default=None, description="With node: the outlet port, not in the splitter's split:."
+    )
+    initial: float = Field(
+        ge=0, description="Where the iterations start: the flow (in unit) or the fraction."
+    )
+    unit: str | None = Field(
+        default=None,
+        description="A stream's flow: the flow unit of initial, low, high and the written "
+        "flow; default units.flow.",
+    )
+    low: float | None = Field(default=None, ge=0, description="Least value; default 0.")
+    high: float | None = Field(
+        default=None, gt=0, description="Largest value; default none (a fraction: 1)."
+    )
+    with_: dict[str, float] = Field(
+        default_factory=dict,
+        alias="with",
+        description="A stream: other feed streams whose flow follows it, stream -> ratio (their "
+        "flow is the ratio times the adjusted flow, in its unit): charge ratios kept.",
+    )
+
+    @model_validator(mode="after")
+    def _one(self) -> SpecVariable:
+        if (self.stream is None) == (self.node is None):
+            raise ValueError("give stream (a feed's flow) or node and port (a split), not both")
+        if self.node is not None and self.port is None:
+            raise ValueError("node: give the splitter's outlet port too")
+        if self.node is not None and (self.with_ or self.unit is not None):
+            raise ValueError("with and unit are for a stream's flow, not a split")
+        if any(v <= 0 for v in self.with_.values()):
+            raise ValueError("with: ratios are positive")
+        return self
+
+
+class SpecPer(Strict):
+    """The denominator of a ratio target: a stream, or one component of it."""
+
+    stream: str
+    component: str | None = None
+
+
+class SpecTarget(Strict):
+    """What a design specification holds (ADR 0070)."""
+
+    stream: str = Field(description="The material stream the target is measured on.")
+    component: str | None = Field(
+        default=None, description="One component of it; default: the whole stream."
+    )
+    quantity: Literal["flow", "annual", "ratio", "fraction"] = Field(
+        default="flow",
+        description="flow: its flow in unit; annual: its amount per year (unit t or kg), the "
+        "flow times hours (default the recipe's hours_per_year); ratio: its flow per the flow "
+        "of per (basis mole or mass); fraction: its share of the stream (basis).",
+    )
+    value: float = Field(ge=0)
+    unit: str | None = Field(
+        default=None,
+        description="flow: a flow unit (default units.flow); annual: t (default) or kg.",
+    )
+    basis: Literal["mole", "mass"] | None = Field(
+        default=None, description="ratio and fraction: on moles (default) or masses."
+    )
+    per: SpecPer | None = Field(default=None, description="ratio: the denominator.")
+    hours: float | None = Field(
+        default=None,
+        gt=0,
+        le=8784,
+        description="annual: operating hours per year; default the recipe's hours_per_year.",
+    )
+
+    @model_validator(mode="after")
+    def _fits(self) -> SpecTarget:
+        if (self.quantity == "ratio") != (self.per is not None):
+            raise ValueError("per: is the denominator of a ratio (and only of a ratio)")
+        if self.quantity == "fraction" and self.component is None:
+            raise ValueError("fraction: name the component")
+        if self.quantity in ("ratio", "fraction") and (self.unit or self.hours):
+            raise ValueError(f"{self.quantity}: no unit or hours (give basis)")
+        if self.quantity in ("flow", "annual") and self.basis is not None:
+            raise ValueError(f"{self.quantity}: no basis (the unit says it)")
+        if self.quantity == "annual" and self.unit not in (None, "t", "kg"):
+            raise ValueError("annual: unit t or kg (per year)")
+        if self.quantity != "annual" and self.hours is not None:
+            raise ValueError("hours: only for an annual target")
+        return self
+
+
+class DesignSpec(Strict):
+    """A design specification (ADR 0070): ``cheme process propagate`` adjusts one variable
+    (a feed's flow, or a split) until the target is met, solved together with the tears."""
+
+    id: str
+    vary: SpecVariable
+    target: SpecTarget
+    tolerance: float = Field(
+        default=1e-6,
+        gt=0,
+        lt=1,
+        description="Met when |value - target| <= tolerance x target (relative).",
+    )
+    cases: list[str] = Field(
+        default_factory=list, description="The cases it holds in; default every case."
+    )
+    provenance: Literal["given", "assumed"] = Field(
+        description="Of the target: a design input (given) or an assumption."
+    )
+    source: str = Field(default="", description="Where the target comes from.")
+
+
 class Flowsheet(Versioned):
     """Feeds, products, blocks, steps and streams: the source of the BFD and PFD."""
 
@@ -1821,6 +2149,12 @@ class Flowsheet(Versioned):
         description="How propagate converges the torn loops; default: Wegstein, 100 "
         "iterations, the flowsheet's tolerance.",
         exclude_if=lambda value: value is None,
+    )
+    specs: list[DesignSpec] = Field(
+        default_factory=list,
+        description="Design specifications for cheme process propagate: feeds or splits "
+        "adjusted until a stream target is met (ADR 0070).",
+        exclude_if=lambda value: not value,  # a plant without specs dumps as it did
     )
     bfd: BfdView | None = Field(default=None, description="How the BFD draws the streams.")
     layout: Layout = Field(default_factory=Layout)

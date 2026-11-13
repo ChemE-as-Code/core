@@ -6,6 +6,8 @@ purity end, the design by a minimum-reflux factor, the reboiler's and condenser'
 cheme process propagate, the rules and the example plant."""
 
 import math
+import os
+import re
 import shutil
 from pathlib import Path
 
@@ -709,3 +711,452 @@ def test_a_rayleigh_still_with_a_condenser_port_writes_its_condenser(tmp_path):
     expected = unit["solution"]["year_average_duty_kW"]
     assert streams["Q1"].state["design"].duty.value == pytest.approx(expected, rel=1e-5)
     assert streams["Q2"].state["design"].duty.value == pytest.approx(expected, rel=1e-5)
+
+
+def test_the_still_condensers_freezing_check(tmp_path):
+    """ADR 0071 (process-library potassium-tert-butoxide-1 L-9): a still's condenser whose
+    coolant's supply lies below the melting point of a component its distillate carries warns;
+    a trace (below 1 mol%) does not count, nor does a supply above the melting point."""
+    rule = "cheme.process-condenser-freezing"
+
+    def found(ws):
+        process, findings = load(ws.root)
+        return [f for f in findings + rules(process) if f.rule == rule]
+
+    def cold(supply):
+        return lambda t: t.replace(
+            "utility: {kind: cooling_water}",
+            f"utility: {{kind: cooling_water, supply_temperature: {{value: {supply}, "
+            "provenance: assumed}}",
+        )
+
+    def melting(ws, edits):
+        path = ws.root / "process/materials.yaml"
+        text = path.read_text()
+        for name, tm in edits.items():
+            text = text.replace(f"  - id: {name}\n", f"  - id: {name}\n    melting_point: {tm}\n")
+        path.write_text(text)
+        return ws
+
+    # acetic acid (289.8 K) is a trace of the distillate: no warning
+    assert not found(melting(_copy(tmp_path / "a", cold(285)), {"ACOH": 289.8}))
+    # a distillate of ACCL melting at 290 K (illustrative) over a 285 K coolant: the column's
+    # default condenser stream Q2 warns
+    ws = melting(_copy(tmp_path / "b", cold(285)), {"ACOH": 289.8, "ACCL": 290})
+    (warning,) = found(ws)
+    assert warning.level == "warning" and "ACCL (290 K)" in warning.message
+    assert "ACOH" not in warning.message and "coolant CW's supply at 285 K" in warning.message
+    assert warning.line is not None and warning.hint
+    # named as the condenser_port, the same
+    named = _copy(
+        tmp_path / "c",
+        lambda t: cold(285)(t).replace(
+            "      outlets: {residue: bottom}\n",
+            "      outlets: {residue: bottom}\n      condenser_port: condenser\n",
+        ),
+    )
+    assert len(found(melting(named, {"ACCL": 290}))) == 1
+    # a coolant above the melting point, or no supply temperature: none
+    assert not found(melting(_copy(tmp_path / "d", cold(295)), {"ACCL": 290}))
+    assert not found(melting(_copy(tmp_path / "e"), {"ACCL": 290}))
+
+
+PRODUCT = "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}"
+OFFCUT = "{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}}"
+
+
+def _ended(tmp_path, end, offcut=None):
+    """The example with its product cut ended at *end* (and its offcut at *offcut*): its
+    still's node and inlets."""
+    from chemeascode.domains.process.batch_still import inlets_of
+
+    def edit(text):
+        assert PRODUCT in text and OFFCUT in text
+        text = text.replace(PRODUCT, f"{{outlet: product, end: {end}}}")
+        if offcut is not None:
+            text = text.replace(OFFCUT, f"{{outlet: offcut, end: {offcut}}}")
+        return text
+
+    process, _ = load(_copy(tmp_path, edit).root)
+    node = process.nodes["ST1"]
+    return process, node, inlets_of(process, node)
+
+
+@pytest.mark.parametrize("end", ["{time: 36000}", "{time: 9360}", "{distilled: 0.999}"])
+def test_a_column_still_whose_end_is_past_its_dry_point_fails_at_once(tmp_path, end):
+    """The example's still boils dry at about 9006 s (2.5016 h), 99.835 % distilled. Its
+    product cut ended at 10 h, 2.6 h or 99.9 % distilled is never reached: core 1.11.0 crept on
+    near empty without end (the column's error control kept the step far above the boils-dry
+    floor), and 1.12.0's first pace check refused it after some thousand steps. The most the
+    end's value can still rise before the still boils dry (the volatile content left, times at
+    most the s per kmol of any vapour of it at the highest reflux, for a time) is short of the
+    end: StillError at once, naming the volatile content left."""
+    import time
+
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    process, node, inlets = _ended(tmp_path, end)
+    start = time.monotonic()
+    with pytest.raises(StillError, match="boils dry before its end.*volatile.*too little"):
+        solve_node(process, node, inlets, "design")
+    # well under a second for the refusal itself; the bound leaves room for a loaded parallel
+    # run, while without the bound only the pace check refuses it, after a minute or more
+    assert time.monotonic() - start < 30.0
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        {"stages": 5, "reflux": "constant", "ratio": 3},
+        {
+            "stages": 5,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "A", "mole_fraction": 0.95},
+            "maximum_ratio": 3,
+        },
+    ],
+)
+def test_a_time_end_past_the_dry_point_at_the_highest_reflux_is_refused_at_once(column):
+    """A column boils up R + 1 kmol per kmol distilled: the time bound takes the reflux at its
+    highest (the ratio, or maximum_ratio while it holds a distillate). 100 kmol at 10 kmol/h and
+    R = 3 boil dry within 40 h: an end past it is refused at the first step, and with the
+    reflux fixed one just before it is reached."""
+    from chemeascode.domains.process.batch_still import StillError
+
+    bound = 100 * 3600 / 10.0 * 4
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        solve_still(_still(column, end={"time": bound * 1.001}), CHARGE, None, COMPS, None)
+    if column["reflux"] == "constant":
+        near = solve_still(_still(column, end={"time": bound * 0.99}), CHARGE, None, COMPS, None)
+        assert sum(near.cuts[0].moles.values()) == pytest.approx(99, rel=1e-8)
+
+
+@pytest.mark.parametrize("column", [None, {"stages": 5, "reflux": "constant", "ratio": 3}])
+@pytest.mark.parametrize("basis", ["mole", "mass"])
+def test_a_purity_end_below_its_floor_is_refused_once_the_floor_rises_past_it(column, basis):
+    """A cut's mean share of its key falls no lower than its key over the cut and all the
+    other volatile content left (the key no longer distilling, the rest joining the cut): with
+    50 kmol each of A and B no cut taken from the start falls below 0.5 A. That floor rises
+    from 0 as the cut fills, so an end below 0.5 is refused ("too little to reach it") once the
+    floor passes it, not at the first step (core review of 1.12.0: the docs said "at once"),
+    and a lower end sooner (more volatile content left), but not by the boils-dry floor at the
+    end of the boil-up; one just above it solves, to its fraction."""
+    from chemeascode.domains.process.batch_still import StillError
+
+    def still(fraction):
+        return _still(column, end={"purity": {"key": "A", "fraction": fraction}, "basis": basis})
+
+    left = []
+    for fraction in (0.4, 0.499):
+        with pytest.raises(
+            StillError, match="boils dry before its end.*too little to reach it"
+        ) as e:
+            solve_still(still(fraction), CHARGE, None, COMPS, None)
+        left.append(float(re.search(r"\(([\d.e+-]+) kmol of volatile", str(e.value)).group(1)))
+    assert 100 > left[0] > left[1] > 1
+    cut = solve_still(still(0.5005), CHARGE, None, COMPS, None).cuts[0]
+    assert cut.moles["A"] / sum(cut.moles.values()) == pytest.approx(0.5005, rel=1e-8)
+
+
+def test_an_unreachable_purity_end_is_refused_by_its_floor(tmp_path):
+    """Integration review of 1.12.0: the example's product cut ended at a purity of 0.5 ACCL
+    is never reached (1.9 % of the charge's volatile content is not ACCL, so the cut stays
+    above 0.98): it relied on the pace check alone and was refused after 34040 steps, some
+    90 s at the 10^6-step horizon. Its floor refuses it in the first 6 % distilled."""
+    import time
+
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    process, node, inlets = _ended(tmp_path, "{purity: {key: ACCL, fraction: 0.5}}")
+    start = time.monotonic()
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        solve_node(process, node, inlets, "design")
+    # well under a second for the refusal itself; the bound leaves room for a loaded parallel
+    # run, while without the bound only the pace check refuses it, after a minute or more
+    assert time.monotonic() - start < 30.0
+
+
+def _paces(run, small, boiled, stop, steps):
+    """Drive a run of the still's pace check over steps 1..*steps* (small(s), boiled(s),
+    stop(s)); the steps at which it does not reach its end."""
+    return [
+        s
+        for s in range(1, steps + 1)
+        if not run.reaches(small(s), s, boiled(s), stop(s), [1.0], [True])
+    ]
+
+
+@pytest.mark.parametrize("delay", [0, 1])
+def test_a_runs_kmol_pace_is_over_all_its_steps(delay):
+    """A run of small steps boiling 1 kmol each (the stop not evaluated) reaches a target of
+    MAX_STEPS kmol exactly within the step horizon, one more is not: the pace divides the kmol
+    boiled since the run's mark by all its steps, from the advance's first step (delay 0) or
+    after a large one (delay 1)."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    steps = STALL_STEPS + delay
+    for target, stalls in ((MAX_STEPS, []), (MAX_STEPS + 1, [steps])):
+        run = _Run(0.0, [1.0], float(target))
+        assert _paces(run, lambda s: s > delay, float, lambda s: None, steps) == stalls
+
+
+@pytest.mark.parametrize("delay", [0, 1])
+def test_a_runs_stop_pace_is_over_the_steps_since_its_value_was_taken(delay):
+    """A run of small steps whose stop rises by 1 each, boiling next to nothing: at that pace
+    an end MAX_STEPS steps away is reached within the step horizon, one a step further is not.
+    From the advance's first step (delay 0) the stop's first value is taken at step 1, so the
+    run's 500 steps span 499 intervals of it; after a large step (delay 1) its 500 steps span
+    500 (core review of 1.12.0: neither the old divisor nor any off by one was tested)."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    steps = STALL_STEPS + delay
+    for end, stalls in ((MAX_STEPS, []), (MAX_STEPS + 1, [steps])):
+        run = _Run(0.0, [1.0], 1.0)
+        stop = lambda s, end=end: float(s - end)  # noqa: E731
+        assert _paces(run, lambda s: s > delay, lambda s: s * 1e-12, stop, steps) == stalls
+
+
+def test_a_runs_stop_pace_after_a_pace_check_is_over_the_next_run():
+    """After a run passes its pace check the next run is measured from that step: the stop
+    rising by 2 a step over the first 500 steps, then by 1, reaches an end 500 + MAX_STEPS
+    away at step 1000 (500 steps, 500 intervals), one a step further is not."""
+    from chemeascode.domains.process.batch_still import MAX_STEPS, STALL_STEPS, _Run
+
+    n = STALL_STEPS
+    for end, stalls in ((MAX_STEPS + n, []), (MAX_STEPS + n + 1, [2 * n])):
+        run = _Run(0.0, [1.0], 1.0)
+
+        def stop(s, end=end):
+            return float((2 * s if s <= n else s + n) - end)
+
+        assert _paces(run, lambda s: True, lambda s: s * 1e-12, stop, 2 * n) == stalls
+
+
+def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):
+    """An end at 2.495 h is reachable (the still boils dry at about 2.5016 h), but the
+    integration crawls towards it, its error control holding the step at about 1e-9 kmol by
+    the column's Fenske index jittering next to the ACCL trace: core 1.11.0 found no result in
+    900 s. A run of small steps whose pace does not reach the end within the step horizon
+    stalls: at the default horizon (10^6 steps) after 55492 steps (2 to 3 minutes), here at
+    20000 after 3492 steps, within seconds."""
+    import time
+
+    from chemeascode.domains.process import batch_still
+    from chemeascode.domains.process.batch_still import StillError, solve_node
+
+    monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
+    process, node, inlets = _ended(tmp_path, "{time: 8982}")
+    start = time.monotonic()
+    with pytest.raises(StillError, match="stalls before its end.*volatile.*end the cut earlier"):
+        solve_node(process, node, inlets, "design")
+    # about 9 s alone; the bound leaves room for a loaded parallel run, while a crawl that does
+    # not stall would run for minutes
+    assert time.monotonic() - start < 60.0
+
+
+@pytest.mark.parametrize(
+    "offcut, residue, cut",
+    [
+        ("{time: 8964}", 0.014457776525169278, 0.0002609452952005986),
+        ("{distilled: 0.9968}", 0.013997659204490307, 0.0007210626158795884),
+    ],
+)
+def test_a_cut_that_begins_in_the_slow_tail_measures_its_ends_pace_from_its_first_step(
+    tmp_path, monkeypatch, offcut, residue, cut
+):
+    """Integration review of 1.12.0: the product cut ended at 8962.5 s leaves the offcut to
+    begin in the slow tail, every step of it small. The stop is not evaluated before an
+    advance's first step (a bubble point's guess would move the solution), so the first run of
+    small steps had no stop value to measure its pace by: it was refused after 500 steps,
+    although core 1.11.0 solves it (in 815 steps for 8964 s). The run's stop pace now counts
+    from its first evaluated step; at the 20000-step horizon it was refused at, it solves to
+    1.11.0's values."""
+    from chemeascode.domains.process import batch_still
+    from chemeascode.domains.process.batch_still import solve_node
+
+    monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
+    process, node, inlets = _ended(tmp_path, "{time: 8962.5}", offcut)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(residue, rel=1e-8)
+    assert [sum(c.moles.values()) for c in result.cuts] == pytest.approx(
+        [4.359549779581488, cut], rel=1e-6
+    )
+
+
+#: core 1.11.0's residue (kmol) of the example with its product cut ended at 8971.2 s, or at
+#: 99.7 % distilled
+SLOW_8971, SLOW_997 = 0.0132200607005656, 0.013122805504220172
+
+
+@pytest.mark.skipif(
+    os.environ.get("CHEME_SLOW_TESTS") != "1", reason="set CHEME_SLOW_TESTS=1 (some 3 minutes)"
+)
+@pytest.mark.parametrize(
+    "end, residue", [("{time: 8971.2}", SLOW_8971), ("{distilled: 0.997}", SLOW_997)]
+)
+def test_a_column_still_needing_tens_of_thousands_of_steps_solves_as_in_1_11_0(
+    tmp_path, end, residue
+):
+    """Integration review of 1.12.0: an end next to the dry point needs more accepted steps
+    than a fixed horizon of 20000 allowed (2.492 h: 33116 steps, 99.7 % distilled: 45414),
+    and 1.12.0 refused ends that core 1.11.0 solves. With the horizon at 10^6 steps (2.493 h,
+    255217 steps in 1.11.0, solves too) they solve to 1.11.0's values."""
+    from chemeascode.domains.process.batch_still import solve_node
+
+    process, node, inlets = _ended(tmp_path, end)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(residue, rel=1e-9)
+
+
+@pytest.mark.parametrize("end", ["{time: 8964}", "{distilled: 0.9967}"])
+def test_a_column_still_slow_but_progressing_near_empty_reaches_its_end(tmp_path, end):
+    """Integration review of 1.12.0: an end at 2.49 h (or 99.67 % distilled) is reached on a
+    tail where explicit Dopri5 takes tiny steps on the PCL3 trace the column enriches (about
+    2e-7 kmol a step, every one below the small-step share). The pre-1.12.0 code solved it
+    (residue 0.01446 kmol); the stall guard refused it as boiling dry after 500 small steps.
+    At its pace the end is within the step budget, so it solves as before."""
+    from chemeascode.domains.process.batch_still import solve_node
+
+    process, node, inlets = _ended(tmp_path, end)
+    result, _ = solve_node(process, node, inlets, "design")
+    assert sum(result.residue.values()) == pytest.approx(0.01445, abs=2e-4)
+
+
+def test_a_light_key_the_column_clears_to_nothing_does_not_stall():
+    """Integration review of 1.12.0: a forerun to a purity end strips A to 1e-17 kmol; the
+    column's gain (alpha^stages, about 1e13) and Underwood's pole at A held explicit Dopri5 at
+    its stability limit (4e-10 kmol a step) for some 1850 steps until A underflowed, and the
+    main cut then ended within 140 steps. The pace check projected the slow run linearly and
+    refused the cut (after 4596 steps, 20.09 kmol left), which the pre-1.12.0 code solved. An
+    amount below 1e-100 of the charge is now gone (no longer a pole), and a run of small steps
+    in which a volatile component falls 1000-fold is progress."""
+    spec = Still.model_validate(
+        {
+            "volatility": {
+                "model": "constant",
+                "alpha": {"A": 10.1435, "B": 4.5999, "C": 1.0},
+                "provenance": "assumed",
+            },
+            "boilup": {"value": 10.0, "unit": "kmol/h", "provenance": "assumed"},
+            "column": {
+                "stages": 13,
+                "reflux": "constant_distillate",
+                "distillate": {"key": "A", "mole_fraction": 0.9166},
+                "maximum_ratio": 32,
+                "provenance": "assumed",
+            },
+            "cuts": [
+                {"outlet": "forerun", "end": {"purity": {"key": "A", "fraction": 0.8479}}},
+                {"outlet": "main", "end": {"distilled": 0.51892}},
+            ],
+            "outlets": {"residue": "bottom"},
+            "provenance": "assumed",
+        }
+    )
+    result = solve_still(spec, {"A": 42.46695, "B": 0.0029449, "C": 25.86294}, None, {}, None)
+    assert result.residue["C"] == pytest.approx(18.248, abs=1e-3)
+    assert result.time == pytest.approx(70791.2, abs=0.1)
+
+
+def test_the_stall_guard_leaves_a_bubble_point_still_as_it_was():
+    """Integration review of 1.12.0: the stall guard evaluated the stop at the start of each
+    cut and again on the step that crossed it, which moved the bubble point's warm start and
+    shifted a Raoult still's cuts by 2e-8 (2.21443518 kmol for 2.21443523). It evaluates the
+    stop where the code before it did, so the cuts are the same to the last digits."""
+    from chemeascode.domains.process.schema import Component
+
+    def comp(name, vp, mw, latent):
+        spec = {"id": name, "name": name, "molar_mass": mw, "heat_of_vaporization": latent}
+        if vp:
+            spec["vapour_pressure"] = vp | {"provenance": "given", "source": "x"}
+        return Component.model_validate(spec)
+
+    comps = {
+        "A": comp(
+            "A",
+            {"a": 4.72583, "b": 1660.652, "c": -1.461, "temperature_range": [287.7, 354.07]},
+            78.11,
+            30720,
+        ),
+        "B": comp(
+            "B",
+            {"a": 4.07827, "b": 1343.943, "c": -53.773, "temperature_range": [308.52, 384.66]},
+            92.14,
+            33180,
+        ),
+        "P": comp("P", None, 128.0, None),
+    }
+    ends = [
+        {"time": 1800},
+        {"distilled": 0.15},
+        {"distilled": 0.2, "basis": "mass"},
+        {"purity": {"key": "A", "fraction": 0.98}},
+        {"residue": {"key": "A", "mole_fraction": 1e-3}},
+        {"temperature": 383.0},
+    ]
+    spec = _still(
+        {
+            "stages": 10,
+            "reflux": "constant_distillate",
+            "distillate": {"key": "A", "mole_fraction": 0.99},
+            "maximum_ratio": 20,
+        },
+        volatility={"model": "raoult", "provenance": "assumed", "source": "x"},
+        pressure=101.325,
+        nonvolatile=["P"],
+        end=None,
+        cuts=[{"outlet": f"c{i}", "end": e} for i, e in enumerate(ends)],
+        outlets={"residue": "bottom"},
+    )
+    result = solve_still(spec, {"A": 30.0, "B": 40.0, "P": 30.0}, None, comps, 101.325)
+    cuts = [sum(c.moles.values()) for c in result.cuts]
+    assert cuts == pytest.approx(
+        [
+            1.371064070398571,
+            13.628935929601434,
+            10.223928853946878,
+            2.214435232211436,
+            6.607246939555203,
+            0.0,
+        ],
+        rel=1e-11,
+        abs=1e-12,
+    )
+    assert result.time == pytest.approx(126937.04774572354, rel=1e-12)
+
+
+def test_a_still_boilup_no_cut_uses_does_not_count(tmp_path):
+    """Every cut with its own boil-up in 1/h, the still's own (150 kW) unused: the outlets do
+    not depend on the hours of flows, so the recipe's batch size on the product cut is no
+    circle, and no heat_of_vaporization is asked for the unused kW boil-up (ADR 0068)."""
+    from chemeascode.domains.process.batch_still import outlets_need_hours
+
+    cuts = (
+        "{outlet: product, end: {time: 3600}, boilup: {value: 2, unit: 1/h, provenance: assumed}}",
+        "{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}, boilup: {value: 2, "
+        "unit: 1/h, provenance: assumed}}",
+    )
+    ws = _copy(
+        tmp_path,
+        lambda text: text.replace(
+            "{outlet: product, end: {purity: {key: ACCL, fraction: 0.998}, basis: mass}}", cuts[0]
+        ).replace("{outlet: offcut, end: {residue: {key: ACCL, mole_fraction: 0.05}}}", cuts[1]),
+    )
+    recipe = ws.root / "process/recipe.yaml"
+    recipe.write_text(recipe.read_text().replace("unit: kg, stream: S1,", "unit: kg, stream: S2,"))
+    process, _ = load(ws.root)
+    spec = process.nodes["ST1"].still
+    assert spec.boilup.unit == "kW" and [b.unit for b in spec.boilups()] == ["1/h", "1/h"]
+    assert not outlets_need_hours(spec)
+    result = _propagate(ws, write=True)
+    assert not [f.format() for f in result.findings if f.level in ("error", "warning")]
+    assert result.written >= 5
+    # the still's own boil-up still counts with a feed or a cut without its own
+    timed = spec.model_copy(
+        update={"cuts": [spec.cuts[0], spec.cuts[1].model_copy(update={"boilup": None})]}
+    )
+    assert [b.unit for b in timed.boilups()] == ["kW", "1/h"] and not outlets_need_hours(timed)
+    first = spec.model_copy(
+        update={"cuts": [spec.cuts[0].model_copy(update={"boilup": None}), spec.cuts[1]]}
+    )
+    assert outlets_need_hours(first)

@@ -145,7 +145,8 @@ solvent swap (`still:` on the step, below) gets its cuts and residue. A step wit
 `cheme process crystallizers` reports their balances and duties. A filter-dryer's filter, wash,
 re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
 procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
-dryer. Other separators, and
+dryer. A separator with a known split (a sieve dryer, a decanter, a scrubber) gives
+`recovery:` (below) and gets its outlets from it. Other separators, and
 reactors without conversions, are never solved (`cheme.process-propagate-not-solved` lists
 their streams lacking values): give those values yourself. Derived values are `calculated` with source `cheme process propagate: ...`
 and a fingerprint; never edit them by hand (give the value as `assumed` instead, which propagate
@@ -179,6 +180,44 @@ convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel
   state. Record the tears and the tolerance in `DESIGN.md`.
 - Nothing that depends on a loop that does not converge is written. Raise
   `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`.
+
+**Feeds for a target: design specifications (ADR 0070).** Never scale feeds by hand or by
+script to a product rate, a charge ratio or a purity, and never tune a make-up to a loop by
+hand. Declare the target in `specs:` and let propagate solve the feed (or a purge split)
+together with the tears:
+
+```yaml
+specs:
+  - id: rate                         # 1000 t/a of product in the recipe's hours_per_year
+    vary: {stream: S4, initial: 70, with: {S1: 1.89688, S3: 0.26124}}   # followers at their charge ratio
+    target: {stream: S24, quantity: annual, value: 1000, unit: t}
+    provenance: given
+    source: "design basis (D-002)"
+  - id: charge                       # the make-up that holds the charge ratio of a recycle loop
+    vary: {stream: S3, initial: 90, with: {S4: 0.133273}}
+    target: {stream: S9, component: TBA, quantity: ratio, per: {stream: S2, component: K}, basis: mole, value: 8.60}
+    provenance: assumed
+    source: "D-004"
+```
+
+- Vary a feed stream's flow (remove its given or assumed `flow`; `initial` is the first guess)
+  or a splitter outlet left out of its `split:` (`vary: {node, port, initial}`). Put every feed
+  that follows the varied one at a fixed ratio in `with:`. A feed that follows another stream
+  (caustic per kmol of vented HCl) needs its own spec (`quantity: ratio`), or it stays at its
+  hand value and the balance flags it.
+- Targets: `flow` (a flow unit), `annual` (t/a; `hours` or the recipe's), `ratio` to `per:`,
+  `fraction` of a component (`basis: mole` or `mass`).
+- One spec per degree of freedom: a target its variable cannot move is a warning
+  (`cheme.process-design-spec`), as is one beyond `low`/`high`. `cheme.process-spec` (validate)
+  lists declarations that cannot be solved. Record the specs in `DESIGN.md`.
+- A batch plant: the spec sets the year-average rate. The recipe's batch size must give it
+  (`batch = rate x cycle(batch)`): `cheme.recipe-basis` names the batch size that closes it, or
+  the train's capacity when the cycle grows about as fast as the batch. Set `batch_size` to it
+  and run `--fill` again.
+- A separator with a known split: `recovery: {outlets: {port: {component: share of its inlet
+  flow}}, provenance, source}`, one outlet left out for the rest, instead of ASSUMED outlet
+  values from a script, so that a spec upstream reaches past it (`cheme.process-recovery`
+  checks it).
 
 **Duties from the models (ADR 0059).** Do not copy a reactor's, still's or crystallizer's duty
 from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
@@ -240,6 +279,19 @@ still:
   `property-retrieval`), or declare the component `nonvolatile` when it really stays in the
   still. Never invent a relative volatility to make the step pass. An assumed `alpha` states
   its basis in its source.
+- A suspended solid, a salt or an immiscible non-volatile liquid goes in `separate_phase:`, not
+  `nonvolatile:`: it then does not dilute the liquid in Raoult's law (ADR 0068). `nonvolatile`
+  is a dissolved solute. Do not declare a component `nonvolatile` only because a template lists
+  it at 0: a component the charge does not hold needs no vapour pressure.
+- A vacuum ramp or a pump-limited forerun is a sequence of `cuts:`, each with its own
+  `pressure:` and `boilup:` (`unit: m3/h` is the vapour's volume at the still, a vacuum pump's
+  capacity). A cut ending at a `temperature` per pressure step replaces a residue key set by
+  hand.
+- `heat_up_time: true` gives the heat-up of the charge and the vessel's metal a time at the
+  still's own boil-up's heat input (not a pump-limited forerun's), added to the recipe's
+  `distil` from the still: do not also write a hand `heat` operation for it. A jacket that
+  heats at another rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a
+  `heat` with `temperatures` has no batch content on a still).
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
