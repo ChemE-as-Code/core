@@ -42,7 +42,14 @@ propagates, fingerprints and reports as in 1.12.0.
 - **A recipe operation's heat on its stream.** `Operation.stream` on a `heat` or `cool` with
   `temperatures` (schema error without them) names an energy stream with one end at a block or
   step of the unit procedure (`recipe._nodes`) that no model's duty goes on (`duties.target`,
-  the still's and vent condenser's, the heat-up port; `cheme.recipe-reference` otherwise).
+  the still's and vent condenser's, the heat-up port, a dryer's `energy.port`, which its duty
+  is compared with: `duties.dryer_target`; `cheme.recipe-reference` otherwise). An operation
+  before the run of a batch or still whose `heat_up` (ADR 0063) holds the content's and the
+  metal's heat from the charge's temperature to the model's (the next `dose`, `react` or
+  `distil` after it: its `from:`, else each batch or still of the unit) is
+  `cheme.recipe-reference` too (`recipe._heated_up`): that heat is in the model's duty, on its
+  `energy_port` or its `heat_up_port`, already. A heat or cool after the run is a heat of its
+  own and is written.
   `recipe.stream_heats` gives its heat into the content, `(C + C_m)(T_1 - T_0)` per batch (C
   the batch's charge before its dose, else its end, as the jacket time takes it; a dryer's wet
   cake before the `dry`, else its product; `C_m` the vessel's `metal_heat_capacity`, or 0),
@@ -57,7 +64,8 @@ propagates, fingerprints and reports as in 1.12.0.
   energy stream at that port (`duties.split_heat_up`, `heat_up_target`), the rest to the
   model's `energy_port` or one heat stream, which no longer considers that port. `process
   reactors` adds `model_duty.heat_up`. A port that is no energy port of the node, or is its
-  `energy_port`, is `cheme.process-energy-port` (error).
+  `energy_port`, is `cheme.process-energy-port` (error). The port is in both parts'
+  fingerprint (`ModelDuty.inputs`), so a duty written before it was set or removed goes stale.
 - **A charged solid's heat of solution.** `batch.heat_of_solution` (an isothermal batch or
   semi-batch; schema error on an adiabatic one, whose charge temperature is the one after it
   dissolved) is the integral heat per kmol charged, `HeatOfSolution` as a dose's. It is
@@ -97,14 +105,24 @@ propagates, fingerprints and reports as in 1.12.0.
   before the discharge), else the wet cake's. With the dryer's own `energy.vessel_heat_capacity`
   too it is an error (`cheme.recipe-vessel`, and the dryer's energy lists it as missing). A
   `heat` or `cool` with `temperatures` in a dryer's vessel, refused by 1.12.0, takes its time
-  from the jacket, `(C + C_m) / (U A) ln(...)`, C the wet cake's (before the `dry`) or the
-  product's (after it) at the components' `liquid_heat_capacity`, A the jacket's `area` or the
-  vessel's heated area. A filter's vessel keeps the refusal.
+  from the jacket, `(C + C_m) / (U A) ln(...)`, C the wet cake's (before the `dry`: its mass
+  times the dryer's `energy.heat_capacity`, as the dryer's balance takes it, else at the
+  components' `liquid_heat_capacity`) or the product's (after it, at the components'
+  `liquid_heat_capacity`; the dryer's heat capacity is the wet cake's), A the jacket's `area`
+  or the vessel's heated area. A heat or cool before the `dry` (in the procedure's order: the
+  wet cake is new each batch) brings the wet cake to its end temperature: the dryer heats the
+  cake from there (`recipe.dryer_cake`, `recipe_heat` in its report), so the cake's heat-up is
+  the operation's (on its stream, or reported) and the dryer's, each part once. A filter's
+  vessel keeps the refusal.
 - **Fingerprints.** Every new field is left out of its dump when not given (`exclude_if`).
   `batch.heat_up_port`, `heat_of_solution` and `agitator_power` are in `stirred_tank.duty_only`;
   a still's `sensible_heat`, `heat_loss` and `agitator_power` in `batch_still.STILL_DUTY_ONLY`;
   `vessel_metal` in `recycle.NOT_SWEPT`: none is in the outlets' or a tear's fingerprint. Each
-  is in its duty's fingerprint (`ModelDuty.inputs`).
+  is in its duty's fingerprint (`ModelDuty.inputs`), `heat_up_port` too.
+- **The duty's basis.** A term a duty holds is not listed among those left out: with
+  `agitator_power`, `heat_loss`, `sensible_heat` or a charged heat of solution the basis text
+  drops that part of its "not included" clause (`duties._batch_basis`, `_still_extras`); a plant
+  that uses none of them reads as in 1.12.0.
 
 ## Consequences
 
@@ -112,10 +130,12 @@ propagates, fingerprints and reports as in 1.12.0.
   `n cp dT + C_m dT / h`, and the rest as the duty without `heat_up`; the agitator's `-P t /
   h`; a charged heat of solution's `n_0 dH_sol` with the outlet and the peak cooling duty
   unchanged; a recipe heat-up's `(C + C_m) dT / h` on its stream, stale when the operation
-  changes; a conversion step's metal `C_m (T_out - T_in) / h`; a dryer's metal from a
-  cool-down's end temperature, and the cool-down's jacket time and heat; a still's sensible
-  rise and heat loss against quadratures of their integrals along Raoult's bubble point to
-  1e-6.
+  changes, and refused before the run of a batch with `heat_up`; a conversion step's metal
+  `C_m (T_out - T_in) / h`; a dryer's metal from a cool-down's end temperature, and the
+  cool-down's jacket time and heat; a warm-up before the `dry` on its stream, the dryer's
+  sensible heat from its end temperature; a still's sensible rise and heat loss against
+  quadratures of their integrals along Raoult's bubble point to 1e-6, at 1 and at 2 h of flows
+  per batch.
 - Positive: on a scratch copy of potassium-tert-butoxide-1 (process-library main), REACT's
   `heat` operation with `stream: Q1` and Q1's hand duty removed: `process propagate --fill`
   writes Q1 25.5655 kW `calculated` (the hand value, the recipe's year average: 25.57 kW, 606.2
@@ -130,7 +150,9 @@ propagates, fingerprints and reports as in 1.12.0.
   charged component, an agitator's power constant over the model's time (not over the recipe's
   other operations), a heat loss at one UA and ambient temperature over the boil-up only. A
   recipe heat's content is the batch's charge or end (or the dryer's cake or product), as the
-  jacket time takes it, not the content at that operation in general.
+  jacket time takes it, not the content at that operation in general. A heat or cool before a
+  `heat_up` model's run is refused on a stream, not split against the model's range: the
+  operation's temperatures need not match the charge's and the model's.
 - Left open:
   - acetyl-chloride-1 L-11, the heat of mixing and of the phase separation: a dose's or the
     charge's integral heat of solution can be given since 1.10.0 and now, but no value for PCl3
@@ -140,9 +162,15 @@ propagates, fingerprints and reports as in 1.12.0.
     phosphorous acid's state, its D-005);
   - an agitator's or a drive's power in a dryer and a crystallizer: the dryer's balance divides
     by an `efficiency` that already lumps what it gains and loses, so whether an agitator's heat
-    enters before or after it is the plant's to say, and the crystallizer's lumped balance has
-    no time of its own to multiply a power by;
-  - a vessel's heat losses besides a still's, and the losses during a heat-up or a hold.
+    enters before or after it is the plant's to say. A crystallizer's would follow this ADR's
+    construction (a continuous one's kW adds to its rate as it is; a batch one's over the
+    recipe operations it runs in, as its metal takes the batch's hours); no library entry asked
+    for it (core#191's L-12 is the reactors' agitators), so it is not added here;
+  - a vessel's heat losses besides a still's (core#191 names the still's): an isothermal batch's
+    would follow the agitator's construction, `UA (T - T_amb) t` over the batch's hours, but
+    only over the model's time (not the recipe's other operations, as the agitator's); an
+    adiabatic batch's would change its temperature path, a model change. Not added here; nor
+    the losses during a heat-up or a hold, whose temperatures over time no model follows.
 
 ## Evidence
 

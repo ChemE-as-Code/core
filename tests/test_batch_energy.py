@@ -105,6 +105,24 @@ def test_the_heat_up_port_rules(tmp_path):
     assert finding.level == "error" and "heat_up_port x is no energy port" in finding.message
 
 
+def test_adding_the_heat_up_port_makes_the_netted_duty_stale(tmp_path):
+    """Q1 written with the heat-up netted in, then heat_up_port set: validate finds Q1 stale
+    (the port is in the duty's fingerprint), and propagate writes the rest alone."""
+    ws = heats._held_at_300(tmp_path, recipes._jacketed(metal_heat_capacity=1000.0), cooling=True)
+    _two_streams(ws)
+    netted = _duty(ws, "Q1")
+    path = ws.root / "process/flowsheet.yaml"
+    path.write_text(path.read_text().replace("heat_up: true, ", "heat_up: true, heat_up_port: h, "))
+    process, _ = load(ws.root)
+    (stale,) = [f for f in rules(process) if f.rule == "cheme.process-calculated-stale"]
+    assert "Q1" in stale.message
+    run(ws, process, "design", write=True)
+    split = _duty(ws, "Q1")
+    heat_up = 5 * 150.0 * 10.0 / 3600.0 + 1000.0 * 10.0 / HOURS / 3600.0
+    assert split["value"] == pytest.approx(netted["value"] + heat_up, rel=1e-5)
+    assert split["fingerprint"] != netted["fingerprint"]
+
+
 # -- the agitator's power and a charged solid's heat of solution ----------------------------------
 
 
@@ -131,6 +149,10 @@ def test_the_agitators_power_is_heat_the_cooling_water_removes(tmp_path):
     (before,) = recipe_report(plain.root).vessels
     (after,) = recipe_report(ws.root).vessels
     assert after.peak_duty == pytest.approx(before.peak_duty + 2.0, rel=1e-12)
+    # the basis says the agitation is in, not that it is left out
+    basis = _row(ws)["model_duty"]["basis"]
+    assert "agitation" not in basis.split(";")[1]
+    assert "heat losses not included; the agitator's 2 kW over the model's 1.5 h" in basis
     # without a recipe the batch's hours are not known: the duty says what it lacks
     (ws.root / "process/recipe.yaml").unlink()
     duty = _row(ws)["model_duty"]
@@ -175,6 +197,10 @@ def test_a_charged_heat_of_solution_in_a_plant_and_its_rules(tmp_path):
     q, q0 = _duty(ws, "Q1"), _duty(plain, "Q1")
     assert q0["value"] - q["value"] == pytest.approx(5 * 4000.0 / 3600.0, rel=1e-5)
     assert q["fingerprint"] != q0["fingerprint"]
+    (row,) = [r for r in reactor_report(ws.root).reactors if r["node"] == "R"]
+    basis = row["model_duty"]["basis"]
+    assert "the charged components' heat of solution as they dissolve, " in basis
+    assert "their heat of solution" not in basis and "absorption and solution" not in basis
     # the outlet's fingerprint is as without it: the heat changes the duty only
     s3 = duties._streams(ws)["S3"]["state"]["design"]["flow"]["fingerprint"]
     assert s3 == duties._streams(plain)["S3"]["state"]["design"]["flow"]["fingerprint"]
@@ -188,14 +214,14 @@ def test_a_charged_heat_of_solution_in_a_plant_and_its_rules(tmp_path):
 # -- a recipe operation's heat on its stream ------------------------------------------------------
 
 
-def _heated(tmp_path, stream="Q2", metal=1000.0, **kw):
-    """The fixture held at 300 K without heat_up, its recipe heating the charge 290 -> 300 K
-    on the steam Q2 (*stream*)."""
+def _heated(tmp_path, stream="Q2", metal=1000.0, heat_up=False, at=1, **kw):
+    """The fixture held at 300 K without heat_up (*heat_up*), its recipe heating the charge
+    290 -> 300 K on the steam Q2 (*stream*), operation *at* of the unit procedure."""
     recipe = recipes._jacketed(metal_heat_capacity=metal) if metal else recipes._jacketed()
     recipe["unit_procedures"][0]["operations"].insert(
-        1, {"id": "heatup", "kind": "heat", "temperatures": [290, 300], "stream": stream} | kw
+        at, {"id": "heatup", "kind": "heat", "temperatures": [290, 300], "stream": stream} | kw
     )
-    ws = heats._held_at_300(tmp_path, recipe, heat_up=False, cooling=True)
+    ws = heats._held_at_300(tmp_path, recipe, heat_up=heat_up, cooling=True)
     return ws, _two_streams(ws)
 
 
@@ -261,12 +287,30 @@ def test_an_operations_stream_must_be_an_energy_stream_of_the_unit_no_model_writ
             }
         )
     for stream, why in (
-        ("Q1", "R's model writes the duty of Q1 already"),
+        ("Q1", "R's model gives the duty of Q1 already"),
         ("S1", "S1 is no energy stream"),
     ):
         ws, _ = _heated(tmp_path / stream, stream=stream)
         messages = [f.message for f in recipes._recipe_findings(ws) if f.level == "error"]
         assert any(why in m for m in messages), messages
+
+
+def test_a_heat_the_models_heat_up_holds_is_refused_on_a_stream(tmp_path):
+    """With heat_up the batch's duty on Q1 holds the charge's and the metal's heat-up: the
+    recipe's heat-up before the dose on Q2 would count it twice, and is refused; a heat after
+    the reaction is a heat of its own and is written."""
+    ws, result = _heated(tmp_path, heat_up=True)
+    messages = [f.message for f in recipes._recipe_findings(ws) if f.level == "error"]
+    assert any("R's model heats the content up itself (heat_up)" in m for m in messages), messages
+    assert "state" not in duties._streams(ws)["Q2"]  # nothing written on it
+    terms = _row(ws)["model_duty"]["terms_kW"]
+    assert terms["charge heat-up"] > 0 and terms["vessel metal"] > 0
+    after, _ = _heated(tmp_path / "after", heat_up=True, at=3)  # after react
+    assert not [f for f in recipes._recipe_findings(after) if f.rule == "cheme.recipe-reference"]
+    (heat,) = recipe_report(after.root).heats  # the content at its end, after the dose
+    q2 = _duty(after, "Q2")
+    assert q2["provenance"] == "calculated"
+    assert q2["value"] == pytest.approx(heat.kJ / (HOURS * 3600.0), rel=1e-5)
 
 
 # -- a conversion step's vessel metal -------------------------------------------------------------
@@ -353,10 +397,12 @@ CW = """\
 """
 
 
-def _dryer_plant(tmp_path, metal=True, cool=True):
+def _dryer_plant(tmp_path, metal=True, cool=True, warm=None):
     """The filter-dryer of test_dryer with its vessel's 2000 kJ/K metal given on the recipe's
     vessel (not the dryer's), and (*cool*) the product cooled in it 333.15 -> 303.15 K on a
-    jacket of 3 kW/K at 293.15 K before the discharge, its heat on Q2."""
+    jacket of 3 kW/K at 293.15 K before the discharge, its heat on Q2; with *warm* (a stream)
+    the wet cake warmed 278.15 -> 313.15 K before the drying on the jacket's 373.15 K, its
+    heat on that stream (Q3: steam into D1.warm)."""
     flowsheet = dryers.FLOWSHEET
     if metal:
         flowsheet = flowsheet.replace("        vessel_heat_capacity: 2000\n", "")
@@ -370,6 +416,17 @@ def _dryer_plant(tmp_path, metal=True, cool=True):
         .rstrip("\n")
         + "\n  - {id: Q2, kind: energy, from: D1.cool, to: CW.r}\n"
     )
+    if warm:
+        flowsheet = (
+            flowsheet.replace("products:\n", STEAM.replace("STEAM", "STEAM2") + "products:\n")
+            .replace(
+                "      - {id: cool, direction: out, kind: energy}\n",
+                "      - {id: cool, direction: out, kind: energy}\n"
+                "      - {id: warm, direction: in, kind: energy}\n",
+            )
+            .rstrip("\n")
+            + "\n  - {id: Q3, kind: energy, from: STEAM2.s, to: D1.warm}\n"
+        )
     recipe = copy.deepcopy(dryers.RECIPE)
     up = recipe["unit_procedures"][0]
     if metal:
@@ -390,6 +447,13 @@ def _dryer_plant(tmp_path, metal=True, cool=True):
                 "stream": "Q2",
             },
         )
+    if warm:
+        up["vessel"]["jacket"] = up["vessel"].get("jacket", {"u": 600, "area": 5.0}) | {
+            "heating_temperature": 373.15,
+            "provenance": "assumed",
+        }
+        op = {"id": "warm", "kind": "heat", "temperatures": [278.15, 313.15], "stream": warm}
+        up["operations"].insert(2, op)
     root = tmp_path / "plant"
     (root / "process").mkdir(parents=True)
     (root / "plant.yaml").write_text("name: dryer-test\nstage: concept\nsheets: []\n")
@@ -457,6 +521,30 @@ def test_a_cool_down_in_the_dryers_vessel_has_a_jacket_time_and_its_heat_on_a_st
     messages = [f.message for f in recipe_report(ws.root).findings if f.level == "error"]
     assert any("both give the dryer's metal" in m for m in messages)
     assert "not both" in _dryer_entry(ws)["missing"][0]
+
+
+def test_a_warm_up_before_the_drying_is_the_recipes_and_the_dryer_heats_the_cake_on(tmp_path):
+    """The wet cake (500 kg/h x 1.6 kJ/(kg K) x 5 h, the dryer's own heat capacity) and the
+    2000 kJ/K metal from 278.15 to 313.15 K on Q3; the dryer heats both on to 333.15 K: the
+    cake's 55 K counted once, 35 K on Q3 and 20 K in the dryer's duty."""
+    ws = _dryer_plant(tmp_path, cool=False, warm="Q3")
+    errors = [f.format() for f in recipe_report(ws.root).findings if f.level == "error"]
+    assert not errors, errors
+    cake = 500.0 * 1.6 * dryers.HOURS
+    q3 = _duty(ws, "Q3")
+    assert q3["provenance"] == "calculated"
+    assert q3["value"] == pytest.approx((cake + 2000.0) * 35.0 / dryers.HOURS / 3600, rel=1e-5)
+    energy = _dryer_entry(ws)
+    assert energy["sensible_kJ_h"] == pytest.approx(500.0 * 1.6 * 20.0, rel=1e-9)
+    assert energy["vessel_kJ_h"] == pytest.approx(2000.0 * 20.0 / dryers.HOURS, rel=1e-5)
+    assert energy["recipe_heat"] == {"operation": "warm", "cake_temperature_K": 313.15}
+    plain = _dryer_entry(_dryer_plant(tmp_path / "plain", cool=False))
+    assert "recipe_heat" not in plain and plain["sensible_kJ_h"] == pytest.approx(44000.0)
+    # the dryer's own heating stream is the dryer model's: refused for the recipe's heat
+    ws = _dryer_plant(tmp_path / "port", cool=False, warm="Q1")
+    messages = [f.message for f in recipe_report(ws.root).findings if f.level == "error"]
+    assert any("D1's model gives the duty of Q1 already" in m for m in messages), messages
+    assert _duty(ws, "Q1")["provenance"] == "assumed"
 
 
 # -- a still's sensible rise while it boils and its heat losses -----------------------------------
@@ -545,6 +633,15 @@ def test_the_stills_sensible_rise_and_heat_loss_follow_their_integrals():
     assert duty.terms_kW["heat losses"] == pytest.approx(result.heat_loss / 3600.0)
     assert duty.terms_kW["agitation"] == pytest.approx(-3.0 * result.time / 3600.0, rel=1e-12)
     assert duty.heat_kW == pytest.approx(sum(duty.terms_kW.values()), rel=1e-12)
+    assert "heat losses not included" not in duty.basis
+    assert "heat lost over the boil-up, UA 500 W/K" in duty.basis
+    # the same batch as 2 h of half the flows: the same heats per batch, half the kW
+    twice = solve_still(spec, {"A": 0.4, "P": 0.1}, None, comps, 101.325, hours=2.0)
+    assert twice.sensible_rise == pytest.approx(exact, rel=1e-6)
+    assert twice.heat_loss == pytest.approx(result.heat_loss, rel=1e-9)
+    halved = still_duty(node, twice)
+    for term in ("sensible rise", "heat losses", "agitation"):
+        assert halved.terms_kW[term] == pytest.approx(duty.terms_kW[term] / 2, rel=1e-6)
     assert still_duty(SimpleNamespace(id="ST", still=_still()), plain).terms_kW == {
         "boil-up": plain.energy / 3600.0
     }

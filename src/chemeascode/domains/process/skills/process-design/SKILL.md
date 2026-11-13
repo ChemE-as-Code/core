@@ -249,7 +249,7 @@ process recipe` reports the heat per batch of each jacket-timed heat-up in a ves
 the basis for a heater step without a model; do not also count it in a model with `heat_up`.
 Name that heater step's energy stream in the operation's `stream:` (ADR 0075) and propagate
 writes the heat-up's or cool-down's duty on it instead of a hand value (not a stream a model's
-duty goes on). More terms of ADR 0075, before typing a stream by hand: a charged solid's heat of
+duty goes on, nor a heat before the run of a batch or still with `heat_up`, which holds it). More terms of ADR 0075, before typing a stream by hand: a charged solid's heat of
 solution in `batch.heat_of_solution` (as a dose's); the agitator's power in
 `batch.agitator_power` or `still.agitator_power` (kW into the content while the model runs; the
 batch needs the recipe); the warm-up on steam and the reaction on cooling water as two streams

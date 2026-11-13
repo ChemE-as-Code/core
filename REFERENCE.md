@@ -1146,13 +1146,17 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   procedure holding a still may give a `vessel` (sized from what its steps take in, or its
   `volume`; no jacket check). ADR 0075: a `heat` or `cool` with `temperatures` may name the
   energy `stream` its heat goes on, an energy stream at a step or block of the unit that no
-  model's duty goes on (`cheme.recipe-reference` otherwise): `process propagate` writes the
+  model's duty goes on (nor a dryer's `energy.port`), and not before the run (the next `dose`,
+  `react` or `distil`) of a batch or still with `heat_up`, whose duty holds that heat-up already
+  (`cheme.recipe-reference` otherwise): `process propagate` writes the
   content's and the metal's heat over the batch's hours of flows on it (`calculated`, stale when
   the operation, the vessel or the batch changes; a given or assumed duty is compared,
   `cheme.process-duty`), and `heats` lists the operation with its `stream` even without metal. A
   dryer's vessel takes a `heat` or `cool` with `temperatures` too (the wet cake before the `dry`,
-  the dried product after it, at the components' `liquid_heat_capacity`, on `jacket.area` or the
-  vessel's heated area; 1.12.0 refused it), and its `metal_heat_capacity` is the dryer's metal,
+  at the dryer's `energy.heat_capacity`, the dried product after it, at the components'
+  `liquid_heat_capacity`, on `jacket.area` or the vessel's heated area; 1.12.0 refused it; after
+  one before the `dry` the dryer heats the wet cake from its end temperature, `recipe_heat` in
+  `process crystallizers`), and its `metal_heat_capacity` is the dryer's metal,
   heated each batch from the temperature the vessel was left at, the end of the last operation
   with `temperatures` before the `dry` in the procedure's cycle (a cool-down before the
   discharge), else from the wet cake's (`cheme.recipe-vessel` error when the dryer gives
@@ -1195,7 +1199,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (with `heat_up`) puts the charge's heat-up and the vessel's metal on that energy port's stream
   (steam) and the rest of the duty on `energy_port` (cooling water), so heating and cooling are
   not netted (`process reactors` adds `model_duty.heat_up`; a port that is no energy port, or
-  the `energy_port` itself, is `cheme.process-energy-port`); `batch.heat_of_solution: {values:
+  the `energy_port` itself, is `cheme.process-energy-port`; the port is in the duties'
+  fingerprint); `batch.heat_of_solution: {values:
   {component: kJ/kmol}, provenance}` is a charged component's integral heat of solution (a
   solid dissolving as it is charged), in the term `solution` (a share the vent's vapour takes
   off takes it back as a dose's does), not in the peak cooling duty or the screening (released

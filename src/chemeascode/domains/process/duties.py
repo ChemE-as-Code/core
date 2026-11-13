@@ -312,26 +312,40 @@ def other_energy(process: Any, node: Any, case: str) -> tuple[float, dict[str, A
 # -- the models' duties -------------------------------------------------------------------------
 
 
-def _batch_basis(terms: dict[str, float]) -> str:
+def _batch_basis(
+    terms: dict[str, float],
+    dosed: bool | None = None,
+    charged: bool = False,
+    agitated: bool = False,
+) -> str:
     """The basis of a batch's duty: :data:`BATCH_BASIS`, or with the terms of ADR 0063 it
-    holds (a heat of solution, the charge's heat-up); with the vent's vapour (ADR 0062)
-    :data:`VENT_VAPOUR_BASIS` after it."""
-    solution, heat_up = "solution" in terms, "charge heat-up" in terms
+    holds (a heat of solution, the charge's heat-up) and those of ADR 0075 (*charged*: the
+    charge's heat of solution; *agitated*: the agitator's power, its own text after it);
+    with the vent's vapour (ADR 0062) :data:`VENT_VAPOUR_BASIS` after it. *dosed*: whether
+    the doses' heat of solution is in the term ``solution`` (None: whether that term is)."""
+    solution = "solution" in terms if dosed is None else dosed
+    heat_up = "charge heat-up" in terms
     vent = VENT_VAPOUR_BASIS if "vent vapour" in terms else ""
-    if not (solution or heat_up):
+    if not (solution or heat_up or charged or agitated):
         return BATCH_BASIS + vent
     held = "the heat its reactions release over the batch, the doses warmed to the batch's "
     held += "temperature"
     if solution:
         held += " and their heat of solution as they mix in"
+    if charged:
+        held += ", the charged components' heat of solution as they dissolve"
     if heat_up:
         held += ", the charge heated from its inlet temperature to the batch's"
-    left = ("" if heat_up else "the charge's heat-up, ") + (
-        "" if solution else "the heats of absorption and solution, "
-    )
+    left = "" if heat_up else "the charge's heat-up, "
+    if not solution:
+        left += (
+            "the heat of absorption and the doses' heat of solution, "
+            if charged
+            else "the heats of absorption and solution, "
+        )
     return (
-        f"isothermal batch: {held}, per hour of the flowsheet's flows; {left}agitation and heat "
-        "losses not included"
+        f"isothermal batch: {held}, per hour of the flowsheet's flows; {left}"
+        f"{'' if agitated else 'agitation and '}heat losses not included"
     ) + vent
 
 
@@ -351,19 +365,23 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
     if result.heat_terms is None:
         return ModelDuty(node.id, model, None, basis=BATCH_BASIS, missing=result.heat_missing)
     terms = {k: v / 3600.0 for k, v in result.heat_terms.items()}
-    duty = ModelDuty(node.id, model, sum(terms.values()), terms, _batch_basis(terms))
     solutions = [
         d.heat_of_solution.model_dump(mode="json", exclude=NOT_INPUTS)
         for d in getattr(node.batch, "dosing", ())
         if d.heat_of_solution is not None
     ]
+    charged = getattr(node.batch, "heat_of_solution", None)
+    power = getattr(node.batch, "agitator_power", None)
+    basis = (
+        _batch_basis(terms)
+        if charged is None and power is None  # as in 1.12.0
+        else _batch_basis(terms, bool(solutions), charged is not None, power is not None)
+    )
+    duty = ModelDuty(node.id, model, sum(terms.values()), terms, basis)
     if solutions:  # the duty's, not an isothermal batch's outlets (their fingerprint)
         duty.inputs["heat_of_solution"] = solutions
-    charged = getattr(node.batch, "heat_of_solution", None)
     if charged is not None:  # ADR 0075: the charge's, as it dissolved
         duty.inputs["charge_heat_of_solution"] = charged.model_dump(mode="json", exclude=NOT_INPUTS)
-        duty.basis += "; the charged components' heat of solution as they dissolve"
-    power = getattr(node.batch, "agitator_power", None)
     if power is not None and _agitation(process, case, duty, power, result.time):
         return duty
     if not getattr(node.batch, "heat_up", False):
@@ -371,6 +389,9 @@ def batch_duty(node: Any, result: Any, process: Any = None, case: str | None = N
         # heat-up nor the metal's is in its duty (the recipe's heat operation holds both)
         return _metal_left_out(process, node, case, duty)
     duty.inputs["heat_up"] = True
+    port = getattr(node.batch, "heat_up_port", None)
+    if port is not None:  # it moves the heat-up off the rest's stream (ADR 0075)
+        duty.inputs["heat_up_port"] = port
     temperatures = (getattr(result, "charge_temperature", None), result.temperature)
     return with_metal(process, node, case, duty, temperatures)
 
@@ -432,6 +453,19 @@ def heat_up_target(process: Any, node: Any) -> tuple[Target | None, str]:
         return None, f"no energy stream at its heat_up_port {port}"
     stream, _, into, _ = at[0]
     return Target(stream, port, into, "batch.heat_up_port"), ""
+
+
+def dryer_target(process: Any, node: Any) -> tuple[Target | None, str]:
+    """The energy stream a dryer's duty is compared against (``dryer.energy.port``, ADR 0057),
+    or None and why ('' without the port)."""
+    port = getattr(getattr(getattr(node, "dryer", None), "energy", None), "port", None)
+    if port is None:
+        return None, ""
+    at = [e for e in _energy_ends(process, node) if e[1] == port]
+    if not at:
+        return None, f"no energy stream at its energy.port {port}"
+    stream, _, into, _ = at[0]
+    return Target(stream, port, into, "dryer.energy.port"), ""
 
 
 def _metal_left_out(
@@ -530,6 +564,10 @@ def _still_extras(spec: Any, result: Any, duty: ModelDuty, process: Any) -> str:
         if result.sensible_rise is None:
             return f"the content's sensible rise (still.sensible_heat): {result.sensible_missing}"
         duty.terms_kW["sensible rise"] = result.sensible_rise / per_hour
+        duty.basis = duty.basis.replace(
+            "the content's sensible rise while it boils and heat losses not included",
+            "heat losses not included",
+        )
         duty.basis += "; the content's sensible heat as its bubble point rises while it boils"
         duty.inputs["sensible_heat"] = True
         if process is not None:
@@ -541,6 +579,8 @@ def _still_extras(spec: Any, result: Any, duty: ModelDuty, process: Any) -> str:
     loss = getattr(spec, "heat_loss", None)
     if loss is not None and result.heat_loss is not None:
         duty.terms_kW["heat losses"] = result.heat_loss / per_hour
+        duty.basis = duty.basis.replace(" and heat losses not included", " not included")
+        duty.basis = duty.basis.replace("; heat losses not included", "")
         duty.basis += (
             f"; heat lost over the boil-up, UA {loss.ua:g} W/K to {loss.ambient_temperature:g} K"
         )

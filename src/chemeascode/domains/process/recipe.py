@@ -38,10 +38,13 @@ sized from what its steps take in.
 
 ADR 0075: a ``heat`` or ``cool`` with ``temperatures`` may name the energy ``stream`` its heat
 goes on (the content's and the metal's, per hour of the flowsheet's flows, as the models'
-duties): ``cheme process propagate`` writes it (:func:`stream_heats`). A dryer's vessel takes a
-heat-up or cool-down with ``temperatures`` too (the wet cake before the drying, the product
-after it, on the jacket's area or the vessel's heated area), and its ``metal_heat_capacity`` is
-the dryer's metal, heated from the temperature the vessel was left at (:func:`dryer_metal`). A
+duties): ``cheme process propagate`` writes it (:func:`stream_heats`); not a stream a model's
+duty goes on, nor a heat a batch's or still's ``heat_up`` holds (:func:`_heated_up`). A dryer's
+vessel takes a heat-up or cool-down with ``temperatures`` too (the wet cake before the drying,
+the product after it, on the jacket's area or the vessel's heated area; after one before the
+drying the dryer heats the wet cake on from its end, :func:`dryer_cake`), and its
+``metal_heat_capacity`` is the dryer's metal, heated from the temperature the vessel was left
+at (:func:`dryer_metal`). A
 batch's ``agitator_power`` adds to the peak duty its jacket is checked against.
 
 A vented batch or semi-batch unit (``batch.vent``, ADR 0054) reports its off-gas per batch:
@@ -63,7 +66,8 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
   dryer; a ``filter``: no filter with filtration), a ``dose`` from a step without dosing, a
   ``start.after`` that is no earlier unit procedure, a duplicate id, a step in the ``units`` of
   one vessel and named by another unit procedure, a vessel or vent of a unit (a block, or
-  ``units``) that holds several batch or semi-batch steps;
+  ``units``) that holds several batch or semi-batch steps, an operation's ``stream`` (ADR
+  0075) a model's duty goes on or whose heat a model's ``heat_up`` holds;
 - ``recipe-duration``: a ``from:`` duration the model cannot give (it does not solve);
 - ``recipe-vessel`` (warning): a given vessel the batch fills beyond its fill fraction;
 - ``recipe-jacket`` (warning): the peak duty to remove (the unit's model, isothermal) exceeds
@@ -726,8 +730,9 @@ def _jacket_heat(
 
 def _dryer_content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Content:
     """The content of *up*'s dryer per batch (ADR 0075): the wet cake (its inlet) as the
-    charge, the dried product as the end, at the components' ``liquid_heat_capacity`` (kJ/K
-    None when one is missing), at the drying temperature. Raises ValueError."""
+    charge, at the dryer's ``energy.heat_capacity`` (else as the product), the dried product
+    as the end, at the components' ``liquid_heat_capacity`` (kJ/K None when one is missing),
+    at the drying temperature. Raises ValueError."""
     from chemeascode.domains.process import dryer as drying
     from chemeascode.domains.process.model import stream_flows
 
@@ -750,7 +755,14 @@ def _dryer_content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -
         return total * hours
 
     wet = stream_flows(process, inlet, case).components
-    return _Content(capacity(wet), capacity(result.product), 0.0, 0.0, None, node.dryer.temperature)
+    energy = node.dryer.energy
+    if energy is not None and wet is not None:
+        # the dryer's own heat capacity of the wet cake, as its balance heats the cake on from
+        # where a heat-up before the drying left it (dryer_cake)
+        cake = sum(wet.values()) * energy.heat_capacity * hours
+    else:
+        cake = capacity(wet)
+    return _Content(cake, capacity(result.product), 0.0, 0.0, None, node.dryer.temperature)
 
 
 def dryer_metal(process: Any, node_id: str) -> tuple[float, float | None, str] | None:
@@ -773,6 +785,27 @@ def dryer_metal(process: Any, node_id: str) -> tuple[float, float | None, str] |
         if op.temperatures is not None:
             return metal, op.temperatures[1], procedure
     return metal, None, procedure
+
+
+def dryer_cake(process: Any, node_id: str) -> tuple[float, str] | None:
+    """(K, the operation's id) the recipe brings dryer *node_id*'s wet cake to before the
+    drying (ADR 0075): the end of the last ``heat`` or ``cool`` with ``temperatures`` before
+    the ``dry`` in the unit procedure that holds the dryer, in its order (the wet cake is new
+    each batch: a cool-down after the ``dry`` acts on the product); that operation's heat is
+    its own, so the dryer heats the cake from there. None without one."""
+    recipe, _, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    for up in recipe.unit_procedures:
+        if not any(node.id == node_id for node in _nodes(process, up)):
+            continue
+        ops = up.operations
+        at = next((i for i, o in enumerate(ops) if o.kind == "dry" and o.from_ == node_id), None)
+        if at is None:
+            at = next((i for i, o in enumerate(ops) if o.kind == "dry"), 0)
+        before = [o for o in ops[:at] if o.temperatures is not None]
+        return (before[-1].temperatures[1], before[-1].id) if before else None  # type: ignore[index]
+    return None
 
 
 def vessel_metal(process: Any, node_id: str) -> tuple[float, str, Recipe] | None:
@@ -1268,8 +1301,12 @@ def evaluate(
                         "reference",
                         f"{up.id}.{op.id}: stream {op.stream}: {failure}",
                         [*at, "operations", j, "stream"],
-                        "name the energy stream of the heat-up or cool-down at a step of the "
-                        "unit (a heater's or cooler's), not one a model's duty goes on",
+                        "drop the operation's stream (its heat is reported), or the model's "
+                        "heat_up (the stream then holds the heat-up; heat_up_port puts the "
+                        "model's on a stream of its own)"
+                        if isinstance(failure, _Counted)
+                        else "name the energy stream of the heat-up or cool-down at a step of "
+                        "the unit (a heater's or cooler's), not one a model's duty goes on",
                         [up.id],
                     )
             if op.temperatures is not None:
@@ -1640,30 +1677,66 @@ class StreamHeat:
 
 
 def _model_streams(process: Any) -> dict[str, str]:
-    """Energy stream id -> the block or step whose model writes its duty (ADR 0059, 0061,
-    0062, 0075)."""
+    """Energy stream id -> the block or step whose model gives its duty (ADR 0059, 0061,
+    0062, 0075): writes it, or compares it (a dryer's ``energy.port``, ADR 0057)."""
     from chemeascode.domains.process import duties
 
     found: dict[str, str] = {}
     for node in [*process.flowsheet.steps, *process.flowsheet.blocks]:
-        if duties.duty_model(node) is None:
-            continue
-        for find in (
-            duties.target,
-            duties.still_condenser_target,
-            duties.vent_condenser_target,
-            duties.heat_up_target,
-        ):
+        finds = (
+            (
+                duties.target,
+                duties.still_condenser_target,
+                duties.vent_condenser_target,
+                duties.heat_up_target,
+            )
+            if duties.duty_model(node) is not None
+            else ()
+        )
+        for find in (*finds, duties.dryer_target):
             goal, _ = find(process, node)
             if goal is not None:
                 found.setdefault(goal.stream.id, node.id)
     return found
 
 
+class _Counted(_Reference):
+    """An operation's heat a model's duty holds already (``heat_up``, ADR 0075)."""
+
+
+#: The operations a model's run in the recipe starts with: a batch's (dose, react) and a
+#: still's (distil).
+_RUNS = {"dose": "batch", "react": "batch", "distil": "still"}
+
+
+def _heated_up(process: Any, up: UnitProcedure, op: Operation) -> str | None:
+    """The batch or still of *up* whose model heats its content up itself (``heat_up``, ADR
+    0063) over *op*: a heat or cool before that model's run (the first dose, react or distil
+    after *op*: its ``from:``, else each batch or still of *up*), its duty holding the
+    content's and the metal's heat from the charge's temperature to the model's (ADR 0075).
+    None when no model's heat-up follows *op*."""
+    ops = up.operations
+    run = next((o for o in ops[ops.index(op) + 1 :] if o.kind in _RUNS), None)
+    if run is None:
+        return None
+    what = _RUNS[run.kind]
+    if run.from_ is not None:
+        nodes = [n for n in [process.nodes.get(run.from_)] if n is not None]
+    else:
+        nodes = _nodes(process, up)
+    for node in nodes:
+        spec = getattr(node, what, None)
+        if what == "batch" and getattr(node, "reactor", None) not in ("batch", "semibatch"):
+            continue
+        if getattr(spec, "heat_up", False):
+            return node.id
+    return None
+
+
 def _stream_end(process: Any, up: UnitProcedure, op: Operation) -> tuple[Any, str, str, bool]:
     """(the energy stream, the unit's node and port it joins, into that node) of *op*'s
     ``stream``. Raises _Reference when it is no energy stream at a block or step of *up*, or a
-    model writes its duty already."""
+    model gives its duty already; _Counted when a model's ``heat_up`` holds *op*'s heat."""
     stream = next((s for s in process.flowsheet.streams if s.id == op.stream), None)
     if stream is None or stream.kind != "energy":
         raise _Reference(f"{op.stream} is no energy stream of the flowsheet")
@@ -1676,7 +1749,12 @@ def _stream_end(process: Any, up: UnitProcedure, op: Operation) -> tuple[Any, st
     else:
         raise _Reference(f"energy stream {op.stream} joins no block or step of {up.label}")
     if (model := _model_streams(process).get(stream.id)) is not None:
-        raise _Reference(f"{model}'s model writes the duty of {op.stream} already")
+        raise _Reference(f"{model}'s model gives the duty of {op.stream} already")
+    if (warm := _heated_up(process, up, op)) is not None:
+        raise _Counted(
+            f"{warm}'s model heats the content up itself (heat_up): its duty holds this "
+            f"{op.kind}'s heat, the content's and the metal's, already"
+        )
     return stream, node, port, into
 
 
