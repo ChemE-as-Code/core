@@ -118,6 +118,31 @@
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
+- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
+  optional:
+  - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
+    {heat_of_solution}` (van 't Hoff on the solute's mole fraction, an ideal solution),
+    reported as not at the operating conditions (`solubility_transfer`, info
+    `cheme.process-crystallizer-transfer`, an unsourced basis while assumed).
+  - The liquor a `measured_in: mother_liquor` solubility holds at, `solubility.liquor:
+    {mass_fraction, tolerance}`, compared with the solved mother liquor (warning
+    `cheme.process-crystallizer-liquor`).
+  - A displacement wash on a filter, `solid_separation.wash:` (its own inlet port, `R = (1 -
+    E)^n` of the cake's liquor stays, a `wash_filtrate` outlet), with the crystals the wash
+    dissolves up to a stated approach to their solubility (`dissolution:`, balanced as a phase
+    change) and the wash's time in a recipe `filter`.
+  - A second liquid phase, `second_liquid:`: a filter's cake holds it at its own cake liquid, a
+    crystallizer leaves it out of its mother liquor.
+  - The dryer's `pressure`, `selectivity: raoult` (the volatiles kept by their vapour
+    pressures), `sublimation:` (the vapour saturated with a subliming product, its heat in the
+    duty), `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
+    flash at the condenser's temperature, its duty, a `condensate` outlet). With `cooling:` or
+    `condenser:`, propagate writes the outlets' temperatures, and their duties are compared with
+    their energy streams (`cheme.process-dryer-duty`).
+  - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
+    library entries with a crystallizer, filter or dryer gave the same results as the base for
+    `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,
+    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative.
 
 ### Fixed
 

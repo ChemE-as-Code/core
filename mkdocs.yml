@@ -208,4 +208,5 @@ nav:
       - "0069 Thermal screening beyond the largest reaction": adr/0069-thermal-screening-beyond-the-largest-reaction.md
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
       - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
+      - "0072 Crystallizer, wash and dryer follow-ups": adr/0072-crystallizer-wash-and-dryer-follow-ups.md
       - Template: adr/template.md

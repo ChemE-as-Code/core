@@ -130,12 +130,24 @@ with units, fallback, notes and the test that solves each arrangement):
   spectator once, 0 stated); a pure-water value alone is an error, never used silently. A
   reslurry wash is a crystallizer fed by the cake and the wash water (two inlets; the crystals
   dissolve to saturation), its own `separation:` or a following `solid_separation:` the
-  re-filtration. Never write a precipitation or a wash loss as a conversion reaction;
+  re-filtration. Never write a precipitation or a wash loss as a conversion reaction. One
+  sourced solubility point away from the crystallizer's temperature is carried there only by
+  an explicit `transfer: {heat_of_solution}` (van 't Hoff, ASSUMED unless sourced; reported as
+  not at the operating conditions), never entered as a `value` at another temperature; data
+  measured in a mother liquor state that liquor (`liquor: {mass_fraction, tolerance}`) so that
+  `cheme process crystallizers` warns when the solved liquor drifts from it; an oil apart from
+  the liquor is a `second_liquid:` (ADR 0072);
 - **specified, solids**: a filter or centrifuge as `solid_separation:` (solid recovery and cake
   liquid; with `filtration:` and a specific cake resistance, Ruth's filtration time for the
   recipe), and a filter-dryer or vacuum dryer as `dryer:` (the volatiles dried to a
   `residual_moisture`; the duty from the cake's heat capacity, the latent heats and the
   vessel; the drying time for the recipe from a `drying_rate` and the vessel's heated area).
+  A displacement wash on the filter is `solid_separation.wash:` (its own inlet port, a wash
+  efficiency, optionally the crystals it dissolves); a dryer may give its `pressure`, keep its
+  volatiles by their vapour pressures (`selectivity: raoult`), lose a subliming product
+  (`sublimation:`), cool the product and the vessel after drying (`cooling:`) and condense its
+  vapour (`condenser:`, a `condensate` outlet) (ADR 0072). Each of these needs its data with a
+  source, or ASSUMED and said so;
   In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
   holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
   (ADR 0057). A precipitation in the reactor that is filtered and dried there lists the batch

@@ -1340,6 +1340,52 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
     `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
 
+- **Crystallizer, wash and dryer options** (ADR 0072; each optional, a flowsheet without them
+  solves and reports as before):
+  - **One solubility point carried to the crystallizer's temperature**:
+    `solubility: {unit, points: [[T0, s0]], transfer: {heat_of_solution: kJ/kmol, provenance,
+    source}}` (a pure-solvent point only) applies `ln(x / x0) = -(dH_sol / R) (1 / T - 1 / T0)`
+    to the solute's mole fraction in its solvent (an ideal solution, a constant heat of solution;
+    0 states no temperature dependence). The report gives `solubility_transfer` (from, to, the
+    value there, the basis), an info `cheme.process-crystallizer-transfer` says it is not a
+    value at the operating conditions, and the model basis says so (not sourced while the
+    transfer is assumed). Without `transfer:` one point away from the temperature is refused as
+    before.
+  - **The liquor a solubility was measured in**: `measured_in: mother_liquor` data may give
+    `liquor: {mass_fraction: {spectator: w}, tolerance, provenance, source}`; `process
+    crystallizers` compares the solved mother liquor (solute, solvent and dissolved spectators)
+    with it (`mother_liquor.composition`) and warns beyond the relative tolerance
+    (`cheme.process-crystallizer-liquor`).
+  - **A displacement wash on the filter**: `solid_separation.wash: {port, efficiency,
+    cake_liquid, dissolution, provenance, source}` takes the wash liquid by its own material
+    inlet `port`. The unwashed cake's liquor stays by `R = (1 - E)^n` (n the mass wash ratio,
+    wash over the unwashed cake's liquor), the washed cake holds its `cake_liquid` (default the
+    separation's), the rest of it wash. `dissolution: {crystal, solute, solubility,
+    temperature, saturation}` lets the wash dissolve the crystals (an anhydrous crystal into its
+    dissolved component) up to `saturation` (1: saturated, the upper bound of the loss) of its
+    solubility per kg of wash. `outlets.wash_filtrate` may keep the washings apart. A recipe
+    `filter` `from:` it adds the wash's time at the final filtration rate, `mu V_w (alpha M /
+    A^2 + R_m / A) / dP`, to Ruth's. `validate` balances the dissolution as a phase change.
+  - **A second liquid phase**: `solid_separation.second_liquid: {components, cake_liquid}` (an
+    oil the cake holds at its own cake liquid); `crystallizer.second_liquid: {components}`
+    (spectators in a phase of their own, left out of a per-liquor solubility basis and the
+    salting-out molality; no `salting_out` coefficient for them).
+  - **The dryer**: `pressure` (kPa(a)); `selectivity: raoult` (the volatiles kept are what an
+    open evaporation of an ideal cake liquid at the drying temperature leaves, `n_i / n_i0 =
+    f^(P_i / P_max)`, each volatile's `vapour_pressure`); `sublimation: {components: {solid:
+    vapour component}, heat: {solid: kJ/kg}}` (the vapour leaves saturated with the solid at the
+    dryer's pressure, `n_j = n_vap P_j / (P - sum P_j)`, an upper bound of the loss, its heat in
+    the duty); `cooling: {product_temperature, heat_capacity, vessel_temperature, port}` (the
+    product cooled before discharge and the vessel's metal back for the next batch, which then
+    heats it from there); `condenser: {temperature, heat_capacity, port}` (the vapour flashed at
+    the condenser's temperature and the dryer's pressure over an ideal condensate, its duty the
+    latent heat of what condenses and the condensate's cooling; `outlets.condensate` takes the
+    condensate, the vapour outlet then what passes to the pump). With `cooling:` or
+    `condenser:` propagate writes the outlets' temperatures. The cooling's and condenser's duties
+    are compared with the energy streams at their (outlet) ports (`cheme.process-dryer-duty`).
+  - The tests are `tests/test_solids_followups.py`, the decision
+    `docs/adr/0072-crystallizer-wash-and-dryer-follow-ups.md`.
+
 - **Batch still and solvent swap**: a block or step with `still:` (ADR 0055,
   `domains/process/batch_still.py`) is a batch (Rayleigh) still: one equilibrium stage, total
   condenser, no reflux, `dN_i/ds = -y_i` over the moles boiled up. The vapour comes from
