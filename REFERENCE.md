@@ -1287,14 +1287,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   given), total reflux with no vapour hold-up; a given outlet temperature other than the
   programme's end, or any at reflux, is refused, and reflux refuses `vent.vapour`,
   `vent.head_space` and `heat_up`. Their duty adds `content` (the content's sensible heat as
-  its temperature moves) and takes `doses` warmed to the temperature each met; `process
-  reactors` gives `temperatures` (`mode`, `start_K`, `end_K`, `max_K`). `batch.solids: {id:
+  its temperature moves) and takes `doses`, the dosed gas passing through (`vent gas`) and a
+  returned condensate (`condensate return`) at the temperature each met (a programme's vent
+  condenser duty: its integral over the run); the recipe's jacket check takes a programme's
+  lowest temperature over the batch; `process reactors` gives `temperatures` (`mode`,
+  `start_K`, `end_K`, `max_K`). `batch.solids: {id:
   {density, diameter | specific_area, provenance}}` carries a component as a solid phase: out
   of the liquid's mole fractions, concentrations and activities (a rate law with an order in
   it is refused; a `reverse: equilibrium` takes its activity as 1, and a solid not there
   neither reacts nor dissolves), its volume `n M / density` in the content's, its
   `liquid_heat_capacity` in the content's heat capacity; a rate per m3 is then per m3 of the
-  liquid. A precipitate that forms as it reacts is carried this way. A rate law with `basis:
+  liquid, and it is no solvent of a vent's Henry gas (`process reactors` rates the outlet's
+  liquid without it). A precipitate that forms as it reacts is carried this way; a solid
+  charged alone reacts once the liquid is dosed; one the batch never holds is refused. A rate
+  law with `basis:
   surface` and `solid: id` is per m2 of that solid's surface: its particles at the charge
   (equal spheres of `diameter`, `6 / (density d)` m2/kg, or `specific_area`) shrink at a
   constant number, `A = A_0 (n / n_0)^(2/3)`; a surface rate's solid must be charged, not
@@ -1308,7 +1314,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   absorbed (Beer-Lambert, decadic; `absorptivity` in m2/kmol, 100 times L/(mol cm); no
   absorber: all of it), the lamp on in the `on` windows (default throughout); the absorbed
   power heats the content (the duty's `light` term, the adiabatic balance, the peak cooling
-  duty); `process reactors` gives `light`. Without its light a photochemical rate is refused
+  duty; a lamp alone keeps the temperature); `process reactors` gives `light` and no outlet
+  rate of a photochemical law (the light is the tank's). Without its light a photochemical
+  rate is refused
   (a CSTR, a fixed bed). The screening's gas release takes the particles and the light from
   the charge in the case screened. `cheme.process-reactor` adds: an initiation naming a
   reaction not of the step, a `batch.solids` component undeclared ((warning) not `phase:

@@ -285,9 +285,12 @@ class _Mixture:
         return [[r.stoichiometry.get(n, 0.0) for r in self.reactions] for n in self.names]
 
     def rates(self, moles: Sequence[float], t: float, p: float) -> list[float]:
-        """kmol/(m3 s), kmol/(kg s) or kmol/(m2 s) per reaction at the composition *moles*."""
+        """kmol/(m3 s), kmol/(kg s) or kmol/(m2 s) per reaction at the composition *moles*; none
+        while the liquid is empty (a solid phase charged, the liquid dosed later, ADR 0074)."""
         solid = self.solids
         x = self.fractions(moles)
+        if not any(x.values()):
+            return [0.0] * len(self.reactions)
         photons = self.absorbed(moles, x)[0] if self.light is not None else None
         found = []
         for r in self.reactions:
@@ -309,10 +312,12 @@ class _Mixture:
 
     def fractions(self, moles: Sequence[float]) -> dict[str, float]:
         """The liquid's mole fractions at *moles*: a vented gas (``gone``) and a solid phase
-        (ADR 0074) at 0."""
+        (ADR 0074) at 0; every one 0 while the liquid is empty."""
         solid = self.solids
         if solid:  # a solid phase is no part of the liquid's composition (ADR 0074)
             total = sum(v for n, v in zip(self.names, moles, strict=True) if n not in solid)
+            if total <= 0:
+                return dict.fromkeys(self.names, 0.0)
         else:
             total = sum(moles)
         # a trace instead of zero: an integrator's trial stage may empty a reactant, where a
@@ -336,7 +341,8 @@ class _Mixture:
         concentration = 0.0
         if light.absorber is not None:
             liquid = {n: v for n, v in x.items() if v > 0 and n not in self.gone}
-            concentration = x.get(light.absorber, 0.0) / self.liquid.molar_volume(liquid)
+            if liquid:
+                concentration = x.get(light.absorber, 0.0) / self.liquid.molar_volume(liquid)
         share = absorbed_share(light, concentration)
         volume = self.liquid_volume(moles)
         return (flux * share / volume if volume > 0 else 0.0), power * share, flux * share
@@ -568,7 +574,7 @@ def _solid_phase(
     kmol (``M / density``) and, for a rate law per m2 of its surface, its particles' area at the
     *charge*. Raises TankError: a surface rate without its solid charged as a phase with a
     size, a dosed one (the surface of a dosed solid needs the particles' population), a rate
-    law on a solid phase's concentration, a gas batch."""
+    law on a solid phase's concentration, a gas batch, a solid the batch never holds."""
     solids = dict(getattr(batch, "solids", None) or {})
     surface = [r for r in reactions if r.rate is not None and r.rate.basis == "surface"]
     if lacking := sorted({r.rate.solid for r in surface} - set(solids)):
@@ -582,6 +588,11 @@ def _solid_phase(
         raise TankError("batch.solids: a solid phase in a liquid batch (liquid-phase reactions)")
     if lacking := sorted(n for n in solids if not getattr(components.get(n), "molar_mass", None)):
         raise TankError("batch.solids: no molar_mass for " + ", ".join(lacking))
+    if stray := sorted(set(solids) - set(mix.names)):
+        raise TankError(
+            "batch.solids: " + ", ".join(stray) + " is not in the batch (neither charged, dosed "
+            "nor in its reactions)"
+        )
     named = [
         r.id
         for r in reactions
@@ -802,11 +813,14 @@ def solve_batch(
             result = _solve_batch(*args, isothermal_at, doses, vent_phase, None, pad, components)
         else:
             shares = vent.shares()
+            solids = set(getattr(batch, "solids", None) or ())  # no solvent (ADR 0074)
             for _ in range(HENRY_RUNS):
                 result = _solve_batch(
                     *args, isothermal_at, doses, vent_phase, shares, pad, components
                 )
-                if _henry_step(result, reactions, doses, henry, shares, vent_phase, pressure):
+                if _henry_step(
+                    result, reactions, doses, henry, shares, vent_phase, pressure, solids
+                ):
                     break
             else:
                 result.notes.append(
@@ -893,11 +907,12 @@ def _henry_step(
     shares: dict[str, float],
     phase: Any,
     pressure: float,
+    solids: set[str] | frozenset[str] = frozenset(),
 ) -> bool:
     """One substitution of the Henry shares (in place in *shares*) from the run *result*:
     each component's share that leaves moved so that the liquid at the end holds its
     solubility ``x_g = y_g P / H_g(T)``; True when every one holds (or is bound at 0 or 1), and
-    then ``result.henry`` reports them."""
+    then ``result.henry`` reports them. A solid phase (*solids*, ADR 0074) is no solvent."""
     from chemeascode.domains.process.vent_vapour import HENRY_TOLERANCE
 
     t_end, p = result.temperature, pressure
@@ -909,9 +924,10 @@ def _henry_step(
         )
         gross[name] = formed + sum(d.passing.get(name, 0.0) for d in doses)
     total_gas = sum(gross.values())
+    liquid = {n: v for n, v in result.outlet.items() if n not in solids}
     vapour = 0.0
     if phase is not None and phase.volatile:
-        vapour = sum(phase.saturation(result.outlet, t_end, p).values())
+        vapour = sum(phase.saturation(liquid, t_end, p).values())
     # with a head space (ADR 0071) the gas over the liquid at the end is the head space's
     over = result.head_space.get("end_kmol") if result.head_space else None
     over_total = sum(over.values()) if over else 0.0
@@ -925,7 +941,7 @@ def _henry_step(
         else:
             y = (1.0 - vapour) * (gross.get(g, 0.0) / total_gas if total_gas > 0 else 1.0)
         x = min(y * p / h, 1.0)
-        others = sum(v for n, v in result.outlet.items() if n != g and v > 0)
+        others = sum(v for n, v in liquid.items() if n != g and v > 0)
         soluble = x / (1.0 - x) * others if x < 1.0 else math.inf
         kept = result.outlet.get(g, 0.0)
         share = shares[g]
@@ -1527,10 +1543,27 @@ def _solve_batch(
     active: list[Callable[[list[float]], list[float]]] = []  # the derivatives now
     current = [batch_kinetics.PLAIN]  # the ADR 0074 regime now
     # ADR 0074, with a moving temperature or a lamp: the heat into the content over the batch,
-    # kJ by term (the content's sensible heat, the doses warmed to the temperature they met,
-    # minus the light absorbed), the photons absorbed (kmol), and what lacks a heat capacity
-    moving = {"content": 0.0, "doses": 0.0, "light": 0.0, "photons": 0.0}
+    # kJ by term (the content's sensible heat, the doses and the dosed gas passing through
+    # warmed to the temperature they met, a returned condensate warmed back to it, minus the
+    # light absorbed), the photons absorbed (kmol), and what lacks a heat capacity
+    moving = {
+        "content": 0.0,
+        "doses": 0.0,
+        "vent gas": 0.0,
+        "condensate return": 0.0,
+        "light": 0.0,
+        "photons": 0.0,
+    }
     moving_missing: list[str] = []
+
+    def passing_sensible(t: float) -> list[tuple[float, float]]:
+        """(kW/K, K) of the dosed gas passing through to the vent at time *t*: the part of
+        :func:`feeding`'s sensible flows that is no dose's liquid."""
+        return [
+            (share * gas, d.temperature)
+            for d, gas in zip(doses, passing_capacity, strict=True)
+            if gas is not None and (share := d.rate(t)) > 0
+        ]
 
     def account(
         state: Sequence[float],
@@ -1538,9 +1571,12 @@ def _solve_batch(
         h: float,
         sensible: Sequence[tuple[float, float]],
         regime: batch_kinetics.Regime,
+        clock: float,
     ) -> None:
-        """One accepted step of *h* s from *state* to *new* into :data:`moving` (trapezoids)."""
+        """One accepted step of *h* s at *clock* s from *state* to *new* into :data:`moving`
+        (trapezoids)."""
         t0, t1 = state[-2], new[-2]
+        mid = 0.5 * (t0 + t1)
         if t1 != t0:
             try:
                 c0 = mix.capacity(dict(zip(names, state[:size], strict=True)), t0)
@@ -1549,7 +1585,17 @@ def _solve_batch(
             except TankError as failure:
                 if str(failure) not in moving_missing:
                     moving_missing.append(str(failure))
-        moving["doses"] += sum(c * (0.5 * (t0 + t1) - t_d) * h for c, t_d in sensible)
+        gas = passing_sensible(clock + 0.5 * h)
+        warmed = sum(c * (mid - t_d) * h for c, t_d in gas)
+        moving["doses"] += sum(c * (mid - t_d) * h for c, t_d in sensible) - warmed
+        moving["vent gas"] += warmed
+        if returns:  # the condensate of this step, warmed back from the condenser's temperature
+            moving["condensate return"] += sum(
+                (new[base + k] - new[base + nv + k] - state[base + k] + state[base + nv + k])
+                * cp
+                * (mid - tc)
+                for k, cp in enumerate(cp_vap)
+            )
         if mix.light is not None and regime.lit:
             a, b = mix.absorbed(state[:size]), mix.absorbed(new[:size])
             moving["light"] += 0.5 * (a[1] + b[1]) * h
@@ -1629,7 +1675,7 @@ def _solve_batch(
                         warming += _kinetic_rate(mix, names, state, new, h, regime)
                     cooling = max(cooling, released / h + warming + mixing)
             if varying:
-                account(state, new, h, sensible, regime)
+                account(state, new, h, sensible, regime, clock)
             previous = conversion(state, clock)
             clock += h
             progress = abs(conversion(new, clock) - previous)
@@ -1741,11 +1787,15 @@ def _solve_batch(
         breaks = sorted({*breaks, *(x for x in extra_breaks if x < breaks[-1])})
     passing_now = passing_rate((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else 0.0
     passing_by = passing_of((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else {}
+    # the first segment's regime (ADR 0074) for the vent's rate at the start: up to the first
+    # break of the dosing, else of the regime
+    opening = regime_of(
+        0.0, breaks[1] if len(breaks) > 1 else (extra_breaks[0] if extra_breaks else None)
+    )
+    current[:] = [opening]
     if ng:  # the head space's expelled gas at the start: the first segment's derivatives
         first = feeding((breaks[0] + breaks[1]) / 2) if len(breaks) > 1 else ([0.0] * size, [], 0)
-        active[:] = [
-            make_derivatives(*first, regime_of(0.0, breaks[1] if len(breaks) > 1 else None))
-        ]
+        active[:] = [make_derivatives(*first, opening)]
     record(state, clock)
     zero = [0.0] * len(names)
     for a, b in zip(breaks, breaks[1:], strict=False):
@@ -1835,8 +1885,9 @@ def _solve_batch(
         gases = {n: result.vent.get(n, 0.0) for n in gas_names}  # the non-condensables
         result.vent_temperature = tc if condensing else state[-2]
         if phase is not None:
+            moved = adiabatic or program is not None  # its temperature moved over the run
             _vapour_results(
-                result, phase, state, names, volatile, base, condensing, gases, adiabatic
+                result, phase, state, names, volatile, base, condensing, gases, moved, mix.solids
             )
             if lacking := [n for n in asked if n not in names]:
                 result.notes.append(
@@ -1897,6 +1948,8 @@ def _solve_batch(
                 for d, c in zip(doses, passing_capacity, strict=True)
                 if c is not None
             )
+            if varying:  # warmed to the temperature it met (ADR 0074)
+                gas = moving["vent gas"]
             if gas:
                 result.heat_terms["vent gas"] = gas
             if any(d.solution is not None for d in doses):
@@ -1911,7 +1964,13 @@ def _solve_batch(
             if getattr(batch, "heat_up", False):
                 _heat_up(result, mix, charge, charge_temperature, temperature)
         if nv:
-            _vapour_heat(result, phase, temperature, condensing and phase.returns)
+            _vapour_heat(
+                result,
+                phase,
+                temperature,
+                condensing and phase.returns,
+                moving["condensate return"] if program is not None else None,
+            )
     elif nv and (
         no_heat := [
             n
@@ -1983,12 +2042,13 @@ def _moving_terms(
     """An isothermal batch's heat terms with a temperature that moves or a lamp (ADR 0074):
     ``doses`` warmed to the temperature each met, ``content`` the content's sensible heat as
     its temperature follows the programme or the bubble point, minus the ``light`` absorbed."""
-    lacking = [
-        f"the liquid_heat_capacity of dose {k + 1} (the batch's temperature moves)"
-        for k, c in enumerate(capacity)
-        if c is None
-    ]
-    if program is not None or reflux:
+    lacking = []
+    if program is not None or reflux:  # a lamp alone keeps the temperature (:func:`_heat_terms`)
+        lacking = [
+            f"the liquid_heat_capacity of dose {k + 1} (the batch's temperature moves)"
+            for k, c in enumerate(capacity)
+            if c is None
+        ]
         lacking += [f"the content's heat capacity: {m}" for m in missing_now]
     if lacking:
         result.heat_terms = None
@@ -2055,11 +2115,14 @@ def _vapour_results(
     base: int,
     condensing: bool,
     gases: Mapping[str, float],
-    adiabatic: bool,
+    moved: bool,
+    solids: Mapping[str, float],
 ) -> None:
     """A vented batch's vapour (ADR 0062) into *result*: what the gas carried off the liquid,
-    what a condenser condensed of it, what passed by the vent, the condenser's heat, and the
-    vapour's share of the gas over the liquid at the end."""
+    what a condenser condensed of it, what passed by the vent, the condenser's heat (*moved*:
+    the temperature moved over the run, adiabatic or on a programme, so the integral), and the
+    vapour's share of the gas over the liquid at the end (a solid phase, *solids*, no part of
+    it, ADR 0074)."""
     from chemeascode.domains.process.vent_vapour import condenser_heat
 
     nv = len(volatile)
@@ -2074,7 +2137,7 @@ def _vapour_results(
         result.vent[name] = result.vent.get(name, 0.0) + amount
     t_end, p = state[-2], result.pressure
     if nv:
-        held = {n: v for n, v in result.outlet.items() if v > 0}
+        held = {n: v for n, v in result.outlet.items() if v > 0 and n not in solids}
         result.vapour_share = sum(phase.saturation(held, t_end, p).values())
     if not condensing:
         return
@@ -2089,7 +2152,7 @@ def _vapour_results(
             "ideal_gas data)"
         )
     integrated = state[base + 2 * nv + 1]
-    if adiabatic:
+    if moved:
         # the temperature changed over the run: the integral, not the end's terms
         result.condenser_heat, result.condenser_terms = integrated, {"total": integrated}
     else:
@@ -2125,10 +2188,17 @@ def _head_space_results(
         )
 
 
-def _vapour_heat(result: TankResult, phase: Any, temperature: float, returned: bool) -> None:
+def _vapour_heat(
+    result: TankResult,
+    phase: Any,
+    temperature: float,
+    returned: bool,
+    warmed: float | None = None,
+) -> None:
     """The isothermal batch's heat terms for its vent's vapour (ADR 0062): the latent heat of
     what the gas carried off (``vent vapour``) and a returned condensate warmed back from the
-    condenser's temperature (``condensate return``); or what they lack."""
+    condenser's temperature (``condensate return``; *warmed*, kJ, when a programme moved the
+    temperature it came back to, ADR 0074); or what they lack."""
     if result.heat_terms is None:
         return  # its own terms lack data already
     degassing = getattr(phase, "degassing", None) or {}
@@ -2159,9 +2229,13 @@ def _vapour_heat(result: TankResult, phase: Any, temperature: float, returned: b
         v * (phase.heat_of_vaporization[n] or 0.0) for n, v in result.vapour.items()
     )
     if returned and result.condensate:
-        result.heat_terms["condensate return"] = sum(
-            v * (phase.liquid_heat_capacity[n] or 0.0) * (temperature - phase.condenser)
-            for n, v in result.condensate.items()
+        result.heat_terms["condensate return"] = (
+            warmed
+            if warmed is not None
+            else sum(
+                v * (phase.liquid_heat_capacity[n] or 0.0) * (temperature - phase.condenser)
+                for n, v in result.condensate.items()
+            )
         )
 
 

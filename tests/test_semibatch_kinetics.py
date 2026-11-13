@@ -10,6 +10,7 @@ import pytest
 from chemeascode.domains.chemistry.liquid import Liquid
 from chemeascode.domains.chemistry.rates import RateLaw
 from chemeascode.domains.chemistry.reactions import Reactions
+from chemeascode.domains.chemistry.thermochemistry import R
 from chemeascode.domains.process.batch_kinetics import (
     AVOGADRO,
     LIGHT_SPEED,
@@ -17,12 +18,17 @@ from chemeascode.domains.process.batch_kinetics import (
     breaks,
     photon_flux,
 )
-from chemeascode.domains.process.model import load, rules
+from chemeascode.domains.process.model import load, rules, stream_flows
+from chemeascode.domains.process.propagate import run
 from chemeascode.domains.process.reactors import reactor_report, reactor_text
-from chemeascode.domains.process.schema import Batch, Component, Dosing, Tank
+from chemeascode.domains.process.schema import Batch, Component, Tank, Vent
 from chemeascode.domains.process.stirred_tank import Dose, TankError, solve_batch, solve_cstr
+from chemeascode.domains.process.vent_vapour import henry_phase
 from chemeascode.domains.safety.reaction_hazards import hazard_text, screen
 from tests import test_semibatch as dosed
+from tests import test_semibatch_vent as vented
+from tests import test_vent_vapour as vapour
+from tests.test_vent_vapour import GAS
 
 V = {"A": 0.1, "B": 0.1, "C": 0.1, "S": 0.1, "M": 0.01, "P": 0.1}  # m3/kmol
 CP = {"A": 150.0, "B": 150.0, "C": 150.0, "S": 150.0, "M": 25.0, "P": 150.0}  # kJ/(kmol K)
@@ -546,3 +552,250 @@ def test_the_rules_name_an_initiation_s_unknown_reaction(tmp_path):
     process, found = load(dosed._plant(tmp_path, stray).root)
     messages = [f.message for f in found + rules(process) if f.rule == "cheme.process-reactor"]
     assert any("initiation" in m and "R9" in m for m in messages)
+
+
+# -- a solid phase with the liquid, the vent and the reports -------------------------------------
+
+
+def test_a_solid_charged_alone_waits_for_its_liquid():
+    """The solid charged, the liquid dosed later: nothing reacts while the liquid is empty.
+    First order in c_A per m3 of the liquid, ``dn_A/dt = q - k n_A``, ``n_A = q/k (1 -
+    exp(-k t))`` whatever the solid; a surface rate zero order in the liquid shrinks the
+    particles as when the liquid is there from the start."""
+    k, t_d, q = 1e-3, 600.0, 2.0 / 600.0
+    solids = {"M": {"density": DENSITY, "diameter": 1e-4, "provenance": "assumed"}}
+    batch = _batch(dosing=[{"stream": "D", "time": t_d}], solids=solids)
+    dose = Dose({"A": 2.0, "S": 3.0}, 300.0, [(0.0, t_d, 1.0)])
+    inert = _solve(_first_order(k), batch, {"M": 0.5}, doses=[dose], components=_components())
+    assert inert.outlet["A"] == pytest.approx(q / k * (1.0 - math.exp(-k * t_d)), rel=1e-6)
+    assert inert.outlet["M"] == pytest.approx(0.5, rel=1e-12)
+    ks, n0 = 1e-6, 0.5
+    shrinking = _solve(
+        _surface_reactions(ks), batch, {"M": n0}, doses=[dose], components=_components()
+    )
+    tau = 3.0 * n0 / (ks * 6.0 * n0 * M_MASS / (DENSITY * 1e-4))
+    assert shrinking.outlet["M"] == pytest.approx(n0 * (1.0 - t_d / tau) ** 3, rel=1e-6)
+
+
+def test_a_solid_the_batch_never_holds_is_refused():
+    batch = _batch(time=60, solids={"P": {"density": 500.0, "provenance": "assumed"}})
+    with pytest.raises(TankError, match="P is not in the batch"):
+        _solve(_first_order(1e-3), batch, {"A": 1.0, "S": 4.0}, components=_components())
+
+
+def test_a_solid_phase_is_no_solvent_for_a_henry_gas():
+    """A -> B + G, G at its Henry solubility at the end, ``x_G = P / H`` of the liquid: an inert
+    solid charged with it leaves the dissolved G as it is."""
+    vent = {
+        "stream": "V",
+        "components": ["G"],
+        "henry": {"G": {"points": [[300.0, 2000.0]], "provenance": "assumed"}},
+    }
+    solids = {"M": {"density": DENSITY, "provenance": "assumed"}}
+    found = {}
+    for solid in (1e-9, 10.0):
+        batch = vented._batch(vent, solids=solids)
+        result = solve_batch(
+            vented._reactions(1e-3),
+            {"S": 5.0, "M": solid},
+            300.0,
+            101.325,
+            batch,
+            {"G": GAS},
+            Liquid(vented.V | {"G": 0.05}),
+            vented.CP | {"G": 60.0, "M": 25.0},
+            doses=[Dose({"A": 1.0}, 300.0, [(0.0, vented.DOSING, 1.0)])],
+            vent_phase=henry_phase(Vent.model_validate(vent)),
+            components=_components(),
+        )
+        liquid = {n: v for n, v in result.outlet.items() if n != "M"}
+        assert result.outlet["G"] / sum(liquid.values()) == pytest.approx(
+            101.325 / 2000.0, rel=1e-8
+        )
+        assert result.henry["G"]["state"] == "saturated"
+        found[solid] = result.outlet["G"]
+    assert found[10.0] == pytest.approx(found[1e-9], rel=1e-8)
+
+
+# -- the duty with a moving temperature, the vent's peak -----------------------------------------
+
+
+def _gas_dosed(program=None, light=None):
+    """1 kmol A and 1 kmol of the inert N dosed at 280 K over 1 h into 5 kmol S at 300 K; N
+    passes through to the vent (ideal-gas cp 3.5 R)."""
+    spec = {"vent": {"stream": "V", "components": ["G"], "inerts": ["N"]}}
+    if program is not None:
+        spec["program"] = {"points": program, "provenance": "assumed"}
+    if light is not None:
+        spec["light"] = light
+    return solve_batch(
+        vented._reactions(1e-3),
+        {"S": 5.0},
+        300.0,
+        101.325,
+        vented._batch(**spec),
+        {"G": GAS, "N": GAS},
+        Liquid(vented.V),
+        vented.CP,
+        doses=[Dose({"A": 1.0, "N": 1.0}, 280.0, [(0.0, vented.DOSING, 1.0)])],
+    )
+
+
+def test_the_gas_passing_through_warms_once_to_the_temperature_it_met():
+    """The passing gas's warming is the ``vent gas`` term alone, ``c (T - T_d)``, as without
+    a programme; along a ramp 300 to 320 K over the dosing it meets 310 K on average."""
+    cp_gas = 3.5 * R
+    plain = _gas_dosed()
+    assert plain.heat_terms["doses"] == pytest.approx(150.0 * 20.0, rel=1e-12)
+    assert plain.heat_terms["vent gas"] == pytest.approx(cp_gas * 20.0, rel=1e-12)
+    flat = _gas_dosed([(0.0, 300.0)])
+    for term in ("doses", "vent gas", "reaction"):
+        assert flat.heat_terms[term] == pytest.approx(plain.heat_terms[term], rel=1e-9)
+    lamp = _gas_dosed(light={"power": 1.0, "wavelength": 400.0, "provenance": "assumed"})
+    assert lamp.heat_terms["vent gas"] == pytest.approx(cp_gas * 20.0, rel=1e-9)
+    ramp = _gas_dosed([(0.0, 300.0), (vented.DOSING, 320.0)])
+    assert ramp.heat_terms["vent gas"] == pytest.approx(cp_gas * 30.0, rel=1e-9)
+    assert ramp.heat_terms["doses"] == pytest.approx(150.0 * 30.0, rel=1e-9)
+
+
+def test_a_lamp_alone_keeps_the_temperature_for_the_duty():
+    """A dose at the batch's temperature needs no heat capacity: with a lamp the temperature
+    does not move, so its duty is known as without one."""
+    cp = {n: c for n, c in CP.items() if n != "C"}
+    light = {"power": 100.0, "wavelength": 400.0, "provenance": "assumed"}
+    dose = Dose({"A": 0.9, "C": 0.1}, 300.0, [(0.0, 3600.0, 1.0)])
+    found = []
+    for spec in ({}, {"light": light}):
+        batch = _batch(dosing=[{"stream": "D", "time": 3600}], **spec)
+        result = solve_batch(
+            _first_order(1e-3),
+            {"A": 0.1, "S": 4.0},
+            300.0,
+            101.325,
+            batch,
+            {},
+            Liquid(V),
+            cp,
+            doses=[dose],
+        )
+        assert result.heat_missing == []
+        assert result.heat_terms["doses"] == pytest.approx(0.0, abs=1e-9)
+        found.append(result)
+    assert "light" in found[1].heat_terms
+    moved = _batch(
+        dosing=[{"stream": "D", "time": 3600}],
+        program={"points": [(0.0, 300.0), (3600.0, 310.0)], "provenance": "assumed"},
+    )
+    result = solve_batch(
+        _first_order(1e-3),
+        {"A": 0.1, "S": 4.0},
+        300.0,
+        101.325,
+        moved,
+        {},
+        Liquid(V),
+        cp,
+        doses=[dose],
+    )
+    assert result.heat_terms is None
+    assert "the batch's temperature moves" in result.heat_missing[0]
+
+
+@pytest.mark.parametrize("factor", [0.0, 0.1])
+def test_the_vent_s_peak_waits_for_the_initiation(factor):
+    """A -> B + G vented, first order, held at *factor* until 1000 s: the gas peaks just after
+    the initiation at ``k n_A``, ``n_A = exp(-factor k t_i - k (t - t_i))``, not at the
+    start."""
+    k, t_i = 1e-3, 1000.0
+    batch = Batch.model_validate(
+        {
+            "time": 3000.0,
+            "vent": {"stream": "V", "components": ["G"]},
+            "initiation": {"time": t_i, "factor": factor, "provenance": "assumed"},
+            "provenance": "assumed",
+        }
+    )
+    result = solve_batch(
+        vented._reactions(k), {"A": 1.0, "S": 4.0}, 300.0, 101.325, batch, {}, Liquid(V), CP
+    )
+    after = result.peak_vent_time - t_i  # the first step after the initiation
+    assert 0.0 < after < 10.0
+    assert result.peak_vent_flow == pytest.approx(
+        k * math.exp(-factor * k * t_i - k * after), rel=1e-6
+    )
+
+
+def test_a_programme_returns_the_condensate_at_the_temperature_it_met():
+    """A vent condenser at 270 K returning its condensate: held at 310 K from 10 s, the
+    condensate comes back to 310 K, as at 310 K throughout."""
+    pressure = vapour._clausius(50.0, 4000.0)
+    phase = vapour._phase("S", pressure, condenser=270.0)
+    vent = vapour.VAPOUR | {"condenser": {"temperature": 270.0, "provenance": "assumed"}}
+
+    def returned(points):
+        program = {"points": points, "provenance": "assumed"}
+        result = vapour._run(vent, phase, batch=vented._batch(vent, time=7200, program=program))
+        condensed = result.condensate["S"]
+        return result.heat_terms["condensate return"], condensed, result
+
+    held, condensed, flat = returned([(0.0, 310.0)])
+    assert held == pytest.approx(condensed * 150.0 * 40.0, rel=1e-9)
+    ramped, condensed, ramp = returned([(0.0, 300.0), (10.0, 310.0)])
+    assert ramped == pytest.approx(condensed * 150.0 * 40.0, rel=1e-3)
+    # the condenser's duty integrated over the run, as at 310 K throughout
+    assert ramp.condenser_heat == pytest.approx(flat.condenser_heat, rel=1e-3)
+
+
+PRODUCT_P = (
+    "  - {id: P, name: P, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,\n"
+    "     liquid_heat_capacity: 150, phase: solid}\ntemplates:"
+)
+
+
+def test_process_reactors_rates_the_liquid_without_its_solid(tmp_path, monkeypatch):
+    """A -> P with P precipitating (batch.solids): the outlet's rate is ``k c_A`` of the
+    liquid, ``x_A`` of A, B and S over their molar volume, the solid left out."""
+    monkeypatch.setattr(
+        dosed,
+        "MATERIALS",
+        dosed.MATERIALS.replace("templates:", PRODUCT_P).replace("[A, B, S]", "[A, B, S, P]"),
+    )
+    reactions = dosed.REACTIONS.replace("{A: -1, B: 1}", "{A: -1, P: 1}").replace("0.01", "3e-4")
+    flowsheet = dosed.FLOWSHEET.replace(
+        "provenance: assumed}\n    hazard",
+        "time: 7200, provenance: assumed,\n"
+        "           solids: {P: {density: 1200, provenance: assumed}}}\n    hazard",
+    )
+    ws = dosed._plant(tmp_path, flowsheet, reactions)
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written
+    (row,) = reactor_report(ws.root).reactors
+    (entry,) = row["reactions"]
+    process, _ = load(ws.root)
+    flows = stream_flows(process, process.flowsheet.streams[2], "design").components
+    liquid = {n: kg / 44.05 for n, kg in flows.items() if n != "P" and kg}
+    assert flows["P"] > 0.5 * 44.05  # a good part of it solid
+    assert entry["rate"] == pytest.approx(3e-4 * liquid["A"] / (0.1 * sum(liquid.values())))
+
+
+def test_process_reactors_leaves_a_photochemical_rate_to_the_tank(tmp_path):
+    """The light is the tank's: no outlet rate of a photochemical law, and no light reported
+    as missing."""
+    reactions = dosed.REACTIONS.replace(
+        "form: power_law, basis: volume, driving: concentration, k: {A: 0.01},\n"
+        "            orders: {A: 1}",
+        "form: photochemical, basis: volume, driving: concentration, k: {A: 0.5}",
+    )
+    flowsheet = dosed.FLOWSHEET.replace(
+        "provenance: assumed}\n    hazard",
+        "provenance: assumed,\n"
+        "           light: {power: 2000, wavelength: 400, provenance: assumed}}\n    hazard",
+    )
+    ws = dosed._plant(tmp_path, flowsheet, reactions)
+    process, _ = load(ws.root)
+    assert run(ws, process, "design", write=True).written
+    (row,) = reactor_report(ws.root).reactors
+    (entry,) = row["reactions"]
+    assert entry["rate"] is None and "photochemical" in entry["rate_note"]
+    assert not [m for m in row["missing"] if "light" in m]
+    assert row["tank"]["light"]["photons_absorbed_kmol_h"] > 0

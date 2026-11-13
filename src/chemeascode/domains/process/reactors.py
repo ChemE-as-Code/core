@@ -181,9 +181,12 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
     moles_out = [_moles(process, s, case) for s in outs]
     y = None
     moles_liquid = [_moles(process, s, case) for s in liquid_outs]
+    # a batch's solid phase (ADR 0074) is out of the liquid's composition, its activity 1
+    solids = set(getattr(getattr(item, "batch", None), "solids", None) or ())
     if len(liquid_outs) == 1 and moles_liquid[0] is not None:
-        total = sum(moles_liquid[0].values())
-        y = {n: v / total for n, v in moles_liquid[0].items()} if total > 0 else None
+        held = {n: v for n, v in moles_liquid[0].items() if n not in solids}
+        total = sum(held.values())
+        y = {n: v / total for n, v in held.items()} if total > 0 else None
     phi = None
     real_gas_unknown = False
     if getattr(item, "fugacity", "ideal") == "peng_robinson" and y and t is not None and p:
@@ -214,6 +217,7 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             "rate_unit": None,
         }
         names = list(reaction.stoichiometry)
+        stoich = {n: v for n, v in reaction.stoichiometry.items() if n not in solids}
         if t is not None:
             if not missing(names, data) and not outside(names, data, t):
                 entry["heat_of_reaction_kJ_kmol"] = reaction_enthalpy(
@@ -228,11 +232,11 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             entry["ln_k"] is not None and y is not None and p is not None and not real_gas_unknown
         )
         liquid_known = entry["ln_k"] is not None and y is not None and on_liquid is not None
-        if liquid_known and all(y.get(n, 0.0) > 0 for n in names):  # type: ignore[union-attr]
+        if liquid_known and all(y.get(n, 0.0) > 0 for n in stoich):  # type: ignore[union-attr]
             from chemeascode.domains.chemistry.liquid import ln_quotient
 
             try:  # on the basis K is written on, the activities at the outlet temperature
-                ln_q = ln_quotient(reaction.stoichiometry, basis, y, t, on_liquid)  # type: ignore[arg-type]
+                ln_q = ln_quotient(stoich, basis, y, t, on_liquid)  # type: ignore[arg-type]
                 entry["ln_q_over_k"] = ln_q - entry["ln_k"]
                 entry["basis"] = basis
             except ValueError as failure:
@@ -248,7 +252,11 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                 )
             entry["ln_q_over_k"] = ln_q - entry["ln_k"]
         law = reaction.rate
-        if law is not None and y is not None and t is not None and p is not None:
+        if law is not None and law.form == "photochemical":
+            # its rate takes the light the content absorbs, the tank's (tank.light), not the
+            # outlet stream's (ADR 0074)
+            entry["rate_note"] = "a photochemical rate: the light absorbed is the tank's"
+        elif law is not None and y is not None and t is not None and p is not None:
             if not law.covers(t):
                 lacking.append(f"a temperature inside the rate's range of {reaction.id}")
             else:
@@ -259,9 +267,14 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                         if law.reverse == "equilibrium"
                         else None
                     )
-                    entry["rate"] = rate(
-                        law, reaction.stoichiometry, y, t, p, k_out, on_liquid, basis
-                    )
+                    entry["rate"] = rate(law, stoich, y, t, p, k_out, on_liquid, basis)
+                    gone = [
+                        n
+                        for n, v in reaction.stoichiometry.items()
+                        if n in solids and v * entry["rate"] < 0
+                    ]
+                    if any(moles_liquid[0].get(n, 0.0) <= 0 for n in gone):  # type: ignore[union-attr]
+                        entry["rate"] = 0.0  # a solid that is not there neither reacts
                     entry["rate_unit"] = {
                         "catalyst_mass": "kmol/(kg s)",
                         "surface": "kmol/(m2 s)",

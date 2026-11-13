@@ -55,7 +55,11 @@ solves exactly as before: same break points, same arithmetic.
   its volume `n M / density` in the content's, its `liquid_heat_capacity` in the content's heat
   capacity; a rate per m3 is per m3 of the liquid. A rate law naming its concentration is
   refused; a `reverse: equilibrium` takes its activity as 1, and a solid not there neither
-  reacts nor dissolves. A precipitate forming as it reacts is carried this way.
+  reacts nor dissolves. A precipitate forming as it reacts is carried this way. It is no
+  solvent of a vent's Henry gas, and `process reactors` takes the outlet's rate and `ln(Q/K)`
+  on the liquid without it. A solid charged alone, the liquid dosed later, has nothing to
+  react with until the liquid comes (no rate while the liquid is empty); a solid the batch
+  never holds (neither charged, dosed nor in its reactions) is refused.
 - **Surface rate.** `rate.basis: surface` with `rate.solid` is per m2 of that solid's surface:
   equal particles charged at the start (`diameter`: `6 / (density d)` m2/kg, or
   `specific_area`), shrinking at a constant number, `A = A_0 (n / n_0)^(2/3)`. A dosed surface
@@ -64,8 +68,12 @@ solves exactly as before: same break points, same arithmetic.
   the temperature linearly between its points, held after the last; `batch.heat: reflux` holds
   the liquid at its bubble point at the vessel's pressure (Raoult's law, the bubble point moved
   from `safety/reaction_network.py` to `process/batch_kinetics.py`), total reflux with no vapour
-  hold-up. The duty takes `doses` warmed to the temperature each met and a `content` term, the
-  content's sensible heat as its temperature moves. A given outlet temperature other than the
+  hold-up. The duty takes `doses`, the dosed gas passing through to the vent (`vent gas`) and,
+  on a programme, a vent condenser's returned condensate (`condensate return`) warmed to the
+  temperature each met, and a `content` term, the content's sensible heat as its temperature
+  moves; on a programme the vent condenser's duty is its integral over the run, as an
+  adiabatic batch's. The recipe's jacket check of a programme takes its lowest temperature over
+  the batch, where the jacket removes least. A given outlet temperature other than the
   programme's end, or any at reflux, is refused; reflux refuses a vent's vapour and head space
   (the gas over a boiling liquid is its vapour) and `heat_up`.
 - **Light.** `rate.form: photochemical` is `r = Phi(T) prod(c_i^a_i) q_a`: `k` the quantum yield
@@ -74,11 +82,14 @@ solves exactly as before: same break points, same arithmetic.
   path_length, on}`: `power` W of radiant power entering per m3 of the charge (intensive, as the
   batch's basis), `q_0 = P lambda / (h c N_A)` with the CODATA 2022 exact constants, absorbed by
   `1 - 10^(-epsilon c l)` (Beer-Lambert, decadic), the lamp on in its `on` windows. The power
-  absorbed heats the content (the duty's `light` term, the adiabatic balance). A photochemical
-  rate without its light raises.
+  absorbed heats the content (the duty's `light` term, the adiabatic balance); a lamp alone does
+  not move the temperature, so a dose at the batch's needs no heat capacity. A photochemical
+  rate without its light raises. `process reactors` gives no outlet rate of a photochemical law
+  (the light absorbed is the tank's, reported as `tank.light`).
 - **Segments.** The integrator splits the dosing and the post-reaction at the initiation, the
   programme's points and the lamp's windows (`batch_kinetics.breaks`), so each term is constant
-  within a segment (`Regime`: the reactions' factors, the lamp, the programme's slope).
+  within a segment (`Regime`: the reactions' factors, the lamp, the programme's slope); the
+  vent's rate at the start is in the first segment's regime.
 - **Fingerprints and rules.** The new keys are left out of the dump when not given, so existing
   outlets keep their fingerprints; reflux adds its components' vapour-pressure data.
   `cheme.process-reactor` checks an initiation's reactions, a solid's and an absorber's
@@ -111,7 +122,8 @@ solves exactly as before: same break points, same arithmetic.
   - Reflux has no vapour hold-up, no condenser or jacket limit, no vent vapour; the reflux
     screening barrier (condenser capacity against the boil-off at the MTT, iodomethane-1 L-9)
     and the recipe's jacket check at reflux stay open (the recipe takes a peak duty of an
-    isothermal step only).
+    isothermal step only). A programme's jacket check is conservative: the peak duty against
+    the jacket at the programme's lowest temperature, not the duty and the jacket over time.
   - The light is monochromatic, one absorber and one path length, the content well mixed (no
     light gradient in the rate); the screening has no lamp-failure scenario beyond an `on`
     window.
