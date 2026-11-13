@@ -449,6 +449,16 @@ class HeatOfSolution(Strict):
     source: str = ""
 
 
+class AgitatorPower(Strict):
+    """The power an agitator puts into a vessel's content, which ends there as heat (ADR
+    0075): its shaft power, kW."""
+
+    value: float = Field(gt=0, description="kW into the content while the model runs.")
+    unit: Literal["kW"] = "kW"
+    provenance: Provenance
+    source: str = ""
+
+
 class Dosing(Strict):
     """A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,
     its flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over
@@ -790,6 +800,28 @@ class Batch(Strict):
         "holds the batch at its temperature from the start and leaves it to the recipe.",
         exclude_if=lambda value: not value,  # a batch's fingerprint stays as it was
     )
+    heat_up_port: str | None = Field(
+        default=None,
+        description="With heat_up: the energy port whose stream carries the charge's heat-up "
+        "and the vessel's metal (steam for the warm-up), apart from the rest of the model's "
+        "duty on energy_port (the reaction's cooling water; ADR 0075).",
+        exclude_if=lambda value: value is None,  # a batch's fingerprint stays as it was
+    )
+    heat_of_solution: HeatOfSolution | None = Field(
+        default=None,
+        description="An isothermal batch or semi-batch: the heat the charge's components take "
+        "up (or release) as they dissolve when charged, a solid's heat of solution, per kmol "
+        "charged; in the model's duty, not in its peak cooling duty or the screening (ADR "
+        "0075).",
+        exclude_if=lambda value: value is None,  # a batch's fingerprint stays as it was
+    )
+    agitator_power: AgitatorPower | None = Field(
+        default=None,
+        description="An isothermal batch or semi-batch: the agitator's power that ends as heat "
+        "in the content while the model runs (its dosing and reaction time); in the model's "
+        "duty and the recipe's peak duty (ADR 0075).",
+        exclude_if=lambda value: value is None,  # a batch's fingerprint stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -799,6 +831,15 @@ class Batch(Strict):
             raise ValueError("give time or target, one of them")
         if self.heat_up and self.heat == "adiabatic":
             raise ValueError("heat_up: an isothermal batch (an adiabatic one exchanges no heat)")
+        if self.heat_up_port is not None and not self.heat_up:
+            raise ValueError("heat_up_port: the charge's heat-up's stream, with heat_up: true")
+        if self.heat == "adiabatic" and (
+            self.heat_of_solution is not None or self.agitator_power is not None
+        ):
+            raise ValueError(
+                "heat_of_solution and agitator_power: an isothermal batch (an adiabatic one's "
+                "charge temperature is the one after it dissolved; it exchanges no heat)"
+            )
         if not self.dosing and self.time is None and self.target is None:
             raise ValueError("give time or target, one of them")
         streams = [d.stream for d in self.dosing]
@@ -1365,6 +1406,16 @@ class Solids(Strict):
         return self
 
 
+class HeatLoss(Strict):
+    """A vessel's heat loss to its surroundings (ADR 0075): its overall coefficient times its
+    outer area, and the ambient temperature."""
+
+    ua: float = Field(gt=0, description="W/K, the content to the surroundings.")
+    ambient_temperature: float = Field(gt=0, description="K of the surroundings.")
+    provenance: Provenance
+    source: str = ""
+
+
 class Volatility(Strict):
     """How a batch still's vapour follows from its liquid: ``raoult`` (each volatile
     component's ``vapour_pressure`` in materials.yaml, the still at its bubble point at its
@@ -1629,6 +1680,26 @@ class Still(Strict):
         "duty; default with a column: its one heat stream out.",
         exclude_if=lambda value: value is None,
     )
+    sensible_heat: bool = Field(
+        default=False,
+        description="Count the content's sensible heat as its bubble point rises while it "
+        "boils (volatility raoult): the pot's liquid_heat_capacity times each step's rise, in "
+        "the still's duty (ADR 0075); default: the boil-up's latent heat at constant "
+        "temperature.",
+        exclude_if=lambda value: not value,  # a still's dump stays as it was
+    )
+    heat_loss: HeatLoss | None = Field(
+        default=None,
+        description="The still's heat loss to its surroundings over the boil-up (volatility "
+        "raoult), UA (T - T_ambient) along its temperatures, in the still's duty (ADR 0075).",
+        exclude_if=lambda value: value is None,  # a still's dump stays as it was
+    )
+    agitator_power: AgitatorPower | None = Field(
+        default=None,
+        description="The pot's agitator power that ends as heat in the content over the "
+        "boil-up's time, taken off the still's duty (ADR 0075).",
+        exclude_if=lambda value: value is None,  # a still's dump stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -1649,6 +1720,10 @@ class Still(Strict):
             raise ValueError("heat_up needs volatility raoult (the charge's bubble point)")
         if self.heat_up_time and self.volatility.model == "constant":
             raise ValueError("heat_up_time needs volatility raoult (a still's temperatures)")
+        if (self.sensible_heat or self.heat_loss) and self.volatility.model == "constant":
+            raise ValueError(
+                "sensible_heat and heat_loss need volatility raoult (a still's temperatures)"
+            )
         raoult = self.volatility.model == "raoult"
         if not raoult and any(c.pressure is not None for c in self.cuts):
             raise ValueError("a cut's pressure needs volatility raoult")
@@ -1697,6 +1772,13 @@ class Energetic(Strict):
         "(an energy stream from or to a heating or cooling utility). A stream from or to "
         "another block or step is heat only where energy_port names it.",
         exclude_if=lambda value: value is None,  # a node's dump stays as it was
+    )
+    vessel_metal: bool = Field(
+        default=False,
+        description="A conversion step in a recipe vessel with metal_heat_capacity: its duty "
+        "holds the vessel's metal heated or cooled with the content, from its inlets' "
+        "temperature to its outlets' (ADR 0075); default: the metal is left out.",
+        exclude_if=lambda value: not value,  # a node's dump stays as it was
     )
 
 

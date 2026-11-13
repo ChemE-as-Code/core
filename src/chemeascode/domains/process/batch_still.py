@@ -63,6 +63,11 @@ doses (ADR 0050, 0051). One batch is the hours of flows the recipe's batch size 
 (``process/recipe.yaml``: batch size over the flowsheet's rate of its stream), else one hour.
 A vapour rate or a duty is of the still in one batch, so the time and the energy per batch scale
 with those hours; a specific boil-up (1/h) does not need them. Pure Python.
+
+ADR 0075 adds, beside the integration (never in its state): with ``sensible_heat`` the pot's
+sensible rise while it boils, ``int C dT = [C (T - T_0)] - int (T - T_0) sum_i cp_i dN_i`` over
+each step (Simpson's rule on ``SUBSTEPS`` dense evaluations of it); with ``heat_loss`` the heat
+lost, ``UA int (T - T_amb) dt``; with ``agitator_power`` its ``P t`` (:mod:`.duties`).
 """
 
 from __future__ import annotations
@@ -116,6 +121,9 @@ COLUMN_ASSUMPTIONS = (
     "condensed (heat_of_vaporization of the distillate's composition)",
 )
 
+#: Sub-intervals of each integration step over which the sensible rise and the heat loss
+#: (ADR 0075) are integrated by Simpson's rule (dense evaluations of the step, even).
+SUBSTEPS = 8
 #: Points of a still's profile (beside the integrator's own).
 PROFILE_POINTS = 50
 #: Relative error per step of the integration.
@@ -196,6 +204,12 @@ class StillResult:
     #: at the still's boil-up's heat input (None: not known, ``heat_up_time_missing`` why)
     heat_up_time: float | None = None
     heat_up_time_missing: str = ""
+    #: with ``sensible_heat`` (ADR 0075): kJ per batch the pot's content takes as its bubble
+    #: point rises while it boils (None: not known, ``sensible_missing`` why)
+    sensible_rise: float | None = None
+    sensible_missing: str = ""
+    #: with ``heat_loss`` (ADR 0075): kJ per batch lost to the surroundings over the boil-up
+    heat_loss: float | None = None
     #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
     column: dict[str, Any] | None = None
     #: the reflux ratio at each profile point (a column; else empty)
@@ -795,6 +809,16 @@ def solve_still(
     k = len(names)
     feed_share = [v / total_feed for v in z] if total_feed > 0 else [0.0] * k
     result = StillResult(dict(zip(names, n0, strict=True)), {}, {}, [], pressure, hours)
+    # ADR 0075: the pot's sensible rise while it boils and the heat lost over the boil-up, kJ
+    # per batch, beside the integration (never in its state, so a still without them solves
+    # as before): each step by Simpson's rule over SUBSTEPS sub-intervals
+    cps = [getattr(components.get(n), "liquid_heat_capacity", None) for n in names]
+    sensible = bool(getattr(spec, "sensible_heat", False))
+    if sensible and (gaps := [n for n, cp in zip(names, cps, strict=True) if not cp]):
+        sensible = False
+        result.sensible_missing = "the liquid_heat_capacity of " + ", ".join(gaps)
+    loss = getattr(spec, "heat_loss", None)
+    gains = {"sensible": 0.0, "loss": 0.0}
     energy_known = all(h is not None for h in latent)
     column = _Column(spec.column, phase, names, n0) if spec.column is not None else None
 
@@ -856,6 +880,33 @@ def solve_still(
             ]
 
         return f
+
+    def gain(f: Callable[[list[float]], list[float]], old: list[float], h: float) -> None:
+        """One step of *h* kmol boiled up from *old*: the pot's sensible rise, int C dT =
+        [C (T - T_0)] - int (T - T_0) sum cp_i dn_i (C the content's heat capacity, T_0 its
+        temperature at the step's start), and the heat lost, UA int (T - T_amb) dt."""
+        points = []
+        try:
+            for j in range(SUBSTEPS + 1):
+                s = _dopri_step(f, old, h * j / SUBSTEPS)[0] if j else old
+                moles = [max(v, 0.0) for v in s[:k]]
+                points.append((moles, phase.vapour(moles)[1], f(moles + s[k:])))
+        except StillError:  # a step that boils the still empty: its share is negligible
+            return
+        if any(t is None for _, t, _ in points):
+            return
+        t0 = points[0][1]
+        if sensible:
+            ends = sum(n * (cp or 0.0) for n, cp in zip(points[-1][0], cps, strict=True))
+            weights = [
+                (t - t0) * sum(d * (cp or 0.0) for d, cp in zip(df[:k], cps, strict=True))
+                for _, t, df in points
+            ]
+            rise = ends * (points[-1][1] - t0) - _simpson(weights, h)
+            gains["sensible"] += rise * hours
+        if loss is not None:
+            weights = [(t - loss.ambient_temperature) * df[k] for _, t, df in points]
+            gains["loss"] += loss.ua / 1000.0 * _simpson(weights, h)
 
     # the state: kmol by component (per hour of flows), s of boil-up, kJ per batch
     state = [*n0, 0.0, 0.0]
@@ -990,6 +1041,8 @@ def solve_still(
             steps += 1
             small = h < STALL_SHARE * (total0 + total_feed)
             boiled += h
+            if sensible or loss is not None:
+                gain(f, state, h)
             state = new
             before = result.profile[-1][2]
             record(state)
@@ -1206,6 +1259,10 @@ def solve_still(
     end_t = result.profile[-1][2]
     if start_t is not None and end_t is not None:
         result.temperatures = (start_t, end_t)
+    if sensible:
+        result.sensible_rise = gains["sensible"]
+    if loss is not None:
+        result.heat_loss = gains["loss"]
     if column is not None:
         result.column = _column_summary(spec.column, column, refluxes, tops, result)
     if len(result.profile) > PROFILE_POINTS:
@@ -1216,6 +1273,14 @@ def solve_still(
             refluxes = [*(refluxes[i] for i in picked), refluxes[-1]]
     result.refluxes = refluxes
     return result
+
+
+def _simpson(values: list[float], h: float) -> float:
+    """Composite Simpson's rule over an interval of *h* from *values* at its ends and the
+    points evenly between (an even number of sub-intervals)."""
+    n = len(values) - 1
+    inner = sum((4.0 if i % 2 else 2.0) * v for i, v in enumerate(values[1:-1], start=1))
+    return h / (3.0 * n) * (values[0] + inner + values[-1])
 
 
 def _column_summary(
@@ -1489,14 +1554,13 @@ def solve_node(
             mode="json",
             exclude={
                 "boilup": True,
-                "heat_up": True,  # the duty's, not the outlets'
-                "heat_up_time": True,  # the recipe's time, not the outlets'
+                # the duty's or the recipe's time, not the outlets'
+                **dict.fromkeys(STILL_DUTY_ONLY, True),
                 "cuts": {"__all__": {"boilup": True}},  # below, with an end at a time
                 "provenance": True,
                 "source": True,
                 "volatility": _TEXTS,
                 "column": _TEXTS,
-                "condenser_port": True,
             },
         ),
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
@@ -1653,6 +1717,16 @@ def _heat_input(spec: Any, result: StillResult) -> float | None:
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
 _TEXTS = {"provenance", "source"}
+#: What of a still changes its duty or its recipe time, not its outlets: left out of the
+#: outlets' and the tears' fingerprints (ADR 0063, 0068, 0075).
+STILL_DUTY_ONLY = (
+    "heat_up",
+    "heat_up_time",
+    "condenser_port",
+    "sensible_heat",
+    "heat_loss",
+    "agitator_power",
+)
 
 
 def node_outlets(process: Any, spec: Any, result: StillResult) -> dict[str, dict[str, float]]:
@@ -2237,11 +2311,11 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
 def _heat_entry(
     process: Any, node: Any, case: str, result: StillResult, solution: dict[str, Any]
 ) -> None:
-    """With ``heat_up`` or a recipe vessel's metal (ADR 0063): the year-average duty its
-    energy stream carries is the model's whole duty, with its terms, the heat-up per batch and
-    the whole energy per batch on the duty's basis (``total_energy_kWh_per_batch``;
-    ``energy_kWh_per_batch`` stays the boil-up's latent heat); a still without them reports as
-    before."""
+    """With ``heat_up``, a recipe vessel's metal (ADR 0063) or ADR 0075's sensible rise, heat
+    loss or agitator power: the year-average duty its energy stream carries is the model's
+    whole duty, with its terms, the heat-up per batch and the whole energy per batch on the
+    duty's basis (``total_energy_kWh_per_batch``; ``energy_kWh_per_batch`` stays the boil-up's
+    latent heat); a still without them reports as before."""
     from chemeascode.domains.process.duties import still_duty
     from chemeascode.domains.process.recipe import metal_of
 
@@ -2249,7 +2323,9 @@ def _heat_entry(
         metal = metal_of(process, node.id, case) is not None
     except ValueError:
         metal = True  # declared, its batch's hours not known: the duty says so
-    if not node.still.heat_up and not metal:
+    spec = node.still
+    extras = spec.sensible_heat or spec.heat_loss is not None or spec.agitator_power is not None
+    if not spec.heat_up and not metal and not extras:
         return
     duty = still_duty(node, result, process, case)
     solution["year_average_duty_kW"] = duty.heat_kW
@@ -2260,6 +2336,14 @@ def _heat_entry(
     solution["duty_terms_kW"] = dict(duty.terms_kW)
     if duty.missing:
         solution["duty_missing"] = list(duty.missing)
+    if spec.sensible_heat:  # ADR 0075
+        solution["sensible_rise_kWh_per_batch"] = (
+            result.sensible_rise / 3600.0 if result.sensible_rise is not None else None
+        )
+    if spec.heat_loss is not None:
+        solution["heat_loss_kWh_per_batch"] = (
+            result.heat_loss / 3600.0 if result.heat_loss is not None else None
+        )
     if node.still.heat_up:
         solution["heat_up_kWh_per_batch"] = (
             result.heat_up / 3600.0 if result.heat_up is not None else None

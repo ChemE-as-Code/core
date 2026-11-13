@@ -526,7 +526,8 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
 
     spec = node.still
     metal = vessel_metal(process, node.id)
-    if not spec.heat_up and metal is None:
+    extras = _still_extras(spec)
+    if not spec.heat_up and metal is None and not extras:
         return list(assumptions)
     duty = _LATENT
     if spec.heat_up:
@@ -560,7 +561,36 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
             text = duty
         elif text.startswith("the reboiler's and the condenser's duty"):
             text = reboiler
+        if spec.sensible_heat:  # ADR 0075
+            text = text.replace(", no sensible heat of the content while it boils", "")
+            text = text.replace(", no sensible heat of the content", "")
+            text = text.replace(", no sensible heat", "")
+        if spec.heat_loss is not None:
+            text = text.replace(", no heat losses", "")
         found.append(text)
+    return found + extras
+
+
+def _still_extras(spec: Any) -> list[str]:
+    """What a still's ``sensible_heat``, ``heat_loss`` and ``agitator_power`` add to its
+    assumptions (ADR 0075); none without them."""
+    found = []
+    if spec.sensible_heat:
+        found.append(
+            "sensible_heat: the pot's content heated as its bubble point rises while it boils, "
+            "at its liquid_heat_capacity (the column's holdup, a step between cuts at a new "
+            "pressure and a portion mixing in left out)"
+        )
+    if spec.heat_loss is not None:
+        found.append(
+            "heat_loss: UA (T - T_ambient) over the boil-up's time at the still's temperature "
+            "(not over the heat-up or a hold)"
+        )
+    if spec.agitator_power is not None:
+        found.append(
+            "agitator_power: the agitator's power ends as heat in the content over the "
+            "boil-up's time, taken off the duty"
+        )
     return found
 
 
@@ -581,6 +611,16 @@ def _heat_assumptions(batch: Any) -> list[str]:
         found.append(
             "heat_up: the charge heated from its inlet temperature to the batch's at its heat "
             "capacity, counted in the duty (no heating time: the recipe's)"
+        )
+    if batch is not None and batch.heat_of_solution is not None:  # ADR 0075
+        found.append(
+            "batch.heat_of_solution: the charged components dissolve as they are charged, their "
+            "integral heat counted in the duty (not in the peak cooling duty or the screening)"
+        )
+    if batch is not None and batch.agitator_power is not None:
+        found.append(
+            "agitator_power: the agitator's power ends as heat in the content over the model's "
+            "dosing and reaction time (not over the recipe's other operations)"
         )
     return found
 

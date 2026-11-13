@@ -442,6 +442,44 @@
   "kind": "flowsheet",
   "schema": {
     "$defs": {
+      "AgitatorPower": {
+        "additionalProperties": false,
+        "description": "The power an agitator puts into a vessel's content, which ends there as heat (ADR\n0075): its shaft power, kW.",
+        "properties": {
+          "value": {
+            "description": "kW into the content while the model runs.",
+            "exclusiveMinimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "const": "kW",
+            "default": "kW",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "title": "AgitatorPower",
+        "type": "object"
+      },
       "Batch": {
         "additionalProperties": false,
         "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as\nthey form, by a second outlet.",
@@ -519,6 +557,43 @@
             "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
             "title": "Heat Up",
             "type": "boolean"
+          },
+          "heat_up_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "With heat_up: the energy port whose stream carries the charge's heat-up and the vessel's metal (steam for the warm-up), apart from the rest of the model's duty on energy_port (the reaction's cooling water; ADR 0075).",
+            "title": "Heat Up Port"
+          },
+          "heat_of_solution": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfSolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch or semi-batch: the heat the charge's components take up (or release) as they dissolve when charged, a solid's heat of solution, per kmol charged; in the model's duty, not in its peak cooling duty or the screening (ADR 0075)."
+          },
+          "agitator_power": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AgitatorPower"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch or semi-batch: the agitator's power that ends as heat in the content while the model runs (its dosing and reaction time); in the model's duty and the recipe's peak duty (ADR 0075)."
           },
           "provenance": {
             "enum": [
@@ -791,6 +866,12 @@
             "default": null,
             "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
             "title": "Energy Port"
+          },
+          "vessel_metal": {
+            "default": false,
+            "description": "A conversion step in a recipe vessel with metal_heat_capacity: its duty holds the vessel's metal heated or cooled with the content, from its inlets' temperature to its outlets' (ADR 0075); default: the metal is left out.",
+            "title": "Vessel Metal",
+            "type": "boolean"
           },
           "still": {
             "anyOf": [
@@ -2333,6 +2414,45 @@
         "title": "HeadSpace",
         "type": "object"
       },
+      "HeatLoss": {
+        "additionalProperties": false,
+        "description": "A vessel's heat loss to its surroundings (ADR 0075): its overall coefficient times its\nouter area, and the ambient temperature.",
+        "properties": {
+          "ua": {
+            "description": "W/K, the content to the surroundings.",
+            "exclusiveMinimum": 0,
+            "title": "Ua",
+            "type": "number"
+          },
+          "ambient_temperature": {
+            "description": "K of the surroundings.",
+            "exclusiveMinimum": 0,
+            "title": "Ambient Temperature",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ua",
+          "ambient_temperature",
+          "provenance"
+        ],
+        "title": "HeatLoss",
+        "type": "object"
+      },
       "HeatOfAbsorption": {
         "additionalProperties": false,
         "description": "The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol\ndissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share\nkept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas\nthat degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on\nthe gas basis.",
@@ -3691,6 +3811,12 @@
             "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
             "title": "Energy Port"
           },
+          "vessel_metal": {
+            "default": false,
+            "description": "A conversion step in a recipe vessel with metal_heat_capacity: its duty holds the vessel's metal heated or cooled with the content, from its inlets' temperature to its outlets' (ADR 0075); default: the metal is left out.",
+            "title": "Vessel Metal",
+            "type": "boolean"
+          },
           "still": {
             "anyOf": [
               {
@@ -4060,6 +4186,36 @@
             "default": null,
             "description": "The energy port (out, to cooling) whose stream carries the condenser's duty; default with a column: its one heat stream out.",
             "title": "Condenser Port"
+          },
+          "sensible_heat": {
+            "default": false,
+            "description": "Count the content's sensible heat as its bubble point rises while it boils (volatility raoult): the pot's liquid_heat_capacity times each step's rise, in the still's duty (ADR 0075); default: the boil-up's latent heat at constant temperature.",
+            "title": "Sensible Heat",
+            "type": "boolean"
+          },
+          "heat_loss": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatLoss"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The still's heat loss to its surroundings over the boil-up (volatility raoult), UA (T - T_ambient) along its temperatures, in the still's duty (ADR 0075)."
+          },
+          "agitator_power": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AgitatorPower"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The pot's agitator power that ends as heat in the content over the boil-up's time, taken off the still's duty (ADR 0075)."
           },
           "provenance": {
             "enum": [

@@ -118,6 +118,42 @@
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
+- The rest of a batch's energy balance (ADR 0075, core#191), each opt-in and in the duty only
+  (neither the outlets' nor a tear's fingerprint):
+  - a recipe `heat` or `cool` with `temperatures` may name its energy `stream:`; `cheme process
+    propagate` writes the content's and the vessel's metal's heat over the batch's hours of
+    flows on it (`calculated`, compared where given or assumed), so a heater step's hand duty
+    follows the recipe (a scratch copy of potassium-tert-butoxide-1: Q1 25.5655 kW, its hand
+    value 25.57 kW); `cheme.recipe-reference` (error), so that no heat is counted twice: a
+    stream at no step of the unit, a stream a model writes or a dryer's `energy.port` (its duty
+    is compared with the dryer's), and an operation before the run (the next `dose`, `react`
+    or `distil`) of a batch or still with `heat_up`, whose duty holds that heat-up and the
+    metal's already (a heat after the run is written);
+  - `batch.heat_up_port: PORT` (with `heat_up`): the charge's heat-up and the vessel's metal on
+    that energy stream (steam), the rest of the model's duty on `energy_port` (cooling water),
+    not netted (potassium-tert-butoxide-1 L-11); `process reactors` adds `model_duty.heat_up`;
+    the port is in both duties' fingerprint, so a duty written before the port was set (or
+    removed) is `cheme.process-calculated-stale`;
+  - `batch.heat_of_solution`: a charged solid's integral heat of solution in the isothermal
+    duty's term `solution` (methyltriphenylphosphonium-bromide-1 L-8), not in the peak cooling
+    duty or the screening;
+  - `batch.agitator_power` and `still.agitator_power` (kW): the agitator's heat over the model's
+    time, the term `agitation` (potassium-tert-butoxide-1 and tert-butyldimethylsilyl-chloride-1
+    L-12), and in the recipe's peak duty for the jacket check; a duty's basis no longer lists
+    as left out a term it holds (agitation, a still's heat losses and sensible rise, the
+    charged heat of solution);
+  - `still.sensible_heat: true` and `still.heat_loss: {ua, ambient_temperature}` (raoult): the
+    pot's sensible rise while its bubble point rises and the heat lost over the boil-up, the
+    terms `sensible rise` and `heat losses` (with `heat_up_time` they take time too);
+  - `vessel_metal: true` on a conversion step in a recipe vessel with `metal_heat_capacity`: the
+    metal from its inlets' to its outlets' temperature;
+  - a dryer's vessel takes a `heat` or `cool` with `temperatures` (the wet cake before the
+    `dry`, at the dryer's `energy.heat_capacity`, the product after it, at the components'
+    `liquid_heat_capacity`, timed on its jacket; potassium-tert-butoxide-1 L-6), and its
+    recipe vessel's `metal_heat_capacity` is the dryer's metal, heated from the temperature the
+    vessel was left at (potassium-tert-butoxide-1 L-5); after a heat or cool before the `dry`
+    the dryer heats the wet cake from that operation's end temperature (its heat is the
+    operation's; `process crystallizers` reports `recipe_heat`).
 
 ### Fixed
 
@@ -185,6 +221,12 @@
   dump when absent).
 - ADR 0062's acetyl-chloride-1 figure is per acetyl chloride formed (0.0006 %), not per kmol
   of the reaction's extent (0.0019 %).
+- A recipe vessel's `metal_heat_capacity` on a dryer's unit procedure, which 1.12.0 ignored, is
+  the dryer's metal (ADR 0075; with the dryer's own `energy.vessel_heat_capacity` too it is an
+  error, `cheme.recipe-vessel`); a `heat` or `cool` with `temperatures` in a dryer's vessel,
+  which 1.12.0 refused, is timed. No library entry gives either. The process generator's code
+  changed (`schema.py`, `model.py`): the example sheets are regenerated, no drawn output
+  changes.
 
 ## 1.11.0 (2026-11-06)
 
