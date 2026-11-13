@@ -262,9 +262,10 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
                     entry["rate"] = rate(
                         law, reaction.stoichiometry, y, t, p, k_out, on_liquid, basis
                     )
-                    entry["rate_unit"] = (
-                        "kmol/(kg s)" if law.basis == "catalyst_mass" else "kmol/(m3 s)"
-                    )
+                    entry["rate_unit"] = {
+                        "catalyst_mass": "kmol/(kg s)",
+                        "surface": "kmol/(m2 s)",
+                    }.get(law.basis, "kmol/(m3 s)")
                     if phi is not None and law.reverse == "equilibrium":
                         entry["rate_note"] = (
                             "(1 - Q/K) of the rate law on partial pressures, the equilibrium on "
@@ -365,6 +366,7 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             }
             if solved_tank.kind == "semibatch":
                 tank_entry |= semibatch_entry(solved_tank)
+            tank_entry |= kinetics_entry(solved_tank)
             if vent is not None:
                 tank_entry |= vent_entry(solved_tank, vent.stream)
             if item.reactor in ("batch", "semibatch"):
@@ -532,6 +534,8 @@ def reactor_text(report: ReactorReport) -> str:
                     + f"; peak cooling duty {num(tank['peak_cooling_duty_kW_m3'], ' kW/m3')}"
                     + (f"; {'; '.join(tank['notes'])}" if tank["notes"] else "")
                 )
+        if tank:
+            lines += kinetics_lines(tank)
         if r.get("model_duty"):
             lines += report_lines(r["model_duty"])
         if r["missing"]:
@@ -615,6 +619,59 @@ def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
             k: dict(v) if isinstance(v, dict) else v for k, v in solved.head_space.items()
         }
     return {"vent": found}
+
+
+def kinetics_entry(solved: Any) -> dict[str, Any]:
+    """What ``process reactors`` adds for a batch or semi-batch's ADR 0074 terms, each only
+    where declared: ``initiation`` (with the uninitiated scenario), ``solids``, ``light`` and
+    ``temperatures`` (a programme's or a reflux's)."""
+    found: dict[str, Any] = {}
+    for key in ("initiation", "solids", "light", "temperatures"):
+        if value := getattr(solved, key, None):
+            found[key] = value
+    return found
+
+
+def kinetics_lines(tank: dict[str, Any]) -> list[str]:
+    """The text lines of :func:`kinetics_entry`."""
+    lines = []
+    if start := tank.get("initiation"):
+        line = (
+            f"    initiation at {start['time_s']:.6g} s (rates at {start['factor']:g} of theirs "
+            f"before it, {', '.join(start['reactions'])})"
+        )
+        if (scenario := start.get("uninitiated")) is not None:
+            worst = scenario.get("cooling_failure")
+            x = scenario.get("max_accumulation")
+            line += f"; uninitiated until {scenario['until_s']:.6g} s: " + (
+                f"accumulation at most {x:.3g}" if x is not None else "nothing dosed accumulates"
+            )
+            if worst:
+                line += f", cooling failure at worst {worst['mtsr_K']:.6g} K"
+            if scenario.get("missing"):
+                line += f" ({scenario['missing']})"
+        lines.append(line)
+    for name, solid in (tank.get("solids") or {}).items():
+        area = (
+            f", surface {solid['area_start_m2']:.4g} -> {solid['area_end_m2']:.4g} m2"
+            if "area_start_m2" in solid
+            else ""
+        )
+        lines.append(
+            f"    solid {name}: {solid['start_kmol_h']:.4g} -> {solid['end_kmol_h']:.4g} kmol/h"
+            + area
+        )
+    if light := tank.get("light"):
+        lines.append(
+            f"    light {light['power_kW']:.4g} kW: {light['photons_absorbed_kmol_h']:.4g} kmol "
+            f"of photons and {light['absorbed_kJ_h']:.6g} kJ absorbed per hour of charge"
+        )
+    if temps := tank.get("temperatures"):
+        lines.append(
+            f"    {temps['mode']}: {temps['start_K']:.6g} K at the start, {temps['end_K']:.6g} K "
+            f"at the end (at most {temps['max_K']:.6g} K)"
+        )
+    return lines
 
 
 def semibatch_entry(solved: Any) -> dict[str, Any]:
