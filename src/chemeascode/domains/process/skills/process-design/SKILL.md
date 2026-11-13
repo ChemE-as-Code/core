@@ -329,9 +329,21 @@ still:
 - `cheme process stills` gives each cut's purity and recovery, the reflux at the start and
   the end, the boil-up time and the duties. A note says when a constant distillate reached its
   `maximum_ratio` (its purity falls from there) or a cut's end was reached at once.
-- The shortcut has no holdup and uses Gilliland's correlation: it gives a leaner distillate
-  than a rigorous column at the same stages and reflux. State the stages and reflux you
-  assumed in `DESIGN.md`, and size the column and condenser elsewhere.
+- The shortcut has no holdup and uses Gilliland's correlation: at a constant relative volatility
+  it gives a leaner distillate than a rigorous column at the same stages and reflux. It takes
+  the still's relative volatility for the whole column, so for a liquid whose relative
+  volatility falls towards the top (methanol-water) it can be purer than the rigorous column (by
+  up to 0.02 in mole fraction against DWSIM, ADR 0061's amendment). It is a bound at the
+  smallest relative volatility along the column over the run: give `volatility: constant` at it
+  for a conservative cut. That is the distillate's at its purest where the relative volatility
+  falls towards the top, but the still's at the end of the cut where it rises (a negative
+  deviation from Raoult's law, the light side of a maximum-boiling azeotrope): there the
+  distillate's makes the cut purer than the column gives. Or check the column with `cheme
+  process simulate`: a feed at the reboiler is refused there, so give the column one stage more
+  and feed the still's saturated liquid to the stage above the reboiler, nearly all of it
+  leaving as bottoms (its distillate is the batch column's within 1.5e-3 in DWSIM). State the
+  stages, reflux and volatility you assumed in `DESIGN.md`, and size the column and condenser
+  elsewhere.
 
 `cheme process simulate --fill` solves the whole flowsheet in DWSIM, separators, exchangers,
 columns and recycles included, from the feeds and the specs in `process/simulation.yaml`; see

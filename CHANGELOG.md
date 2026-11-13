@@ -118,6 +118,24 @@
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
+- Batch rectification (`still.column`, ADR 0061) qualified against published worked examples
+  and DWSIM (core#195, ADR 0061's amendment, `tests/test_batch_rectification.py`): Diwekar,
+  Malik and Madhavan's (1987) binary cases (their short-cut's mean distillate within 1.2e-3 at
+  constant reflux, their variable-reflux distillate within 0.6 %, their rigorous column's purity
+  reproduced by the tests' plate-to-plate reference within 2.3e-3) and Lotter and Diwekar's
+  (1997) rectifier; their case 7 and quaternary are not reproducible from the printed inputs (a
+  test keeps the quaternary's reason checked). With `CHEME_DWSIM_TESTS=1`, DWSIM's rigorous
+  column (NRTL): the shortcut is not purer for benzene-toluene, but up to 0.02 purer for
+  methanol-water, whose relative volatility falls towards the top; at the top's relative
+  volatility it is never purer. The skills `process-design` and `unit-ops-distillation` now
+  say that the shortcut is conservative at a constant relative volatility, and where it varies
+  along the column to give `volatility: constant` at its smallest along the column over the
+  run (the distillate's where it falls towards the top, the still's at the end of the cut where
+  it rises: a plate-to-plate column at alpha = 1.2 + x is leaner than the shortcut at the
+  distillate's, 0.653 against 0.784), or to check the column with `cheme process simulate`, one
+  stage more and fed above the reboiler (a feed at the reboiler is refused there; DWSIM gives
+  the reboiler-fed column's distillate within 1.5e-3). No model change: no library entry's
+  result changes.
 
 ### Fixed
 
