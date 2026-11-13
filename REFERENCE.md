@@ -988,8 +988,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   own XML. `validate` reports `cheme.generated-outdated` (warning: the YAML changed, rebuild),
   `cheme.generated-edited` (error: the XML was edited by hand; `build` refuses it unless
   `--force`) and `cheme.generated-version` (warning: cheme-as-code's generator version, generator
-  code (`generator_sha256`, a hash of the `chemeascode.domains.process` sources) or schema version
-  changed). A YAML edit never reports `generated-edited`.
+  code (`generator_sha256`, a hash of the sheet-drawing modules of `chemeascode.domains.process`
+  and of the fields `propagate` and `simulate` write, not of the code deriving them) or schema
+  version changed). A YAML edit never reports `generated-edited`.
 - **Balances.** Steady-state, non-reactive mass and component balances per block and per step,
   on its boundary streams (internal streams cancel), with `|in - out| <= abs + rel * max(in,
   out)`, in the default case and every other case that streams give a state for.

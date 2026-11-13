@@ -58,7 +58,7 @@
     "property_package": "Peng-Robinson (PR)",
     "model_fingerprint": "aa92c1c90ad4962a",
     "inputs": {
-      "commit": "ee267c757021cd728ab0bff62a37335f896cce65",
+      "commit": "c400bec4e4be6678bf972f0951b93d1d997f45a8",
       "dirty": [
         "process/flowsheet.yaml"
       ],

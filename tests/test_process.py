@@ -123,6 +123,89 @@ def test_generator_fingerprint_covers_what_build_imports():
     assert all((here / name).is_file() for name in provenance.GENERATOR_MODULES)
 
 
+def test_generator_fingerprint_changes_with_the_stale_fields(monkeypatch):
+    """Adding or removing a field propagate or simulate writes (one a sheet can leave blank as
+    stale) changes ``generator_sha256``; the code deriving the values is not fingerprinted."""
+    from chemeascode.domains.process import propagate, provenance
+    from chemeascode.domains.process.simulation import translate
+
+    provenance.generator_fingerprint.cache_clear()
+    before = provenance.generator_fingerprint()
+    assert "propagate.py" not in provenance.GENERATOR_MODULES
+    for module, extra in ((propagate, "phase"), (translate, "phase")):
+        with monkeypatch.context() as patch:
+            patch.setattr(module, "WRITTEN", (*module.WRITTEN, extra))
+            provenance.generator_fingerprint.cache_clear()
+            assert provenance.generator_fingerprint() != before
+        with monkeypatch.context() as patch:
+            patch.setattr(module, "WRITTEN", module.WRITTEN[:-1])
+            provenance.generator_fingerprint.cache_clear()
+            assert provenance.generator_fingerprint() != before
+        with monkeypatch.context() as patch:
+            patch.setattr(module, "SOURCE", module.SOURCE + " v2")
+            provenance.generator_fingerprint.cache_clear()
+            assert provenance.generator_fingerprint() != before
+    provenance.generator_fingerprint.cache_clear()
+    assert provenance.generator_fingerprint() == before
+
+
+def test_generator_fingerprint_covers_the_stale_marking_data():
+    """``build.py`` and ``pfd_sheet.py`` blank stale cells through ``props.stale`` only, and every
+    module constant the ``stale_fields`` (and ``ours``) it calls read is in ``STALE_FIELD_DATA``."""
+    import ast
+    import importlib
+    import inspect
+    import json
+    import textwrap
+
+    from chemeascode.domains.process import props, provenance
+
+    here = Path(provenance.__file__).parent
+    for sheet in ("build.py", "pfd_sheet.py"):
+        tree = ast.parse((here / sheet).read_text(encoding="utf-8"))
+        stale_from = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and any(a.name == "stale" for a in node.names)
+        }
+        assert stale_from == {"chemeascode.domains.process.props"}, (sheet, stale_from)
+        assert "props.py" in provenance.GENERATOR_MODULES
+        imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)} | {
+            a.name for node in ast.walk(tree) if isinstance(node, ast.Import) for a in node.names
+        }
+        assert not any(m.endswith(("propagate", "translate")) for m in imported if m), sheet
+
+    # The modules props.stale asks for their stale fields.
+    asked = {
+        node.value.id
+        for node in ast.walk(ast.parse(textwrap.dedent(inspect.getsource(props.stale))))
+        if isinstance(node, ast.Attribute)
+        and node.attr == "stale_fields"
+        and isinstance(node.value, ast.Name)
+    }
+    assert asked == {"propagate", "translate"}
+    covered = set(provenance.STALE_FIELD_DATA)
+    for alias, short in (("propagate", "propagate"), ("translate", "simulation.translate")):
+        module = importlib.import_module(f"chemeascode.domains.process.{short}")
+        names: set[str] = set()
+        for function in (module.stale_fields, module.ours):
+            names |= {
+                node.id
+                for node in ast.walk(ast.parse(textwrap.dedent(inspect.getsource(function))))
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+            }
+        data = {
+            name
+            for name in names
+            if isinstance(getattr(module, name, None), str | tuple) and name.isupper()
+        }
+        assert data, alias
+        assert {(short, name) for name in data} <= covered, (alias, data)
+    assert all(
+        isinstance(v, str | list) for v in json.loads(provenance.stale_field_data()).values()
+    )
+
+
 def test_values_round_trip_with_provenance_and_case(recycle):
     from pydexpi.loaders.public import load_xml_with_report
 
