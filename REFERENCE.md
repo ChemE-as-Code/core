@@ -1143,7 +1143,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   content and metal kJ per batch, mean and year-average kW; a recipe without metal reports as in
   1.9.0). A unit
   procedure holding a still may give a `vessel` (sized from what its steps take in, or its
-  `volume`; no jacket check).
+  `volume`; no jacket check). ADR 0075: a `heat` or `cool` with `temperatures` may name the
+  energy `stream` its heat goes on, an energy stream at a step or block of the unit that no
+  model's duty goes on (`cheme.recipe-reference` otherwise): `process propagate` writes the
+  content's and the metal's heat over the batch's hours of flows on it (`calculated`, stale when
+  the operation, the vessel or the batch changes; a given or assumed duty is compared,
+  `cheme.process-duty`), and `heats` lists the operation with its `stream` even without metal. A
+  dryer's vessel takes a `heat` or `cool` with `temperatures` too (the wet cake before the `dry`,
+  the dried product after it, at the components' `liquid_heat_capacity`, on `jacket.area` or the
+  vessel's heated area; 1.12.0 refused it), and its `metal_heat_capacity` is the dryer's metal,
+  heated each batch from the temperature the vessel was left at, the end of the last operation
+  with `temperatures` before the `dry` in the procedure's cycle (a cool-down before the
+  discharge), else from the wet cake's (`cheme.recipe-vessel` error when the dryer gives
+  `energy.vessel_heat_capacity` too; `process crystallizers` reports `vessel_metal` with its
+  start temperature). A batch's `agitator_power` adds to the peak duty of the jacket check.
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1176,7 +1189,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   duty (`charge heat-up`), and the vessel's metal with it; without it the model holds the batch
   at its temperature from the start and leaves both to the recipe's heat operation. `heat_up`
   and an isothermal batch's `heat_of_solution` change only the duty: the outlets and a recycle's
-  tears do not go stale on them, nor on a vent condenser's `energy_port`. `process propagate` writes both outlets and the balance
+  tears do not go stale on them, nor on a vent condenser's `energy_port`. ADR 0075, each on an
+  isothermal batch or semi-batch only and changing only the duty: `batch.heat_up_port: PORT`
+  (with `heat_up`) puts the charge's heat-up and the vessel's metal on that energy port's stream
+  (steam) and the rest of the duty on `energy_port` (cooling water), so heating and cooling are
+  not netted (`process reactors` adds `model_duty.heat_up`; a port that is no energy port, or
+  the `energy_port` itself, is `cheme.process-energy-port`); `batch.heat_of_solution: {values:
+  {component: kJ/kmol}, provenance}` is a charged component's integral heat of solution (a
+  solid dissolving as it is charged), in the term `solution` (a share the vent's vapour takes
+  off takes it back as a dose's does), not in the peak cooling duty or the screening (released
+  at the charge; rules as a dose's: an undeclared component, error, one the charge does not
+  carry, warning); `batch.agitator_power: {value: kW, provenance}` is the agitator's power that
+  ends as heat in the content over the model's dosing and reaction time, the term `agitation`
+  (`-P t` over the batch's hours of flows: it needs `process/recipe.yaml`) and the recipe's peak
+  duty plus `P`. A conversion step with `vessel_metal: true` in a recipe vessel with
+  `metal_heat_capacity` adds the term `vessel metal`, the metal from its inlets' temperature to
+  its outlets' (each side's mean by heat capacity); its heat-up is in its Hess path already (a
+  warning on a node that is no conversion step, or in no such vessel). `process propagate` writes both outlets and the balance
   closes over them; `process reactors` adds the vent's kmol/h and peak rate per m3 of the final
   content, `process recipe` its peak kmol/s and m3/h per batch and what a batch gives off, and
   `process reactor-hazards` leaves the vented gas out of the MTSR and the MTT (the vent's
@@ -1319,8 +1348,12 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     vessel_heat_capacity, efficiency, port}`, `process crystallizers` reports the duty `(m cp
     (T - T_in) + sum W lambda + C_v (T - T_in) / h_batch) / eta`. A latent heat that is not
     declared comes from the component's `critical` constants (Pitzer, Poling et al. 2001, eq.
-    7-9.4). The vessel's heat is per batch of `process/recipe.yaml`. The duty is compared with
-    the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
+    7-9.4). The vessel's heat is per batch of `process/recipe.yaml`. In a recipe vessel with
+    `metal_heat_capacity` (and no `vessel_heat_capacity`, ADR 0075) the metal is heated from
+    the temperature the vessel was left at (the end of the last `heat` or `cool` with
+    `temperatures` before the `dry`, a cool-down in the dryer before the discharge), else from
+    the wet cake's: `C_m (T - T_left) / h_batch` (`vessel_metal` in the report). The duty is
+    compared with the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
     everything but the volatiles, so its moisture is the residual moisture.
   - A recipe `dry` operation with `from:` the dryer takes one batch's vapour over
     `drying_rate` (kg/(m2 h)) times the heated area of the unit procedure's vessel
@@ -1432,12 +1465,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
     vacuum ramp that ends below the charge still times the metal's heat-up.
+  - ADR 0075, each in the duty only (not the outlets' or a tear's fingerprint), reported by
+    `process stills` among `duty_terms_kW`: `still.sensible_heat: true` (raoult) adds the pot's
+    content heated as its bubble point rises while it boils (`sensible rise`, its
+    `liquid_heat_capacity`, each step by Simpson's rule on its dense evaluations;
+    `sensible_rise_kWh_per_batch`; the column's holdup, the step between cuts at a new pressure
+    and a portion mixing in left out); `still.heat_loss: {ua: W/K, ambient_temperature: K,
+    provenance}` (raoult) the heat lost over the boil-up, `UA int (T - T_amb) dt`
+    (`heat losses`, `heat_loss_kWh_per_batch`; not over the heat-up or a hold);
+    `still.agitator_power: {value: kW, provenance}` the agitator's heat over the boil-up's time
+    (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does.
   - An end at a temperature (or any end) stops where the integrator found it (core#198: a
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
     (core#214); a component only an inlet's template lists (before propagate) is an info.
   - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
-    boils (and the heat-up without `heat_up`), losses, constant level by volume. `process
+    boils without `sensible_heat` (and the heat-up without `heat_up`), losses without
+    `heat_loss`, constant level by volume. `process
     simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
     and the constant-level swap's closed form (`tests/test_batch_still.py`).

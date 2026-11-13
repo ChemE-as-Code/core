@@ -246,9 +246,20 @@ content's temperature (a batch only with `heat_up`: without it the model holds t
 temperature, and the recipe's heat operation holds the content's and the metal's heat; a still
 at constant volatility models no temperature and gets none). `cheme
 process recipe` reports the heat per batch of each jacket-timed heat-up in a vessel with metal:
-the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, a one-stage still's condensers (unless
-`still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give
-those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
+the basis for a heater step without a model; do not also count it in a model with `heat_up`.
+Name that heater step's energy stream in the operation's `stream:` (ADR 0075) and propagate
+writes the heat-up's or cool-down's duty on it instead of a hand value (not a stream a model's
+duty goes on). More terms of ADR 0075, before typing a stream by hand: a charged solid's heat of
+solution in `batch.heat_of_solution` (as a dose's); the agitator's power in
+`batch.agitator_power` or `still.agitator_power` (kW into the content while the model runs; the
+batch needs the recipe); the warm-up on steam and the reaction on cooling water as two streams
+with `batch.heat_up_port: PORT` beside `energy_port` (do not net them on one stream); a still's
+`sensible_heat: true` and `heat_loss: {ua, ambient_temperature}`; `vessel_metal: true` on a
+conversion step in a vessel with metal. A dryer in a vessel with `metal_heat_capacity` heats
+that metal from the temperature the vessel was left at (a `cool` with `temperatures` in the
+dryer's vessel, timed on its jacket): give the metal there, not also as the dryer's
+`vessel_heat_capacity`. A one-stage still's condensers (unless `still.condenser_port` names
+one) and the dryer (its own `energy.port`) are not written: give those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
 in, or `energy_port`) and its condenser (its one heat stream out, or `still.condenser_port`):
 never type the reflux's share of the reboiler as a stream of its own. A batch's vent condenser
 (`batch.vent.condenser`, ADR 0062, see the `reactions` skill) is a different condenser from a
