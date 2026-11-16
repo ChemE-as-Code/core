@@ -39,6 +39,32 @@ PRESSURE_UNITS = {
     "bar(g)": (100.0, "gauge"),
     "MPa(g)": (1000.0, "gauge"),
 }
+#: Concentrations retain their measurement basis, including the element or COD equivalent.
+WASTEWATER_LABELS = {
+    "flow": "Liquid flow",
+    "COD": "COD",
+    "TN": "Total nitrogen",
+    "TP": "Total phosphorus",
+    "TSS": "Suspended solids",
+    "NH4": "Ammonium nitrogen",
+    "PO4": "Orthophosphate phosphorus",
+}
+WASTEWATER_UNITS = {
+    "COD": "mg COD/L",
+    "TN": "mg N/L",
+    "TP": "mg P/L",
+    "TSS": "mg TSS/L",
+    "NH4": "mg N/L",
+    "PO4": "mg P/L",
+    "flow": "m3/day",
+}
+
+
+def same_unit(left: str, right: str) -> bool:
+    """Equivalent unit spellings, with the same magnitude and measurement basis."""
+    return left == right or {left, right} == {"m3/d", "m3/day"}
+
+
 #: Temperature units of the plant files.
 TEMPERATURE_UNITS = ("K", "°C")
 

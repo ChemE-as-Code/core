@@ -173,10 +173,20 @@ each value taken from the evidence cites its observation in `source`.
      the liquid's components that have an Antoine `vapour_pressure` (Raoult, ideal unless
      `activity: {id: gamma}` from a source), the vapour leaves the liquid and its
      `heat_of_vaporization` cools the vessel (part of its model duty). Do not type a vapour
-     `fraction` or script the evaporative cooling any more, unless the vent gas is mostly a
-     displaced head space or a sweep gas (a dose pushing out the head space, a nitrogen
-     purge): the model carries vapour only on the gas the reactions form and a passing dose,
-     so there it understates the vapour; keep the hand estimate and say why in DESIGN.md. A
+     `fraction` or script the evaporative cooling any more. Where the vent gas is mostly a
+     displaced head space or a sweep gas (ADR 0071), model the carrier: list the inert in
+     `inerts: [N2]` (it never dissolves: a dose's share of it passes straight through, carrying
+     vapour), pad the head space with `head_space: {stream: PAD, provenance, source}` (an
+     inlet of the step with only the inert, its kmol/h the head space's gas at the start, so
+     the empty volume over the charge), and dose a sweep or purge as a dose of the inert
+     (`dosing: [{stream: SWEEP, start: s, time: s}]`). The head space then expels, vapour-laden,
+     what the dose displaces and the rising vapour pressure pushes out; whatever leaves strips
+     the liquid's volatile components, so a dosed excess (a methyl bromide, a solvent)
+     degasses under the sweep: do not type a stripping share. A dissolved gas with no Antoine
+     `vapour_pressure` in `materials.yaml` (a dilute solute such as HCl, or a gas above its
+     critical point) degasses with `vapour: {components: [..., HCL],
+     henry: {HCL: {points: [[K, kPa]], provenance, source}}}`. A vent of an inert alone needs
+     no `components`; the vent stream's template lists the inerts. A
      reflux or vent condenser on the line is `condenser: {temperature: K, returns: vessel,
      energy_port: PORT, provenance, source}` on the vent, below the vessel's temperature
      (an isothermal batch's is its liquid outlet's given temperature, which `heat_up` heats a
@@ -191,8 +201,16 @@ each value taken from the evidence cites its observation in `source`.
      template lists it). A content that boils at the vessel's pressure is refused: that is a
      still or a reflux, not a vent. `reactor-hazards` then takes the gas release at the MTSR
      with its vapour (no condenser credited); `boils` there is a warning to size the relief
-     for the boil-up. Not modelled: a head-space or sweep gas the dose displaces, mass-transfer
-     limits, the heat of absorption.
+     for the boil-up. A gas that dissolves releases its heat of absorption: give
+     `heat_of_absorption: {values: {HCL: kJ/kmol}, provenance, source}` on the vent (negative:
+     released; the formed gas's dissolved share releases it, a degassing gas takes it back;
+     keep the reactions' heats on the gas basis). Give a condensable's `melting_point` (K) in
+     `materials.yaml` where it freezes near the coolant's temperature (tert-butanol, 298.3 K,
+     acetic acid, 289.8 K): `cheme.process-condenser-freezing` warns when the vent condenser's
+     outlet or its coolant's supply, or a batch still's condenser's coolant supply, lies below
+     it; move the condenser to a tempered loop or say
+     in DESIGN.md why the mixture cannot freeze. Not modelled: a pressure balance (a closed
+     vessel, a depressurising), mass-transfer limits.
    Tanks and batches hold gas-phase or liquid-phase reactions (one phase; a semi-batch liquid). A liquid needs
    `liquid_molar_volume` for concentrations and space times, and for an adiabatic tank or a
    liquid duty `liquid_heat_capacity` (kJ/(kmol K)) and each reaction's `heat_of_reaction`. A
@@ -281,7 +299,23 @@ each value taken from the evidence cites its observation in `source`.
    reaction's value stays in the output). A semi-batch prints its MTSR over the batch (an
    initiation charge, the end of each dosing segment). A vented batch reports its gas release
    at the MTSR (`cheme.reactor-hazard-vent`): give `hazard.vent_capacity` (m3/h at the vessel's
-   pressure) from the vent sizing; the blocked-vent pressure is not screened. These are screening values for the HAZOP study, not a
+   pressure) from the vent sizing; the blocked-vent pressure is not screened. A semi-batch's
+   output also gives (ADR 0069) the largest gas release over the whole batch (each moment's
+   content at its own MTSR; the vent check takes the larger, so size the vent for it, not for
+   a scratch script over the cooling profile), each dosed reactant's accumulation and the share
+   of it that can still react (a deliberate excess cannot), the dissolved, dosed and vented
+   gases held in the liquid a cooling failure can release (`cheme.reactor-hazard-dissolved`,
+   info: judge which is toxic and size the scrubber or catch tank for it) and, where the
+   content boils at the MTSR, its boil-up at its bubble point. Where a reaction consumes the
+   product of another (a comproportionation, a consecutive decomposition) the output gives
+   the network's dT_ad and MTSR, their largest heat together; say `hazard.potential: network`
+   when that is what a cooling failure runs, and keep slow side reactions out with
+   `hazard.reactions`. The default MTT takes a product that boils lowest (at least 5 % of the
+   liquid once it formed); where a dose reacts away or the content is a mixture, give the
+   components a `vapour_pressure` (or `heat_of_vaporization`) and say `hazard.mtt_from:
+   bubble-point`: the MTT is then the content's bubble point (Raoult's law) at the worst
+   moment and after the cooling failure, instead of a hand-set `hazard.mtt`. These are
+   screening values for the HAZOP study, not a
    reaction-hazard assessment. A phase change is no reaction: a precipitation, dissolution or
    wash loss belongs in a `crystallizer:` on the step (`spectators:` for the other solutes of
    the liquor; skill `separation-method-selection`). Where one stays written as a reaction,
@@ -342,6 +376,10 @@ each value taken from the evidence cites its observation in `source`.
   or names an undeclared component.
 - `cheme.process-heat-of-reaction` (warning): a given heat of reaction more than 2 % from
   the formation data; check the coefficients and the sources.
+- `cheme.process-condenser-freezing` (warning): a vent condenser's outlet, or its coolant's
+  supply, below the `melting_point` of a component it condenses; a batch still's condenser's
+  coolant supply below that of a component its distillate carries at 1 mol% or more (ADR
+  0071).
 
 ## Expected outputs and provenance
 

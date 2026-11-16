@@ -251,6 +251,12 @@ def sample_node(
         raise SamplingError(f"no reaction of {node} gives an uncertainty: nothing to sample")
     fs = process.flowsheet
     inlets = [s for s in fs.streams if (e := process.ends(s)[1]) is not None and e.node == node]
+    if model in ("batch", "semibatch"):
+        from chemeascode.domains.process.stirred_tank import pad_stream
+
+        # a (semi-)batch's head space's pad is no feed of the liquid and no reactant to pick
+        # the key from (ADR 0071): solve_node finds it among the node's inlets itself
+        inlets = [s for s in inlets if s.id != pad_stream(item)]
     if model == "semibatch":  # the charge and its doses: solve_node splits them
         inlets = [s for s in inlets if s.kind == "material"]
         inlet: Any = inlets

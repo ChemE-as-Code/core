@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from chemeascode.domains.process.schema import Quantity, State, Strict
 from chemeascode.domains.process.simulation import SCHEMA
+from chemeascode.foundation.project_paths import project_name
 from chemeascode.foundation.schema_base import unsupported_schema
 
 #: Unit operations the translation knows, by cheme-as-code name.
@@ -286,12 +287,39 @@ class MethodSelection(Strict):
 
 
 class QSDsanConfiguration(Strict):
-    """The opt-in, project-owned A2/O worker; not a general flowsheet translator."""
+    """Version 1 of the project-worker contract."""
 
-    model: Literal["wwtp-a2o"]
-    environment: str = ".venv"
-    input: str = "inputs/baseline.json"
-    timeout_s: float = Field(default=300, gt=0, le=3600, allow_inf_nan=False)
+    model: str = Field(min_length=1, description="Model identifier shown with calculated values.")
+    worker: str = Field(
+        pattern=r"^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$",
+        description="Python module in the declared files.",
+    )
+    input: str = Field(description="Project-relative path of the primary input.")
+    files: list[str] = Field(
+        min_length=1,
+        description="Explicit project-relative module and data files required by the worker.",
+    )
+    timeout_s: float = Field(
+        default=300,
+        gt=0,
+        le=3600,
+        allow_inf_nan=False,
+        description="Maximum worker execution time in seconds.",
+    )
+
+    @field_validator("input")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return project_name(value)
+
+    @field_validator("files")
+    @classmethod
+    def _files(cls, paths: list[str]) -> list[str]:
+        return [project_name(p) for p in paths]
+
+    @property
+    def inputs(self) -> list[str]:
+        return sorted({self.input, *self.files})
 
 
 class Simulation(Strict):
@@ -302,13 +330,13 @@ class Simulation(Strict):
     simulator: Literal["dwsim", "idaes", "qsdsan"] = Field(
         default="dwsim",
         description="The simulator that solves the flowsheet: dwsim (the default), "
-        "qsdsan (the A2/O worker), or "
+        "qsdsan (a project-defined dynamic process model), or "
         "idaes, an optional backend run in the Python CHEME_IDAES_PYTHON names (heater, cooler, "
         "valve, pump, compressor, expander, mixer, splitter, flash, conversion reactor and "
         "recycles; property packages 'IDAES ideal VLE' and 'IDAES Peng-Robinson').",
     )
     qsdsan: QSDsanConfiguration | None = None
-    property_package: str = Field(
+    property_package: str | None = Field(
         default="Peng-Robinson (PR)",
         description="The simulator's property package name: with dwsim one of the packages the "
         "DWSIM route runs (methods.yml), with idaes one of the IDAES backend's "
@@ -363,6 +391,9 @@ class Simulation(Strict):
             other = self.model_fields_set - {"schema_", "kind", "simulator", "qsdsan"}
             if other:
                 raise ValueError(f"Unsupported fields for qsdsan: {', '.join(sorted(other))}")
+            self.property_package = None
+        elif self.property_package is None:
+            raise ValueError("A molecular simulation requires a property package")
         elif self.qsdsan is not None:
             raise ValueError("qsdsan configuration requires simulator: qsdsan")
         return self

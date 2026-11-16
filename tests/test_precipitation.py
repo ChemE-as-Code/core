@@ -52,9 +52,8 @@ def test_spectators_pass_unchanged_and_the_liquor_leaves_saturated_per_kg_of_liq
     result = solve_train(feed, form, solubility=0.05, liquor=liquor)
     slurry = result.streams["slurry"]
     assert result.crystals_formed == pytest.approx(55.0, rel=1e-12)
-    assert (slurry.solute, slurry.solvent, slurry.spectators) == pytest.approx(
-        (45.0, 800.0, {"NaCl": 100.0})
-    )
+    assert (slurry.solute, slurry.solvent) == pytest.approx((45.0, 800.0))
+    assert slurry.spectators == pytest.approx({"NaCl": 100.0})
     # per kg of solvent alone it would be C = 100 - 0.05 x 800 = 60 kg/h
     per_solvent = solve_train(feed, form, solubility=0.05, liquor=Liquor(molar_mass={"NaCl": NACL}))
     assert per_solvent.crystals_formed == pytest.approx(60.0, rel=1e-12)

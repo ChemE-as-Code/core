@@ -330,7 +330,7 @@ def test_every_molecular_simulator_has_an_enthalpy_reference():
     """A backend added to ``simulator:`` without its reference would crash the energy audit."""
     simulators = set(get_args(Simulation.model_fields["simulator"].annotation))
     # The dynamic A2/O worker returns water-quality indicators and bypasses the energy audit.
-    simulators.remove(backends.QSDSAN)
+    simulators = {name for name in simulators if backends.BACKENDS[name].molecular}
     assert set(energy_checks.REFERENCES) == simulators
     assert set(energy_checks.FORMATION_REFERENCES) == simulators
 

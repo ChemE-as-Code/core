@@ -189,3 +189,79 @@ def model_findings(model: dict[str, Any], sim: Any, sim_doc: Any) -> list[Findin
             "remove them, or simulate with simulator: dwsim",
         )
     return found
+
+
+class Backend:
+    """Process-specific hooks. Molecular solvers share translation, fill and recording."""
+
+    molecular = True
+    worker = None
+
+    def inputs(self, sim):
+        from .record import RUN_INPUTS
+
+        return RUN_INPUTS
+
+    def spec(self, sim):
+        return {}
+
+
+class QSDsanBackend(Backend):
+    """Project-supplied process model executed using the worker protocol."""
+
+    molecular = False
+
+    def inputs(self, sim):
+        from .worker_model import inputs
+
+        return inputs(sim.qsdsan)
+
+    def spec(self, sim):
+        return {"molecular": False, "model": sim.qsdsan.model, "qsdsan": sim.qsdsan.model_dump()}
+
+    @staticmethod
+    def worker(*args, **kwargs):
+        from .qsdsan import run
+
+        return run(*args, **kwargs)
+
+    def prepare(self, process, sim, case, fingerprints=None):
+        from . import worker_model
+        from .translate import Translation
+
+        hashes = (
+            fingerprints
+            if fingerprints is not None
+            else worker_model.hashes(process.root, sim.qsdsan)
+        )
+        key = worker_model.fingerprint(process, case, sim.qsdsan, hashes)
+        findings = (
+            []
+            if key
+            else [
+                Finding(
+                    SIMULATION_FILE,
+                    "error",
+                    "cheme.process-sim-input-missing",
+                    "A declared simulation input is missing or unavailable",
+                )
+            ]
+        )
+        return Translation(fingerprint=key or "", findings=findings)
+
+
+BACKENDS = {DWSIM: Backend(), IDAES: Backend(), QSDSAN: QSDsanBackend()}
+
+
+def declared_inputs(sim_bytes):
+    """Extra paths needed to read a saved simulation, including historical revisions."""
+    import yaml
+    from pydantic import ValidationError
+
+    from .schema import Simulation
+
+    try:
+        sim = Simulation.model_validate(yaml.safe_load(sim_bytes))
+    except (ValueError, ValidationError, yaml.YAMLError):
+        return ()
+    return BACKENDS[sim.simulator].inputs(sim)

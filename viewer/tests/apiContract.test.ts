@@ -182,7 +182,11 @@ const ISSUE_KEYS: (keyof Issue)[] = [
 ];
 const SHEET_KEYS: (keyof Sheet)[] = ["id", "file", "title", "kind", "generator", "status"];
 const TREE_KEYS: (keyof TreeEntry)[] = ["path", "type", "kind"];
+import simulationWater from "./fixtures/api/simulation-qsdsan.json";
+import streamWater from "./fixtures/api/streams-qsdsan.json";
+
 const TABLE_KEYS: (keyof StreamTable)[] = [
+  "calculated_columns",
   "rev",
   "case",
   "cases",
@@ -918,9 +922,10 @@ describe("the end-to-end mocks look like the real responses", () => {
 });
 
 const SIMULATION_KEYS: (keyof SimulationView)[] = ["rev", "file", "run_file", "case", "cases", "spec", "run", "stale", "staleness", "units", "problem", "findings"];
-const SIM_SPEC_KEYS: (keyof SimulationView["spec"])[] = ["simulator", "property_package", "components", "tolerance", "tear_streams", "exclude", "guesses", "specs"];
+const SIM_SPEC_KEYS: (keyof SimulationView["spec"])[] = ["simulator", "property_package", "model", "molecular", "qsdsan", "components", "tolerance", "tear_streams", "exclude", "guesses", "specs"];
 const SIM_UNIT_KEYS: (keyof SimulationUnit)[] = ["id", "unit", "status", "reason", "spec", "run", "basis"];
 const SIM_RUN_KEYS: (keyof SimulationRun)[] = [
+  "schema", "evidence", "integration_completed", "verification", "steady_state_screen",
   "case",
   "run_at",
   "tool",
@@ -945,7 +950,15 @@ describe("real /api/simulation", () => {
   const current = simulationRunJson as unknown as SimulationView;
   const stale = simulationStaleJson as unknown as SimulationView;
   const failed = simulationFailedJson as unknown as SimulationView;
-  const all = [asu, current, stale, failed];
+  const water = simulationWater as unknown as SimulationView;
+  const all = [asu, current, stale, failed, water];
+  it("carries declared quantities alongside given properties", () => {
+    expectKnown([streamWater], TABLE_KEYS, "dynamic stream table");
+    expectKnown(streamWater.streams, STREAM_KEYS, "dynamic streams");
+    expectKnown(streamWater.calculated_columns, ["key","label","unit","basis"], "calculated columns");
+    expectKnown([water.run!], SIM_RUN_KEYS, "dynamic run");
+    expect(water.stale).toBe(false);
+  });
 
   it("uses only fields the viewer's types know", () => {
     expectKnown(all, SIMULATION_KEYS, "simulation");

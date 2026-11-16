@@ -85,7 +85,6 @@ const toggle = (id: string) => (selected.value = selected.value === id ? null : 
 
 const streams = computed(() => filterStreams(table.data.value?.streams ?? [], text.value, which.value));
 const balances = computed(() => table.data.value?.balances ?? []);
-const wastewater = computed(() => table.data.value?.wastewater);
 const problems = computed(() => balances.value.filter((b) => b.status === "imbalance").length);
 const stale = computed(() => (table.data.value?.streams ?? []).filter((s) => s.stale.length).length);
 
@@ -175,32 +174,9 @@ const fullComposition = ref(false);
     <LoadState :loading="table.loading.value && !table.data.value" :error="table.error.value" @retry="table.reload" />
 
     <template v-if="table.data.value">
-      <div v-if="wastewater" class="notice wastewater-notice" data-wastewater>
-        <p><strong>Wastewater results · saved final simulated time</strong>
-          <span class="badge info">{{ wastewater.status }}</span>
-          <span v-if="wastewater.stale === true" class="badge warning" data-wastewater-stale>stale: inputs changed</span>
-          <span v-else-if="wastewater.stale === null" class="badge warning">input match not established</span>
-        </p>
-        <p v-if="wastewater.run_at || wastewater.evidence" class="muted">
-          {{ wastewater.run_at ? runTime(wastewater.run_at) : '' }} · {{ wastewater.evidence }}
-        </p>
-        <p class="muted">
-          Flow is liquid volume per day; concentrations retain COD, N, P and TSS measurement bases.
-          These are calculated values, not measured plant data or proof of steady state or elemental conservation.
-          <RouterLink :to="{ path: '/file/' + wastewater.run_file, query: rev ? { rev } : {} }">Saved run record</RouterLink>
-        </p>
-        <p v-if="wastewater.stale" class="muted">Changed inputs: {{ wastewater.changed_files.join(', ') || 'fingerprint differs' }}. Values below belong to the earlier run.</p>
-        <details v-if="wastewater.findings.length" data-wastewater-findings>
-          <summary>{{ wastewater.findings.length }} record issue(s) · missing values are shown as —</summary>
-          <ul><li v-for="(f, i) in wastewater.findings" :key="i">{{ f.message }} {{ f.hint }}</li></ul>
-        </details>
-      </div>
       <p class="muted count">
-        {{ streams.length }} of {{ table.data.value.streams.length }} streams
-        <template v-if="wastewater"> · units shown in column headings · C = calculated · — = no usable recorded value</template>
-        <template v-else> · units: pressure {{ table.data.value.units.pressure }},
+        {{ streams.length }} of {{ table.data.value.streams.length }} streams · units: pressure {{ table.data.value.units.pressure }},
         temperature {{ table.data.value.units.temperature }}, flow {{ table.data.value.units.flow }}, duty {{ table.data.value.units.duty }}
-        </template>
       </p>
       <div class="table-wrap">
         <table class="data stream-table">
@@ -209,20 +185,14 @@ const fullComposition = ref(false);
               <th>Stream</th>
               <th>From → to</th>
               <th>BFD</th>
-              <template v-if="wastewater">
-                <th v-for="column in wastewater.columns" :key="column.key" :title="column.basis" :data-wastewater-column="column.key">
-                  {{ column.label }}<div class="muted small">{{ column.unit }}</div>
-                </th>
-              </template>
-              <template v-else>
               <th>Pressure</th>
               <th>Temperature</th>
               <th>Flow</th>
               <th>Duty</th>
               <th>Composition</th>
               <th>Phase</th>
+              <th v-for="col in table.data.value.calculated_columns" :key="col.key" :title="col.basis" :data-calculated-column="col.key">{{ col.label }}</th>
               <th>Calculated</th>
-              </template>
               <th>Links</th>
             </tr>
           </thead>
@@ -246,13 +216,6 @@ const fullComposition = ref(false);
               </td>
               <td class="mono">{{ s.from }} → {{ s.to }}</td>
               <td class="bfd">{{ bfdCell(s.id, s.on_bfd) }}</td>
-              <template v-if="wastewater">
-                <td v-for="column in wastewater.columns" :key="column.key" class="num" :data-field="column.key">
-                  <ProcessValueCell v-if="s.wastewater?.[column.key]" :value="s.wastewater[column.key]" :show-unit="false" />
-                  <span v-else class="muted" title="No usable recorded value">—</span>
-                </td>
-              </template>
-              <template v-else>
               <td class="num" :data-field="'pressure'"><ProcessValueCell :value="s.properties.pressure" /><span v-if="isFilled(s.id, 'pressure')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
               <td class="num" :data-field="'temperature'"><ProcessValueCell :value="s.properties.temperature" /><span v-if="isFilled(s.id, 'temperature')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
               <td class="num" :data-field="'flow'"><ProcessValueCell :value="s.properties.flow" /><span v-if="isFilled(s.id, 'flow')" class="sim-mark" :class="{ stale: sim?.stale }" :title="simTitle" data-sim>sim</span></td>
@@ -273,10 +236,15 @@ const fullComposition = ref(false);
                   <span v-if="s.phase.stale" class="badge warning">stale</span>
                 </template>
               </td>
-              <td>
-                <div v-for="(v, name) in s.calculated" :key="name">{{ name }} <ProcessValueCell :value="v" /></div>
+              <td v-for="col in table.data.value.calculated_columns" :key="col.key" :data-calculated="col.key">
+                <ProcessValueCell v-if="s.calculated[col.key]" :value="s.calculated[col.key]!" />
+                <span v-else class="muted">—</span>
               </td>
-              </template>
+              <td>
+                <template v-for="(v, name) in s.calculated" :key="name">
+                  <div v-if="!table.data.value.calculated_columns?.some(col => col.key === name)">{{ name }} <ProcessValueCell :value="v" /></div>
+                </template>
+              </td>
               <td>
                 <span v-for="l in s.links" :key="l.target + l.ref" class="badge" :class="l.resolved ? 'pass' : 'info'" :title="l.problem ?? 'resolved'">
                   {{ l.target }} {{ l.ref }}
@@ -284,15 +252,12 @@ const fullComposition = ref(false);
               </td>
             </tr>
             <tr v-if="!streams.length">
-              <td :colspan="wastewater ? 4 + wastewater.columns.length : 11" class="muted">No streams.</td>
+              <td :colspan="11 + (table.data.value.calculated_columns?.length ?? 0)" class="muted">No streams.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <component :is="wastewater ? 'details' : 'div'" class="balance-section">
-      <summary v-if="wastewater">Molecular mass-balance checks (separate from wastewater results)</summary>
-      <p v-if="wastewater" class="muted">The existing checks require molecular mass flows in kg/h. Wastewater values above do not populate those fields, so these checks may remain not-evaluable. COD/N/P conservation requires a separate balance including reactions, accumulation, sludge and gas.</p>
       <h2>Balances <span class="muted small">(steady state, non-reactive, boundary streams; tolerance per block)</span></h2>
       <div class="table-wrap">
         <table class="data balance-table">
@@ -316,7 +281,6 @@ const fullComposition = ref(false);
           </tbody>
         </table>
       </div>
-      </component>
     </template>
     </template>
   </div>
@@ -366,9 +330,6 @@ h2 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
 }
-.wastewater-notice { margin-bottom: var(--space-3); }
-.balance-section { margin-top: var(--space-3); }
-.balance-section summary { cursor: pointer; }
 .legend {
   font-size: var(--text-sm);
 }

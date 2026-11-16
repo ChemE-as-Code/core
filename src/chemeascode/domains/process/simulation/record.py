@@ -301,10 +301,9 @@ def view(
     load (*problem* says why): the spec and the record are then shown, the staleness is None."""
     from chemeascode.domains.process.simulation.translate import translate
 
-    if sim.simulator == "qsdsan":
-        from chemeascode.domains.process.simulation.qsdsan import view as qsdsan_view
+    from .backends import BACKENDS
 
-        return qsdsan_view(process, sim, data, case, fingerprints, problem)
+    backend = BACKENDS[sim.simulator]
 
     findings: list[Finding] = []
     cases: list[str] = []
@@ -315,7 +314,12 @@ def view(
     if process is not None:
         cases = [c.id for c in process.flowsheet.cases]
         case = case or process.flowsheet.default_case()
-        found = translate(process, sim, sim_doc, case)
+        found = (
+            translate(process, sim, sim_doc, case)
+            if backend.molecular
+            else backend.prepare(process, sim, case, fingerprints)
+        )
+        current = found.fingerprint or None
         findings = found.findings
         bases = found.bases
         if found.model is not None:
@@ -349,7 +353,7 @@ def view(
             status, reason = "excluded", left_out[uid]
         elif uid in model_units:
             status, reason = "simulated", ""
-        elif process is None:
+        elif process is None or (not backend.molecular and uid in ran):
             status, reason = ran.get(uid, {}).get("status", "unknown"), ""
         else:
             refused = [f.message for f in findings if uid in f.ids and f.level == "error"]
@@ -382,7 +386,8 @@ def view(
         "cases": cases,
         "spec": {
             "simulator": sim.simulator,
-            "property_package": sim.property_package,
+            "property_package": sim.property_package if backend.molecular else None,
+            **backend.spec(sim),
             "components": dict(sim.components),
             "tolerance": sim.tolerance.model_dump(mode="json"),
             "tear_streams": list(sim.tear_streams),

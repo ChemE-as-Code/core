@@ -567,6 +567,17 @@ def _vent_lines(gas: dict[str, Any]) -> list[str]:
             f"at {h['partial_pressure_kPa']:.4g} kPa, H {h['henry_kPa']:.4g} kPa), "
             f"{h['share_vented']:.4g} of what formed vented; {h['state']}"
         )
+    if head := gas.get("head_space"):  # ADR 0071
+
+        def kmol(found: dict[str, float]) -> str:
+            return ", ".join(f"{n} {v:.4g}" for n, v in found.items() if v) or "none"
+
+        lines.append(
+            f"      head space {head['start_m3']:.4g} m3 at the start, {head['end_m3']:.4g} m3 "
+            f"at the end (vessel {head['vessel_m3']:.4g} m3, per hour of charge); its gas "
+            f"expelled meanwhile: {kmol(head['expelled_kmol'])} kmol/h, left at the end (vented "
+            f"with the next charge): {kmol(head['end_kmol'])} kmol/h"
+        )
     return lines
 
 
@@ -599,6 +610,10 @@ def vent_entry(solved: Any, stream: str) -> dict[str, Any]:
         found["condensate_kmol_h"] = dict(solved.condensate)
     if solved.henry:
         found["henry"] = {n: dict(v) for n, v in solved.henry.items()}
+    if solved.head_space:  # ADR 0071
+        found["head_space"] = {
+            k: dict(v) if isinstance(v, dict) else v for k, v in solved.head_space.items()
+        }
     return {"vent": found}
 
 

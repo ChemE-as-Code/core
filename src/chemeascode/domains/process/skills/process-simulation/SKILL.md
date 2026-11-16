@@ -5,6 +5,10 @@ description: Solve the flowsheet in DWSIM, or for a bounded scope in the optiona
 
 # Process simulation
 
+## QSDsan wastewater models
+
+For `simulator: qsdsan`, inspect the declared worker and inputs before running either mode. Both execute project Python with the user's permissions. Select the numerical installation with the user-side `CHEME_QSDSAN_PYTHON`. The worker's request and response contract is illustrated in `examples/process-qsdsan`. Use `--check` for a disposable run and `--fill` to publish validated stream measurements. Inspect the saved case's `evidence` path for numerical checks and limitations. Report completion, steady-state evidence and site validation separately.
+
 ## Purpose and when to use
 
 `cheme process simulate` builds a DWSIM flowsheet from `process/flowsheet.yaml` and
@@ -16,7 +20,8 @@ shortcut and rigorous columns, and recycle loops. `cheme process propagate` cove
 pass-through, mixer, splitter and reactor balances and its own batch and solids models, with
 the model duties of batch and semi-batch steps, `still:`, `crystallizer:` with `energy:` and
 conversion steps on their energy streams (ADR 0059: `--fill` writes and checks them, so do not
-type them by hand) and recycles torn at `tears:` (skill `process-design`); simulate covers
+type them by hand), recycles torn at `tears:`, feeds solved for `specs:` and separators with a
+specified `recovery:` (skill `process-design`); simulate covers
 the other energy balances and the separations.
 
 ## Required inputs and missing inputs

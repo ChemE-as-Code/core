@@ -663,8 +663,11 @@ def test_a_template_component_no_inlet_carries_is_not_the_stills(tmp_path):
     flowsheet = FLOWSHEET.replace(
         "        composition: {basis: mole_fraction, values: {B: 1.0}, provenance: given}\n", ""
     )
-    messages = [f.message for f in _findings(_plant(tmp_path / "b", flowsheet, TEMPLATE_W))]
-    assert any("W lack a vapour_pressure" in m for m in messages), messages
+    found = _findings(_plant(tmp_path / "b", flowsheet, TEMPLATE_W))
+    # core#214: only a component the charge holds needs a vapour pressure; the template's
+    # guess (before propagate) is an info, not an error that would stop propagate
+    assert [f.level for f in found] == ["info"], [f.format() for f in found]
+    assert "template lists W without a vapour_pressure" in found[0].message
 
 
 def test_an_assumed_ideal_liquid_is_not_sourced(tmp_path):
@@ -949,3 +952,70 @@ def test_the_adrs_example_of_one_stages_purity():
     assert quoted == ["0.70", "0.59"]
     assert f"distillate of {quoted[0]} mole fraction at 84 %" in text
     assert f"{quoted[1]} at 99 %" in text
+
+
+def test_an_end_past_where_the_still_boils_dry_is_refused_at_once():
+    """Integration review of 1.12.0: an end the still cannot reach before it boils dry is
+    refused at its first step, not after the integration crept on near empty (core 1.11.0 hung
+    on a column still's time end past it). The bound: the share distilled rises at most by the
+    volatile content left (mole) or its mass (mass), the time by the volatile kmol left times
+    the most s per kmol of any vapour of them (kg/h: the heaviest; m3/h: at the highest
+    temperature searched; kW: the largest latent heat; times R + 1 at the highest reflux). An
+    end within the bound is integrated as before."""
+    charge = {"A": 50, "B": 50}
+    # 10 kmol/h from 100 kmol: the still boils dry at 10 h exactly, and the bound is that
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        solve_still(_still(end={"time": 10.01 * 3600}), charge, None, {}, None)
+    near = solve_still(_still(end={"time": 9.99 * 3600}), charge, None, {}, None)
+    assert sum(near.cuts[0].moles.values()) == pytest.approx(99.9, rel=1e-8)
+    # 20 % of the charge nonvolatile: at most 80 % (by mole) is distilled
+    heavy = {"A": 50, "B": 30, "C": 20}
+    with pytest.raises(StillError, match="too little to reach it"):
+        solve_still(_still(end={"distilled": 0.85}, nonvolatile=["C"]), heavy, None, {}, None)
+    mole = solve_still(_still(end={"distilled": 0.79}, nonvolatile=["C"]), heavy, None, {}, None)
+    assert sum(mole.cuts[0].moles.values()) == pytest.approx(79, rel=1e-8)
+    # by mass: at most the volatile content's mass share of the charge, 62.5 % here
+    masses = {
+        n: Component.model_validate({"id": n, "name": n, "molar_mass": m})
+        for n, m in (("A", 78.11), ("B", 92.14), ("C", 200.0))
+    }
+    mass0 = 50 * 78.11 + 30 * 92.14 + 20 * 200.0
+    assert (50 * 78.11 + 30 * 92.14) / mass0 == pytest.approx(0.6251, abs=1e-4)
+    by_mass = {"basis": "mass"}
+    with pytest.raises(StillError, match="too little to reach it"):
+        solve_still(
+            _still(end={"distilled": 0.63} | by_mass, nonvolatile=["C"]), heavy, None, masses, None
+        )
+    reached = solve_still(
+        _still(end={"distilled": 0.62} | by_mass, nonvolatile=["C"]), heavy, None, masses, None
+    )
+    cut = reached.cuts[0].moles
+    assert (cut["A"] * 78.11 + cut["B"] * 92.14) / mass0 == pytest.approx(0.62, rel=1e-8)
+
+
+@pytest.mark.parametrize("unit, rate", [("kg/h", 1000.0), ("m3/h", 1000.0)])
+def test_a_time_end_past_the_bound_of_a_mass_or_volume_boilup_is_refused_at_once(unit, rate):
+    """The time bound of a boil-up in kg/h takes the heaviest volatile component's molar mass
+    (toluene: 100 kmol at 92.14 kg/kmol and 1000 kg/h, 33170 s; all of it boils off in
+    8512.5 kg, 30645 s), one in m3/h the ideal gas at the highest temperature searched
+    (HOTTEST, 2000 K: 59082 s, though the still boils at 353-384 K). An end past the bound is
+    refused at the first step; one before the still boils dry is reached."""
+    from chemeascode.domains.process.batch_still import GAS_CONSTANT, HOTTEST
+
+    raoult = {"model": "raoult", "provenance": "given", "source": "NIST WebBook"}
+    boilup = {"value": rate, "unit": unit, "provenance": "assumed"}
+    if unit == "kg/h":
+        bound, dry = 100 * 92.14 * 3600 / rate, (50 * 78.11 + 50 * 92.14) * 3600 / rate
+    else:
+        bound = 100 * 3600 * GAS_CONSTANT * HOTTEST / (rate * 101.325)
+        dry = 100 * 3600 * GAS_CONSTANT * 353.0 / (rate * 101.325)  # below its least
+    charge = {"A": 50, "B": 50}
+
+    def still(time):
+        spec = _still(volatility=raoult, pressure=101.325, boilup=boilup, end={"time": time})
+        return solve_still(spec, charge, None, _components(), 101.325)
+
+    with pytest.raises(StillError, match="boils dry before its end.*too little to reach it"):
+        still(bound * 1.001)
+    reached = still(dry * 0.95)
+    assert reached.time == pytest.approx(dry * 0.95, rel=1e-9)

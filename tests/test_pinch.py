@@ -109,9 +109,10 @@ def test_boiling_stream_enters_the_cascade_at_its_temperature():
     assert len(latent) == 1 and latent[0].high == latent[0].low == pytest.approx(395.0)
     assert latent[0].delta_h == pytest.approx(-50.0) and latent[0].streams == [0]
     # the isothermal load is a horizontal step of the grand composite curve
-    assert result.grand_composite_curve == pytest.approx(
-        [(415.0, 30.0), (395.0, 50.0), (395.0, 0.0), (345.0, 50.0)]
-    )
+    expected = [(415.0, 30.0), (395.0, 50.0), (395.0, 0.0), (345.0, 50.0)]
+    assert len(result.grand_composite_curve) == len(expected)
+    for point, want in zip(result.grand_composite_curve, expected, strict=True):
+        assert point == pytest.approx(want)
 
 
 def test_condensing_stream_and_threshold():

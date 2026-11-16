@@ -475,7 +475,7 @@ def _predictive(
         spec.detail = "; ".join(f.message for f in sim_state.get("findings", [])[:2])
         spec.hint = "run cheme process simulate --check"
     else:
-        refused = [c for c, t in translations.items() if t.model is None]
+        refused = [c for c, t in translations.items() if t.model is None and not t.fingerprint]
         if refused:
             errors = [f for f in translations[refused[0]].findings if f.level == "error"]
             spec.status = "fail"
@@ -520,9 +520,12 @@ def _predictive(
             req.detail = f"no run recorded in {record.RUN_FILE}"
             req.hint = "run cheme process simulate --fill (it records the run)"
     else:
+        from chemeascode.domains.process.simulation.backends import BACKENDS
         from chemeascode.foundation.provenance import source_revision
 
-        fingerprints = source_revision(root, record.RUN_INPUTS).fingerprints
+        fingerprints = source_revision(
+            root, BACKENDS[sim.simulator].inputs(sim) if sim else record.RUN_INPUTS
+        ).fingerprints
         if absent:
             rec.status, rec.detail = "missing", "no run for case " + ", ".join(absent)
             rec.hint = "run cheme process simulate --fill --case <case>"
@@ -531,7 +534,7 @@ def _predictive(
             if entry is None:
                 continue
             translation = translations.get(case)
-            now = translation.fingerprint if translation and translation.model else None
+            now = translation.fingerprint if translation else None
             state = record.staleness(entry, now, fingerprints)
             errors = [f for f in entry.get("findings", []) if f.get("level") == "error"]
             current.evidence[case] = {
@@ -624,8 +627,22 @@ def _predictive(
         basis.hint = "replace specified splits and conversions by predictive unit models"
     out.append(basis)
 
-    out.append(_property_package(sim, sim_state.get("doc")))
-    out.append(_property_regime(sim, process, entries, translations))
+    from chemeascode.domains.process.simulation.backends import BACKENDS
+
+    if sim is not None and not BACKENDS[sim.simulator].molecular:
+        for key in ("property-package", "property-regime"):
+            out.append(
+                Requirement(
+                    "predictive." + key,
+                    "predictive",
+                    "Molecular property methods",
+                    status="unsupported",
+                    detail="Dynamic process model without a molecular property package.",
+                )
+            )
+    else:
+        out.append(_property_package(sim, sim_state.get("doc")))
+        out.append(_property_regime(sim, process, entries, translations))
     if process is not None:
         out.append(_stream_properties(process))
     out += _energy_audit(process, data, cases)

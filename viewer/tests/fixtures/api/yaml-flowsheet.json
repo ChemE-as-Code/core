@@ -767,6 +767,18 @@
       "Block": {
         "additionalProperties": false,
         "properties": {
+          "recovery": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Recovery"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A separator (a Separating, Absorbing, Adsorbing ... step or a generic ProcessStep, without another model): the outlets solved from the share of each component's inlet flow to each outlet port."
+          },
           "energy_port": {
             "anyOf": [
               {
@@ -1048,7 +1060,7 @@
       },
       "Boilup": {
         "additionalProperties": false,
-        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization) or a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge). With a ``column`` it is the reboiler's: (R + 1)\ntimes the distillate (ADR 0061).",
+        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's\ntemperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR\n0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
         "properties": {
           "value": {
             "exclusiveMinimum": 0,
@@ -1061,7 +1073,8 @@
               "kmol/s",
               "kg/h",
               "kW",
-              "1/h"
+              "1/h",
+              "m3/h"
             ],
             "title": "Unit",
             "type": "string"
@@ -1733,6 +1746,61 @@
         "title": "Declared",
         "type": "object"
       },
+      "DesignSpec": {
+        "additionalProperties": false,
+        "description": "A design specification (ADR 0070): ``cheme process propagate`` adjusts one variable\n(a feed's flow, or a split) until the target is met, solved together with the tears.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "vary": {
+            "$ref": "#/$defs/SpecVariable"
+          },
+          "target": {
+            "$ref": "#/$defs/SpecTarget"
+          },
+          "tolerance": {
+            "default": 1e-06,
+            "description": "Met when |value - target| <= tolerance x target (relative).",
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Tolerance",
+            "type": "number"
+          },
+          "cases": {
+            "description": "The cases it holds in; default every case.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cases",
+            "type": "array"
+          },
+          "provenance": {
+            "description": "Of the target: a design input (given) or an assumption.",
+            "enum": [
+              "given",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "Where the target comes from.",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vary",
+          "target",
+          "provenance"
+        ],
+        "title": "DesignSpec",
+        "type": "object"
+      },
       "Dosing": {
         "additionalProperties": false,
         "description": "A feed dosed into a semi-batch (``reactor: semibatch``): an inlet stream of the step,\nits flow the amount dosed per hour of charge, fed from ``start`` at a constant rate over\n``time``, or in the ``profile``'s segments one after the other.",
@@ -2232,6 +2300,78 @@
           "provenance"
         ],
         "title": "Filtration",
+        "type": "object"
+      },
+      "HeadSpace": {
+        "additionalProperties": false,
+        "description": "The vessel's head space (ADR 0071): the gas over the liquid, held at the vessel's\npressure and saturated with the liquid's vapour. Its inert gas (the pad) enters by\n``stream``, an inlet of the step that carries only ``vent.inerts`` (kmol/h of it: the head\nspace's inert at the start, on the batch's basis), so that the head space's volume follows\nas ``V = n R T / ((1 - Y) P)`` and the vessel's as the liquid's plus that. As the liquid\ngrows (a dose displaces it), its vapour pressure rises or it warms, the head space expels\nits gas, vapour-laden, by the vent; what is left of it at the end leaves by the vent too\n(with the next charge or the purge, without vapour).",
+        "properties": {
+          "stream": {
+            "description": "The inlet stream of the step that pads the head space.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stream",
+          "provenance"
+        ],
+        "title": "HeadSpace",
+        "type": "object"
+      },
+      "HeatOfAbsorption": {
+        "additionalProperties": false,
+        "description": "The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol\ndissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share\nkept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas\nthat degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on\nthe gas basis.",
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Vent gas -> kJ/kmol (J/mol) dissolved.",
+            "minProperties": 1,
+            "title": "Values",
+            "type": "object"
+          },
+          "unit": {
+            "const": "kJ/kmol",
+            "default": "kJ/kmol",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "values",
+          "provenance"
+        ],
+        "title": "HeatOfAbsorption",
         "type": "object"
       },
       "HeatOfSolution": {
@@ -2740,7 +2880,7 @@
               }
             ],
             "default": null,
-            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components, a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature; ADR 0058).",
+            "description": "K: the maximum technical temperature (the boiling point at the reactor's pressure, a relief set temperature); default: the lowest boiling point of the liquid's components at the reactor's pressure (the normal boiling point at about atmospheric pressure, else Clausius-Clapeyron with heat_of_vaporization), leaving out a batch's vent components and inerts (and a head space's pad), a dosed gas and dissolved gases (a minor share of the liquid boiling below the process temperature, or a vent.vapour.henry gas; ADR 0058, 0071), and counting a product a counted reaction forms in the liquid (ADR 0069); hazard.mtt_from: bubble-point takes the content's bubble point instead.",
             "title": "Mtt"
           },
           "reactions": {
@@ -2762,8 +2902,42 @@
               }
             ],
             "default": null,
-            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058).",
+            "description": "m3/h of gas the vent and its line pass at the vessel's pressure, from the vent sizing: compared with the gas a vented batch gives off at the MTSR (ADR 0058), for a semi-batch the larger of that and its largest release over the batch, and with a content's boil-up where it boils at the MTSR (ADR 0069).",
             "title": "Vent Capacity"
+          },
+          "potential": {
+            "anyOf": [
+              {
+                "enum": [
+                  "largest",
+                  "network"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How the counted reactions' heat sets dT_ad and the MTSR: largest (the default: each reaction alone run to completion, the largest counts) or network (the largest heat any forward extents of the counted reactions together release from the content: a consecutive reaction on a product counts, ADR 0069).",
+            "title": "Potential"
+          },
+          "mtt_from": {
+            "anyOf": [
+              {
+                "enum": [
+                  "boiling-points",
+                  "bubble-point"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The default MTT without mtt: boiling-points (the default: the lowest boiling point of what boils in the liquid, ADR 0058) or bubble-point (the content's bubble point at the vessel's pressure from the components' vapour_pressure, else normal_boiling_point and heat_of_vaporization; the lower of the worst moment's content and the content once the reaction setting the MTSR ran to completion, ADR 0069).",
+            "title": "Mtt From"
           },
           "provenance": {
             "enum": [
@@ -2784,6 +2958,45 @@
           "provenance"
         ],
         "title": "ReactionHazard",
+        "type": "object"
+      },
+      "Recovery": {
+        "additionalProperties": false,
+        "description": "A component separator's specified split (ADR 0070): the share of each component's inlet\nflow that leaves by each outlet. ``cheme process propagate`` solves the outlets from it.",
+        "properties": {
+          "outlets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "description": "Outlet port -> component -> fraction of that component's inlet flow (all material inlets together) that leaves by the port; a component a listed port does not name leaves none by it. One material outlet may be left out: it takes the rest.",
+            "minProperties": 1,
+            "title": "Outlets",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "description": "Where the fractions come from (vendor data, a balance script, a DESIGN.md decision).",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outlets",
+          "provenance"
+        ],
+        "title": "Recovery",
         "type": "object"
       },
       "ResidualMoisture": {
@@ -3133,6 +3346,242 @@
         "title": "Solubility",
         "type": "object"
       },
+      "SpecPer": {
+        "additionalProperties": false,
+        "description": "The denominator of a ratio target: a stream, or one component of it.",
+        "properties": {
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "component": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Component"
+          }
+        },
+        "required": [
+          "stream"
+        ],
+        "title": "SpecPer",
+        "type": "object"
+      },
+      "SpecTarget": {
+        "additionalProperties": false,
+        "description": "What a design specification holds (ADR 0070).",
+        "properties": {
+          "stream": {
+            "description": "The material stream the target is measured on.",
+            "title": "Stream",
+            "type": "string"
+          },
+          "component": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "One component of it; default: the whole stream.",
+            "title": "Component"
+          },
+          "quantity": {
+            "default": "flow",
+            "description": "flow: its flow in unit; annual: its amount per year (unit t or kg), the flow times hours (default the recipe's hours_per_year); ratio: its flow per the flow of per (basis mole or mass); fraction: its share of the stream (basis).",
+            "enum": [
+              "flow",
+              "annual",
+              "ratio",
+              "fraction"
+            ],
+            "title": "Quantity",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "flow: a flow unit (default units.flow); annual: t (default) or kg.",
+            "title": "Unit"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "mole",
+                  "mass"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ratio and fraction: on moles (default) or masses.",
+            "title": "Basis"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SpecPer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ratio: the denominator."
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 8784,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "annual: operating hours per year; default the recipe's hours_per_year.",
+            "title": "Hours"
+          }
+        },
+        "required": [
+          "stream",
+          "value"
+        ],
+        "title": "SpecTarget",
+        "type": "object"
+      },
+      "SpecVariable": {
+        "additionalProperties": false,
+        "description": "What a design specification adjusts (ADR 0070): the flow of a feed stream, or the\nfraction of a splitter's inlet that leaves by one of its outlets.",
+        "properties": {
+          "stream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A feed stream (from a feed terminal) whose flow is adjusted; its flow is then written by cheme process propagate (calculated), never given or assumed.",
+            "title": "Stream"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A splitter (SplittingMaterial) whose outlet fraction is adjusted.",
+            "title": "Node"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "With node: the outlet port, not in the splitter's split:.",
+            "title": "Port"
+          },
+          "initial": {
+            "description": "Where the iterations start: the flow (in unit) or the fraction.",
+            "minimum": 0,
+            "title": "Initial",
+            "type": "number"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A stream's flow: the flow unit of initial, low, high and the written flow; default units.flow.",
+            "title": "Unit"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Least value; default 0.",
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Largest value; default none (a fraction: 1).",
+            "title": "High"
+          },
+          "with": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "A stream: other feed streams whose flow follows it, stream -> ratio (their flow is the ratio times the adjusted flow, in its unit): charge ratios kept.",
+            "title": "With",
+            "type": "object"
+          }
+        },
+        "required": [
+          "initial"
+        ],
+        "title": "SpecVariable",
+        "type": "object"
+      },
       "State": {
         "additionalProperties": false,
         "properties": {
@@ -3217,6 +3666,18 @@
       "Step": {
         "additionalProperties": false,
         "properties": {
+          "recovery": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Recovery"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A separator (a Separating, Absorbing, Adsorbing ... step or a generic ProcessStep, without another model): the outlets solved from the share of each component's inlet flow to each outlet port."
+          },
           "energy_port": {
             "anyOf": [
               {
@@ -3509,6 +3970,14 @@
             "title": "Nonvolatile",
             "type": "array"
           },
+          "separate_phase": {
+            "description": "Components in a phase of their own (a suspended solid, an immiscible non-volatile liquid or salt): they stay in the still and do not count in the liquid's mole fractions (Raoult's law, the residue end, the column), ADR 0068.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Separate Phase",
+            "type": "array"
+          },
           "boilup": {
             "$ref": "#/$defs/Boilup"
           },
@@ -3559,6 +4028,12 @@
             "default": false,
             "description": "Count the charge's heat-up from its inlet temperature to its bubble point (volatility raoult), and a swap's feed warmed to the still's temperature as it mixes in, in the still's duty and its whole energy per batch (ADR 0063); default: the boil-up's latent heat alone.",
             "title": "Heat Up",
+            "type": "boolean"
+          },
+          "heat_up_time": {
+            "default": false,
+            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; every cut with its own boil-up: the mean over the boil-up), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
+            "title": "Heat Up Time",
             "type": "boolean"
           },
           "column": {
@@ -3612,7 +4087,7 @@
       },
       "StillCut": {
         "additionalProperties": false,
-        "description": "One distillate cut: its outlet port, collected until its ``end``.",
+        "description": "One distillate cut: its outlet port, collected until its ``end``; at its own\n``pressure`` and ``boilup`` (ADR 0068: a vacuum ramp in steps, a forerun the vacuum pump\nlimits), else the still's.",
         "properties": {
           "outlet": {
             "description": "The step's outlet port the cut leaves by.",
@@ -3621,6 +4096,32 @@
           },
           "end": {
             "$ref": "#/$defs/StillEnd"
+          },
+          "pressure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kPa(a) of the still while this cut is collected (volatility raoult); default: the still's.",
+            "title": "Pressure"
+          },
+          "boilup": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Boilup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The boil-up while this cut is collected; default: the still's."
           }
         },
         "required": [
@@ -4332,12 +4833,19 @@
             "type": "string"
           },
           "components": {
-            "description": "The components that leave the liquid as they form.",
+            "description": "The components that leave the liquid as they form (at least one, or inerts).",
             "items": {
               "type": "string"
             },
-            "minItems": 1,
             "title": "Components",
+            "type": "array"
+          },
+          "inerts": {
+            "description": "Gases that never dissolve (ADR 0071): a dose's share of them passes straight through to the vent (a sweep or purge gas, the nitrogen of a dosed air), the head space holds them; each carries the liquid's vapour like a formed gas.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Inerts",
             "type": "array"
           },
           "fraction": {
@@ -4379,11 +4887,34 @@
             ],
             "default": null,
             "description": "A partial vent condenser: {temperature K, returns: vessel or a stream, energy_port} (ADR 0062; needs vapour)."
+          },
+          "head_space": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeadSpace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The vessel's head space, padded with inerts by an inlet stream: the gas it expels carries the vapour (ADR 0071; needs inerts)."
+          },
+          "heat_of_absorption": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfAbsorption"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Of a vent gas that dissolves: released by a formed gas's dissolved share, taken back by a gas that degasses (ADR 0071)."
           }
         },
         "required": [
-          "stream",
-          "components"
+          "stream"
         ],
         "title": "Vent",
         "type": "object"
@@ -4457,6 +4988,14 @@
             },
             "description": "Component -> a constant activity coefficient in the vessel's liquid, from a source (default 1: an ideal liquid).",
             "title": "Activity",
+            "type": "object"
+          },
+          "henry": {
+            "additionalProperties": {
+              "$ref": "#/$defs/HenryConstant"
+            },
+            "description": "Component -> its Henry's-law constant (ADR 0071): a dissolved gas with no Antoine vapour_pressure in materials.yaml (a dilute solute such as HCl, or a gas above its critical point) degasses into the gas leaving at y = H x / P instead of Raoult's law; it never condenses in a vent condenser.",
+            "title": "Henry",
             "type": "object"
           },
           "source": {
@@ -4699,6 +5238,14 @@
         ],
         "default": null,
         "description": "How propagate converges the torn loops; default: Wegstein, 100 iterations, the flowsheet's tolerance."
+      },
+      "specs": {
+        "description": "Design specifications for cheme process propagate: feeds or splits adjusted until a stream target is met (ADR 0070).",
+        "items": {
+          "$ref": "#/$defs/DesignSpec"
+        },
+        "title": "Specs",
+        "type": "array"
       },
       "bfd": {
         "anyOf": [

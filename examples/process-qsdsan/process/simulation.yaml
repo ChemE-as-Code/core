@@ -1,0 +1,8 @@
+schema: cheme/simulation/v1
+kind: simulation
+simulator: qsdsan
+qsdsan:
+  model: contract-demonstration
+  worker: demo_worker
+  input: results.json
+  files: [demo_worker.py]

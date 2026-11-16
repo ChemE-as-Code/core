@@ -61,6 +61,7 @@ from chemeascode.domains.process.fixed_bed import ASSUMPTIONS as BED_ASSUMPTIONS
 from chemeascode.domains.process.fixed_bed import bed_limitations
 from chemeascode.domains.process.model import Process
 from chemeascode.domains.process.simulation import SIMULATION_FILE
+from chemeascode.domains.process.simulation.backends import BACKENDS
 from chemeascode.domains.process.stirred_tank import ASSUMPTIONS as TANK_ASSUMPTIONS
 from chemeascode.foundation.provenance import written_by
 from chemeascode.foundation.yamlsource import _yaml_line
@@ -258,6 +259,15 @@ def _reactor_basis(
                 from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
 
                 assumptions += list(VENT)  # the vent's vapour and Henry split (ADR 0062)
+            if vent is not None and (
+                vent.inerts
+                or vent.heat_of_absorption is not None
+                or vent.head_space is not None
+                or (vent.vapour is not None and vent.vapour.henry)
+            ):
+                from chemeascode.domains.process.vent_vapour import GAS_ASSUMPTIONS
+
+                assumptions += list(GAS_ASSUMPTIONS)  # inerts, head space, absorption (ADR 0071)
         coupled = _coupled(runs)
         if coupled:
             coupling = coupled
@@ -607,7 +617,7 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         if not _sourced(vol):
             lacking.append("ideal liquid (volatility assumed)")
         comps = process.components()
-        stays = set(spec.nonvolatile) | solid_components(process)
+        stays = set(spec.nonvolatile) | set(spec.separate_phase) | solid_components(process)
         for name in sorted(_present(process, inlets_of(process, node)) - stays):
             vp = getattr(comps.get(name), "vapour_pressure", None)
             if _sourced(vp):
@@ -862,7 +872,9 @@ def model_bases(
     found = []
     for key, index, node in _units(process):
         # This classifier describes molecular simulation models. Wastewater evidence is separate.
-        simulated = sim is not None and sim.simulator != "qsdsan" and node.id not in excluded
+        simulated = (
+            sim is not None and BACKENDS[sim.simulator].molecular and node.id not in excluded
+        )
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]

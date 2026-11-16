@@ -1,139 +1,129 @@
-"""Execute the local A2/O worker in its numerical environment, without importing QSDsan."""
+"""Run trusted project Python in a disposable directory using a user-selected interpreter."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
-import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-WORKER = "wwtp_a2o.interfaces.cli.cheme"
-
-
-def local_path(root: Path, name: str) -> Path:
-    """A project-relative path, confined even when the file is a symlink."""
-    path = Path(name)
-    if path.is_absolute() or ".." in path.parts or any(p.lower() == ".git" for p in path.parts):
-        raise ValueError(f"Expected a project-relative path: {name}")
-    target = (root / path).resolve()
-    if not target.is_relative_to(root.resolve()):
-        raise ValueError(f"Path leaves the process project: {name}")
-    return target
+from chemeascode.foundation.project_paths import local_path
+from chemeascode.foundation.schemas.run import AdapterResult
 
 
-def recipe_path(path: str, input_path: str) -> bool:
-    """Source files staged for --check and fingerprinted by the command and viewer."""
-    p = Path(path)
-    return (
-        path in {input_path, "requirements.lock.txt", "pyproject.toml", "plant.yaml"}
-        or (len(p.parts) == 1 and p.suffix == ".py")
-        or (p.parts[0] == "wwtp_a2o" and p.suffix in {".py", ".html"})
-        or (p.parts[0] == "licenses" and p.suffix == ".txt")
-        or path
-        in {
-            "process/flowsheet.yaml",
-            "process/materials.yaml",
-            "process/simulation.yaml",
-            "process/case-inputs.json",
-        }
-    )
+def _stop_group(child: subprocess.Popen) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(child.pid), "/T", "/F"], capture_output=True, check=False
+        )
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(child.pid, signal.SIGKILL)
+    child.kill()
+    child.wait()
 
 
-def recipe_files(root: Path, input_path: str) -> list[str]:
-    candidates = [*root.glob("*"), *root.joinpath("process").glob("*")]
-    for folder in ("wwtp_a2o", "licenses"):
-        candidates.extend(root.joinpath(folder).rglob("*"))
-    candidates.append(local_path(root, input_path))
-    names = {p.relative_to(root).as_posix() for p in candidates if p.is_file()}
-    selected = sorted(p for p in names if recipe_path(p, input_path))
-    for name in selected:
-        local_path(root, name)
-    return selected
-
-
-@dataclass
-class WorkerResult:
-    payload: dict[str, Any]
-    stdout: str
-    stderr: str
-    returncode: int
-
-
-def execute(
-    root: Path,
-    *,
-    environment: str,
-    input_path: str,
-    case: str,
-    timeout: float,
-    write: bool,
-) -> WorkerResult:
-    """Launch only the supported worker. --check operates on a disposable project copy."""
-    python = local_path(root, environment) / (
-        "Scripts/python.exe" if os.name == "nt" else "bin/python"
-    )
-    if not python.is_file():
-        raise ValueError(f"QSDsan environment is missing: {python}; see the process README")
-    local_path(root, input_path)
-    if not (root / "wwtp_a2o/interfaces/cli/cheme.py").is_file():
-        raise ValueError("This project does not contain the wwtp-a2o ChemE worker")
+def execute(root: Path, config, case: str, evidence: Path) -> AdapterResult:
+    """Stage only declared inputs. The worker receives request and response filenames."""
+    setting = os.environ.get("CHEME_QSDSAN_PYTHON", "")
+    python = Path(setting)
+    if not python.is_absolute() or not python.is_file():
+        raise ValueError(
+            "Set CHEME_QSDSAN_PYTHON to the absolute path of your trusted Python executable"
+        )
+    module = config.worker.replace(".", "/")
+    if not {module + ".py", module + "/__main__.py"}.intersection(config.inputs):
+        raise ValueError("Worker module must be listed in qsdsan.files")
     with tempfile.TemporaryDirectory(prefix="cheme-qsdsan-") as temporary:
         temp = Path(temporary)
-        target = root
-        if not write:
-            # Three parent levels also preserve the existing example's repository layout.
-            target = temp / "library/processes/wwtp-a2o"
-            target.mkdir(parents=True)
-            for name in recipe_files(root, input_path):
-                dest = target / name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(local_path(root, name), dest)
-        response = temp / "response.json"
-        env = os.environ.copy()
-        env.update(
-            PYTHONUTF8="1",
-            PYTHONDONTWRITEBYTECODE="1",
-            OPENBLAS_NUM_THREADS="1",
-            OMP_NUM_THREADS="1",
-            CHEME_CORE_PYTHON=sys.executable,
+        stage = temp / "project"
+        stage.mkdir()
+        for name in config.inputs:
+            path = local_path(root, name)
+            if not path.is_file():
+                raise ValueError(f"Missing worker input: {name}")
+            target = stage / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+        request, response = temp / "request.json", temp / "response.json"
+        request.write_text(
+            json.dumps(
+                {
+                    "case": case,
+                    "input": config.input,
+                    "files": config.inputs,
+                    "timeout_s": config.timeout_s,
+                    "evidence": str(evidence.resolve()),
+                }
+            ),
+            encoding="utf-8",
         )
-        command = [
+        allowed = (
+            "PATH",
+            "SYSTEMROOT",
+            "WINDIR",
+            "TEMP",
+            "TMP",
+            "TMPDIR",
+            "HOME",
+            "USERPROFILE",
+            "LOCALAPPDATA",
+            "APPDATA",
+            "LANG",
+            "LC_ALL",
+        )
+        env = {key: os.environ[key] for key in allowed if key in os.environ}
+        env.update(OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MPLCONFIGDIR=str(temp / "mpl"))
+        cmd = [
             str(python),
+            "-E",
+            "-s",
+            "-B",
+            "-X",
+            "utf8",
             "-m",
-            WORKER,
-            "--root",
-            str(target),
-            "--input",
-            input_path,
-            "--case",
-            case,
-            "--response",
+            config.worker,
+            str(request),
             str(response),
         ]
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=target,
+        with (evidence / "worker.log").open("wb") as log:
+            child = subprocess.Popen(
+                cmd,
+                cwd=stage,
                 env=env,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                capture_output=True,
-                timeout=timeout,
-                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=os.name != "nt",
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
             )
-        except subprocess.TimeoutExpired as failure:
-            payload = json.loads(response.read_text(encoding="utf-8")) if response.exists() else {}
-            raise ValueError(
-                f"QSDsan worker exceeded {timeout:g} seconds; "
-                f"evidence: {payload.get('run', 'no run created')}. No result was accepted."
-            ) from failure
-        if not response.is_file():
-            raise ValueError("QSDsan worker produced no response: " + completed.stderr[-2000:])
-        payload = json.loads(response.read_text(encoding="utf-8"))
-        return WorkerResult(payload, completed.stdout, completed.stderr, completed.returncode)
+            try:
+                code = child.wait(timeout=config.timeout_s)
+            except subprocess.TimeoutExpired as exc:
+                _stop_group(child)
+                raise ValueError(
+                    f"QSDsan worker timed out after {config.timeout_s:g} seconds"
+                ) from exc
+        if code:
+            with (evidence / "worker.log").open("rb") as log:
+                log.seek(max(0, log.seek(0, 2) - 1500))
+                tail = log.read().decode("utf-8", errors="replace")
+            raise ValueError(f"QSDsan worker exit code {code}: {tail}")
+        if not response.is_file() or response.is_symlink() or response.stat().st_size > 16_000_000:
+            raise ValueError("Worker response missing, linked or too large")
+        try:
+            payload = json.loads(response.read_bytes())
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("Invalid worker response JSON") from exc
+        if not isinstance(payload, dict) or "evidence" in payload:
+            raise ValueError("Expected AdapterResult; core owns the evidence location")
+        if any(
+            p.is_symlink() or p.is_junction() or not (p.is_file() or p.is_dir())
+            for p in [evidence, *evidence.rglob("*")]
+        ):
+            raise ValueError("Worker evidence contains a link or special file")
+        return AdapterResult.model_validate(payload)

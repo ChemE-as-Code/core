@@ -94,8 +94,6 @@ export interface ProcessStream {
     stale: boolean;
   } | null;
   calculated: Record<string, ProcessValue>;
-  /** Saved final-time wastewater results, never molecular mass/mole fractions. */
-  wastewater?: Record<string, ProcessValue>;
   /** Names of calculated values whose inputs changed since they were calculated. */
   stale: string[];
   /** Blocks or steps whose balance fails and that this stream crosses. */
@@ -127,17 +125,7 @@ export interface ProcessNode {
 }
 
 export interface StreamTable {
-  wastewater?: {
-    status: "available" | "partial" | "missing" | "failed" | "invalid";
-    case: string;
-    run_file: string;
-    run_at: string | null;
-    evidence: string | null;
-    stale: boolean | null;
-    changed_files: string[];
-    columns: { key: string; label: string; unit: string; basis: string }[];
-    findings: { file: string; rule: string; message: string; hint: string }[];
-  };
+  calculated_columns?: { key: string; label: string; unit: string; basis: string }[];
   rev: string | null;
   case: string;
   cases: { id: string; description: string; default: boolean }[];
@@ -578,6 +566,11 @@ export interface SimRunUnit {
 
 /** One case's entry of `process/simulation-run.json` (`cheme process simulate --fill`). */
 export interface SimulationRun {
+  evidence?: string;
+  integration_completed?: boolean;
+  schema?: string;
+  verification?: Record<string, unknown>;
+  steady_state_screen?: Record<string, unknown>;
   case: string;
   /** ISO 8601, UTC. */
   run_at: string;
@@ -631,6 +624,9 @@ export interface SimulationView {
   cases: string[];
   spec: {
     simulator: string;
+    molecular?: boolean;
+    qsdsan?: { model: string; worker: string; input: string; files: string[]; timeout_s: number };
+    model?: string;
     property_package: string | null;
     components: Record<string, string>;
     tolerance: Record<string, number>;

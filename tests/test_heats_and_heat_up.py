@@ -716,9 +716,10 @@ def test_the_vessels_metal_makes_only_the_duty_stale(tmp_path):
 
 
 def test_a_tear_downstream_of_a_duty_only_input_keeps_its_fingerprint(tmp_path):
-    """The tear fingerprint (loop_inputs) leaves out still.heat_up, still.condenser_port (the
-    stream the condenser's duty is written on, ADR 0061), batch.heat_up and an isothermal
-    batch's heats of solution; an adiabatic batch's heat of solution is in it."""
+    """The tear fingerprint (loop_inputs) leaves out still.heat_up, still.heat_up_time (the
+    recipe's time, ADR 0068), still.condenser_port (the stream the condenser's duty is written
+    on, ADR 0061), batch.heat_up and an isothermal batch's heats of solution; an adiabatic
+    batch's heat of solution is in it."""
     from chemeascode.domains.process.recycle import loop_inputs
 
     def fingerprint(ws, tear):
@@ -728,6 +729,15 @@ def test_a_tear_downstream_of_a_duty_only_input_keeps_its_fingerprint(tmp_path):
     assert fingerprint(_still_plant(tmp_path / "a", heat_up=False), "S4") == fingerprint(
         _still_plant(tmp_path / "b"), "S4"
     )
+    timed = _still_plant(tmp_path / "t")
+    path = timed.root / "process/flowsheet.yaml"
+    path.write_text(
+        path.read_text().replace(
+            "      heat_up: true\n", "      heat_up: true\n      heat_up_time: true\n"
+        )
+    )
+    assert "heat_up_time: true" in path.read_text()
+    assert fingerprint(timed, "S4") == fingerprint(_still_plant(tmp_path / "u"), "S4")
     ported = still._plant(
         tmp_path / "p",
         flowsheet=still.FLOWSHEET.replace(

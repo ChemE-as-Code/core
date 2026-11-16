@@ -858,15 +858,19 @@ def _structure_plan(sheet: Sheet, structure: dict[str, Any], cut) -> None:
             sheet.polyline(
                 "structures", [part["start"][:2], part["end"][:2]], stroke=colour, width=0.2
             )
-        elif cut is not None and s == "solid" and part.get("material") == "handrail":
-            if part.get("lod") != 2:  # the top rail
-                sheet.polyline(
-                    "structures",
-                    [part["start"][:2], part["end"][:2]],
-                    stroke=COLOURS["platform"],
-                    width=0.12,
-                    **{"stroke-dasharray": "1,0.6"},
-                )
+        elif (
+            cut is not None
+            and s == "solid"
+            and part.get("material") == "handrail"
+            and part.get("lod") != 2  # the top rail
+        ):
+            sheet.polyline(
+                "structures",
+                [part["start"][:2], part["end"][:2]],
+                stroke=COLOURS["platform"],
+                width=0.12,
+                **{"stroke-dasharray": "1,0.6"},
+            )
     for wall in structure.get("walls", []):
         sheet.polygon(
             "structures",

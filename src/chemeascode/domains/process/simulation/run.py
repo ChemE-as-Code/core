@@ -54,7 +54,7 @@ from chemeascode.domains.process.simulation import (
     record,
 )
 from chemeascode.domains.process.simulation import energy as energy_checks
-from chemeascode.domains.process.simulation.backends import IDAES, QSDSAN, TITLES
+from chemeascode.domains.process.simulation.backends import BACKENDS, IDAES, TITLES
 from chemeascode.domains.process.simulation.translate import (
     _mole_fractions,
     load,
@@ -114,10 +114,9 @@ def run(
             )
         return result
 
-    if sim.simulator == QSDSAN:
-        from chemeascode.domains.process.simulation.qsdsan import run as run_qsdsan
-
-        return run_qsdsan(workspace.root, case, sim, write=write, save=save)
+    worker = BACKENDS[sim.simulator].worker
+    if worker is not None:
+        return worker(workspace.root, case, sim, write=write, save=save)
     found_model = translate(process, sim, sim_doc, case)
     result.findings += found_model.findings
     model = found_model.model

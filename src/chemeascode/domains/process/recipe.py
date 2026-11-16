@@ -69,6 +69,7 @@ Rules (``cheme.recipe-*``), each finding naming the file, line, rule and a hint:
 from __future__ import annotations
 
 import math
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
@@ -138,7 +139,8 @@ class Operation(Strict):
         alias="from",
         description="dose and react: the batch or semi-batch step whose model gives the "
         "duration (its dosing time; its reaction time, the post-reaction of a semi-batch); "
-        "distil: the still step whose model gives its boil-up time (ADR 0055); "
+        "distil: the still step whose model gives its boil-up time (ADR 0055; with its "
+        "heat_up_time, the heat-up's time too, ADR 0068); "
         "dry: a dryer step (its drying time); filter: a solid_separation step with "
         "filtration (Ruth's filtration time).",
     )
@@ -453,7 +455,9 @@ def batch_hours(process: Any, recipe: Recipe, case: str) -> float:
         rate = _volume_flow(process, flows.components) if size.unit == "m3" else flows.total
     if not rate:
         raise ValueError(f"no flow of {size.stream}: the batch's hours of flows are not known")
-    return size.value * (1000.0 if size.unit == "t" else 1.0) / rate
+    trial = _TRIAL_BATCH.get()
+    value = size.value if trial is None else trial
+    return value * (1000.0 if size.unit == "t" else 1.0) / rate
 
 
 def hours_per_batch(process: Any, case: str) -> float | None:
@@ -578,7 +582,8 @@ def _content(process: Any, recipe: Recipe, up: UnitProcedure, case: str) -> _Con
     inlets = _inlets(process, unit)
     inlet = tank_inlet(node, inlets)
     solved, _ = solve_node(process, node, inlet, case)
-    charge = split_inlets(node, inlets)[0] if model == "semibatch" else inlet
+    # a semi-batch's, or a batch's with a head space's pad (ADR 0071): the charge stream
+    charge = split_inlets(node, inlets)[0] if isinstance(inlet, list) else inlet
     comps = process.components()
 
     def capacity(moles: dict[str, float]) -> float | None:
@@ -944,6 +949,10 @@ def _duration_from(process: Any, step_id: str, kind: str, case: str) -> float:
         if kind != "distil":
             raise _Reference(f"{step_id} is a still: from: it on a distil operation")
         solved, _ = solve_still(process, node, inlets_of(process, node), case)
+        if getattr(still, "heat_up_time", False):  # the heat-up's time too (ADR 0068)
+            if solved.heat_up_time is None:
+                raise ValueError(f"{step_id}'s heat_up_time: no {solved.heat_up_time_missing}")
+            return (solved.time + solved.heat_up_time) / 3600.0
         return solved.time / 3600.0
     model = getattr(node, "reactor", None)
     if model not in ("batch", "semibatch") or node.batch is None:
@@ -965,10 +974,16 @@ def _duration_from(process: Any, step_id: str, kind: str, case: str) -> float:
 
 
 def evaluate(
-    process: Any, recipe: Recipe, doc: Any = None, case: str | None = None
+    process: Any,
+    recipe: Recipe,
+    doc: Any = None,
+    case: str | None = None,
+    *,
+    check_basis: bool = True,
 ) -> RecipeResult:
     """The cycle of *recipe* on *process* in *case* (default: the default case) with its
-    ``cheme.recipe-*`` findings (see the module docstring)."""
+    ``cheme.recipe-*`` findings (see the module docstring); without the basis check unless
+    *check_basis*."""
     case = case or process.flowsheet.default_case()
     size = recipe.batch_size
     result = RecipeResult(
@@ -1248,7 +1263,8 @@ def evaluate(
         )
     result.rate = size.value * (1000.0 if size.unit == "t" else 1.0) * result.batches_per_year
     result.rate /= recipe.hours_per_year.value
-    _basis(process, recipe, result, case, add)
+    if check_basis:
+        _basis(process, recipe, result, case, add)
     return result
 
 
@@ -1341,17 +1357,115 @@ def _basis(process: Any, recipe: Recipe, result: RecipeResult, case: str, add: A
     result.flowsheet_rate = given
     rate = result.rate or 0.0
     if abs(given - rate) > TOLERANCE * rate:
+        fit = batch_for_rate(process, recipe, given, case)
+        if fit.batch is not None and fit.cycle is not None:
+            found = (
+                f"; at the flowsheet's rate, a batch of {fit.batch:.6g} {size.unit} closes it "
+                f"(cycle {fit.cycle:.4g} h at that batch: batch = rate x cycle, ADR 0070)"
+            )
+        elif fit.best_rate is not None and fit.best_batch is not None:
+            found = (
+                f"; no batch size makes the flowsheet's rate: the cycle grows about as fast as "
+                f"the batch, and the batches tried made {fit.best_rate:.6g} {unit} at most (a "
+                f"batch of {fit.best_batch:.6g} {size.unit}, ADR 0070)"
+            )
+        else:
+            found = ""
         add(
             "warning",
             "basis",
             f"{size.stream}: {given:.6g} {unit} in the flowsheet (case {case}); the recipe gives "
             f"{size.value:g} {size.unit} x {result.batches_per_year:.6g} batches / "
-            f"{recipe.hours_per_year.value:g} h = {rate:.6g} {unit}",
+            f"{recipe.hours_per_year.value:g} h = {rate:.6g} {unit}{found}",
             at,
-            "scale the flowsheet's feeds to the recipe, or change the batch size or the "
-            "recipe: the balance, the LCI per kg and the TEA must share one basis",
+            "scale the flowsheet's feeds to the recipe (a design specification, specs:), or "
+            "change the batch size or the recipe: the balance, the LCI per kg and the TEA must "
+            "share one basis",
             [size.stream],
         )
+
+
+#: The batch size every batch model's hours of flows are taken from while
+#: :func:`batch_for_rate` tries one (None: the recipe's).
+_TRIAL_BATCH: ContextVar[float | None] = ContextVar("trial_batch", default=None)
+#: Cycles :func:`batch_for_rate` evaluates at most.
+BATCH_ITERATIONS = 16
+#: :func:`batch_for_rate` closes ``batch = rate x cycle(batch)`` to this share of the batch.
+BATCH_TOLERANCE = 1e-6
+#: :func:`batch_for_rate`'s secant step stays within this factor of the batches tried.
+BATCH_STEP = 2.0
+
+
+@dataclass
+class BatchFit:
+    """The batch size that makes a rate (:func:`batch_for_rate`)."""
+
+    #: The batch size (the recipe's unit) and its cycle (h); None when none was found.
+    batch: float | None = None
+    cycle: float | None = None
+    #: The largest rate (kg/h, or m3/h) of the batch sizes tried, and that batch size: what
+    #: the train makes at most, as far as the iterations saw, when no batch size was found.
+    best_rate: float | None = None
+    best_batch: float | None = None
+
+
+def batch_for_rate(process: Any, recipe: Recipe, rate: float, case: str) -> BatchFit:
+    """The batch size (the recipe's unit) whose cycle makes *rate* (kg/h, or m3/h for m3) of
+    the batch-size stream, ``batch = rate x cycle(batch)``, and the cycle at it (ADR 0070). The
+    cycle depends on the batch through the jacket and dosing times, a still's boil-up and a
+    filter's or dryer's time, so the batch is solved by secant iterations on
+    ``batch - rate x cycle(batch)`` from the recipe's batch size (one substitution first), every
+    batch model's hours of flows taken from the batch tried. None found (:attr:`BatchFit.batch`)
+    within :data:`BATCH_ITERATIONS` cycles: a unit whose time grows about as fast as its batch
+    caps the train's rate below *rate*; :attr:`BatchFit.best_rate` is the most the batches tried
+    made."""
+    size = recipe.batch_size
+    factor = 1000.0 if size.unit == "t" else 1.0
+    fit = BatchFit()
+
+    def residual(batch: float) -> tuple[float, float] | None:
+        if batch <= 0:
+            return None
+        trial = recipe.model_copy(update={"batch_size": size.model_copy(update={"value": batch})})
+        token = _TRIAL_BATCH.set(batch)
+        try:
+            found = evaluate(process, trial, None, case, check_basis=False)
+        except ValueError:
+            return None
+        finally:
+            _TRIAL_BATCH.reset(token)
+        if not found.cycle_time or any(f.level == "error" for f in found.findings):
+            return None
+        made = batch * factor / found.cycle_time
+        if fit.best_rate is None or made > fit.best_rate:
+            fit.best_rate, fit.best_batch = made, batch
+        return batch - rate * found.cycle_time / factor, found.cycle_time
+
+    a = size.value
+    first = residual(a)
+    if first is None:
+        return fit
+    fa, cycle = first
+    if abs(fa) <= BATCH_TOLERANCE * a:
+        fit.batch, fit.cycle = a, cycle
+        return fit
+    b = rate * cycle / factor  # one substitution, then secants
+    for _ in range(BATCH_ITERATIONS):
+        second = residual(b)
+        if second is None:
+            return fit
+        fb, cycle = second
+        if abs(fb) <= BATCH_TOLERANCE * b:
+            fit.batch, fit.cycle = b, cycle
+            return fit
+        if fb == fa:
+            return fit
+        # a secant step stays within a factor BATCH_STEP of the batches tried: an unbounded
+        # one extrapolates far from the recipe's batch, to one its units cannot run (a still
+        # that boils dry before a time end)
+        step = b - fb * (b - a) / (fb - fa)
+        a, fa, b = b, fb, min(max(step, min(a, b) / BATCH_STEP), BATCH_STEP * max(a, b))
+    return fit
 
 
 def _volume_flow(process: Any, components: dict[str, float] | None) -> float | None:

@@ -1,0 +1,14 @@
+# n-Butane isomerisation with propane as an inert. Molar masses from the formulas (IUPAC 2021
+# standard atomic weights); n-butane and isobutane are isomers, so the reaction keeps the mass of
+# every stream's butanes.
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: NC4, name: n-Butane, formula: C4H10, cas: 106-97-8, molar_mass: 58.122}
+  - {id: IC4, name: Isobutane, formula: C4H10, cas: 75-28-5, molar_mass: 58.122}
+  - {id: C3, name: Propane, formula: C3H8, cas: 74-98-6, molar_mass: 44.096}
+templates:
+  - {id: butanes, title: Butane loop stream, components: [NC4, IC4, C3]}
+property_method:
+  adapter: thermo
+  status: placeholder

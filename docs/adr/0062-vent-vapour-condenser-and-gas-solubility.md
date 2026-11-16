@@ -130,8 +130,9 @@ Options considered:
     gas loads E-103 with 0.0048 kW and its evaporative cooling is 0.0052 kW. This does **not**
     resolve its L-3: R-101 forms almost no HCl (0.008 kmol/h), and the gas that carries most of
     the vapour is the head space the PCl3 dose displaces and the nitrogen, which the model does
-    not represent. It passes 2.06e-5 kmol/h of acetyl chloride past E-103, 0.0019 % of the
-    1.098 kmol/h formed, against the entry's own per-source estimate of about 0.099 % and its
+    not represent. It passes 2.06e-5 kmol/h of acetyl chloride past E-103, 0.0006 % of the
+    3.29 kmol/h formed (three per kmol of the reaction's 1.098 kmol/h extent; 0.0019 % was
+    per kmol of extent, corrected after process-library #408), against the entry's own per-source estimate of about 0.099 % and its
     typed upper bound of 0.213 % (`fraction` 0.00213); the script's 0.17 and 0.19 kW are of
     that carrier gas too. The entry keeps its hand fraction and script until a head space and
     sweep gas are modelled.
@@ -162,7 +163,8 @@ Options considered:
     of absorption or desorption;
   - one condenser per vent, one stage; the screening credits none;
   - `process simulate` still refuses a vented batch.
-- Follow-ups: a head-space and inert sweep (the gas a dose displaces, a nitrogen purge;
+- Follow-ups (ADR 0071 takes the head space, the inert sweep, the degassing and the heat of
+  absorption): a head-space and inert sweep (the gas a dose displaces, a nitrogen purge;
   acetyl-chloride-1 L-3); the degassing of a dosed or charged excess by its solubility (core#179
   item 2: sodium-azide-1 L-2's dissolved methyl nitrite, methyltriphenylphosphonium-bromide-1
   L-3); a heat of absorption of a dosed gas (core#179 item 4); a reflux at the boiling point.
