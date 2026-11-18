@@ -14,7 +14,7 @@ from chemeascode.domains.piping.fmt import format_file
 from chemeascode.interfaces.api.serve import PYDEXPI_MODULES, create_app, import_pydexpi
 from chemeascode.interfaces.cli import app as cli_app
 from chemeascode.templates.install import init
-from tests.conftest import REFERENCE, git
+from tests.conftest import REFERENCE, git, python_command
 
 SHEET = "pid/P-01.xml"
 
@@ -131,7 +131,10 @@ def test_file(committed: Path):
     assert response.headers["content-type"].startswith("text/plain")
     assert 'name: "Test plant"' in response.text
     (committed / "plant.yaml").write_text("name: changed\n")
-    assert api.get("/api/file", params={"path": "plant.yaml"}).text == "name: changed\n"
+    assert (
+        api.get("/api/file", params={"path": "plant.yaml"}).content
+        == (committed / "plant.yaml").read_bytes()
+    )
     at_head = api.get("/api/file", params={"path": "plant.yaml", "rev": "HEAD"}).text
     assert 'name: "Test plant"' in at_head
 
@@ -301,7 +304,7 @@ def test_checks(committed: Path):
 
 
 def test_running_checks_needs_the_session_token(committed: Path):
-    add_command_check(committed, "touch PWNED")
+    add_command_check(committed, python_command("from pathlib import Path; Path('PWNED').touch()"))
     api = client(committed)
     assert api.post("/api/checks/run").status_code == 403
     assert api.post("/api/checks/run", headers={"X-Cheme-Token": "guess"}).status_code == 403
@@ -318,7 +321,12 @@ def test_command_checks_time_out(committed: Path, monkeypatch):
     import chemeascode.interfaces.api.serve as serve_module
 
     monkeypatch.setattr(serve_module, "CHECK_TIMEOUT", 0.5)
-    add_command_check(committed, "sleep 30; touch LATE")
+    add_command_check(
+        committed,
+        python_command(
+            "import time; from pathlib import Path; time.sleep(30); Path('LATE').touch()"
+        ),
+    )
     started = time.monotonic()
     result = {c["id"]: c for c in run_checks_now(client(committed)).json()["checks"]}
     assert time.monotonic() - started < 10
@@ -328,7 +336,7 @@ def test_command_checks_time_out(committed: Path, monkeypatch):
 def test_only_one_check_run_at_a_time(committed: Path):
     import threading
 
-    add_command_check(committed, "sleep 1")
+    add_command_check(committed, python_command("import time; time.sleep(1)"))
     api = client(committed)
     statuses: list[int] = []
     threads = [
@@ -474,12 +482,13 @@ def test_path_traversal_is_refused(committed: Path, path: str, rev: str | None):
     assert api.get("/api/log", params={"path": path}).status_code == 400
 
 
+@pytest.mark.usefixtures("symlink_support")
 def test_symlinks_escaping_the_root_are_refused(committed: Path):
     outside = committed.parent / "outside.txt"
     outside.write_text("secret\n")
     os.symlink(outside, committed / "leak.txt")
     os.symlink(committed / ".git" / "config", committed / "gitconfig")
-    os.symlink(committed.parent, committed / "up")
+    os.symlink(committed.parent, committed / "up", target_is_directory=True)
     os.symlink(committed / "plant.yaml", committed / "alias.yaml")
     api = client(committed)
     for path in ("leak.txt", "gitconfig", "up/outside.txt"):
@@ -491,6 +500,7 @@ def test_symlinks_escaping_the_root_are_refused(committed: Path):
     assert "alias.yaml" in tree
     assert not tree & {"leak.txt", "gitconfig", "up"}
     # Committed, a symlink is a blob holding the target path: not served as a file.
+    git(committed, "config", "core.symlinks", "true")
     git(committed, "add", "leak.txt")
     git(committed, "commit", "-qm", "symlink")
     assert api.get("/api/file", params={"path": "leak.txt", "rev": "HEAD"}).status_code == 400
@@ -547,7 +557,7 @@ def test_local_host_headers_are_accepted(committed: Path):
     ],
 )
 def test_cross_site_requests_are_refused(committed: Path, headers: dict[str, str]):
-    add_command_check(committed, "touch PWNED")
+    add_command_check(committed, python_command("from pathlib import Path; Path('PWNED').touch()"))
     api = client(committed)
     for method, url in (("GET", "/api/checks?run=1"), ("POST", "/api/checks/run")):
         response = api.request(method, url, headers=headers)
@@ -670,7 +680,7 @@ def _served(committed: Path, monkeypatch, *args: str) -> dict:
 
 
 def test_a_wildcard_bind_refuses_other_host_names(committed: Path, monkeypatch):
-    add_command_check(committed, f"touch {committed / 'RAN'}")
+    add_command_check(committed, python_command("from pathlib import Path; Path('RAN').touch()"))
     app = _served(committed, monkeypatch, "--host", "0.0.0.0")["app"]
     # a page whose name was rebound to this machine (DNS rebinding)
     evil = TestClient(app, base_url="http://evil.example:8765")
@@ -700,7 +710,7 @@ def test_allowed_host_names_are_served(committed: Path, monkeypatch):
 
 
 def test_a_network_bind_runs_no_checks_unless_allowed(committed: Path, monkeypatch):
-    add_command_check(committed, f"touch {committed / 'RAN'}")
+    add_command_check(committed, python_command("from pathlib import Path; Path('RAN').touch()"))
     app = _served(committed, monkeypatch, "--host", "0.0.0.0", "--allow-host", "box.lan")["app"]
     api = TestClient(app, base_url="http://box.lan:8765")
     session = api.get("/api/session")
@@ -725,7 +735,7 @@ def test_a_network_bind_runs_no_checks_unless_allowed(committed: Path, monkeypat
 
 
 def test_a_local_bind_runs_the_checks(committed: Path, monkeypatch):
-    add_command_check(committed, f"touch {committed / 'RAN'}")
+    add_command_check(committed, python_command("from pathlib import Path; Path('RAN').touch()"))
     app = _served(committed, monkeypatch)["app"]
     assert run_checks_now(TestClient(app, base_url="http://127.0.0.1:8765")).status_code == 200
     assert (committed / "RAN").exists()

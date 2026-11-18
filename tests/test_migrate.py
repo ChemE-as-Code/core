@@ -92,7 +92,7 @@ def test_add_schema_inserts_the_first_key_as_text():
 def test_a_later_version_chains_its_transform(tmp_path, monkeypatch):
     """The policy: a breaking change registers (kind, v1, v2); a v0 file goes v0 -> v1 -> v2."""
     path = tmp_path / "equipment-list.yaml"
-    path.write_text("# list\nequipment: []\n")
+    path.write_text("# list\nequipment: []\n", newline="\n")
 
     def v2(text: str, kind: str) -> str:
         return text.replace(f"cheme/{kind}/v1", f"cheme/{kind}/v2")
@@ -151,7 +151,9 @@ def test_migrate_check_then_write_keeps_comments_and_is_idempotent(plant):
         "# end\n"
     )
     assert (plant / "process/design-basis.yaml").read_bytes() == (
-        b"schema: cheme/design_basis/v1\n" + before[plant / "process/design-basis.yaml"]
+        b"schema: cheme/design_basis/v1"
+        + (b"\r\n" if b"\r\n" in before[plant / "process/design-basis.yaml"] else b"\n")
+        + before[plant / "process/design-basis.yaml"]
     )
     changed = [p for p, data in before.items() if p.read_bytes() != data]
     assert len(changed) == 3  # the process files already declare their schema

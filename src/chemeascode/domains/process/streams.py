@@ -398,6 +398,23 @@ def stream_table(
                 "links": _links(stream, lists, sheet_ids),
             }
         )
+    from chemeascode.domains.process.simulation.worker_model import VALUE_SOURCE
+    from chemeascode.foundation.units import WASTEWATER_LABELS
+
+    measured = {}
+    for stream in streams:
+        for key, cell in stream["calculated"].items():
+            if (cell.get("source") or "").startswith(VALUE_SOURCE):
+                measured.setdefault(key, set()).add(cell["unit"])
+    columns = [
+        {
+            "key": key,
+            "label": WASTEWATER_LABELS.get(key, key),
+            "unit": next(iter(units)) if len(units) == 1 else "",
+            "basis": ", ".join(sorted(units)),
+        }
+        for key, units in measured.items()
+    ]
     nodes = _nodes(process, lists, sheet_ids)
     titles = {n["id"]: n["title"] for n in nodes}
     return {
@@ -407,6 +424,7 @@ def stream_table(
         "units": fs.units.model_dump(mode="json", exclude_none=True),
         "tolerance": fs.tolerance.model_dump(mode="json"),
         "streams": streams,
+        **({"calculated_columns": columns} if columns else {}),
         "balances": [
             {**b.entry(), "title": titles.get(b.node, "")}
             for b in found

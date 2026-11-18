@@ -420,10 +420,16 @@ def stale(process: Process, stream: Any, case: str) -> list[str]:
     if state is None:
         return []
     marked = {name: q.fingerprint for name, q in state.calculated.items() if q.fingerprint}
+    simulated = {
+        k: marked.pop(k) for k, q in state.calculated.items() if k in marked and translate.ours(q)
+    }
     if state.phase is not None and state.phase.fingerprint:
         marked["phase"] = state.phase.fingerprint
     found = propagate.stale_fields(process, stream, case)
     found += translate.stale_fields(process, stream, case)
+    if simulated:
+        model = translate.translation(process, case)
+        found.extend(k for k, fp in simulated.items() if not model or fp != model.fingerprint)
     if not marked:
         return found
     current = {fingerprint(process, stream, case)}

@@ -1,0 +1,218 @@
+{
+  "rev": null,
+  "case": "design",
+  "cases": [
+    {
+      "id": "design",
+      "description": "",
+      "default": true,
+      "capacity": null,
+      "provenance": null,
+      "applicability": null,
+      "source": null
+    }
+  ],
+  "default_case": "design",
+  "units": {
+    "pressure": "kPa(a)",
+    "temperature": "K",
+    "flow": "kg/h",
+    "duty": "kW",
+    "enthalpy": "kJ/kmol"
+  },
+  "tolerance": {
+    "abs": 1.0,
+    "rel": 0.005
+  },
+  "streams": [
+    {
+      "id": "FEED",
+      "title": "",
+      "kind": "material",
+      "from": "IN.out",
+      "to": "TANK.in",
+      "from_block": "IN",
+      "to_block": "WATERLINE",
+      "on_bfd": true,
+      "template": "water",
+      "has_state": true,
+      "properties": {
+        "pressure": {
+          "value": 101.325,
+          "unit": "kPa(a)",
+          "basis": null,
+          "provenance": "given",
+          "source": "design basis",
+          "stale": false
+        },
+        "temperature": null,
+        "flow": null,
+        "duty": null
+      },
+      "composition": null,
+      "phase": null,
+      "calculated": {
+        "flow": {
+          "value": 100.0,
+          "unit": "m3/day",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: QSDsan contract-demonstration",
+          "stale": false
+        },
+        "TN": {
+          "value": 20.0,
+          "unit": "mg N/L",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: QSDsan contract-demonstration",
+          "stale": false
+        }
+      },
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    },
+    {
+      "id": "WATER",
+      "title": "",
+      "kind": "material",
+      "from": "TANK.out",
+      "to": "OUT.in",
+      "from_block": "WATERLINE",
+      "to_block": "OUT",
+      "on_bfd": true,
+      "template": "water",
+      "has_state": true,
+      "properties": {
+        "pressure": null,
+        "temperature": null,
+        "flow": null,
+        "duty": null
+      },
+      "composition": null,
+      "phase": null,
+      "calculated": {
+        "flow": {
+          "value": 100.0,
+          "unit": "m3/day",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: QSDsan contract-demonstration",
+          "stale": false
+        },
+        "TN": {
+          "value": 12.0,
+          "unit": "mg N/L",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: QSDsan contract-demonstration",
+          "stale": false
+        },
+        "NH4": {
+          "value": 0.0,
+          "unit": "mg N/L",
+          "basis": null,
+          "provenance": "calculated",
+          "source": "cheme process simulate: QSDsan contract-demonstration",
+          "stale": false
+        }
+      },
+      "stale": [],
+      "imbalance": [],
+      "links": []
+    }
+  ],
+  "calculated_columns": [
+    {
+      "key": "flow",
+      "label": "Liquid flow",
+      "unit": "m3/day",
+      "basis": "m3/day"
+    },
+    {
+      "key": "TN",
+      "label": "Total nitrogen",
+      "unit": "mg N/L",
+      "basis": "mg N/L"
+    },
+    {
+      "key": "NH4",
+      "label": "Ammonium nitrogen",
+      "unit": "mg N/L",
+      "basis": "mg N/L"
+    }
+  ],
+  "balances": [
+    {
+      "node": "WATERLINE",
+      "kind": "block",
+      "status": "not-evaluable",
+      "in_kg_h": 0.0,
+      "out_kg_h": 0.0,
+      "missing": [
+        "FEED flow",
+        "WATER flow"
+      ],
+      "failing": [],
+      "streams_in": [
+        "FEED"
+      ],
+      "streams_out": [
+        "WATER"
+      ],
+      "title": ""
+    },
+    {
+      "node": "TANK",
+      "kind": "step",
+      "status": "not-evaluable",
+      "in_kg_h": 0.0,
+      "out_kg_h": 0.0,
+      "missing": [
+        "FEED flow",
+        "WATER flow"
+      ],
+      "failing": [],
+      "streams_in": [
+        "FEED"
+      ],
+      "streams_out": [
+        "WATER"
+      ],
+      "title": ""
+    }
+  ],
+  "nodes": [
+    {
+      "id": "IN",
+      "kind": "feed",
+      "title": "",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "OUT",
+      "kind": "product",
+      "title": "",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "WATERLINE",
+      "kind": "block",
+      "title": "",
+      "block": null,
+      "links": []
+    },
+    {
+      "id": "TANK",
+      "kind": "step",
+      "title": "",
+      "block": "WATERLINE",
+      "links": []
+    }
+  ],
+  "bfd_connections": {},
+  "bfd_connections_from": "flowsheet"
+}

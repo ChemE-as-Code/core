@@ -125,6 +125,7 @@ export interface ProcessNode {
 }
 
 export interface StreamTable {
+  calculated_columns?: { key: string; label: string; unit: string; basis: string }[];
   rev: string | null;
   case: string;
   cases: { id: string; description: string; default: boolean }[];
@@ -565,6 +566,11 @@ export interface SimRunUnit {
 
 /** One case's entry of `process/simulation-run.json` (`cheme process simulate --fill`). */
 export interface SimulationRun {
+  evidence?: string;
+  integration_completed?: boolean;
+  schema?: string;
+  verification?: Record<string, unknown>;
+  steady_state_screen?: Record<string, unknown>;
   case: string;
   /** ISO 8601, UTC. */
   run_at: string;
@@ -572,7 +578,7 @@ export interface SimulationRun {
   tool: string;
   /** `method`: the property method the simulator ran with (older servers leave it out). */
   simulator: { name: string; version: string | null; method?: string };
-  property_package: string;
+  property_package: string | null;
   /** The fingerprint every simulated stream value carries. */
   model_fingerprint: string;
   /** The inputs as they were after the run: HEAD, the files changed against it, each input file's fingerprint. */
@@ -618,7 +624,10 @@ export interface SimulationView {
   cases: string[];
   spec: {
     simulator: string;
-    property_package: string;
+    molecular?: boolean;
+    qsdsan?: { model: string; worker: string; input: string; files: string[]; timeout_s: number };
+    model?: string;
+    property_package: string | null;
     components: Record<string, string>;
     tolerance: Record<string, number>;
     tear_streams: string[];

@@ -19,6 +19,7 @@ from chemeascode.foundation.schema_base import INCHIKEY_RE, Origin, unsupported_
 from chemeascode.foundation.uncertainty import Uncertainty
 from chemeascode.foundation.units import PRESSURE_UNITS as PRESSURE_UNITS  # the unit convention
 from chemeascode.foundation.units import TEMPERATURE_UNITS as TEMPERATURE_UNITS
+from chemeascode.foundation.units import WASTEWATER_UNITS
 
 
 class Strict(BaseModel):
@@ -45,6 +46,7 @@ ENTHALPY_UNITS = ("kJ/kmol",)
 #: The one unit of each ``state.calculated`` property that is read as a number (energy
 #: balances, exergy flows, sheets); another unit is ``cheme.process-unit``, never converted.
 CALCULATED_UNITS = {
+    **WASTEWATER_UNITS,
     "molar_mass": "kg/kmol",
     "density": "kg/m3",
     "enthalpy": "kJ/kmol",

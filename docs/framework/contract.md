@@ -249,6 +249,9 @@ findings: [...]
 | DWSIM | `simulate --fill`: each entry of `process/simulation-run.json` | `simulator` key: `dwsim`, version, `method` = property package | flowsheet passes: one per solve without a recycle, else the passes of the worker's accelerated tear iteration plus DWSIM's recycle test on its result, summed over the re-solves (DWSIM's flowsheet solver has no count of its own) | the simulator's messages |
 | Propagation | `cheme process propagate --json` | `cheme process propagate`, cheme-as-code version | sweeps through the nodes | the nodes not solved (also in `units`, `status: not-solved`) |
 | Properties | `cheme process props --json` | `thermo`, its version, the EOS | null (one flash per stream) | the streams refused or missing inputs |
+| QSDsan (ADR 0065) | `simulate --fill`: case record and `process/simulation-runs/<id>/` | QSDsan version and worker-supplied method | null | core publishes validated measurements and retains prior evidence |
+
+The project worker receives the case, declared inputs, timeout and an evidence directory. Its response is an AdapterResult. Core publishes each stream's quantities in `state.<case>.calculated` and fingerprints the model inputs. `GET /api/streams`, the stream CLI and the PFD stream inspector share these values. See [ADR 0065](../adr/0065-qsdsan-a2o-process-worker.md) and [ADR 0066](../adr/0066-wastewater-stream-table.md).
 
 The DWSIM entry keeps the keys it had (`simulator`, `converged`, `property_package`); an entry
 written before `status` and `simulator.method` existed reads the same, `status` following

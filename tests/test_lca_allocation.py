@@ -415,7 +415,7 @@ def test_dataset_fingerprints_ignore_line_endings(blocks: Path) -> None:
     _write(blocks, _scope())
     first = dataset_yaml(lca_report(blocks))
     lca = blocks / "lca" / "lca.yaml"
-    lca.write_bytes(lca.read_bytes().replace(b"\n", b"\r\n"))
+    lca.write_bytes(lca.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
     assert dataset_yaml(lca_report(blocks)) == first
 
 

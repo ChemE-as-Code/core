@@ -66,7 +66,11 @@ def main() -> None:
                     hashes.append(h)
             entry[relative] = hashes
     manifest = {"schema": MANIFEST_SCHEMA, "skills": skills}
-    out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(manifest, indent=1, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
     print(f"{out.relative_to(ROOT)}: {sum(len(f) for f in skills.values())} files")
 
 

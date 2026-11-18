@@ -2448,3 +2448,9 @@ The same text is in `NOTICE`. Which licence applies where:
   in the repository. `cheme init` adds no `LICENSE` file for the plant content, and neither does
   the ChemE-as-Code/project-template repository generated from it.
 - pyDEXPI and the other dependencies keep their own licenses.
+
+### Project-defined QSDsan simulations
+
+Set `simulator: qsdsan` in `process/simulation.yaml`. Its `qsdsan` block declares `model`, `worker` (Python module), `input`, `files` and optionally `timeout_s` (default 300). Use slash-separated project-relative paths. Both modes execute trusted project code using the interpreter named by `CHEME_QSDSAN_PYTHON`. The module receives two JSON file paths, request and response. See the [worker contract](docs/adr/0065-qsdsan-a2o-process-worker.md).
+
+`cheme process simulate --fill` publishes quantities under each stream's `state.<case>.calculated`. The record points to `process/simulation-runs/<id>/`. Inspect the original numerical evidence there. `--check` runs against staged inputs. Validation reports `cheme.process-sim-run-stale` when declared sources change. Invalid input or unsuccessful execution produces `cheme.process-qsdsan`; an unavailable model input can also produce `cheme.process-sim-input-missing`. The API exposes optional `calculated_columns`, `spec.molecular`, `spec.model`, `spec.qsdsan` (the declared worker inputs), `run.evidence` and `run.integration_completed`.

@@ -263,3 +263,7 @@ changes the architecture adds an ADR there.
 GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later); see [LICENSE](LICENSE).
 Copyright and TU Delft's copyright disclaimer are in [NOTICE](NOTICE). Plant repositories shown in
 the viewer keep their own licences.
+
+### Dynamic simulation results
+
+Stream records expose `calculated` quantities with units, provenance, source and staleness. Optional `calculated_columns` supplies labels, units and measurement bases for separate columns in the existing Stream table. Given or assumed pressure and other molecular properties remain visible. The PFD stream inspector reads the same quantities. For a nonmolecular backend `/api/simulation` reports `spec.molecular: false`, the model name, a null property package and the worker's method. The case record's `evidence` identifies the saved numerical results.

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,

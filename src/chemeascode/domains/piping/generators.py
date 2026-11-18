@@ -330,7 +330,11 @@ def _is_frame(workspace: Workspace, entry: SheetEntry, current: bytes) -> bool:
 
     try:
         frame = frame_bytes(workspace, entry)
-        return current in (frame, format_bytes(frame)[0])
+        # Git may check out a frame with CRLF while storing LF in the commit.
+        return current.replace(b"\r\n", b"\n") in (
+            frame.replace(b"\r\n", b"\n"),
+            format_bytes(frame)[0],
+        )
     except (GeneratorError, FormatRefused):
         return False
 

@@ -1647,6 +1647,18 @@ def create_app(
             found = _small(snapshot, path)
             if found is not None:
                 texts[path] = found
+        if SIMULATION_FILE in texts:
+            from chemeascode.domains.process.simulation.backends import declared_inputs
+
+            for path in declared_inputs(texts[SIMULATION_FILE][0]):
+                if path in texts:
+                    continue
+                try:
+                    found = _small(snapshot, path)
+                except ApiError:
+                    continue
+                if found is not None:
+                    texts[path] = found
         if FLOWSHEET_FILE not in texts:
             raise ApiError(404, f"no {FLOWSHEET_FILE} at {snapshot.label}")
 
@@ -1736,7 +1748,9 @@ def create_app(
         snapshot = repo.snapshot(rev)
         sim_text = _need(snapshot, SIMULATION_FILE)
         texts = {}
-        for path in (*record.RUN_INPUTS, record.RUN_FILE):
+        from chemeascode.domains.process.simulation.backends import declared_inputs
+
+        for path in (*declared_inputs(sim_text[0]), record.RUN_FILE):
             try:
                 found = _small(snapshot, path)
             except ApiError:

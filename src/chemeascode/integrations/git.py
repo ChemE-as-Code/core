@@ -41,12 +41,12 @@ def cheme_command() -> str:
     first on PATH), else the ``cheme`` on PATH, else ``<python> -m chemeascode``.
     """
     script = sys.argv[0] if sys.argv and sys.argv[0] else ""
-    if Path(script).name == "cheme" and Path(script).is_file():
-        return shlex.quote(os.path.abspath(script))
+    if Path(script).name in {"cheme", "cheme.exe"} and Path(script).is_file():
+        return shlex.quote(Path(os.path.abspath(script)).as_posix())
     found = shutil.which("cheme")
     if found:
-        return shlex.quote(os.path.abspath(found))
-    return f"{shlex.quote(sys.executable)} -m chemeascode"
+        return shlex.quote(Path(os.path.abspath(found)).as_posix())
+    return f"{shlex.quote(Path(sys.executable).as_posix())} -m chemeascode"
 
 
 def readable_projection(model: Any) -> str:
@@ -132,7 +132,9 @@ def setup(root: Path, *, hook: bool = True) -> list[str]:
         ).stdout.strip()
         plant_dir = Path(os.path.relpath(root.resolve(), Path(top).resolve())).as_posix()
         target.write_text(
-            HOOK.format(cheme=command, plant_dir=shlex.quote(plant_dir)), encoding="utf-8"
+            HOOK.format(cheme=command, plant_dir=shlex.quote(plant_dir)),
+            encoding="utf-8",
+            newline="\n",
         )
         target.chmod(target.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         done.append(f"pre-commit hook: {target}")

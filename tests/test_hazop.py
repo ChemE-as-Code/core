@@ -176,7 +176,7 @@ def test_cli_rate_check_report_on_the_example(example, monkeypatch):
 
 def test_the_skill_carries_the_example_study():
     skill = ROOT / "src/chemeascode/domains/safety/skills/hazop-study/examples/study.yaml"
-    assert skill.read_bytes() == (EXAMPLE / STUDY).read_bytes()
+    assert skill.read_text(encoding="utf-8") == (EXAMPLE / STUDY).read_text(encoding="utf-8")
 
 
 def test_a_fresh_project_documents_the_study_location(tmp_path):
@@ -556,6 +556,10 @@ def test_crlf_files_keep_their_line_endings(example):
     rate(Workspace(example), "H-01", "S3", write=True)
     after = path.read_bytes()
     assert b"\r\n" in after and b"\n" not in after.replace(b"\r\n", b"")
+    # Preserved newlines alone are not enough: the edit must still be valid YAML
+    # and the recalculated target must be current.
+    assert load_study(example, STUDY).model is not None
+    assert not rate(Workspace(example), "H-01", "S3", write=False).changes
 
 
 def test_an_empty_study_is_a_draft_even_with_a_real_matrix(example, monkeypatch):

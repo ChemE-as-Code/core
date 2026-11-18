@@ -1,0 +1,139 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "qsdsan",
+    "property_package": null,
+    "molecular": false,
+    "model": "contract-demonstration",
+    "qsdsan": {
+      "model": "contract-demonstration",
+      "worker": "demo_worker",
+      "input": "results.json",
+      "files": [
+        "demo_worker.py"
+      ],
+      "timeout_s": 300
+    },
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [],
+    "guesses": {},
+    "specs": {}
+  },
+  "run": {
+    "schema": "cheme/adapter-result/v1",
+    "case": "design",
+    "status": "converged",
+    "model_fingerprint": "4ffd3af85386864b",
+    "inputs": {
+      "commit": null,
+      "dirty": [],
+      "fingerprints": {
+        "demo_worker.py": "sha256:fb320a2bdbf4d1aa0bf56757204614c72ab4f413f8e7cdb9e8c7f0e048c71b4a",
+        "process/flowsheet.yaml": "sha256:d887bb2d3a75043b5eb6033876ac8ce9d158c935b90c0da5d24ec5505e7dfff9",
+        "process/materials.yaml": "sha256:504177589498dd2e62f5c0596d0481071103a1cdb708290294a7b890003d2b0f",
+        "process/simulation.yaml": "sha256:6e3244bbb6dd2ce714aa13d4b6295551f11be7270492d1f2fb9473c46f1f0313",
+        "results.json": "sha256:44a3433ba3da660873c7d23671bd4aa9548246162e6d0b234aa56a58ab98fc61"
+      }
+    },
+    "iterations": null,
+    "messages": [
+      "Protocol example with recorded quantities."
+    ],
+    "units": [
+      {
+        "id": "TANK",
+        "status": "simulated",
+        "converged": null,
+        "results": {}
+      }
+    ],
+    "streams": [
+      {
+        "id": "FEED",
+        "values": {
+          "flow": {
+            "value": 100,
+            "unit": "m3/day"
+          },
+          "TN": {
+            "value": 20,
+            "unit": "mg N/L"
+          }
+        },
+        "filled": [
+          "flow",
+          "TN"
+        ]
+      },
+      {
+        "id": "WATER",
+        "values": {
+          "flow": {
+            "value": 100,
+            "unit": "m3/day"
+          },
+          "TN": {
+            "value": 12,
+            "unit": "mg N/L"
+          },
+          "NH4": {
+            "value": 0,
+            "unit": "mg N/L"
+          }
+        },
+        "filled": [
+          "flow",
+          "TN",
+          "NH4"
+        ]
+      }
+    ],
+    "findings": [],
+    "run_at": "2026-10-28T12:00:00Z",
+    "integration_completed": true,
+    "converged": true,
+    "simulator": {
+      "name": "QSDsan",
+      "version": "fixture",
+      "method": "recorded data"
+    },
+    "property_package": null,
+    "tool": "cheme-as-code fixture",
+    "evidence": "process/simulation-runs/00000000000000000000000000000001"
+  },
+  "stale": false,
+  "staleness": {
+    "model_fingerprint": "4ffd3af85386864b",
+    "current_fingerprint": "4ffd3af85386864b",
+    "changed_files": []
+  },
+  "units": [
+    {
+      "id": "TANK",
+      "unit": null,
+      "status": "simulated",
+      "reason": "",
+      "spec": null,
+      "run": {
+        "id": "TANK",
+        "status": "simulated",
+        "converged": null,
+        "results": {}
+      }
+    }
+  ],
+  "problem": null,
+  "findings": []
+}
