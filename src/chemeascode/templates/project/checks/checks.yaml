@@ -50,7 +50,9 @@ checks:
     title: Assumed values are marked ASSUMED in the design basis
     stage: concept
     kind: command
-    command: grep -q ASSUMED process/design-basis.yaml
+    command: >-
+      python -c "from pathlib import Path; import sys;
+      sys.exit(0 if 'ASSUMED' in Path('process/design-basis.yaml').read_text(encoding='utf-8') else 1)"
   # kind: validate fails on errors. `fail_on: warning` (or info) makes warnings fail too, `rules`
   # limits it to some rule ids (* matches any text), and `accept` lists findings the gate lets
   # pass, each by the id `cheme validate --json` gives it and with a reason (who, why).

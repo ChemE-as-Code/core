@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -42,7 +43,9 @@ def test_template_ships_the_runner(plant: Path):
 
 def test_dry_run_derives_this_stage_from_the_repository(plant: Path, monkeypatch, capsys):
     monkeypatch.chdir(plant)
-    monkeypatch.setenv("CHEME", str(Path(sys.executable).parent / "cheme"))
+    monkeypatch.setenv(
+        "CHEME", str(Path(sys.executable).parent / ("cheme.exe" if os.name == "nt" else "cheme"))
+    )
     monkeypatch.setenv("CLAUDE_BIN", "/bin/false")
     empty = plant / ".claude" / "skills" / "dexpi-xml" / "snippets" / "empty-sheet.xml"
     shutil.copy(empty, plant / "pid" / "P-02.xml")
@@ -116,7 +119,7 @@ def test_runner_dry_run_with_an_older_system_python(plant: Path, tmp_path: Path)
     git(plant, "commit", "-qm", "plant")
     env = {
         **os.environ,
-        "CHEME": str(Path(sys.executable).parent / "cheme"),
+        "CHEME": str(Path(sys.executable).parent / ("cheme.exe" if os.name == "nt" else "cheme")),
         "PATH": "/usr/bin:/bin",  # no claude: a dry run does not need it
     }
     env.pop("CLAUDE_BIN", None)
@@ -147,22 +150,42 @@ def test_headless_allowlist_matches_the_settings(plant: Path):
 
 
 def _fake_claude(tmp_path: Path, cost: float) -> Path:
-    """A ``claude`` that records its arguments and prints a result with *cost*."""
-    fake = tmp_path / "claude"
+    """A Python test worker that records its arguments and prints a result."""
+    fake = tmp_path / "claude.py"
     fake.write_text(
-        "#!/bin/sh\n"
-        f'printf "%s\\n" "$@" > "{tmp_path}/args.txt"\n'
-        f'echo \'{{"total_cost_usd": {cost}, "num_turns": 1, '
-        '"permission_denials": [{"tool_name": "Bash"}]}\'\n'
+        "import json, sys\nfrom pathlib import Path\n"
+        "Path(__file__).with_name('args.txt').write_text('\\n'.join(sys.argv[1:]))\n"
+        f"print(json.dumps({{'total_cost_usd': {cost}, 'num_turns': 1, "
+        "'permission_denials': [{'tool_name': 'Bash'}]}))\n",
+        encoding="utf-8",
     )
-    fake.chmod(0o755)
     return fake
+
+
+def _python_worker(runner, fake: Path, monkeypatch) -> None:
+    """Launch the test worker with this Python, without relying on Unix shebangs.
+
+    Keep the real subprocess and all arguments, including the multi-line prompt. Only the
+    fake Claude executable is substituted; cheme and git still run unchanged.
+    """
+    import subprocess
+    from types import SimpleNamespace
+
+    def run(command, **kwargs):
+        if command[0] == str(fake):
+            command = [sys.executable, *command]
+        return subprocess.run(command, check=kwargs.pop("check", False), **kwargs)
+
+    monkeypatch.setattr(runner, "subprocess", SimpleNamespace(run=run))
 
 
 def test_runner_keeps_a_chain_inside_the_total_cap(plant: Path, tmp_path: Path, monkeypatch):
     monkeypatch.chdir(plant)
-    monkeypatch.setenv("CHEME", str(Path(sys.executable).parent / "cheme"))
-    monkeypatch.setenv("CLAUDE_BIN", str(_fake_claude(tmp_path, 5.23)))
+    monkeypatch.setenv(
+        "CHEME", str(Path(sys.executable).parent / ("cheme.exe" if os.name == "nt" else "cheme"))
+    )
+    fake = _fake_claude(tmp_path, 5.23)
+    monkeypatch.setenv("CLAUDE_BIN", str(fake))
     (plant / "scripts" / "agent-run" / "spec.md").write_text("A small test plant.\n")
     plan = plant / "scripts" / "agent-run" / "stages.json"
     data = json.loads(plan.read_text())
@@ -171,6 +194,7 @@ def test_runner_keeps_a_chain_inside_the_total_cap(plant: Path, tmp_path: Path, 
     git(plant, "add", "-A")
     git(plant, "commit", "-qm", "plant")
     runner = runner_module(plant / "scripts" / "agent-run" / "run_stage.py")
+    _python_worker(runner, fake, monkeypatch)
     out = plant / "build" / "agent-run"
 
     assert runner.main(["stage", "S1", "--total-cap", "8"]) == 0
@@ -224,21 +248,24 @@ def test_runner_records_the_session_and_switches_its_hooks_off(
         },
     }
     transcript.write_text(json.dumps(line) + "\n")
-    fake = tmp_path / "claude"
+    fake = tmp_path / "claude.py"
     fake.write_text(
-        "#!/bin/sh\n"
-        f'echo "$CHEME_RUN_RECORD" > "{tmp_path}/switch.txt"\n'
-        f'echo \'{{"total_cost_usd": 1.5, "num_turns": 3, "session_id": "{session}", '
-        '"subtype": "success", "result": "Drew the PFD."}\'\n'
+        "import json, os\nfrom pathlib import Path\n"
+        "Path(__file__).with_name('switch.txt').write_text(os.environ['CHEME_RUN_RECORD'])\n"
+        f"print(json.dumps({{'total_cost_usd': 1.5, 'num_turns': 3, 'session_id': '{session}', "
+        "'subtype': 'success', 'result': 'Drew the PFD.'}))\n",
+        encoding="utf-8",
     )
-    fake.chmod(0o755)
-    monkeypatch.setenv("CHEME", str(Path(sys.executable).parent / "cheme"))
+    monkeypatch.setenv(
+        "CHEME", str(Path(sys.executable).parent / ("cheme.exe" if os.name == "nt" else "cheme"))
+    )
     monkeypatch.setenv("CLAUDE_BIN", str(fake))
     (plant / "scripts" / "agent-run" / "spec.md").write_text("A small test plant.\n")
     git(plant, "add", "-A")
     git(plant, "commit", "-qm", "plant")
     head = git(plant, "rev-parse", "HEAD").strip()
     runner = runner_module(plant / "scripts" / "agent-run" / "run_stage.py")
+    _python_worker(runner, fake, monkeypatch)
     assert runner.main(["stage", "S1", "--budget", "3"]) == 0
     assert (tmp_path / "switch.txt").read_text().strip() == "off"
     run_id = "20261027-202241-s1"

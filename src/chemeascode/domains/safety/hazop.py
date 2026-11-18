@@ -105,7 +105,8 @@ class LoadedStudy:
 
 def load_study(root: Path, path: str) -> LoadedStudy:
     """Load the study *path* (from *root*) and its matrix; only the schema is checked here."""
-    text = (root / path).read_text(encoding="utf-8")
+    # YAML marks must index the same unmodified text the surgical writers edit.
+    text = _read(root / path)
     try:
         document = yaml.compose(text)
         data = yaml.safe_load(text)

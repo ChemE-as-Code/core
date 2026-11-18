@@ -603,10 +603,11 @@ def test_docker_states(monkeypatch, tmp_path):
     command, target, _, name = dwsim._command(tmp_path / "out" / "f.dwxmz")
     assert command[-1] == dwsim.IMAGE and name in command and target == "/out/f.dwxmz"
     assert f"{dwsim.WORKER.resolve()}:/opt/cheme/dwsim_worker.py:ro" in command
-    monkeypatch.setenv("CHEME_DWSIM_PATH", "/opt/dwsim")
+    local = tmp_path / "local DWSIM"
+    monkeypatch.setenv("CHEME_DWSIM_PATH", str(local))
     command, target, env, name = dwsim._command(Path("rel/f.dwxmz"))
     assert Path(target).is_absolute() and name is None
-    assert env["LD_LIBRARY_PATH"].startswith("/opt/dwsim:/opt/dwsim/ThermoCS")
+    assert env["LD_LIBRARY_PATH"].startswith(f"{local}:{local / 'ThermoCS'}")
 
 
 def test_validate_reads_the_simulation_file(plant, monkeypatch):

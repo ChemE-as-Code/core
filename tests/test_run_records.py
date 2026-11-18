@@ -403,8 +403,9 @@ def test_record_commit_touches_only_the_run_folder(committed, claude_home, monke
 def _fake_claude(tmp_path: Path, monkeypatch, output: str) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    fake = bin_dir / "claude"
-    fake.write_text(f"#!/bin/sh\necho '{output}'\n")
+    fake = bin_dir / ("claude.cmd" if os.name == "nt" else "claude")
+    text = f"@echo off\necho {output}\n" if os.name == "nt" else f"#!/bin/sh\necho '{output}'\n"
+    fake.write_text(text, encoding="utf-8", newline="\n")
     fake.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 

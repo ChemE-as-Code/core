@@ -800,9 +800,10 @@ def test_the_build_holds_pipes_inline_structures_platforms_and_zones(plant3d: Pa
     assert build_model(Workspace(plant3d)).text() == model.text()  # byte-identical
 
 
+@pytest.mark.usefixtures("symlink_support")
 def test_sheet_references_are_relative_even_through_a_symlinked_root(plant3d: Path, tmp_path):
     link = tmp_path / "linked"
-    link.symlink_to(plant3d)
+    link.symlink_to(plant3d, target_is_directory=True)
     document = build_model(Workspace(link)).document
     sheets = {
         ref

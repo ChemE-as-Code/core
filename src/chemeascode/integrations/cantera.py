@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Iterable, Mapping
+from importlib.resources import files
 from typing import Any
 
 SITE = "*"
@@ -27,7 +28,10 @@ def _nasa() -> dict[str, tuple[str, Any]]:
 
     species: dict[str, tuple[str, Any]] = {}
     for file in NASA_FILES:
-        for one in ct.Species.list_from_file(file):
+        # Read the shipped data with Python: Cantera's native file loader cannot
+        # resolve a Windows installation path containing non-ASCII characters.
+        text = files("cantera").joinpath("data", file).read_text(encoding="utf-8")
+        for one in ct.Species.list_from_yaml(text, section="species"):
             species.setdefault(one.name, (file, one))
     return species
 

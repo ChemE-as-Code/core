@@ -147,7 +147,7 @@ def test_render_png_crop_and_rev(plant: Path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert 'id="Tank1"' in (plant / "build" / "P-01@HEAD.svg").read_text()
     result = runner.invoke(app, ["render", "--rev", "HEAD", "--crop", "0,0,10.5,20"])
-    assert result.output.strip().endswith("build/P-01@HEAD_crop-0-0-10.5-20.svg")
+    assert Path(result.output.strip()).parts[-2:] == ("build", "P-01@HEAD_crop-0-0-10.5-20.svg")
     assert (plant / "build" / "P-01@HEAD.svg").is_file()
 
     assert runner.invoke(app, ["render", "--crop", "1,2,3"]).exit_code == 2
@@ -176,11 +176,13 @@ def test_render_png_without_resvg_names_the_extra(plant: Path, monkeypatch):
     assert "cheme-as-code[png] @ git+https://github.com/" in result.output
 
 
-def test_diff_list_and_json(plant: Path, monkeypatch):
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_diff_list_and_json(plant: Path, monkeypatch, eol):
     monkeypatch.chdir(plant)
+    git(plant, "config", "core.autocrlf", "true")
     sheet = _commit_formatted(plant)
     text = sheet.read_text(encoding="utf-8")
-    sheet.write_text(text.replace("<String>C1</String>", "<String>C1A</String>", 1))
+    sheet.write_text(text.replace("<String>C1</String>", "<String>C1A</String>", 1), newline=eol)
 
     result = runner.invoke(app, ["diff", "--list"])
     assert result.exit_code == 0, result.output
@@ -271,7 +273,7 @@ def test_diff_and_render_survive_a_sheet_that_does_not_draw(plant: Path, monkeyp
     result = runner.invoke(app, ["render", "pid/P-02.xml", "pid/P-01.xml"])
     assert result.exit_code == 1, result.output
     assert isinstance(result.exception, SystemExit)
-    assert "pid/P-02.xml: cannot render: AttributeError" in result.stderr
+    assert f"{Path('pid/P-02.xml')}: cannot render: AttributeError" in result.stderr
     assert (plant / "build" / "P-01.svg").is_file() and not (plant / "build" / "P-02.svg").exists()
 
 

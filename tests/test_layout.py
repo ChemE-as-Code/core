@@ -619,6 +619,7 @@ def test_api_layout_invalid_file_reports_findings(api_plant: Path):
     assert all(f["file"] == "layout/building.yaml" for f in data["findings"])
 
 
+@pytest.mark.usefixtures("symlink_support")
 def test_api_layout_refuses_a_symlink_out_of_the_repository(plant: Path, tmp_path: Path):
     outside = tmp_path / "secret.yaml"
     outside.write_text(SITE)
@@ -818,6 +819,7 @@ def test_building_without_level_is_a_warning():
     assert found == [("cheme.layout-level", "warning")]
 
 
+@pytest.mark.usefixtures("symlink_support")
 def test_api_layout_skips_one_unreadable_file(plant: Path, tmp_path: Path):
     write_layout(plant)
     outside = tmp_path / "secret.yaml"
