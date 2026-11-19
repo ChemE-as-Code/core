@@ -281,8 +281,11 @@ each value taken from the evidence cites its observation in `source`.
    then PFR, and mixing: their convex hull) and names the structure of its highest yield (Van
    de Vusse kinetics: a CSTR before a PFR). It is a candidate, not a proven region.
 8. For an exothermic reaction, run `cheme process reactor-hazards`: the adiabatic temperature
-   rise, the MTSR after a cooling failure (a batch: all its charge; a CSTR: its unconverted
-   key; a semi-batch: the dosed reactant at its largest accumulation, at the worst moment over
+   rise, the MTSR after a cooling failure (a batch: all its charge, from the temperature an
+   isothermal one is held at; a CSTR: each reaction's unconverted limiting reactant; a
+   conversion or equilibrium step heated above its feed: its outlet's unconverted reactants at
+   the outlet's given temperature, where larger than the fresh feed at the inlet; a gas batch
+   at constant volume; a semi-batch: the dosed reactant at its largest accumulation, at the worst moment over
    the run, so a dosing-controlled step screens lower than its batch; a vented gas leaves as it
    forms and adds nothing to it), the MTT (the reactor's `hazard.mtt`, else the lowest boiling
    point of what boils in the liquid at the reactor's pressure: the normal boiling point from
