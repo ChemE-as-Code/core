@@ -121,3 +121,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0071](0071-gas-liquid-batch-head-space-sweep-and-absorption.md) | Gas-liquid batch: inerts, a head space, degassing, the heat of absorption and the vent condenser's freezing | Proposed | 2026-11-12 |
 | [0075](0075-the-rest-of-a-batchs-energy-balance.md) | The rest of a batch's energy balance: a recipe heat on its stream, the heat-up apart, a charged solid's heat of solution, agitation, a still's sensible rise and losses, a dryer's metal | Proposed | 2026-11-13 |
 | [0073](0073-dosing-time-from-the-jacket-coupled-and-one-pot-vessels.md) | Dosing against the jacket, coupled vessels and one-pot vessels over several batch steps | Proposed | 2026-11-13 |
+| [0074](0074-semi-batch-kinetics-initiation-solids-temperature-light.md) | Semi-batch kinetics: an initiation, a solid phase with a surface rate, a temperature programme or reflux, a photochemical rate | Proposed | 2026-11-13 |

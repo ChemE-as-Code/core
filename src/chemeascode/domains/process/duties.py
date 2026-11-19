@@ -321,13 +321,16 @@ def _batch_basis(
     """The basis of a batch's duty: :data:`BATCH_BASIS`, or with the terms of ADR 0063 it
     holds (a heat of solution, the charge's heat-up) and those of ADR 0075 (*charged*: the
     charge's heat of solution; *agitated*: the agitator's power, its own text after it);
-    with the vent's vapour (ADR 0062) :data:`VENT_VAPOUR_BASIS` after it. *dosed*: whether
-    the doses' heat of solution is in the term ``solution`` (None: whether that term is)."""
+    with the vent's vapour (ADR 0062) :data:`VENT_VAPOUR_BASIS` after it, and the ADR 0074
+    terms. *dosed*: whether the doses' heat of solution is in the term ``solution`` (None:
+    whether that term is)."""
     solution = "solution" in terms if dosed is None else dosed
     heat_up = "charge heat-up" in terms
-    vent = VENT_VAPOUR_BASIS if "vent vapour" in terms else ""
+    added = VENT_VAPOUR_BASIS if "vent vapour" in terms else ""
+    added += MOVING_BASIS if "content" in terms else ""
+    added += LIGHT_BASIS if "light" in terms else ""
     if not (solution or heat_up or charged or agitated):
-        return BATCH_BASIS + vent
+        return BATCH_BASIS + added
     held = "the heat its reactions release over the batch, the doses warmed to the batch's "
     held += "temperature"
     if solution:
@@ -346,9 +349,16 @@ def _batch_basis(
     return (
         f"isothermal batch: {held}, per hour of the flowsheet's flows; {left}"
         f"{'' if agitated else 'agitation and '}heat losses not included"
-    ) + vent
+    ) + added
 
 
+#: What a batch's duty adds with a temperature programme or at reflux (ADR 0074).
+MOVING_BASIS = (
+    "; the doses warmed to the temperature each met and the content's sensible heat as its "
+    "temperature follows the programme or its bubble point (ADR 0074)"
+)
+#: What a batch's duty adds with a lamp (ADR 0074).
+LIGHT_BASIS = "; less the lamp's radiant power the content absorbs (ADR 0074)"
 #: What a batch's duty adds with its vent's vapour (ADR 0062).
 VENT_VAPOUR_BASIS = (
     "; with the latent heat of the vapour the vent gas carries off and a returned "
