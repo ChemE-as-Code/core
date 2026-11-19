@@ -80,51 +80,51 @@
           "residuals": [
             {
               "iteration": 1,
-              "flow": 0.00780688665443758,
+              "flow": 0.00780688665444,
               "pressure": 0.0,
-              "temperature_K": 13.91620658174611
+              "temperature_K": 13.9162065817
             },
             {
               "iteration": 2,
-              "flow": 0.008375154857222667,
+              "flow": 0.00837515485722,
               "pressure": 0.0,
-              "temperature_K": 14.535343003474964
+              "temperature_K": 14.5353430035
             },
             {
               "iteration": 3,
-              "flow": 0.007744771662546451,
+              "flow": 0.00774477166255,
               "pressure": 0.0,
-              "temperature_K": 13.794917645656824
+              "temperature_K": 13.7949176457
             }
           ],
           "bed": {
             "heat": "adiabatic",
             "inlet_temperature_K": 688.15,
             "inlet_pressure_kPa": 10000.0,
-            "outlet_temperature_K": 770.268370982951,
+            "outlet_temperature_K": 770.268370983,
             "outlet_pressure_kPa": 10000.0,
             "pressure_drop_kPa": 0.0,
-            "hot_spot_K": 770.268370982951,
+            "hot_spot_K": 770.268370983,
             "catalyst_mass_kg": 2000.0,
             "extents_kmol_h": {
-              "SYN": 10.706283647105716
+              "SYN": 10.7062836471
             },
             "outlet_kmol_h": {
-              "N2": 99.29351635289427,
-              "H2": 297.8805490586828,
-              "NH3": 31.41296729421144,
-              "AR": 10.000399999999999
+              "N2": 99.2935163529,
+              "H2": 297.880549059,
+              "NH3": 31.4129672942,
+              "AR": 10.0004
             },
             "inlet_kmol_h": {
               "N2": 109.9998,
-              "H2": 329.9993999999999,
-              "NH3": 10.000399999999999,
-              "AR": 10.000399999999999
+              "H2": 329.9994,
+              "NH3": 10.0004,
+              "AR": 10.0004
             },
             "notes": [
               "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
             ],
-            "reaction_heat_kW": 310.18772273507307,
+            "reaction_heat_kW": 310.187722735,
             "energy_residual_kW": 0.0
           }
         }
@@ -199,51 +199,51 @@
           "residuals": [
             {
               "iteration": 1,
-              "flow": 0.00780688665443758,
+              "flow": 0.00780688665444,
               "pressure": 0.0,
-              "temperature_K": 13.91620658174611
+              "temperature_K": 13.9162065817
             },
             {
               "iteration": 2,
-              "flow": 0.008375154857222667,
+              "flow": 0.00837515485722,
               "pressure": 0.0,
-              "temperature_K": 14.535343003474964
+              "temperature_K": 14.5353430035
             },
             {
               "iteration": 3,
-              "flow": 0.007744771662546451,
+              "flow": 0.00774477166255,
               "pressure": 0.0,
-              "temperature_K": 13.794917645656824
+              "temperature_K": 13.7949176457
             }
           ],
           "bed": {
             "heat": "adiabatic",
             "inlet_temperature_K": 688.15,
             "inlet_pressure_kPa": 10000.0,
-            "outlet_temperature_K": 770.268370982951,
+            "outlet_temperature_K": 770.268370983,
             "outlet_pressure_kPa": 10000.0,
             "pressure_drop_kPa": 0.0,
-            "hot_spot_K": 770.268370982951,
+            "hot_spot_K": 770.268370983,
             "catalyst_mass_kg": 2000.0,
             "extents_kmol_h": {
-              "SYN": 10.706283647105716
+              "SYN": 10.7062836471
             },
             "outlet_kmol_h": {
-              "N2": 99.29351635289427,
-              "H2": 297.8805490586828,
-              "NH3": 31.41296729421144,
-              "AR": 10.000399999999999
+              "N2": 99.2935163529,
+              "H2": 297.880549059,
+              "NH3": 31.4129672942,
+              "AR": 10.0004
             },
             "inlet_kmol_h": {
               "N2": 109.9998,
-              "H2": 329.9993999999999,
-              "NH3": 10.000399999999999,
-              "AR": 10.000399999999999
+              "H2": 329.9994,
+              "NH3": 10.0004,
+              "AR": 10.0004
             },
             "notes": [
               "no pressure drop: the catalyst's particle_diameter or bed_voidage is not given"
             ],
-            "reaction_heat_kW": 310.18772273507307,
+            "reaction_heat_kW": 310.187722735,
             "energy_residual_kW": 0.0
           }
         }

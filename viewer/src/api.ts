@@ -44,6 +44,7 @@ export interface ValueUncertainty {
 }
 
 export interface ProcessValue {
+  producer?: { tool: string; adapter: string; model: string };
   value: number;
   unit: string;
   basis?: string | null;
@@ -566,6 +567,15 @@ export interface SimRunUnit {
 
 /** One case's entry of `process/simulation-run.json` (`cheme process simulate --fill`). */
 export interface SimulationRun {
+  producer?: { tool: string; adapter: string; model: string };
+  execution?: { state: "completed" | "failed" | "timed-out" | "refused"; transport: string; exit_code: number | null; elapsed_s: number; message: string };
+  outcome?: {
+    mode: "steady-state" | "dynamic";
+    convergence: "converged" | "not-converged" | "not-applicable" | "unknown";
+    integration: { start: number; requested_end: number; achieved_end: number; time_unit: string; completed: boolean } | null;
+    steady_state: { state: "established" | "not-established" | "not-evaluated"; method: string | null; evidence: string[] };
+  };
+  trajectories?: { path: string; format: "csv"; sha256: string; time_variable: string; time_unit: string; start: number; end: number; variables: { name: string; unit: string }[]; final_snapshot: { time: number; selection: "last-row"; interpretation: "instantaneous" } }[];
   evidence?: string;
   integration_completed?: boolean;
   schema?: string;
@@ -585,7 +595,7 @@ export interface SimulationRun {
   inputs: { commit: string | null; dirty: string[]; fingerprints: Record<string, string> };
   converged: boolean;
   /** `converged` / `not-converged`. Older servers leave it out. */
-  status?: "converged" | "not-converged";
+  status?: "converged" | "not-converged" | "completed" | "failed" | "refused";
   /** Null where the simulator does not report it. */
   iterations: number | null;
   messages: string[];
@@ -625,6 +635,8 @@ export interface SimulationView {
   spec: {
     simulator: string;
     molecular?: boolean;
+    capabilities?: { modes: string[]; publication: "measured" | "molecular"; trajectory_formats: string[] };
+    worker?: { model: string; worker: string | null; input: string; files: string[]; timeout_s: number; mode: string; options: Record<string, unknown>; mappings: Record<string, Record<string, string>> };
     qsdsan?: { model: string; worker: string; input: string; files: string[]; timeout_s: number };
     model?: string;
     property_package: string | null;

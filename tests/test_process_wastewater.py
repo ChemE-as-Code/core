@@ -30,7 +30,7 @@ def test_readers_see_current_and_changed_worker_inputs(tmp_path, monkeypatch):
     def forbid(*args, **kwargs):
         pytest.fail("reading or validating launched the worker")
 
-    monkeypatch.setattr("chemeascode.integrations.qsdsan.execute", forbid)
+    monkeypatch.setattr("chemeascode.integrations.workers.LocalPythonTransport.execute", forbid)
     with TestClient(create_app(root, allowed_hosts=["testserver"])) as client:
         for changed in (False, True):
             if changed:

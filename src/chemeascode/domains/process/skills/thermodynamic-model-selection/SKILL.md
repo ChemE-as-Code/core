@@ -1,6 +1,6 @@
 ---
 name: thermodynamic-model-selection
-description: Recommend a thermodynamic model (equation of state or activity-coefficient model) for a mixture from facts about pressure, polarity, electrolytes, interaction parameters, liquid-liquid split, pseudocomponents and vapour association, with Carlson's decision tree. Use before a phase or flash calculation and before choosing the property method in process/materials.yaml.
+description: Recommend a thermodynamic model (equation of state or activity-coefficient model) for a mixture from facts about pressure, polarity, electrolytes, interaction parameters, liquid-liquid split, pseudocomponents and vapour association, with Carlson's decision tree. Use before a phase or flash calculation and before recording `method_selection` in process/simulation.yaml.
 ---
 
 # Thermodynamic model selection
@@ -9,8 +9,8 @@ description: Recommend a thermodynamic model (equation of state or activity-coef
 
 Recommends thermodynamic models with a rule engine that implements E. C. Carlson's decision tree
 (Chem. Eng. Prog. 92, 1996, 35-46). Use it when a model has to be chosen or justified, before a
-phase calculation (`phase-calculation`) and before recording a property method in
-`process/materials.yaml`. The recommendation is not a validated choice.
+phase calculation (`phase-calculation`) and before recording `method_selection` in
+`process/simulation.yaml`. The recommendation is not a validated choice.
 
 ## Required inputs and missing inputs
 
@@ -48,6 +48,17 @@ Pitzer, `methods[].electrolyte` names the qualified systems the electrolyte rout
 (`cheme process electrolyte`: aqueous NaCl only, liquid properties in the range of
 `electrolytes.yml`); the result's `notes` say so.
 
+The selection does not choose the stream-property package. `materials.yaml` `property_method`
+is written by `cheme process props --fill`, and its package is one of the benchmarked packages
+(`air-pr-chemsep`, `syngas-pr-vapor`, `water-methanol-pcsaft-liquid`), picked from
+`property_method.package` or from the streams' components (`cheme process props --coverage`;
+skill `process-design`). `water-methanol-pcsaft-liquid` runs PC-SAFT through feos (extra
+`saft`, ADR 0064), a model this tree never recommends. It claims liquid density only, so it is
+not in conflict with an activity-coefficient recommendation for the VLE. Do not hand-write
+`property_method` models or equations of state to match a recommendation; setting
+`property_method: {package: <id>}` to choose a benchmarked package is allowed
+(`process-design`).
+
 There is no CLI command for the selection itself. Units go through
 `chemeascode.foundation.units`; units other than K, °C, Pa, kPa, MPa, bar and the `(a)`/`(g)`
 pressures need the `units` extra.
@@ -73,6 +84,12 @@ in the next step. When the choice becomes the plant's property method, record it
 reason in `DESIGN.md`; for the simulation record the facts in `process/simulation.yaml`
 `method_selection.facts` (and, for an approved substitution, `method_selection.substitution`
 with the reason), so the translation checks the property package against them.
+`result.executable["simulation"]` lists DWSIM packages. With `simulator: idaes`, the recorded
+selection is checked by method id (`IDAES ideal VLE` is IDEAL, `IDAES Peng-Robinson` is PR,
+every kij 0), and every IDAES package is reported `cheme.process-sim-method-unbenchmarked`
+(info). With `simulator: qsdsan` (ASM components, a project-defined model) there is no property
+package: `process/simulation.yaml` must not record `property_package` or `method_selection`
+(the schema rejects them, `cheme.process-sim-schema`), and this selection does not apply.
 
 ## Required human judgment
 

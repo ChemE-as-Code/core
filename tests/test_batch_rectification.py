@@ -939,20 +939,23 @@ def test_a_crawl_too_slow_for_the_step_horizon_stalls(tmp_path, monkeypatch):
     the column's Fenske index jittering next to the ACCL trace: core 1.11.0 found no result in
     900 s. A run of small steps whose pace does not reach the end within the step horizon
     stalls: at the default horizon (10^6 steps) after 55492 steps (2 to 3 minutes), here at
-    20000 after 3492 steps, within seconds."""
-    import time
-
+    20000 after about 3500 steps. Check the work done, not wall time shared with other
+    pytest workers on a loaded machine."""
     from chemeascode.domains.process import batch_still
     from chemeascode.domains.process.batch_still import StillError, solve_node
 
     monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
     process, node, inlets = _ended(tmp_path, "{time: 8982}")
-    start = time.monotonic()
-    with pytest.raises(StillError, match="stalls before its end.*volatile.*end the cut earlier"):
+    with pytest.raises(
+        StillError, match="stalls before its end.*volatile.*end the cut earlier"
+    ) as failure:
         solve_node(process, node, inlets, "design")
-    # about 9 s alone; the bound leaves room for a loaded parallel run, while a crawl that does
-    # not stall would run for minutes
-    assert time.monotonic() - start < 60.0
+    # A disabled pace check reaches MAX_STEPS and raises the same error. Require early
+    # refusal within a quarter of that budget, leaving room for platform rounding without
+    # accepting the full-horizon fallback or depending on CPU scheduling and disk pressure.
+    steps = re.search(r"after (\d+) steps", str(failure.value))
+    assert steps is not None
+    assert 0 < int(steps.group(1)) < batch_still.MAX_STEPS // 4
 
 
 @pytest.mark.parametrize(

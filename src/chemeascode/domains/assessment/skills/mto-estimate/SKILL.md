@@ -84,7 +84,16 @@ estimate of the bulk materials, a comparison of two layouts by their quantities,
    units within it and say so, or a quotation), `estimate-equipment-partial` (purchased cost
    only: the package data has no material or bare module factor for it, e.g. aluminium, a
    CS/SS combination, a tank: give `fm`, `fp` or `fbm` from the printed source with its page),
-   `estimate-no-index` (no CEPCI: costs stay in 2001 dollars). The bare module cost includes
+   `estimate-no-index` (no CEPCI: costs stay in 2001 dollars). A reactor whose datasheet gives
+   `catalyst_mass_kg` or `catalyst_volume_m3` gets a line `<TAG>/catalyst`: the first fill,
+   priced from `price: {value, unit (USD/kg or USD/m3), year, provenance, source}` of the
+   catalyst its linked step names in `process/catalysts.yaml`, with no installation factor (a
+   price per kg needs the mass, a price per m3 the volume). Without a price it is not covered
+   (`estimate-catalyst-price`) and `equipment-covered` fails until you price it there.
+   Excluding it in cost-basis.yaml does not help. A price in another currency stays out of the
+   USD totals (`estimate-catalyst-currency`), and one of another year than the cost index is
+   not escalated. `estimate-draft-size` names items sized from a datasheet still marked
+   `draft: true`: confirm the size or give `size` with `size_source`. The bare module cost includes
    the item's installation materials (piping, instruments, steel, insulation, ...) and labour
    and its indirects: do not add the bulk factor estimate on top for the same scope; use the
    take-off to check the bulk quantities, or to price them instead of the bare module factors
@@ -98,7 +107,8 @@ estimate of the bulk materials, a comparison of two layouts by their quantities,
    priced) and `estimate-current`. `cheme assess equipment --write` writes
    `estimate/equipment-cost.csv|md`; the gate requirements `equipment-current` and
    `equipment-covered` (every item costed, its own cost, or excluded with a reason, and a cost
-   index given) belong to `kind: mto` as well.
+   index given) belong to `kind: mto` as well. `equipment-current` also goes stale when the
+   datasheets, `process/flowsheet.yaml` or `process/catalysts.yaml` change.
 
 ## Validation and failure handling
 

@@ -28,7 +28,7 @@ from chemeascode.domains.assessment.lca.emissions import (
 )
 from chemeascode.domains.assessment.lca.gates import lca_gate
 from chemeascode.domains.assessment.lca.quality import default_pedigree
-from chemeascode.domains.assessment.lca.report import dataset_yaml, lca_report
+from chemeascode.domains.assessment.lca.report import dataset_yaml, lca_report, manifest
 from chemeascode.domains.assessment.lca.schemas import (
     DatasetExchange,
     EmissionEstimate,
@@ -196,6 +196,28 @@ def test_leaks_count_the_takeoff_and_the_equipment(blocks: Path) -> None:
     reread = LciDataset.model_validate(yaml.safe_load(dataset_yaml(report)))
     assert next(e for e in reread.exchanges if e.key == "emission:ETOH").provenance == "estimated"
     assert "provenance: estimated" in dataset_yaml(report)
+
+
+@pytest.mark.parametrize(
+    ("count_from", "read"),
+    [
+        (["mto", "equipment"], {"estimate/mto.csv", "equipment/equipment-list.yaml"}),
+        (["mto"], {"estimate/mto.csv"}),
+        (["equipment"], {"equipment/equipment-list.yaml"}),
+    ],
+)
+def test_the_manifest_fingerprints_what_the_leaks_count(
+    blocks: Path, count_from: list[str], read: set[str]
+) -> None:
+    """#313: without construction entries, the take-off and the equipment list an
+    equipment-leak estimate counts from are inputs of the results: the manifest fingerprints
+    them, and only them."""
+    _write(blocks, _scope(emission_estimates=[{**LEAKS, "count_from": count_from}]))
+    report = lca_report(blocks)
+    assert report.loaded, [f.format() for f in report.findings]
+    inputs = set(manifest(report)["inputs"])
+    lists = {"estimate/mto.csv", "equipment/equipment-list.yaml"}
+    assert inputs & lists == read
 
 
 def test_leak_counts_follow_the_takeoff_mapping() -> None:

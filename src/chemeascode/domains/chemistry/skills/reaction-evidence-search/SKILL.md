@@ -53,8 +53,9 @@ database, and it does not bundle source documents.
 ## Workflow and tools
 
 1. **Identities.** Resolve the product, the reactants and the expected by-products to one
-   chemical each: `cheme chemistry props NAME` (PubChem: CAS, SMILES, InChIKey, formula,
-   molar mass; skill `property-retrieval`) and declare them in `process/materials.yaml`
+   chemical each: `cheme chemistry props NAME -p cas -p smiles -p inchikey -p formula -p
+   molecular_weight --source PubChem` (each line names its source; skill `property-retrieval`)
+   and declare them in `process/materials.yaml`
    (skill `materials`) with their synonyms in `name`. Search with the synonyms and the CAS
    number. The evidence file names components by these ids (`evidence-component` warns
    otherwise).

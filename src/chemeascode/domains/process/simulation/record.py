@@ -46,6 +46,12 @@ passes DWSIM made (:func:`chemeascode.integrations.dwsim.solve`), with ``simulat
 the IPOPT iterations of the final simultaneous solve
 (:func:`chemeascode.integrations.idaes.solve`; ``simulator.solver`` then names IPOPT and its
 version, ``notes`` an initialization that did not finish); null where the worker does not report it.
+
+The descriptions above cover the established molecular adapters. Project-worker entries use
+``cheme/adapter-result/v2`` with separate execution, convergence and integration outcomes
+(ADR 0072). Only accepted worker results replace the case; rejected attempts remain separate.
+Consumers use :func:`numerically_converged`, so a historical integration-completion flag
+cannot qualify as numerical convergence. Neither flag establishes physical steady state.
 """
 
 from __future__ import annotations
@@ -92,6 +98,20 @@ def read(root: Path) -> dict[str, Any] | None:
 def entry_of(data: dict[str, Any] | None, case: str) -> dict[str, Any] | None:
     found = (data or {}).get("cases", {}).get(case)
     return found if isinstance(found, dict) else None
+
+
+def numerically_converged(entry: dict[str, Any]) -> bool:
+    """Legacy integration completion is not evidence of a steady-state solve."""
+    if outcome := entry.get("outcome"):
+        execution = entry.get("execution") or {}
+        return (
+            isinstance(outcome, dict)
+            and isinstance(execution, dict)
+            and execution.get("state") == "completed"
+            and entry.get("status") in {"converged", "completed"}
+            and outcome.get("convergence") == "converged"
+        )
+    return bool(entry.get("converged")) and not entry.get("integration_completed", False)
 
 
 def write(root: Path, entry: dict[str, Any]) -> None:

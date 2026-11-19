@@ -15,7 +15,6 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import get_args
 
 import pytest
 import yaml
@@ -24,7 +23,6 @@ from chemeascode.domains.process.model import load as load_process
 from chemeascode.domains.process.simulation import backends, record
 from chemeascode.domains.process.simulation import energy as energy_checks
 from chemeascode.domains.process.simulation.run import run
-from chemeascode.domains.process.simulation.schema import Simulation
 from chemeascode.domains.process.simulation.translate import load, translate
 from chemeascode.foundation.workspace import Workspace
 from chemeascode.integrations import idaes, idaes_worker
@@ -328,9 +326,7 @@ def test_the_energy_audit_states_the_idaes_enthalpy_reference(hda):
 
 def test_every_molecular_simulator_has_an_enthalpy_reference():
     """A backend added to ``simulator:`` without its reference would crash the energy audit."""
-    simulators = set(get_args(Simulation.model_fields["simulator"].annotation))
-    # The dynamic A2/O worker returns water-quality indicators and bypasses the energy audit.
-    simulators = {name for name in simulators if backends.BACKENDS[name].molecular}
+    simulators = {name for name, backend in backends.BACKENDS.items() if backend.molecular}
     assert set(energy_checks.REFERENCES) == simulators
     assert set(energy_checks.FORMATION_REFERENCES) == simulators
 

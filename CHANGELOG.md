@@ -2,7 +2,135 @@
 
 ## Unreleased
 
+### Breaking (next major release, ADR 0072)
+
+- New project-worker results use `cheme/adapter-result/v2` and `completed` for dynamic interval
+  completion. Read `execution` and `outcome` instead of assuming `converged` from a completed
+  dynamic run. Historical v1 results remain readable; DWSIM/IDAES/props/propagate keep v1.
+  Worker failures use `cheme.process-worker`. Existing QSDsan configuration and
+  `CHEME_QSDSAN_PYTHON` remain supported. Rerun old worker results to adopt contract-2 fingerprints;
+  no historical evidence is rewritten. See `docs/framework/project-workers.md`.
+
+### Added
+
+- Shared typed worker exchange, local Python transport, producer-aware provenance and protected
+  measured/molecular publication. Native model inputs are copied and hashed as bytes.
+- CSV trajectory metadata, event-side samples, final instantaneous snapshot checks and generic
+  outcome/evidence presentation. Failed attempts cannot replace successful stream values.
+- Adapter/session extension seam tested without QSDsan or commercial software. Aspen Plus,
+  HYSYS and Dymola adapters remain future work; no SDK/COM/remote service was added.
+
+### Internal moves
+
+- `integrations.qsdsan` execution moved to `integrations.workers`; process orchestration moved
+  from `simulation.qsdsan` to `simulation.worker_run` and `worker_publication`. QSDsan semantics
+  remain in `simulation.qsdsan`. See the framework migration table; no internal alias is kept.
+
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Bundled skills and REFERENCE.md brought up to 1.12 and the QSDsan integration: QSDsan
+  configuration, refusals and outputs; propagate's `recovery:`, `specs:` and tears beside
+  simulate; still refusals, condenser freezing, `heat_up_time` and `separate_phase`; thermal
+  screening in the safety skills; flowsheet `recovery:` for specified splits; the
+  `adsorption` and `assay` commands, missing CLI flags and unit defaults in REFERENCE.md. No
+  behaviour changes.
+
+### Fixed
+
+- `cheme process propagate`: the tear values' fingerprint (`recycle.loop_inputs`) includes the
+  recipe's batch size, and the given and assumed values its stream's rate depends on, when a
+  still upstream of a tear has an end at a time with a boil-up that takes the recipe's hours of
+  flows per batch (ADR 0068). A recipe-only change now makes such a tear stale in
+  `stale_fields` and `cheme validate` (core#295). Every other tear keeps its fingerprint. Library:
+  no loop in the library has such a still upstream of a tear, so no entry changes
+  (`cheme process propagate --check` gives the same findings on the 9 entries with tears).
+- `cheme process propagate`: a tear named twice reports its loop problems (a first guess that
+  cannot be converted, a loop that does not close) at the entry that is iterated, the first, not
+  at the duplicate left out (core#296). Only the finding's line changes; no library entry names
+  a tear twice.
+
+### Fixed
+
+- The stirred tank's integrator clipped every running total at zero with the amounts, so an
+  endothermic absorption (a positive `vent.heat_of_absorption`, ADR 0071) gave a `-0.0`
+  `absorption` heat term and added nothing to the semi-batch's peak cooling duty (#298), and a
+  head space that expands (a shrinking liquid, a cooling adiabatic batch) held its
+  `expelled_kmol` at zero while it drew gas back, so pad + inflow no longer equalled end +
+  expelled and the "drew back more gas from the vent line" note never fired (#299). The same
+  clip held an adiabatic batch's vent-condenser duty (`condenser_heat`, the integral) at zero
+  while the condenser was warmer than the batch and warmed the gas: a batch starting at 300 K
+  with its condenser at 330 K reported 1181 kJ instead of the 757 kJ its closed form gives. Only
+  the amounts are clipped now; the vapour's heats, the head space's expelled totals and the
+  absorption heat keep their sign. Library results are unchanged: no library entry declares a
+  head space or a heat of absorption, and `cheme process reactors --json` is identical to the
+  pin's on all 62 entries whose flowsheet has a vent vapour or condenser (process-library
+  01ba8b7).
+
+### Fixed
+
+- Recipe (core#301): a heat or cool operation with `temperatures` before the first `dose` or
+  `react` now takes the charge's heat capacity and wetted area; before, only a unit procedure
+  with a `dose` did, so a plain `reactor: batch` heated up its end content (after the reaction,
+  and after a vent took gas off), and its heat-up time, `heats[].content_kJ`, cycle time and
+  batches per year were off by C_end/C_charge. It now agrees with the model duty's `heat_up`
+  (ADR 0063). A unit procedure with neither a dose nor a react keeps the end's content. Library
+  results are unchanged: `cheme process recipe` gives the same JSON on all 13 entries with
+  jacket-timed operations (all semi-batches whose first `dose` comes before their first `react`,
+  so every heat or cool sits on the same side of it under both rules; two of them cool before
+  the dose, and some cool after the react).
+- Recipe (core#302): a `cool` (as a `heat` already was) whose `temperatures` start and end at
+  the same value is refused by `cheme/recipe/v1` (`cheme.recipe-schema`); before, it passed the
+  schema and then failed the whole recipe with "the medium cannot cool the content", leaving no
+  cycle time. No library entry has one.
+
+### Fixed
+
+- The crystallizer's recycle no longer refuses a valid steady state at a recycle fraction above
+  about 0.999 as "growing without bound (beyond 1000 times the feed)" (#307). A fraction below
+  1 always keeps a purge, so its recycle is bounded (at most r / (1 - r) times the feed) and is
+  solved whatever its size (0.9995: about 1900 times the feed). Only a recycle of the whole
+  filtrate (fraction 1) is checked for growth without bound: every 1000 passes, a component
+  whose growth per pass is steady is carried on at that growth for 2,000,000 more passes, and
+  the loop is refused only when that component's outflow (evaporated, as crystals or in the
+  liquid the cake holds) does not grow with it. The error names that component instead of
+  saying that no crystals form and nothing is purged. A steady growth alone is not refused:
+  with part of the solvent evaporated, the solute builds up at its feed rate for thousands of
+  passes until the liquor saturates, and then converges. KNO3 (100 kg/h in 900 kg/h of water,
+  the cake holding 0.1 kg of liquor per kg of crystals, the whole filtrate returned) is now
+  solved at 0.05 % of the solvent evaporated and 1 kg/kg (51,705 passes, 95.238 kg/h of
+  crystals; refused before) and at 0.1 % and 0.5 kg/kg (21,432 passes, 96.774 kg/h; refused
+  before). Library results are unchanged (no library crystallizer declares a mother-liquor
+  recycle).
+- A crystallizer temperature within the 1e-9 K tolerance below the lowest solubility point gets
+  that point's solubility, not the highest temperature's (#308). Library results are unchanged.
+- A dryer whose inlet holds none of its volatiles (not listed, or listed at 0) is a dryer
+  finding ("nothing to dry") in `cheme process propagate` instead of a crash with a pydantic
+  ValidationError (residual moisture 0) or a vapour written with fractions summing to 0 (#309).
+  A dryer that evaporates nothing (the residual moisture equals the inlet's) writes its vapour
+  of no flow with the inlet's volatile composition. Library results are unchanged.
+
+### Fixed
+
+- The Monte Carlo of a study with one product (`cheme assess lca` with `uncertainty:`) failed
+  with a TypeError or KeyError under allocation by `economic`, `energy`, `exergy` or `shares`
+  when the product had no price, energy, exergy or share (core#310), and the whole report
+  stopped with it. One product takes the whole burden whatever the method, as the
+  deterministic allocation already had it. A study that ran before gives the same numbers.
+- Brightway backend: a water flow mapped `elementary:` (counted in kg, as every flowsheet
+  resource and emission) was refused against its biosphere3 flow in m3
+  (`cheme.lca-activity-unit`, core#311), so river, lake, sea, well or cooling water and water
+  emitted to air or water had no impacts. The row is now characterised per kg with the
+  crosswalk's `per_kg` (0.001 m3 per kg).
+- Brightway backend: rows in m2*a (land occupation) and kBq (radioactivity) were refused for
+  any biosphere flow, since `square meter-year`, `kilo Becquerel` and `Becquerel` were unknown
+  units (core#312); they are characterised as under the factors backend.
+- `lca/manifest.json` (and the scenario records' input files) fingerprinted
+  `estimate/mto.csv` and the equipment list only when a construction entry read them, not when
+  only an equipment-leak estimate counted its valves, flanges or seals from them (core#313).
+  They are now fingerprinted whenever the results count from them.
+- Library effect: none. Of the 67 LCA studies of the process library (main 34c233d), none uses
+  the Brightway backend, none has an equipment-leak estimate (they exclude leaks), and the 12
+  with `uncertainty:` give identical outputs on this branch and at 1.12.0 + core#254
+  (`lca_report` and every file `cheme assess lca --write` writes, compared byte for byte).
 
 ### Fixed
 
