@@ -243,6 +243,44 @@ def test_a_shrinking_liquid_draws_gas_back_into_the_head_space():
     assert result.vent["N"] == pytest.approx(0.4, rel=1e-12)  # the whole pad, in the end
 
 
+@pytest.mark.parametrize("t_end", [360.0, 250.0])
+def test_a_temperature_programme_expands_or_contracts_the_head_space(t_end):
+    """No reaction, no vapour, a programme 300 K to *t_end* (ADR 0074): the held gas follows
+    ``P V / (R T)``. Warmed it expels the difference; cooled it draws gas back from the vent
+    line, its expelled total negative and noted (#299)."""
+    vent = _vent(inerts=["N"], head_space={"stream": "PAD", "provenance": "assumed"})
+    program = {"points": [(0.0, T), (3600.0, t_end)], "provenance": "assumed"}
+    result = _solve(vent, {"S": 4.0, "A": 1.0}, [], None, {"N": 0.4}, time=3600, program=program)
+    head = result.head_space
+    held = P * head["end_m3"] / (R * t_end)
+    assert result.temperature == pytest.approx(t_end, rel=1e-12)
+    assert head["end_kmol"]["N"] == pytest.approx(held, rel=1e-8)
+    assert head["expelled_kmol"]["N"] == pytest.approx(0.4 - held, rel=1e-6)
+    drew = any("drew back more gas from the vent line" in n for n in result.notes)
+    assert drew is (t_end < T)
+    assert (result.peak_vent_flow > 0) is (t_end > T)
+
+
+def test_a_temperature_programme_raises_the_vapour_share_of_the_head_space():
+    """S volatile, ``ln p = a - b / T``, no reaction: a programme 300 to 330 K raises the vapour's
+    share ``Y = p(T) / P`` as it warms the gas; the head space holds ``(1 - Y) P V / (R T)`` of
+    the pad at the end, the rest expelled with its vapour."""
+    phase = _phase("S", {"S": _clausius(10.0, 4000.0)})
+    vent = _vent(
+        inerts=["N"],
+        vapour={"components": ["S"]},
+        head_space={"stream": "PAD", "provenance": "assumed"},
+    )
+    program = {"points": [(0.0, T), (3600.0, 330.0)], "provenance": "assumed"}
+    result = _solve(vent, {"S": 4.0}, [], phase, {"N": 0.4}, time=3600, program=program)
+    head = result.head_space
+    y = math.exp(math.log(10.0) + 4000.0 / 300.0 - 4000.0 / 330.0) / P
+    held = (1 - y) * P * head["end_m3"] / (R * 330.0)
+    assert head["end_kmol"]["N"] == pytest.approx(held, rel=1e-6)
+    assert head["end_kmol"]["N"] + head["expelled_kmol"]["N"] == pytest.approx(0.4, rel=1e-9)
+    assert result.vapour["S"] > 0
+
+
 @pytest.mark.parametrize("h_abs", [-50000.0, 50000.0])
 def test_a_formed_gas_releases_its_heat_of_absorption(h_abs):
     """A -> B + G, 40 % of G vented: its dissolved 60 % releases its heat of absorption as it

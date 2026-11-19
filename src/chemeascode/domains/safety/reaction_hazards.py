@@ -4,11 +4,14 @@ fixed beds, the parametric sensitivity of the hot spot (``cheme process reactor-
 
 Per reactor (a block or step that names reactions or a reactor model), from its inlet stream:
 
-- ``T_p``, the process temperature: an isothermal batch's held temperature (its outlet's given
-  or assumed one, as the batch model holds it from the start), else a batch's charge
-  temperature; a CSTR's solved temperature; a plug-flow bed's inlet temperature (the bed model
-  starts there); else (conversion, equilibrium, gibbs) the inlet's, or the outlet's given or
-  assumed temperature where hotter and its MTSR larger (below);
+- ``T_p``, the process temperature: a batch whose temperature moves (ADR 0074) at its start,
+  the first point of its ``program`` (its outlet's temperature is the programme's end) or, at
+  ``heat: reflux``, its charge's bubble point at the inlet's pressure, its solids left out (the
+  charge's temperature where that is not known); an isothermal batch's held temperature (its
+  outlet's given or assumed one, as the batch model holds it from the start), else a batch's
+  charge temperature; a CSTR's solved temperature; a plug-flow bed's inlet temperature (the
+  bed model starts there); else (conversion, equilibrium, gibbs) the inlet's, or the outlet's
+  given or assumed temperature where hotter and its MTSR larger (below);
 - ``dT_ad``, the adiabatic rise: the largest heat of one reaction run to completion of its
   limiting reactant, over the heat capacity of the feed (a liquid's ``liquid_heat_capacity``,
   a gas's ideal-gas cp; ``heat_of_reaction``, else the ideal-gas data's). A gas-phase batch is
@@ -95,7 +98,10 @@ the screening lacks), ``-phase-change`` (info: a step not screened, its reaction
 changes), ``-reactions`` (warning: ``hazard.reactions`` names a reaction not screened in the
 step), ``-vent`` (a vented batch's gas release at the MTSR, or a semi-batch's largest over
 the batch: a warning without ``hazard.vent_capacity`` or above it, info within it),
-``-dissolved`` (info: the gases held in the liquid a cooling failure can release, ADR 0069). With
+``-dissolved`` (info: the gases held in the liquid a cooling failure can release, ADR 0069),
+``-initiation`` (a semi-batch with ``batch.initiation``, ADR 0074: the uninitiated scenario,
+the dosing going on into a charge that never initiates, its doses that wait for the initiation
+left out; a warning where its MTSR is above the MTT or the TD24, info otherwise). With
 the vent blocked the gas
 pressurises the vessel: that pressure is not screened (no head space or relief model). These
 are screening values for a concept or basic design: they do not replace calorimetry or a
@@ -173,6 +179,10 @@ class HazardEntry:
     accumulations: dict[str, dict[str, float]] = field(default_factory=dict)
     bubble_point: dict[str, Any] | None = None
     dissolved_release: dict[str, Any] | None = None
+    #: ADR 0074, a semi-batch with batch.initiation: the uninitiated scenario (the dosing going
+    #: on into a charge that never initiates, the doses that wait for it left out): until when,
+    #: its largest accumulation and the MTSR at its worst moment (the model's reactions)
+    initiation: dict[str, Any] | None = None
 
 
 #: HazardEntry's fields the JSON gives only when they hold something (ADR 0058): a reactor
@@ -190,6 +200,7 @@ OPTIONAL = (
     "accumulations",
     "bubble_point",
     "dissolved_release",
+    "initiation",
 )
 
 
@@ -462,6 +473,37 @@ def _held_temperature(process: Any, item: Any, case: str) -> tuple[float, str] |
     return outlet_temperature(process, item, case)
 
 
+def _moving_start(
+    item: Any,
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    pressure: float | None,
+    charge: float,
+) -> tuple[float, str] | None:
+    """K a batch whose temperature moves (ADR 0074) starts at in its model, and the note: a
+    programme's first point (its outlet's temperature is the programme's end), at reflux the
+    charge's bubble point at the inlet's pressure (its solid phase left out), else (no vapour
+    pressure: the model refuses it) the *charge*'s temperature; None for any other batch."""
+    from chemeascode.domains.process.batch_kinetics import bubble_point
+
+    batch = item.batch
+    tail = (
+        ", the MTSR that of a cooling failure at the start; the process reactors profile gives "
+        "the temperature over the batch"
+    )
+    if batch.program is not None:
+        start = batch.program.points[0][1]
+        return start, f"the batch's temperature follows its programme: T_p is its start{tail}"
+    if batch.heat != "reflux":
+        return None
+    liquid = {n: v for n, v in moles.items() if n not in (batch.solids or {})}
+    found, _ = bubble_point(liquid, comps, pressure if pressure is not None else 101.325)
+    lead = "the batch's temperature follows its bubble point (reflux): T_p is the charge's "
+    if found is None:
+        return charge, f"{lead}temperature, its bubble point not known{tail}"
+    return found, f"{lead}bubble point{tail}"
+
+
 def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     """The screening of reactor *node* in *case* (see the module docstring); its phase
     changes take no part in dT_ad and the MTT (a semi-batch's MTSR is its model's, phase
@@ -544,6 +586,11 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
                     "tank",
                 )
             )
+    elif model == "batch" and (moving := _moving_start(item, moles, comps, p_in, t_in)) is not None:
+        # ADR 0074: a programme or reflux moves the batch's temperature; the model starts at the
+        # programme's first point or the charge's bubble point, where X_ac = 1 holds
+        states.append((moving[0], None, "accumulation 1: all charged, cooling fails at the start"))
+        entry.notes.append(moving[1])
     elif model == "batch":
         hold = _held_temperature(process, item, case) if item.batch.heat == "isothermal" else None
         # the model holds an isothermal batch at its outlet's temperature from the start
@@ -718,6 +765,7 @@ def _screen_semibatch(
         entry.missing.append(f"the semibatch: {failure}")
         return entry
     points = solved.cooling_profile
+    _initiation(entry, solved)
     every_rx, _ = process.reactions_of(item.id)
     shares = item.batch.vent.shares() if _vented(item) else {}
     # the model's reactions counted (phase changes too, as the model's cooling failure), and
@@ -823,6 +871,28 @@ def _screen_semibatch(
             stripped,
         )
     return entry
+
+
+def _initiation(entry: HazardEntry, solved: Any) -> None:
+    """A semi-batch's uninitiated scenario (ADR 0074, :func:`.stirred_tank._uninitiated`) into
+    *entry*: the dosing going on into a charge that never initiates, its largest accumulation
+    and the cooling-failure temperature at its worst moment (every reaction of the model, run
+    to completion of what accumulated)."""
+    start = solved.initiation
+    scenario = start.get("uninitiated") if start else None
+    if scenario is None:
+        return
+    worst = scenario.get("cooling_failure")
+    entry.initiation = {
+        "time_s": start["time_s"],
+        "doses_waiting": start["doses_waiting"],
+        "until_s": scenario["until_s"],
+        "max_accumulation": scenario.get("max_accumulation"),
+        "worst_time_s": worst["time_s"] if worst else None,
+        "mtsr_K": worst["mtsr_K"] if worst else None,
+    }
+    if scenario.get("missing"):
+        entry.missing.append(f"the uninitiated scenario: {scenario['missing']}")
 
 
 def _point_network(q: Any, reactions: list[Any], shares: dict[str, float]) -> float | None:
@@ -1339,8 +1409,10 @@ def _gas(
     if after_network is not None:
         after, after_label = after_network, "the content after the counted reactions as a network"
     try:
-        rate = vent_gas_rate(process, item, moles, temperature, pressure)
-        rate_after = vent_gas_rate(process, item, after, temperature, pressure) if after else 0.0
+        rate = vent_gas_rate(process, item, moles, temperature, pressure, case)
+        rate_after = (
+            vent_gas_rate(process, item, after, temperature, pressure, case) if after else 0.0
+        )
     except TankError as failure:
         if not inerts_only:
             entry.missing.append(f"the gas release at the MTSR: {failure}")
@@ -1378,12 +1450,12 @@ def _gas(
         "basis": _basis(hours),
         "per_batch": bool(hours),
     }
-    _vapour_laden(process, item, entry, gas, moles, temperature, pressure, scale)
+    _vapour_laden(process, item, entry, gas, moles, temperature, pressure, scale, case)
     if inerts_only and not gas.get("boils"):
         del entry.missing[missing:]  # no gas release, so nothing it lacks
         return {}
     stripped = (
-        _over_batch(process, item, entry, gas, points, values, pressure, scale)
+        _over_batch(process, item, entry, gas, points, values, pressure, scale, case)
         if points and values and not inerts_only
         else {}
     )
@@ -1420,6 +1492,7 @@ def _over_batch(
     values: list[float],
     pressure: float,
     scale: float,
+    case: str | None = None,
 ) -> dict[str, float]:
     """``gas_release.largest_over_batch`` (ADR 0069): at every step of a semi-batch, the gas
     its content forms at that moment's MTSR (every reaction at its rate law, the vent's shares)
@@ -1443,7 +1516,7 @@ def _over_batch(
     every, _ = process.reactions_of(item.id)
     shares = vent.shares()
     try:
-        rates = extent_rates(process, item, list(points[0].moles))
+        rates = extent_rates(process, item, list(points[0].moles), case)
         extents = [rates(q.moles, t, pressure) for q, t in zip(points, values, strict=True)]
     except TankError as failure:
         entry.missing.append(f"the gas release over the batch: {failure}")
@@ -1521,6 +1594,7 @@ def _vapour_laden(
     temperature: float,
     pressure: float,
     scale: float = 1.0,
+    case: str | None = None,
 ) -> None:
     """A vent with ``vapour`` (ADR 0062): the gas release leaves the vessel saturated with the
     liquid's volatile components at the MTSR, so its volume is the non-condensables' over
@@ -1546,7 +1620,7 @@ def _vapour_laden(
     gas["noncondensable_m3_h"] = gas["rate_m3_h"]
     if share >= 1.0:
         gas["boils"] = True
-        _boil_up(process, item, entry, gas, phase, moles, temperature, pressure, scale)
+        _boil_up(process, item, entry, gas, phase, moles, temperature, pressure, scale, case)
         boil = gas.get("boil_up")
         entry.notes.append(
             f"the content boils at the MTSR ({temperature:.1f} K): its vapour pressure "
@@ -1577,6 +1651,7 @@ def _boil_up(
     mtsr: float,
     pressure: float,
     scale: float,
+    case: str | None = None,
 ) -> None:
     """``gas_release.boil_up`` (ADR 0069, a content boiling at the MTSR): the content (*moles*)
     boils at its bubble point ``T_b`` (the vent's volatile components, Raoult's law), where the
@@ -1619,7 +1694,7 @@ def _boil_up(
         entry.missing.append("the boil-up at the MTSR: heat_of_reaction of " + ", ".join(lack))
         return
     try:
-        rates = extent_rates(process, item, list(moles))(moles, t_b, pressure)
+        rates = extent_rates(process, item, list(moles), case)(moles, t_b, pressure)
     except TankError as failure:
         entry.missing.append(f"the boil-up at the MTSR: {failure}")
         return
@@ -1942,7 +2017,7 @@ def _bubble_mtt(
     vessel's pressure of *contents* (the worst moment's, and once the reaction setting the
     MTSR ran to completion), leaving out the vent components, dosed gases and dissolved gases
     (they leave or boil off), with ``vent.vapour.activity`` where given."""
-    from chemeascode.domains.safety.reaction_network import bubble_point
+    from chemeascode.domains.process.batch_kinetics import bubble_point
 
     pressure = p_in if p_in is not None else 101.325
     t_p = entry.process_temperature
@@ -2220,6 +2295,27 @@ def screen(root: Path, case: str | None = None) -> HazardReport:
                         "MTSR; gas from a longer chain of consecutive reactions is not covered"
                     ),
                 )
+        if (start := e.initiation) is not None and start["mtsr_K"] is not None:
+            above = [
+                n
+                for n, v in (("MTT", e.mtt), ("TD24", e.td24))
+                if v is not None and start["mtsr_K"] > v
+            ]
+            add(
+                "warning" if above else "info",
+                "initiation",
+                f"{e.node}: uninitiated (the initiation due at {start['time_s']:.6g} s never "
+                f"coming), the dosing going on to {start['until_s']:.6g} s accumulates "
+                + (
+                    f"{start['max_accumulation']:.3g} of the dosed reactant"
+                    if start["max_accumulation"] is not None
+                    else "its doses"
+                )
+                + f"; a cooling failure or a late initiation then reaches {start['mtsr_K']:.1f} K"
+                + (f", above the {' and the '.join(above)}" if above else ""),
+                "interlock the dosing on a positive initiation (dosing.after_initiation) and "
+                "limit the initiation charge: what is dosed before it initiates accumulates",
+            )
         if (held := e.dissolved_release) is not None:
             add(
                 "info",
@@ -2309,6 +2405,17 @@ def hazard_text(report: HazardReport) -> str:
                     f"{n} {v['max']:.3g} at {v['time_s'] / 3600:.3g} h ({v['reactive_max']:.3g}"
                     f" at {v['reactive_time_s'] / 3600:.3g} h)"
                     for n, v in e.accumulations.items()
+                )
+            )
+        if (start := e.initiation) is not None:
+            lines.append(
+                f"  uninitiated to {start['until_s'] / 3600:.3g} h (initiation due at "
+                f"{start['time_s'] / 3600:.3g} h, {start['doses_waiting']} dose(s) waiting for "
+                "it): "
+                + (
+                    f"X_ac {start['max_accumulation']:.3g}, MTSR {start['mtsr_K']:.1f} K"
+                    if start["mtsr_K"] is not None
+                    else "nothing dosed accumulates"
                 )
             )
         if (bubble := e.bubble_point) is not None:

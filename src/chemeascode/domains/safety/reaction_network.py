@@ -29,9 +29,14 @@ Pure Python, deterministic (ADR 0010).
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+# the bubble point moved to the process domain, where a batch at reflux follows it (ADR 0074)
+from chemeascode.domains.process.batch_kinetics import (  # noqa: F401 - its callers import it here
+    bubble_point,
+    saturation_pressure,
+)
 
 #: Pivots of one simplex solve at most (Bland's rule terminates; this only guards the loop).
 MAX_PIVOTS = 10000
@@ -178,69 +183,3 @@ def consecutive(reactions: Sequence[Any]) -> list[tuple[str, str]]:
             if any(nu < 0 and n in products for n, nu in j.stoichiometry.items()):
                 found.append((j.id, k.id))
     return found
-
-
-def saturation_pressure(comp: Any, temperature: float) -> float | None:
-    """kPa of *comp*'s vapour at *temperature* K: its Antoine ``vapour_pressure``, else
-    Clausius-Clapeyron from ``normal_boiling_point`` and ``heat_of_vaporization``; 0 for a
-    component that does not boil (neither given, or ``phase: solid``); None when it boils but
-    lacks the data (a normal boiling point only)."""
-    from chemeascode.domains.chemistry.thermochemistry import R
-
-    if getattr(comp, "phase", None) == "solid":
-        return 0.0
-    vapour = getattr(comp, "vapour_pressure", None)
-    if vapour is not None:
-        return vapour.kpa(temperature)
-    normal = getattr(comp, "normal_boiling_point", None)
-    if not normal:
-        return 0.0
-    heat = getattr(comp, "heat_of_vaporization", None)
-    if not heat:
-        return None
-    exponent = -heat / R * (1.0 / temperature - 1.0 / normal)
-    return 101.325 * math.exp(min(exponent, 700.0))
-
-
-def bubble_point(
-    moles: Mapping[str, float],
-    comps: Mapping[str, Any],
-    pressure: float,
-    activity: Mapping[str, float] | None = None,
-    left_out: Sequence[str] = (),
-) -> tuple[float | None, list[str]]:
-    """K: the bubble point of the liquid *moles* (kmol by component) at *pressure* kPa(a), its
-    *left_out* components counted in the liquid but not boiling (they leave or boil off), and
-    the components lacking a vapour pressure (then None). None too when nothing boils."""
-    activity = activity or {}
-    total = sum(v for v in moles.values() if v > 0)
-    if total <= 0:
-        return None, []
-    x = {n: v / total for n, v in moles.items() if v > 0 and n not in left_out}
-    lacking = sorted(n for n in x if saturation_pressure(comps.get(n), 300.0) is None)
-    if lacking:
-        return None, lacking
-
-    def excess(t: float) -> float:
-        return (
-            sum(
-                activity.get(n, 1.0) * xi * (saturation_pressure(comps.get(n), t) or 0.0)
-                for n, xi in x.items()
-            )
-            - pressure
-        )
-
-    low, high = 20.0, 5000.0
-    if excess(high) < 0:
-        return None, []
-    if excess(low) >= 0:
-        return low, []
-    for _ in range(200):
-        mid = 0.5 * (low + high)
-        if excess(mid) < 0:
-            low = mid
-        else:
-            high = mid
-        if high - low < 1e-10:
-            break
-    return 0.5 * (low + high), []

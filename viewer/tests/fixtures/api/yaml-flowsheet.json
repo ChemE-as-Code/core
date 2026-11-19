@@ -442,6 +442,44 @@
   "kind": "flowsheet",
   "schema": {
     "$defs": {
+      "AgitatorPower": {
+        "additionalProperties": false,
+        "description": "The power an agitator puts into a vessel's content, which ends there as heat (ADR\n0075): its shaft power, kW.",
+        "properties": {
+          "value": {
+            "description": "kW into the content while the model runs.",
+            "exclusiveMinimum": 0,
+            "title": "Value",
+            "type": "number"
+          },
+          "unit": {
+            "const": "kW",
+            "default": "kW",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "provenance"
+        ],
+        "title": "AgitatorPower",
+        "type": "object"
+      },
       "Batch": {
         "additionalProperties": false,
         "description": "A batch (``reactor: batch``; the model: :mod:`.stirred_tank`): the inlet is the charge\n(its flow the charge per hour), the outlet its composition when the batch ends, after\n``time`` or at the ``target`` conversion; isothermal or adiabatic. A liquid batch keeps its\ncomposition's volume (ideal mixing), a gas batch its volume (the pressure changes).\n\nA semi-batch (``reactor: semibatch``, liquid) adds the ``dosing`` feeds to the charge; its\n``time`` or ``target`` is the post-reaction after the last dose (neither: it ends with the\ndosing). A liquid batch or semi-batch with a ``vent`` gives off the vent's components as\nthey form, by a second outlet.",
@@ -473,9 +511,11 @@
           },
           "heat": {
             "default": "isothermal",
+            "description": "isothermal (at the outlet's temperature, or a program), adiabatic, or reflux: a liquid held at its bubble point at the vessel's pressure, its vapour condensed and returned (ADR 0074).",
             "enum": [
               "isothermal",
-              "adiabatic"
+              "adiabatic",
+              "reflux"
             ],
             "title": "Heat",
             "type": "string"
@@ -519,6 +559,87 @@
             "description": "An isothermal batch or semi-batch: count the charge's heat-up from its inlet temperature to the batch's in the model's duty (ADR 0063); default: the model holds the batch at its temperature from the start and leaves it to the recipe.",
             "title": "Heat Up",
             "type": "boolean"
+          },
+          "heat_up_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "With heat_up: the energy port whose stream carries the charge's heat-up and the vessel's metal (steam for the warm-up), apart from the rest of the model's duty on energy_port (the reaction's cooling water; ADR 0075).",
+            "title": "Heat Up Port"
+          },
+          "heat_of_solution": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatOfSolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch or semi-batch: the heat the charge's components take up (or release) as they dissolve when charged, a solid's heat of solution, per kmol charged; in the model's duty, not in its peak cooling duty or the screening (ADR 0075)."
+          },
+          "agitator_power": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AgitatorPower"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch or semi-batch: the agitator's power that ends as heat in the content while the model runs (its dosing and reaction time); in the model's duty and the recipe's peak duty (ADR 0075)."
+          },
+          "initiation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Initiation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An induction period: the rate laws held back until the reaction initiates (ADR 0074)."
+          },
+          "program": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/TemperatureProgram"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An isothermal batch's temperature programme: {points: [(s, K)]} (ADR 0074)."
+          },
+          "solids": {
+            "additionalProperties": {
+              "$ref": "#/$defs/SolidPhase"
+            },
+            "description": "Component -> its solid phase: carried out of the liquid, with its particles for a surface rate law (ADR 0074).",
+            "title": "Solids",
+            "type": "object"
+          },
+          "light": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Light"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The light of photochemical rate laws: lamp power, wavelength, absorber (ADR 0074)."
           },
           "provenance": {
             "enum": [
@@ -791,6 +912,12 @@
             "default": null,
             "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
             "title": "Energy Port"
+          },
+          "vessel_metal": {
+            "default": false,
+            "description": "A conversion step in a recipe vessel with metal_heat_capacity: its duty holds the vessel's metal heated or cooled with the content, from its inlets' temperature to its outlets' (ADR 0075); default: the metal is left out.",
+            "title": "Vessel Metal",
+            "type": "boolean"
           },
           "still": {
             "anyOf": [
@@ -1126,6 +1253,68 @@
           "basis"
         ],
         "title": "CakeLiquid",
+        "type": "object"
+      },
+      "CakeWash": {
+        "additionalProperties": false,
+        "description": "A displacement wash of the cake on the filter (ADR 0076): the wash liquid enters by the\nstep's material inlet ``port``, passes through the cake and displaces its liquor. The\nfraction of the unwashed cake's liquor left in the washed cake is ``R = (1 - E)^n``, with\n``E`` the wash ``efficiency`` and ``n`` the mass wash ratio (kg of wash per kg of liquor\nin the unwashed cake); the washed cake holds ``cake_liquid`` (default: the separation's),\nthe rest of it wash liquid. With ``dissolution:`` the wash dissolves crystals on its way.",
+        "properties": {
+          "port": {
+            "description": "The step's material inlet port of the wash liquid.",
+            "title": "Port",
+            "type": "string"
+          },
+          "efficiency": {
+            "description": "E: the wash efficiency per unit mass wash ratio.",
+            "exclusiveMaximum": 1,
+            "exclusiveMinimum": 0,
+            "title": "Efficiency",
+            "type": "number"
+          },
+          "cake_liquid": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CakeLiquid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The liquid the washed cake holds; default the separation's cake_liquid."
+          },
+          "dissolution": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/WashDissolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "efficiency",
+          "provenance"
+        ],
+        "title": "CakeWash",
         "type": "object"
       },
       "Case": {
@@ -1633,6 +1822,18 @@
             "title": "Spectators",
             "type": "array"
           },
+          "second_liquid": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SecondLiquid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Spectators that form a liquid phase of their own (an oil): carried unchanged, left out of the mother liquor's solubility basis and molality (ADR 0076)."
+          },
           "outlets": {
             "additionalProperties": {
               "type": "string"
@@ -1860,6 +2061,12 @@
             "title": "Start",
             "type": "number"
           },
+          "after_initiation": {
+            "default": false,
+            "description": "The dose waits for the reaction to initiate (batch.initiation, ADR 0074): its start counts from the initiation, as a feed interlocked on a positive initiation.",
+            "title": "After Initiation",
+            "type": "boolean"
+          },
           "absorbed": {
             "anyOf": [
               {
@@ -1896,7 +2103,7 @@
       },
       "Dryer": {
         "additionalProperties": false,
-        "description": "A batch (filter-)dryer or vacuum dryer (:mod:`.dryer`): one wet-cake inlet, the dried\nproduct and the vapour out. The ``volatiles`` leave as vapour down to the\n``residual_moisture``; every other component (the solid, and what the cake liquid held\ndissolved) stays in the product. The energy (``energy:``) is the cake's sensible heat to\nthe drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's\nheat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a\nbatch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given\n``drying_time``.",
+        "description": "A batch (filter-)dryer or vacuum dryer (:mod:`.dryer`): one wet-cake inlet, the dried\nproduct and the vapour out. The ``volatiles`` leave as vapour down to the\n``residual_moisture``; every other component (the solid, and what the cake liquid held\ndissolved) stays in the product. The energy (``energy:``) is the cake's sensible heat to\nthe drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's\nheat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a\nbatch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given\n``drying_time``. ADR 0076 adds, each optional: the volatiles kept by their vapour pressures\n(``selectivity: raoult``), a subliming product, the cooling after drying and the vacuum\ncondenser (with a ``condensate`` outlet).",
         "properties": {
           "volatiles": {
             "description": "The components that evaporate.",
@@ -1966,15 +2173,73 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Role -> the step's outlet port.",
+            "description": "Role -> the step's outlet port (condensate: with a condenser, the vapour then what passes it).",
             "propertyNames": {
               "enum": [
                 "product",
-                "vapour"
+                "vapour",
+                "condensate"
               ]
             },
             "title": "Outlets",
             "type": "object"
+          },
+          "pressure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kPa(a) of the dryer (its vacuum): the sublimation and the condenser",
+            "title": "Pressure"
+          },
+          "selectivity": {
+            "default": "inlet_ratio",
+            "description": "The volatiles kept: in the inlet's ratio, or (raoult) what an open evaporation of an ideal cake liquid at the drying temperature leaves, by each volatile's vapour_pressure.",
+            "enum": [
+              "inlet_ratio",
+              "raoult"
+            ],
+            "title": "Selectivity",
+            "type": "string"
+          },
+          "sublimation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Sublimation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "cooling": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DryerCooling"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "condenser": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DryerCondenser"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -1984,6 +2249,138 @@
           "outlets"
         ],
         "title": "Dryer",
+        "type": "object"
+      },
+      "DryerCondenser": {
+        "additionalProperties": false,
+        "description": "The dryer's vacuum condenser (ADR 0076): the vapour, at the drying temperature and the\ndryer's ``pressure``, cooled to ``temperature``, where an ideal condensate is in\nequilibrium with what passes to the vacuum pump (Raoult's law, each vapour's Antoine\n``vapour_pressure``). Its duty is the vapour's latent heat (the dryer's) of what condenses\nand all of the vapour cooled as liquid at ``heat_capacity`` (what passes re-evaporated at\nthe same latent heat, as a vent condenser's); a sublimate passes it uncounted.",
+        "properties": {
+          "temperature": {
+            "description": "K: the condensate and the gas leave at it.",
+            "exclusiveMinimum": 0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "heat_capacity": {
+            "description": "kJ/(kg K) of the vapour cooled as liquid (condensate), constant",
+            "exclusiveMinimum": 0,
+            "title": "Heat Capacity",
+            "type": "number"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The energy outlet port of the condenser: its duty is compared.",
+            "title": "Port"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "temperature",
+          "heat_capacity",
+          "provenance"
+        ],
+        "title": "DryerCondenser",
+        "type": "object"
+      },
+      "DryerCooling": {
+        "additionalProperties": false,
+        "description": "What the dryer cools after drying, in the vessel (ADR 0076): the dried product to its\ndischarge ``product_temperature`` (default: it leaves at the drying temperature) and the\nvessel's metal (``energy.vessel_heat_capacity``) back to ``vessel_temperature`` for the next\nbatch (default: the wet cake's inlet temperature, from which the next batch heats it). With\nit, ``cheme process propagate`` writes the outlets' temperatures.",
+        "properties": {
+          "product_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K of the product at discharge",
+            "title": "Product Temperature"
+          },
+          "heat_capacity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kJ/(kg K) of the dried product (needed with product_temperature)",
+            "title": "Heat Capacity"
+          },
+          "vessel_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K the vessel is cooled back to; default the cake's inlet",
+            "title": "Vessel Temperature"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The energy outlet port of the cooling: its duty is compared.",
+            "title": "Port"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provenance"
+        ],
+        "title": "DryerCooling",
         "type": "object"
       },
       "DryerEnergy": {
@@ -2344,6 +2741,45 @@
         "title": "HeadSpace",
         "type": "object"
       },
+      "HeatLoss": {
+        "additionalProperties": false,
+        "description": "A vessel's heat loss to its surroundings (ADR 0075): its overall coefficient times its\nouter area, and the ambient temperature.",
+        "properties": {
+          "ua": {
+            "description": "W/K, the content to the surroundings.",
+            "exclusiveMinimum": 0,
+            "title": "Ua",
+            "type": "number"
+          },
+          "ambient_temperature": {
+            "description": "K of the surroundings.",
+            "exclusiveMinimum": 0,
+            "title": "Ambient Temperature",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ua",
+          "ambient_temperature",
+          "provenance"
+        ],
+        "title": "HeatLoss",
+        "type": "object"
+      },
       "HeatOfAbsorption": {
         "additionalProperties": false,
         "description": "The heat a vent gas releases as it dissolves in the batch's liquid (ADR 0071): per kmol\ndissolved (kJ/kmol = J/mol), negative when dissolving releases heat. A formed gas's share\nkept dissolved (``fraction`` below 1, or ``henry``) releases it as it forms; a dissolved gas\nthat degasses by ``vapour.henry`` takes it back as it leaves. The reactions' heats stay on\nthe gas basis.",
@@ -2503,6 +2939,54 @@
         "title": "ImposedYield",
         "type": "object"
       },
+      "Initiation": {
+        "additionalProperties": false,
+        "description": "A reaction that initiates only after an induction period (ADR 0074; a Grignard\nformation on a passivated metal): before ``time`` the ``reactions``' rate laws run at\n``factor`` of their rate (0: not at all), from then on at their own. A dose with\n``after_initiation`` waits for it.",
+        "properties": {
+          "time": {
+            "description": "s after the charge the reaction initiates",
+            "exclusiveMinimum": 0,
+            "title": "Time",
+            "type": "number"
+          },
+          "factor": {
+            "default": 0.0,
+            "description": "The rate laws' share of their rate before it.",
+            "exclusiveMaximum": 1,
+            "minimum": 0,
+            "title": "Factor",
+            "type": "number"
+          },
+          "reactions": {
+            "description": "The reactions it holds back (default: every reaction of the step).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "provenance"
+        ],
+        "title": "Initiation",
+        "type": "object"
+      },
       "Layout": {
         "additionalProperties": false,
         "properties": {
@@ -2522,6 +3006,104 @@
           }
         },
         "title": "Layout",
+        "type": "object"
+      },
+      "Light": {
+        "additionalProperties": false,
+        "description": "The light of a photochemical batch or semi-batch (ADR 0074): ``power`` W of radiant power\nat ``wavelength`` entering the content per m3 of the charge, of which the content absorbs\n``1 - 10^(-epsilon c l)`` (Beer-Lambert, decadic: the ``absorber``'s concentration, its\n``absorptivity`` and the ``path_length``), or all of it without an absorber. The photons\nabsorbed drive the photochemical rate laws; the power absorbed heats the content. The lamp\nis on in the ``on`` windows (default: throughout).",
+        "properties": {
+          "power": {
+            "description": "W into the content per m3 of the charge",
+            "exclusiveMinimum": 0,
+            "title": "Power",
+            "type": "number"
+          },
+          "wavelength": {
+            "description": "nm (monochromatic, or the band's centre)",
+            "exclusiveMinimum": 0,
+            "title": "Wavelength",
+            "type": "number"
+          },
+          "absorber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The component that absorbs the light; none: all of it.",
+            "title": "Absorber"
+          },
+          "absorptivity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2/kmol: the absorber's decadic molar absorption coefficient (one L/(mol cm) is 100 m2/kmol).",
+            "title": "Absorptivity"
+          },
+          "path_length": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m: the light's path",
+            "title": "Path Length"
+          },
+          "on": {
+            "description": "(s, s) windows the lamp is on, after the charge; default: throughout.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "On",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "power",
+          "wavelength",
+          "provenance"
+        ],
+        "title": "Light",
         "type": "object"
       },
       "Link": {
@@ -2565,6 +3147,48 @@
           "ref"
         ],
         "title": "Link",
+        "type": "object"
+      },
+      "LiquorComposition": {
+        "additionalProperties": false,
+        "description": "The mother liquor a ``measured_in: mother_liquor`` solubility was measured in (ADR 0076):\neach named spectator's mass fraction in the saturated liquor (solute, solvent and\nspectators), as its source states. ``cheme process crystallizers`` compares the solved\nmother liquor with it (``cheme.process-crystallizer-liquor``).",
+        "properties": {
+          "mass_fraction": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Spectator id -> its mass fraction in the source's liquor.",
+            "minProperties": 1,
+            "title": "Mass Fraction",
+            "type": "object"
+          },
+          "tolerance": {
+            "description": "Relative: how far the solved liquor may differ before it is reported.",
+            "exclusiveMinimum": 0,
+            "title": "Tolerance",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mass_fraction",
+          "tolerance",
+          "provenance"
+        ],
+        "title": "LiquorComposition",
         "type": "object"
       },
       "MotherLiquorRecycle": {
@@ -3155,6 +3779,52 @@
         "title": "SaltingOut",
         "type": "object"
       },
+      "SecondLiquid": {
+        "additionalProperties": false,
+        "description": "A second liquid phase in a slurry (ADR 0076): an oil of the listed ``components``, apart\nfrom the liquor. A filter's cake holds its own ``cake_liquid`` of it (per kg of solid, or\nits mass fraction of the wet cake); a crystallizer leaves them out of its mother liquor\n(its solubility basis and the salting-out molality).",
+        "properties": {
+          "components": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Components",
+            "type": "array"
+          },
+          "cake_liquid": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CakeLiquid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A filter's: the second liquid the cake holds (required in a filter)."
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "components",
+          "provenance"
+        ],
+        "title": "SecondLiquid",
+        "type": "object"
+      },
       "Selectivity": {
         "additionalProperties": false,
         "description": "A conversion reactor given as reported: the per-pass ``conversion`` of the ``key``\ncomponent and the molar selectivity to each product, ``F_p formed / F_key converted``. The\nextents of the reactions follow (series and parallel side reactions in one step).",
@@ -3244,9 +3914,69 @@
         "title": "SelectivityUncertainty",
         "type": "object"
       },
+      "SolidPhase": {
+        "additionalProperties": false,
+        "description": "A component a liquid batch or semi-batch carries as a solid phase (ADR 0074): out of the\nliquid's composition (its mole fractions, concentrations and activities), its volume ``n M\n/ density`` in the content's, its ``liquid_heat_capacity`` (materials.yaml) in the content's\nheat capacity. A rate law per m2 of its surface (``basis: surface``) takes its particles at\nthe charge, of ``diameter`` (equal spheres) or ``specific_area``, shrinking as they react\n(``A = A_0 (n / n_0)^(2/3)``, the particles' number constant).",
+        "properties": {
+          "density": {
+            "description": "kg/m3 of the solid (not the bulk's)",
+            "exclusiveMinimum": 0,
+            "title": "Density",
+            "type": "number"
+          },
+          "diameter": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m: of the particles charged, taken as equal spheres",
+            "title": "Diameter"
+          },
+          "specific_area": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "m2/kg of the particles charged (instead of diameter)",
+            "title": "Specific Area"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "density",
+          "provenance"
+        ],
+        "title": "SolidPhase",
+        "type": "object"
+      },
       "SolidSeparation": {
         "additionalProperties": false,
-        "description": "A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid\nthe cake holds, specified (no filtration or centrifuge model); the liquid divides with the\nsame composition between cake and filtrate. ``outlets`` maps ``cake`` and ``filtrate`` to\nthe step's outlet ports (inside a ``crystallizer:``, the crystallizer's own outlets).",
+        "description": "A filter or centrifuge: the fraction of the solid that reaches the cake and the liquid\nthe cake holds, specified (no filtration or centrifuge model); the liquid divides with the\nsame composition between cake and filtrate. ``outlets`` maps ``cake`` and ``filtrate`` to\nthe step's outlet ports (inside a ``crystallizer:``, the crystallizer's own outlets); with a\n``wash:``, ``wash_filtrate`` may name the outlet of the wash filtrate (else it joins the\nfiltrate).",
         "properties": {
           "solid_recovery": {
             "description": "Fraction of the solid to the cake.",
@@ -3265,7 +3995,8 @@
             "propertyNames": {
               "enum": [
                 "cake",
-                "filtrate"
+                "filtrate",
+                "wash_filtrate"
               ]
             },
             "title": "Outlets",
@@ -3296,6 +4027,30 @@
             ],
             "default": null,
             "description": "The filtration time of a batch (Ruth), for a recipe's filter from:."
+          },
+          "wash": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/CakeWash"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A displacement wash of the cake, with the wash's dissolution (ADR 0076)."
+          },
+          "second_liquid": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SecondLiquid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "An oil apart from the liquor, held in the cake by its own cake_liquid."
           }
         },
         "required": [
@@ -3308,7 +4063,7 @@
       },
       "Solubility": {
         "additionalProperties": false,
-        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed).\n\nWith spectator solutes (``crystallizer.spectators``), the solubility is either measured in\nthat mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a\n``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is\nrefused (``cheme.process-crystallizer``).",
+        "description": "The solubility of a crystallizer's solute in its solvent: ``points`` (temperature in K,\nvalue), interpolated linearly at the crystallizer's temperature and never extrapolated, or\none ``value`` that holds at the crystallizer's conditions as stated by its source (the\nsaturated mother liquor; no temperature dependence claimed). One point away from the\ncrystallizer's temperature is refused unless ``transfer:`` states how it is carried there\n(ADR 0076).\n\nWith spectator solutes (``crystallizer.spectators``), the solubility is either measured in\nthat mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a\n``salting_out:`` (Setschenow) coefficient per spectator; a pure-solvent value alone is\nrefused (``cheme.process-crystallizer``).",
         "properties": {
           "unit": {
             "description": "kg of anhydrous solute per kg of solvent (g/100 g divided by 100), the solute's mass fraction in the saturated solution (spectators included), or kg per kg of solute-free liquor (solvent plus spectators; measured_in: mother_liquor).",
@@ -3373,6 +4128,30 @@
             "default": null,
             "description": "Setschenow coefficients that correct the pure-solvent data for the spectators' molality in the mother liquor."
           },
+          "transfer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SolubilityTransfer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "One point carried to the crystallizer's temperature (van 't Hoff, an ideal solution at a constant heat of solution); reported as not at the operating conditions."
+          },
+          "liquor": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LiquorComposition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "measured_in: mother_liquor: the composition of the liquor the data were measured in, compared with the solved mother liquor."
+          },
           "provenance": {
             "enum": [
               "given",
@@ -3393,6 +4172,43 @@
           "provenance"
         ],
         "title": "Solubility",
+        "type": "object"
+      },
+      "SolubilityTransfer": {
+        "additionalProperties": false,
+        "description": "The transfer of one solubility point to the crystallizer's temperature (ADR 0076): the\ntemperature dependence of an ideal solution's solubility at a constant heat of solution,\n``ln(x / x0) = -(dH_sol / R) (1 / T - 1 / T0)``, on the solute's mole fraction ``x`` in the\nsolute and its solvent. The value it gives is not a measurement at the operating\nconditions, and the report says so.",
+        "properties": {
+          "heat_of_solution": {
+            "description": "kJ/kmol (J/mol) of solute dissolved at infinite dilution, the partial molar enthalpy of the dissolved solute less the crystal's: positive when dissolving takes heat (the solubility rises with temperature); 0 states no temperature dependence.",
+            "title": "Heat Of Solution",
+            "type": "number"
+          },
+          "unit": {
+            "const": "kJ/kmol",
+            "default": "kJ/kmol",
+            "title": "Unit",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "heat_of_solution",
+          "provenance"
+        ],
+        "title": "SolubilityTransfer",
         "type": "object"
       },
       "SpecPer": {
@@ -3739,6 +4555,12 @@
             "default": null,
             "description": "A batch or semi-batch reactor, batch still, crystallizer or conversion step: the energy port whose stream carries the model's year-average duty (cheme process propagate writes it, or compares a given one); default: its one heat stream (an energy stream from or to a heating or cooling utility). A stream from or to another block or step is heat only where energy_port names it.",
             "title": "Energy Port"
+          },
+          "vessel_metal": {
+            "default": false,
+            "description": "A conversion step in a recipe vessel with metal_heat_capacity: its duty holds the vessel's metal heated or cooled with the content, from its inlets' temperature to its outlets' (ADR 0075); default: the metal is left out.",
+            "title": "Vessel Metal",
+            "type": "boolean"
           },
           "still": {
             "anyOf": [
@@ -4116,6 +4938,36 @@
             "description": "The energy port (out, to cooling) whose stream carries the condenser's duty; default with a column: its one heat stream out.",
             "title": "Condenser Port"
           },
+          "sensible_heat": {
+            "default": false,
+            "description": "Count the content's sensible heat as its bubble point rises while it boils (volatility raoult): the pot's liquid_heat_capacity times each step's rise, in the still's duty (ADR 0075); default: the boil-up's latent heat at constant temperature.",
+            "title": "Sensible Heat",
+            "type": "boolean"
+          },
+          "heat_loss": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HeatLoss"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The still's heat loss to its surroundings over the boil-up (volatility raoult), UA (T - T_ambient) along its temperatures, in the still's duty (ADR 0075)."
+          },
+          "agitator_power": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AgitatorPower"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The pot's agitator power that ends as heat in the content over the boil-up's time, taken off the still's duty (ADR 0075)."
+          },
           "provenance": {
             "enum": [
               "given",
@@ -4382,6 +5234,49 @@
         "title": "StreamDef",
         "type": "object"
       },
+      "Sublimation": {
+        "additionalProperties": false,
+        "description": "Solid components of the product that sublime as the vapour leaves (ADR 0076): the\nvapour leaves saturated with them at the drying temperature and the dryer's pressure (an\nupper bound of the loss), each solid's ``vapour_pressure`` in materials.yaml its\nsublimation pressure. Each solid is counted in the vapour as the component it maps to (the\nsame formula).",
+        "properties": {
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Solid component -> the component its vapour is counted as.",
+            "minProperties": 1,
+            "title": "Components",
+            "type": "object"
+          },
+          "heat": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "kJ per kg sublimed, per solid (needed in the duty when it sublimes)",
+            "title": "Heat",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "components",
+          "provenance"
+        ],
+        "title": "Sublimation",
+        "type": "object"
+      },
       "Tank": {
         "additionalProperties": false,
         "description": "A continuous stirred tank (``reactor: cstr``; the model: :mod:`.stirred_tank`): its\nvolume, or the space time V / Q0 on the inlet's volumetric flow, of each of ``count`` equal\ntanks in series; isothermal (at the outlet's temperature, else the inlet's) or adiabatic.",
@@ -4550,6 +5445,51 @@
           }
         },
         "title": "TearGuess",
+        "type": "object"
+      },
+      "TemperatureProgram": {
+        "additionalProperties": false,
+        "description": "An isothermal batch or semi-batch held to a temperature programme (ADR 0074): ``points``\nof (s after the charge, K), the first at 0 s, the content's temperature linear between\nthem and held at the last after it; e.g. a dose at one temperature and the post-reaction at\nanother.",
+        "properties": {
+          "points": {
+            "description": "(time s, temperature K) pairs, the first at 0 s.",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Points",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "points",
+          "provenance"
+        ],
+        "title": "TemperatureProgram",
         "type": "object"
       },
       "Terminal": {
@@ -5205,6 +6145,69 @@
           "provenance"
         ],
         "title": "Volatility",
+        "type": "object"
+      },
+      "WashDissolution": {
+        "additionalProperties": false,
+        "description": "The crystals a cake wash dissolves (ADR 0076): the wash leaves the cake at\n``saturation`` of its solubility (1: saturated, the upper bound of the loss), the\n``crystal`` going into its dissolved ``solute`` (the same formula: an anhydrous crystal)\nuntil the crystals are gone. The ``solubility`` is per kg of the wash liquid as fed\n(``kg/kg_solvent``, its solvent the wash liquid) or the solute's mass fraction in the\nsaturated wash, at the wash's ``temperature``.",
+        "properties": {
+          "crystal": {
+            "description": "The solid component that dissolves (phase: solid).",
+            "title": "Crystal",
+            "type": "string"
+          },
+          "solute": {
+            "description": "The dissolved component it becomes (the same formula).",
+            "title": "Solute",
+            "type": "string"
+          },
+          "solubility": {
+            "$ref": "#/$defs/Solubility"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "K of the wash (needed for solubility points)",
+            "title": "Temperature"
+          },
+          "saturation": {
+            "default": 1.0,
+            "description": "The wash filtrate's approach to the solubility: 1 saturated (an upper bound of the loss), less where the contact is short.",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "title": "Saturation",
+            "type": "number"
+          },
+          "provenance": {
+            "enum": [
+              "given",
+              "assumed",
+              "calculated"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "crystal",
+          "solute",
+          "solubility",
+          "provenance"
+        ],
+        "title": "WashDissolution",
         "type": "object"
       }
     },

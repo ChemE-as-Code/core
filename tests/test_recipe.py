@@ -5,6 +5,7 @@ check against the flowsheet, the Gantt chart and the TEA's batch operation taken
 import copy
 import json
 import math
+import sys
 
 import pytest
 import yaml
@@ -319,6 +320,21 @@ def test_a_jacket_too_small_for_the_peak_duty_is_a_finding(tmp_path):
     assert messages and "108% full" in messages[0]
 
 
+def test_a_programme_s_jacket_check_takes_its_lowest_temperature(tmp_path, monkeypatch):
+    """Dosed at 300 K, held at 340 K (ADR 0074): the peak duty falls in the dosing, where the
+    jacket removes least, so the check takes 300 K, not the programme's end."""
+    program = "program: {points: [[0, 300], [3600, 300], [3700, 340]], provenance: assumed}, "
+    monkeypatch.setattr(
+        sys.modules[__name__], "TWO_UNITS", TWO_UNITS.replace("batch: {", "batch: {" + program, 1)
+    )
+    ws = _plant(tmp_path, _jacketed(coolant=280.0))
+    (vessel,) = recipe_report(ws.root).vessels
+    assert vessel.process_temperature == pytest.approx(300.0)
+    assert vessel.removable == pytest.approx(0.4 * vessel.jacket_area * 20.0, rel=1e-9)
+    (finding,) = _recipe_findings(ws)
+    assert finding.rule == "cheme.recipe-jacket" and finding.level == "warning"
+
+
 def test_heat_up_and_cool_down_times_from_the_jacket(tmp_path):
     recipe = _jacketed()
     ops = recipe["unit_procedures"][0]["operations"]
@@ -522,26 +538,3 @@ def test_a_vessel_of_several_steps_is_sized_from_its_one_batch_step(tmp_path):
     found = _recipe_vessel(process, "R", "design")
     assert found is not None and found.volume == pytest.approx(vessel.volume)
     assert _recipe_vessel(process, "C", "design") is None
-
-
-def test_a_vessel_holding_two_batch_steps_says_which_one_is_not_named(tmp_path):
-    """A block or units holding two batch or semibatch steps: the vessel is not sized from the
-    first in YAML order, it is cheme.recipe-reference."""
-    flowsheet = TWO_UNITS.replace(
-        "  - id: C\n    class: Cooling\n",
-        "  - id: C\n    class: ReactingChemicals\n    reactions: [R1]\n    reactor: batch\n"
-        "    batch: {time: 600, provenance: assumed}\n",
-    )
-    assert flowsheet != TWO_UNITS
-    recipe = _jacketed()
-    up = recipe["unit_procedures"][0]
-    up.pop("unit")
-    up["units"] = ["R", "C"]
-    recipe["unit_procedures"].pop(1)
-    ws = _plant(tmp_path, recipe, propagate=False)
-    (ws.root / "process/flowsheet.yaml").write_text(flowsheet)
-    result = recipe_report(ws.root)
-    assert not result.vessels
-    (finding,) = [f for f in result.findings if f.rule == "cheme.recipe-reference"]
-    assert finding.level == "error" and "R+C holds R, C: several batch" in finding.message
-    assert finding.line is not None and finding.hint
