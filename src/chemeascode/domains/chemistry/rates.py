@@ -172,7 +172,14 @@ def rate(
     :class:`.liquid.Liquid`) of those mole fractions; *ln_k* (on *k_basis*, the basis of the
     reaction's equilibrium constant) is needed with ``reverse: equilibrium``. Raises ValueError
     when it is missing, when a species with a negative order is absent, and with ``reverse:
-    equilibrium`` when a reactant is absent (the reverse rate is then not defined by the law)."""
+    equilibrium`` when a reactant is absent (the reverse rate is then not defined by the law).
+    Without ``reverse: equilibrium`` the rate is 0 while a reactant is absent, whatever the law's
+    order in it: a zero order (``0.0 ** 0 == 1``) or a reactant the law leaves out would
+    otherwise keep converting what is no longer there."""
+    if law.reverse != "equilibrium" and any(
+        nu < 0 and fractions.get(n, 0.0) <= 0 for n, nu in stoichiometry.items()
+    ):
+        return 0.0
     c = driving_forces(law, fractions, temperature, pressure, liquid)
     for n, a in law.orders.items():
         if a < 0 and c.get(n, 0.0) <= 0:
