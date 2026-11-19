@@ -532,6 +532,7 @@ class Adapter:
         self.process = process
         self.package = package_of(process)
         self._flashers: dict[tuple[str, ...], Any] = {}
+        self._pure_flashers: dict[tuple[tuple[str, ...], int], Any] = {}
 
     def _flasher(self, cas: tuple[str, ...]) -> Any:
         if cas not in self._flashers:
@@ -556,12 +557,56 @@ class Adapter:
                 )
         return self._flashers[cas]
 
+    def _pure_flasher(self, cas: tuple[str, ...], index: int) -> Any:
+        """thermo's pure-component flasher (FlashPureVLS) of component *index* of the package
+        *cas*, on the same constants, heat capacities and Peng-Robinson parameters as the
+        package's FlashVL (so its states agree with FlashVL's wherever both converge)."""
+        key = (cas, index)
+        if key not in self._pure_flashers:
+            flasher, constants = self._flasher(cas)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from thermo import PRMIX, CEOSGas, CEOSLiquid, FlashPureVLS
+
+                one = constants.subset([index])
+                correlations = flasher.correlations.subset([index])
+                kwargs = {
+                    "Tcs": one.Tcs,
+                    "Pcs": one.Pcs,
+                    "omegas": one.omegas,
+                    "kijs": [[0.0]],
+                }
+                heat = correlations.HeatCapacityGases
+                gas = CEOSGas(PRMIX, kwargs, HeatCapacityGases=heat)
+                liquid = CEOSLiquid(PRMIX, kwargs, HeatCapacityGases=heat)
+                self._pure_flashers[key] = FlashPureVLS(
+                    one, correlations, gas=gas, liquids=[liquid], solids=[]
+                )
+        return self._pure_flashers[key]
+
+    def _thermo_flash(self, cas: tuple[str, ...], zs: list[float], **spec: float) -> Any:
+        """thermo's flash of *zs* over the package *cas* at *spec*. A single component (every
+        other fraction zero) at a spec that can fall inside its two-phase region (entropy,
+        enthalpy or a vapour fraction between 0 and 1) goes to the pure-component flasher:
+        FlashVL fails there (division by zero, unbound locals). Temperature-pressure flashes and
+        saturation points (vapour fraction 0 or 1) stay on FlashVL, whose phases keep every
+        component (the infinite-dilution K values of :meth:`k_values`)."""
+        flasher, _ = self._flasher(cas)
+        present = [i for i, x in enumerate(zs) if x > 0.0]
+        vf = spec.get("VF")
+        dome = "S" in spec or "H" in spec or (vf is not None and 0.0 < vf < 1.0)
+        if len(present) == 1 and len(zs) > 1 and dome:
+            return self._pure_flasher(cas, present[0]).flash(**spec)
+        return flasher.flash(zs=zs, **spec)
+
     def _zs(self, fractions: dict[str, float]) -> tuple[tuple[str, ...], list[float]]:
-        """Mole fractions over every component of the package (zeros included: thermo's FlashVL
-        fails for a single component, and one flasher serves every stream)."""
+        """Mole fractions over every component of the package (zeros included: one flasher
+        serves every stream), summed over component ids that share a CAS number."""
         comps = self.process.components()
         cas = tuple(sorted(self.package.components))
-        by_cas = {comps[n].cas: x for n, x in fractions.items()}
+        by_cas: dict[str, float] = {}
+        for name, x in fractions.items():
+            by_cas[comps[name].cas] = by_cas.get(comps[name].cas, 0.0) + x
         return cas, [by_cas.get(c, 0.0) for c in cas]
 
     def _vle_claimed(self, what: str) -> None:
@@ -590,10 +635,9 @@ class Adapter:
         """Bubble (*vapor_fraction* 0) or dew (1) temperature in K at *pressure* kPa(a)."""
         self._vle_claimed("saturation temperature")
         cas, zs = self._zs(fractions)
-        flasher, _ = self._flasher(cas)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            state = flasher.flash(P=pressure * 1000.0, VF=vapor_fraction, zs=zs)
+            state = self._thermo_flash(cas, zs, P=pressure * 1000.0, VF=vapor_fraction)
         return float(state.T)
 
     def flash(self, inputs: Inputs, phase: str | None = None) -> Result:
@@ -607,9 +651,15 @@ class Adapter:
         return self._constrained(inputs, phase, result, state)[0]
 
     def _stable(self, inputs: Inputs) -> tuple[Result, Any]:
-        problems = range_problems(self.process, inputs)
-        if problems:
-            raise Unsupported(*problems[0])
+        self._checked(inputs.temperature, inputs.pressure, inputs.fractions)
+        state = self._raw(inputs.fractions, T=inputs.temperature, P=inputs.pressure * 1000.0)
+        return self._described(inputs, state), state
+
+    def _described(self, inputs: Inputs, state: Any) -> Result:
+        """The :class:`Result` of thermo's flashed *state* at *inputs* (its temperature and
+        pressure, already range-checked): the phase from the state's own vapour fraction, so a
+        pure component inside its two-phase region keeps the vapour fraction its flash found;
+        :class:`Unsupported` where the phase or the state is not claimed."""
         cas, zs = self._zs(inputs.fractions)
         names = [self.package.name(c) for c in cas]
         flasher, constants = self._flasher(cas)
@@ -617,10 +667,6 @@ class Adapter:
             warnings.simplefilter("ignore")
             from chemicals.volume import COSTALD_mixture
 
-            try:
-                state = flasher.flash(T=inputs.temperature, P=inputs.pressure * 1000.0, zs=zs)
-            except Exception as failure:  # thermo raises plain exceptions on non-convergence
-                raise Unsupported("property-unsupported", f"flash failed: {failure}") from failure
             vf = float(state.VF)
             phase = "vapor" if vf >= 1.0 - 1e-9 else "liquid" if vf <= 1e-9 else "two-phase"
             if phase == "liquid" and self.package.vapor_only:
@@ -662,14 +708,13 @@ class Adapter:
                 zs, inputs.temperature, constants.Tcs, constants.Vcs, constants.omegas
             )
             density = mw / volume / 1000.0
-        result = Result(
+        return Result(
             molar_mass=mw,
             phase=phase,
             vapor_fraction=vf,
             density=density,
             enthalpy=float(state.H()),
         )
-        return result, state
 
     def _constrained(
         self, inputs: Inputs, phase: str, stable: Result, state: Any
@@ -766,11 +811,10 @@ class Adapter:
 
     def _raw(self, fractions: dict[str, float], **spec: float) -> Any:
         cas, zs = self._zs(fractions)
-        flasher, _ = self._flasher(cas)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
-                return flasher.flash(zs=zs, **spec)
+                return self._thermo_flash(cas, zs, **spec)
             except Exception as failure:  # thermo raises plain exceptions on non-convergence
                 raise Unsupported("property-unsupported", f"flash failed: {failure}") from failure
 
@@ -792,14 +836,20 @@ class Adapter:
         return float(self._vapor_state(inputs, "Cp/Cv").Cp_Cv_ratio())
 
     def flash_ps(self, pressure: float, entropy: float, fractions: dict[str, float]) -> Result:
-        """The state at *pressure* kPa(a) and molar *entropy* (an isentropic step)."""
-        state = self._raw(fractions, P=pressure * 1000.0, S=entropy)
-        return self.flash(Inputs(float(state.T), pressure, fractions))
+        """The state at *pressure* kPa(a) and molar *entropy* (an isentropic step): the state
+        that flash found, range-checked at its temperature (not a new flash at T and P, which
+        for a pure component on its saturation line does not fix the vapour fraction)."""
+        return self._at(fractions, pressure, S=entropy)
 
     def flash_ph(self, pressure: float, enthalpy: float, fractions: dict[str, float]) -> Result:
-        """The state at *pressure* kPa(a) and molar *enthalpy* kJ/kmol."""
-        state = self._raw(fractions, P=pressure * 1000.0, H=enthalpy)
-        return self.flash(Inputs(float(state.T), pressure, fractions))
+        """The state at *pressure* kPa(a) and molar *enthalpy* kJ/kmol (as :meth:`flash_ps`)."""
+        return self._at(fractions, pressure, H=enthalpy)
+
+    def _at(self, fractions: dict[str, float], pressure: float, **spec: float) -> Result:
+        state = self._raw(fractions, P=pressure * 1000.0, **spec)
+        inputs = Inputs(float(state.T), pressure, fractions)
+        self._checked(inputs.temperature, inputs.pressure, inputs.fractions)
+        return self._described(inputs, state)
 
     def bubble_pressure(self, temperature: float, fractions: dict[str, float]) -> float:
         """Bubble-point pressure (the vapour pressure of the liquid) at *temperature* K, kPa(a);
