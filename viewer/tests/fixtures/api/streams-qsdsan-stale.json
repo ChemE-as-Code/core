@@ -71,7 +71,7 @@
       },
       "stale": [
         "TN",
-        "flow"
+        "calculated.flow"
       ],
       "imbalance": [],
       "links": []
@@ -124,7 +124,7 @@
       "stale": [
         "NH4",
         "TN",
-        "flow"
+        "calculated.flow"
       ],
       "imbalance": [],
       "links": []

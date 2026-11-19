@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -25,6 +26,21 @@ from chemeascode.foundation.units import same_unit
 from chemeascode.integrations import qsdsan
 
 
+def _scalar(value):
+    """*value* as a YAML flow node that reads back equal: JSON, except that a float in exponent
+    form gets a decimal point (``1e-05`` -> ``1.0e-05``), since YAML 1.1 reads ``1e-05`` as a
+    string."""
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{_scalar(k)}: {_scalar(v)}" for k, v in value.items()) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(_scalar(v) for v in value) + "]"
+    text = json.dumps(value, ensure_ascii=False)
+    if isinstance(value, float) and "e" in text and "." not in text:
+        mantissa, exponent = text.split("e")
+        text = f"{mantissa}.0e{exponent}"
+    return text
+
+
 def _render_cells(content, case, document):
     """Patch native state mappings while retaining the authored YAML outside each edit."""
     text = content.decode("utf-8")
@@ -45,7 +61,7 @@ def _render_cells(content, case, document):
             end = node.end_mark.index
             if not node.flow_style:
                 end = offsets[_last_line(node)] + len(lines[_last_line(node)].rstrip("\r\n"))
-            edits.append((start, end, json.dumps(after, ensure_ascii=False)))
+            edits.append((start, end, _scalar(after)))
             return
         key, *rest = keys
         pair = _child(node, key)
@@ -59,11 +75,7 @@ def _render_cells(content, case, document):
                 (
                     end,
                     end,
-                    newline
-                    + pad
-                    + json.dumps(key)
-                    + ": "
-                    + json.dumps(after[key], ensure_ascii=False),
+                    newline + pad + _scalar(key) + ": " + _scalar(after[key]),
                 )
             )
 
@@ -126,6 +138,60 @@ def _filled(content, case, adapter, config, fingerprint):
     return _render_cells(content, case, doc)
 
 
+def _try_lock(fd):
+    """Take an exclusive lock on *fd* without waiting (False: another process holds it). The
+    operating system releases it when the process ends, however it ends."""
+    if os.name == "nt":
+        import msvcrt
+
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+@contextlib.contextmanager
+def _publication_lock(lock):
+    """Hold *lock* while publishing. A lock file left by a killed run holds no lock and is taken
+    over; only a live publication refuses."""
+    while True:
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o644)
+        try:
+            if not _try_lock(fd):
+                raise ValueError(
+                    f"Another simulate --fill is publishing ({lock.name}); retry when it ends"
+                )
+            try:
+                same = os.path.samestat(os.fstat(fd), os.stat(lock))
+            except FileNotFoundError:
+                same = False
+        except BaseException:
+            os.close(fd)
+            raise
+        if same:  # else the holder removed the file between our open and lock: open the new one
+            break
+        os.close(fd)
+    try:
+        yield
+    finally:
+        if os.name == "nt":  # an open file cannot be removed; another run may hold it by now
+            os.close(fd)
+            with contextlib.suppress(OSError):
+                lock.unlink()
+        else:
+            with contextlib.suppress(FileNotFoundError):
+                lock.unlink()
+            os.close(fd)
+
+
 def _publish(root, case, entry, evidence, original, content, inputs_before, config):
     for name in (FLOWSHEET_FILE, record.RUN_FILE, "process/simulation-runs"):
         if local_path(root, name) != root.resolve() / name:
@@ -134,52 +200,65 @@ def _publish(root, case, entry, evidence, original, content, inputs_before, conf
     run_file = local_path(root, record.RUN_FILE)
     evidence_root = local_path(root, "process/simulation-runs")
     evidence_root.mkdir(exist_ok=True)
-    lock = run_file.with_suffix(".lock")
-    with lock.open("x") as guard:
-        try:
-            if (
-                worker_model.hashes(root, config) != inputs_before
-                or flowsheet.read_bytes() != original
-            ):
-                raise ValueError("Model inputs changed during execution; retry with current inputs")
-            previous = run_file.read_bytes() if run_file.exists() else None
-            data = (
-                record.parse(previous)
-                if previous is not None
-                else {"schema": record.RUN_SCHEMA, "kind": "simulation-run", "cases": {}}
+    with _publication_lock(run_file.with_suffix(".lock")):
+        if worker_model.hashes(root, config) != inputs_before or flowsheet.read_bytes() != original:
+            raise ValueError("Model inputs changed during execution; retry with current inputs")
+        previous = run_file.read_bytes() if run_file.exists() else None
+        data = (
+            record.parse(previous)
+            if previous is not None
+            else {"schema": record.RUN_SCHEMA, "kind": "simulation-run", "cases": {}}
+        )
+        if data is None:
+            raise ValueError("Existing run record is unreadable; refusing to overwrite it")
+        destination = evidence_root / evidence.name
+        entry["evidence"] = destination.relative_to(root).as_posix()
+        data["cases"][case] = entry
+        encoded = json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False).encode() + b"\n"
+        with tempfile.TemporaryDirectory(dir=evidence_root) as temporary:
+            temp = Path(temporary)
+            (temp / "sheet").write_bytes(content)
+            (temp / "previous-sheet").write_bytes(original)
+            (temp / "record").write_bytes(encoded)
+            shutil.copytree(evidence, temp / "evidence")
+            (temp / "evidence" / "cheme-simulation-entry.json").write_text(
+                json.dumps(entry, indent=2, allow_nan=False), encoding="utf-8"
             )
-            if data is None:
-                raise ValueError("Existing run record is unreadable; refusing to overwrite it")
-            destination = evidence_root / evidence.name
-            entry["evidence"] = destination.relative_to(root).as_posix()
-            data["cases"][case] = entry
-            encoded = (
-                json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False).encode() + b"\n"
-            )
-            with tempfile.TemporaryDirectory(dir=evidence_root) as temporary:
-                temp = Path(temporary)
-                (temp / "sheet").write_bytes(content)
-                (temp / "previous-sheet").write_bytes(original)
-                (temp / "record").write_bytes(encoded)
-                shutil.copytree(evidence, temp / "evidence")
-                (temp / "evidence" / "cheme-simulation-entry.json").write_text(
-                    json.dumps(entry, indent=2, allow_nan=False), encoding="utf-8"
-                )
-                os.replace(temp / "evidence", destination)
+            os.replace(temp / "evidence", destination)
+            try:
+                os.replace(temp / "sheet", flowsheet)
                 try:
-                    os.replace(temp / "sheet", flowsheet)
-                    try:
-                        os.replace(temp / "record", run_file)
-                    except OSError:
-                        os.replace(temp / "previous-sheet", flowsheet)
-                        raise
+                    os.replace(temp / "record", run_file)
                 except OSError:
-                    shutil.rmtree(destination)
+                    os.replace(temp / "previous-sheet", flowsheet)
                     raise
-            return destination
-        finally:
-            guard.close()
-            lock.unlink()
+            except OSError:
+                shutil.rmtree(destination)
+                raise
+        return destination
+
+
+def _worker_findings(adapter):
+    """The findings the worker reported, located at the simulation: an unknown level counts
+    as a warning, so ``--check`` exits 1 on it."""
+    found = []
+    for i, finding in enumerate(adapter.findings):
+        level = finding.get("level")
+        rule = finding.get("rule")
+        ids = finding.get("ids")
+        found.append(
+            Finding(
+                SIMULATION_FILE,
+                level if level in ("error", "warning", "info") else "warning",
+                "cheme.process-qsdsan",
+                f"QSDsan worker{f' ({rule})' if isinstance(rule, str) and rule else ''}: "
+                + str(finding.get("message") or "finding without a message"),
+                ids=[x for x in ids if isinstance(x, str)] if isinstance(ids, list) else [],
+                hint=str(finding.get("hint") or "Reported by the QSDsan worker."),
+                key=f"worker-{i}",
+            )
+        )
+    return found
 
 
 def run(root, case, sim, *, write, save):
@@ -213,6 +292,7 @@ def run(root, case, sim, *, write, save):
             evidence = Path(tmp) / uuid4().hex
             evidence.mkdir()
             adapter = qsdsan.execute(root, config, case, evidence)
+            result.findings.extend(_worker_findings(adapter))
             if (
                 adapter.case != case
                 or adapter.solver.name != "QSDsan"

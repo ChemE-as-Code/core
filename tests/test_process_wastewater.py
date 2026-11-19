@@ -65,3 +65,24 @@ def test_oversized_worker_input_does_not_blank_the_stream_table(tmp_path):
         response = client.get("/api/streams")
         assert response.status_code == 200
         assert len(response.json()["streams"]) == 2
+
+
+def test_serve_fingerprints_a_worker_input_over_the_display_cap(tmp_path, monkeypatch):
+    # serve hashes a declared input over 5 MB as the CLI does, not as missing (#318)
+    from chemeascode.interfaces.cli import app
+
+    root = tmp_path / "plant"
+    shutil.copytree(Path(__file__).resolve().parents[1] / "examples/process-qsdsan", root)
+    data = root / "results.json"
+    data.write_bytes(data.read_bytes() + b" " * (6 * 1024 * 1024))
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("CHEME_QSDSAN_PYTHON", sys.executable)
+    runner = CliRunner()
+    assert runner.invoke(app, ["process", "simulate", "--fill"]).exit_code == 0
+    assert runner.invoke(app, ["process", "simulate", "--check"]).exit_code == 0
+    with TestClient(create_app(root, allowed_hosts=["testserver"])) as client:
+        view = client.get("/api/simulation").json()
+        assert view["stale"] is False, view
+        streams = client.get("/api/streams").json()["streams"]
+        assert streams[0]["calculated"]["TN"]["stale"] is False
+        assert streams[0]["stale"] == []
