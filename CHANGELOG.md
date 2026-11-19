@@ -5,6 +5,12 @@
 ### Added
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Bundled skills and REFERENCE.md brought up to 1.12 and the QSDsan integration: QSDsan
+  configuration, refusals and outputs; propagate's `recovery:`, `specs:` and tears beside
+  simulate; still refusals, condenser freezing, `heat_up_time` and `separate_phase`; thermal
+  screening in the safety skills; flowsheet `recovery:` for specified splits; the
+  `adsorption` and `assay` commands, missing CLI flags and unit defaults in REFERENCE.md. No
+  behaviour changes.
 - Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
   optional:
   - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
@@ -42,6 +48,142 @@
     `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative; only the generator code
     hash that `cheme.generated-version` names changes (schema.py and model.py are generator
     modules).
+- Batch rectification (`still.column`, ADR 0061) qualified against published worked examples
+  and DWSIM (core#195, ADR 0061's amendment, `tests/test_batch_rectification.py`): Diwekar,
+  Malik and Madhavan's (1987) binary cases (their short-cut's mean distillate within 1.2e-3 at
+  constant reflux, their variable-reflux distillate within 0.6 %, their rigorous column's purity
+  reproduced by the tests' plate-to-plate reference within 2.3e-3) and Lotter and Diwekar's
+  (1997) rectifier; their case 7 and quaternary are not reproducible from the printed inputs (a
+  test keeps the quaternary's reason checked). With `CHEME_DWSIM_TESTS=1`, DWSIM's rigorous
+  column (NRTL): the shortcut is not purer for benzene-toluene, but up to 0.02 purer for
+  methanol-water, whose relative volatility falls towards the top; at the top's relative
+  volatility it is never purer. The skills `process-design` and `unit-ops-distillation` now
+  say that the shortcut is conservative at a constant relative volatility, and where it varies
+  along the column to give `volatility: constant` at its smallest along the column over the
+  run (the distillate's where it falls towards the top, the still's at the end of the cut where
+  it rises: a plate-to-plate column at alpha = 1.2 + x is leaner than the shortcut at the
+  distillate's, 0.653 against 0.784), or to check the column with `cheme process simulate`, one
+  stage more and fed above the reboiler (a feed at the reboiler is refused there; DWSIM gives
+  the reboiler-fed column's distillate within 1.5e-3). No model change: no library entry's
+  result changes.
+- The rest of a batch's energy balance (ADR 0075, core#191), each opt-in and in the duty only
+  (neither the outlets' nor a tear's fingerprint):
+  - a recipe `heat` or `cool` with `temperatures` may name its energy `stream:`; `cheme process
+    propagate` writes the content's and the vessel's metal's heat over the batch's hours of
+    flows on it (`calculated`, compared where given or assumed), so a heater step's hand duty
+    follows the recipe (a scratch copy of potassium-tert-butoxide-1: Q1 25.5655 kW, its hand
+    value 25.57 kW); `cheme.recipe-reference` (error), so that no heat is counted twice: a
+    stream at no step of the unit, a stream a model writes or a dryer's `energy.port` (its duty
+    is compared with the dryer's), and an operation before the run (the next `dose`, `react`
+    or `distil`) of a batch or still with `heat_up`, whose duty holds that heat-up and the
+    metal's already (a heat after the run is written);
+  - `batch.heat_up_port: PORT` (with `heat_up`): the charge's heat-up and the vessel's metal on
+    that energy stream (steam), the rest of the model's duty on `energy_port` (cooling water),
+    not netted (potassium-tert-butoxide-1 L-11); `process reactors` adds `model_duty.heat_up`;
+    the port is in both duties' fingerprint, so a duty written before the port was set (or
+    removed) is `cheme.process-calculated-stale`;
+  - `batch.heat_of_solution`: a charged solid's integral heat of solution in the isothermal
+    duty's term `solution` (methyltriphenylphosphonium-bromide-1 L-8), not in the peak cooling
+    duty or the screening;
+  - `batch.agitator_power` and `still.agitator_power` (kW): the agitator's heat over the model's
+    time, the term `agitation` (potassium-tert-butoxide-1 and tert-butyldimethylsilyl-chloride-1
+    L-12), and in the recipe's peak duty for the jacket check; a duty's basis no longer lists
+    as left out a term it holds (agitation, a still's heat losses and sensible rise, the
+    charged heat of solution);
+  - `still.sensible_heat: true` and `still.heat_loss: {ua, ambient_temperature}` (raoult): the
+    pot's sensible rise while its bubble point rises and the heat lost over the boil-up, the
+    terms `sensible rise` and `heat losses` (with `heat_up_time` they take time too);
+  - `vessel_metal: true` on a conversion step in a recipe vessel with `metal_heat_capacity`: the
+    metal from its inlets' to its outlets' temperature;
+  - a dryer's vessel takes a `heat` or `cool` with `temperatures` (the wet cake before the
+    `dry`, at the dryer's `energy.heat_capacity`, the product after it, at the components'
+    `liquid_heat_capacity`, timed on its jacket; potassium-tert-butoxide-1 L-6), and its
+    recipe vessel's `metal_heat_capacity` is the dryer's metal, heated from the temperature the
+    vessel was left at (potassium-tert-butoxide-1 L-5); after a heat or cool before the `dry`
+    the dryer heats the wet cake from that operation's end temperature (its heat is the
+    operation's; `process crystallizers` reports `recipe_heat`).
+- Dosing and vessels (ADR 0073, core#184 part A; `domains/process/dosing.py`):
+  - `vessel.jacket.shortest_dosing: true` in `process/recipe.yaml`: `cheme process recipe`
+    reports (`dosing`) the shortest dosing of each semi-batch step in the vessel whose peak
+    duty the jacket removes at the charge, the dosing schedule stretched in time from the first
+    dose's start (the wait before it kept) and the model solved at each trial (bracketed from
+    the declared schedule, bisected to 1e-4). The time is from the first dose's start to the
+    last dose's end. The model keeps its declared dosing. A coolant not colder than the process
+    gives the reason without a run. Vessels coupled by a vent name each other (`coupled`) with
+    the pair's shortest dosing, the larger of the two (`pair`). On a scratch copy of
+    sodium-azide-1 this is R-102 9.34 h and R-101 2.41 h, so 9.34 h for the pair, against the
+    10 h declared (D-010 found 10 h by hand).
+  - A unit procedure over several batch or semi-batch steps in one vessel (a one-pot
+    sequence, 1.12.0's `cheme.recipe-reference`). The vessel is sized from the largest content
+    of any of them, and the jacket is checked against each step's peak at its own charge
+    (`vessels[].steps`). Jacket times take the content of the batch step that comes next (with
+    no operation `from:` the steps, by the operations' kinds; between the doses and reactions,
+    a `cheme.recipe-duration` error), each vented step reports its vent, and `datasheets fill`
+    gives each step its own peak duty.
+  - `vessel.size_from: steps`: the vessel is sized from what every other step of the unit
+    procedure takes in for one batch too (a conversion step adding a second portion). Without
+    it, such a step taking in more than the batch is `cheme.recipe-vessel` (warning); in a
+    given `vessel.volume`, only where it exceeds the volume times the fill fraction.
+  - A `transfer` operation `from:` the semi-batch whose dose takes what the unit makes: that
+    dose's time. On a scratch copy of p-toluenesulfonyl-chloride-1 this gives Q101's 4.0 h,
+    the hand value.
+  - `cheme.process-coupled-dosing`: a semi-batch dose fed by another batch step's vent. A
+    warning when it runs on another schedule than the generator's dosing; an info with the
+    largest difference between the share of the generator's gas given off and the share
+    dosed. `cheme.recipe-coupling` (warning): the two dose operations do not start together
+    in one batch. `TankResult.vent_profile` holds the vent's running total. It is in no
+    report.
+  - `cheme.process-reactor` (warning): a dosed gas that passes through to the vent (a dose
+    with `absorbed` below 1, or a vent's inerts) without `ideal_gas` data, whose warming is
+    left out of the duty. Until now only the model's note said so; the note stays.
+- Semi-batch kinetics beyond one temperature and one liquid (ADR 0074, core#184 part B), each
+  opt-in on `batch:`. `initiation: {time, factor, reactions}`: an induction period, the rate laws
+  held at `factor` until the reaction initiates; `dosing[].after_initiation` interlocks a dose
+  on it; a semi-batch with an initiation also runs the uninitiated scenario (the dosing going on
+  into a charge that never initiates, its largest accumulation and worst cooling failure),
+  reported by `process reactors` (`tank.initiation`) and `reactor-hazards` (`initiation`,
+  `cheme.reactor-hazard-initiation`). `solids: {id: {density, diameter | specific_area}}`
+  carries a component as a solid phase (out of the liquid's composition, its Henry solvent and
+  the outlet rate `process reactors` reports; a precipitate forming as it reacts; charged alone,
+  nothing reacts until the liquid is dosed; one the batch never holds is refused), and
+  `rate.basis: surface` with `rate.solid` is a rate per m2 of its shrinking particles (`A_0 (n /
+  n_0)^(2/3)`). `program: {points}` moves an isothermal batch's temperature, `heat: reflux`
+  holds it at the content's bubble point; their duty adds the content's sensible heat
+  (`content`) and takes the doses, the dosed gas passing through (`vent gas`) and a returned
+  condensate (`condensate return`) at the temperature each met; the recipe's jacket check takes
+  a programme's lowest temperature. `rate.form: photochemical` (the quantum yield times the
+  photons absorbed) with `light: {power, wavelength, absorber, absorptivity, path_length, on}`
+  (Beer-Lambert, CODATA 2022 constants; the light's heat in the duty's `light` term; `process
+  reactors` gives no outlet rate for it, the light being the tank's). A vent's peak rate takes
+  the initiation's factor and the lamp from the start. `process reactors` adds `solids`,
+  `light` and `temperatures` where declared; `cheme.process-reactor` checks the new keys. A
+  batch without them solves, propagates and fingerprints as in 1.12.0: the library's batch and
+  semi-batch entries' `propagate --check`, `recipe`, `reactors`, `reactor-hazards`, `stills`
+  and `crystallizers` (which reports the dryers) output is unchanged (rel 1e-9).
+
+### Changed
+
+- A recipe vessel's `metal_heat_capacity` on a dryer's unit procedure, which 1.12.0 ignored, is
+  the dryer's metal (ADR 0075; with the dryer's own `energy.vessel_heat_capacity` too it is an
+  error, `cheme.recipe-vessel`); a `heat` or `cool` with `temperatures` in a dryer's vessel,
+  which 1.12.0 refused, is timed. No library entry gives either. The process generator's code
+  changed (`schema.py`, `model.py`): the example sheets are regenerated, no drawn output
+  changes.
+- Library effect of ADR 0073 (`process propagate --check`, `recipe`, `reactors`,
+  `reactor-hazards`, `stills`, `crystallizers --json` and the process and recipe findings of
+  `validate`, on the 17 batch entries of the process library and
+  tert-butyldimethylsilyl-chloride-1, `propagate --check` and `validate` on all 106 entries too,
+  against the base at rel 1e-9): no number changes. New
+  findings only:
+  - p-toluenesulfonyl-chloride-1: `cheme.recipe-vessel` (warning). R102 takes in 3.202 m3 per
+    batch, more than the 2.044 m3 of the batch steps, 80.04 % of the given 4 m3 vessel: just
+    over its fill fraction 0.8 (its L-1 gives the 4 m3 for this portion, 78 % full by the
+    entry's own 3.11 m3), so `process recipe` exits 1.
+  - sodium-azide-1: `cheme.process-reactor` (warning), MEONO passing R-102 without ideal-gas
+    data (its L-9). Also `cheme.process-coupled-dosing` (info): R-102's dose follows R-101's
+    gas to within 0.00665 (its L-11).
+- The committed example sheets are regenerated for `model.py` (the new rules' call); only
+  `generator_sha256` changes.
 
 ## 1.12.0 (2026-11-13)
 
@@ -174,118 +316,6 @@ under Changed.
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
-- Batch rectification (`still.column`, ADR 0061) qualified against published worked examples
-  and DWSIM (core#195, ADR 0061's amendment, `tests/test_batch_rectification.py`): Diwekar,
-  Malik and Madhavan's (1987) binary cases (their short-cut's mean distillate within 1.2e-3 at
-  constant reflux, their variable-reflux distillate within 0.6 %, their rigorous column's purity
-  reproduced by the tests' plate-to-plate reference within 2.3e-3) and Lotter and Diwekar's
-  (1997) rectifier; their case 7 and quaternary are not reproducible from the printed inputs (a
-  test keeps the quaternary's reason checked). With `CHEME_DWSIM_TESTS=1`, DWSIM's rigorous
-  column (NRTL): the shortcut is not purer for benzene-toluene, but up to 0.02 purer for
-  methanol-water, whose relative volatility falls towards the top; at the top's relative
-  volatility it is never purer. The skills `process-design` and `unit-ops-distillation` now
-  say that the shortcut is conservative at a constant relative volatility, and where it varies
-  along the column to give `volatility: constant` at its smallest along the column over the
-  run (the distillate's where it falls towards the top, the still's at the end of the cut where
-  it rises: a plate-to-plate column at alpha = 1.2 + x is leaner than the shortcut at the
-  distillate's, 0.653 against 0.784), or to check the column with `cheme process simulate`, one
-  stage more and fed above the reboiler (a feed at the reboiler is refused there; DWSIM gives
-  the reboiler-fed column's distillate within 1.5e-3). No model change: no library entry's
-  result changes.
-- The rest of a batch's energy balance (ADR 0075, core#191), each opt-in and in the duty only
-  (neither the outlets' nor a tear's fingerprint):
-  - a recipe `heat` or `cool` with `temperatures` may name its energy `stream:`; `cheme process
-    propagate` writes the content's and the vessel's metal's heat over the batch's hours of
-    flows on it (`calculated`, compared where given or assumed), so a heater step's hand duty
-    follows the recipe (a scratch copy of potassium-tert-butoxide-1: Q1 25.5655 kW, its hand
-    value 25.57 kW); `cheme.recipe-reference` (error), so that no heat is counted twice: a
-    stream at no step of the unit, a stream a model writes or a dryer's `energy.port` (its duty
-    is compared with the dryer's), and an operation before the run (the next `dose`, `react`
-    or `distil`) of a batch or still with `heat_up`, whose duty holds that heat-up and the
-    metal's already (a heat after the run is written);
-  - `batch.heat_up_port: PORT` (with `heat_up`): the charge's heat-up and the vessel's metal on
-    that energy stream (steam), the rest of the model's duty on `energy_port` (cooling water),
-    not netted (potassium-tert-butoxide-1 L-11); `process reactors` adds `model_duty.heat_up`;
-    the port is in both duties' fingerprint, so a duty written before the port was set (or
-    removed) is `cheme.process-calculated-stale`;
-  - `batch.heat_of_solution`: a charged solid's integral heat of solution in the isothermal
-    duty's term `solution` (methyltriphenylphosphonium-bromide-1 L-8), not in the peak cooling
-    duty or the screening;
-  - `batch.agitator_power` and `still.agitator_power` (kW): the agitator's heat over the model's
-    time, the term `agitation` (potassium-tert-butoxide-1 and tert-butyldimethylsilyl-chloride-1
-    L-12), and in the recipe's peak duty for the jacket check; a duty's basis no longer lists
-    as left out a term it holds (agitation, a still's heat losses and sensible rise, the
-    charged heat of solution);
-  - `still.sensible_heat: true` and `still.heat_loss: {ua, ambient_temperature}` (raoult): the
-    pot's sensible rise while its bubble point rises and the heat lost over the boil-up, the
-    terms `sensible rise` and `heat losses` (with `heat_up_time` they take time too);
-  - `vessel_metal: true` on a conversion step in a recipe vessel with `metal_heat_capacity`: the
-    metal from its inlets' to its outlets' temperature;
-  - a dryer's vessel takes a `heat` or `cool` with `temperatures` (the wet cake before the
-    `dry`, at the dryer's `energy.heat_capacity`, the product after it, at the components'
-    `liquid_heat_capacity`, timed on its jacket; potassium-tert-butoxide-1 L-6), and its
-    recipe vessel's `metal_heat_capacity` is the dryer's metal, heated from the temperature the
-    vessel was left at (potassium-tert-butoxide-1 L-5); after a heat or cool before the `dry`
-    the dryer heats the wet cake from that operation's end temperature (its heat is the
-    operation's; `process crystallizers` reports `recipe_heat`).
-- Dosing and vessels (ADR 0073, core#184 part A; `domains/process/dosing.py`):
-  - `vessel.jacket.shortest_dosing: true` in `process/recipe.yaml`: `cheme process recipe`
-    reports (`dosing`) the shortest dosing of each semi-batch step in the vessel whose peak
-    duty the jacket removes at the charge, the dosing schedule stretched in time from the first
-    dose's start (the wait before it kept) and the model solved at each trial (bracketed from
-    the declared schedule, bisected to 1e-4). The time is from the first dose's start to the
-    last dose's end. The model keeps its declared dosing. A coolant not colder than the process
-    gives the reason without a run. Vessels coupled by a vent name each other (`coupled`) with
-    the pair's shortest dosing, the larger of the two (`pair`). On a scratch copy of
-    sodium-azide-1 this is R-102 9.34 h and R-101 2.41 h, so 9.34 h for the pair, against the
-    10 h declared (D-010 found 10 h by hand).
-  - A unit procedure over several batch or semi-batch steps in one vessel (a one-pot
-    sequence, 1.12.0's `cheme.recipe-reference`). The vessel is sized from the largest content
-    of any of them, and the jacket is checked against each step's peak at its own charge
-    (`vessels[].steps`). Jacket times take the content of the batch step that comes next (with
-    no operation `from:` the steps, by the operations' kinds; between the doses and reactions,
-    a `cheme.recipe-duration` error), each vented step reports its vent, and `datasheets fill`
-    gives each step its own peak duty.
-  - `vessel.size_from: steps`: the vessel is sized from what every other step of the unit
-    procedure takes in for one batch too (a conversion step adding a second portion). Without
-    it, such a step taking in more than the batch is `cheme.recipe-vessel` (warning); in a
-    given `vessel.volume`, only where it exceeds the volume times the fill fraction.
-  - A `transfer` operation `from:` the semi-batch whose dose takes what the unit makes: that
-    dose's time. On a scratch copy of p-toluenesulfonyl-chloride-1 this gives Q101's 4.0 h,
-    the hand value.
-  - `cheme.process-coupled-dosing`: a semi-batch dose fed by another batch step's vent. A
-    warning when it runs on another schedule than the generator's dosing; an info with the
-    largest difference between the share of the generator's gas given off and the share
-    dosed. `cheme.recipe-coupling` (warning): the two dose operations do not start together
-    in one batch. `TankResult.vent_profile` holds the vent's running total. It is in no
-    report.
-  - `cheme.process-reactor` (warning): a dosed gas that passes through to the vent (a dose
-    with `absorbed` below 1, or a vent's inerts) without `ideal_gas` data, whose warming is
-    left out of the duty. Until now only the model's note said so; the note stays.
-- Semi-batch kinetics beyond one temperature and one liquid (ADR 0074, core#184 part B), each
-  opt-in on `batch:`. `initiation: {time, factor, reactions}`: an induction period, the rate laws
-  held at `factor` until the reaction initiates; `dosing[].after_initiation` interlocks a dose
-  on it; a semi-batch with an initiation also runs the uninitiated scenario (the dosing going on
-  into a charge that never initiates, its largest accumulation and worst cooling failure),
-  reported by `process reactors` (`tank.initiation`) and `reactor-hazards` (`initiation`,
-  `cheme.reactor-hazard-initiation`). `solids: {id: {density, diameter | specific_area}}`
-  carries a component as a solid phase (out of the liquid's composition, its Henry solvent and
-  the outlet rate `process reactors` reports; a precipitate forming as it reacts; charged alone,
-  nothing reacts until the liquid is dosed; one the batch never holds is refused), and
-  `rate.basis: surface` with `rate.solid` is a rate per m2 of its shrinking particles (`A_0 (n /
-  n_0)^(2/3)`). `program: {points}` moves an isothermal batch's temperature, `heat: reflux`
-  holds it at the content's bubble point; their duty adds the content's sensible heat
-  (`content`) and takes the doses, the dosed gas passing through (`vent gas`) and a returned
-  condensate (`condensate return`) at the temperature each met; the recipe's jacket check takes
-  a programme's lowest temperature. `rate.form: photochemical` (the quantum yield times the
-  photons absorbed) with `light: {power, wavelength, absorber, absorptivity, path_length, on}`
-  (Beer-Lambert, CODATA 2022 constants; the light's heat in the duty's `light` term; `process
-  reactors` gives no outlet rate for it, the light being the tank's). A vent's peak rate takes
-  the initiation's factor and the lamp from the start. `process reactors` adds `solids`,
-  `light` and `temperatures` where declared; `cheme.process-reactor` checks the new keys. A
-  batch without them solves, propagates and fingerprints as in 1.12.0: the library's batch and
-  semi-batch entries' `propagate --check`, `recipe`, `reactors`, `reactor-hazards`, `stills`
-  and `crystallizers` (which reports the dryers) output is unchanged (rel 1e-9).
 
 ### Fixed
 
@@ -368,27 +398,6 @@ under Changed.
   dump when absent).
 - ADR 0062's acetyl-chloride-1 figure is per acetyl chloride formed (0.0006 %), not per kmol
   of the reaction's extent (0.0019 %).
-- A recipe vessel's `metal_heat_capacity` on a dryer's unit procedure, which 1.12.0 ignored, is
-  the dryer's metal (ADR 0075; with the dryer's own `energy.vessel_heat_capacity` too it is an
-  error, `cheme.recipe-vessel`); a `heat` or `cool` with `temperatures` in a dryer's vessel,
-  which 1.12.0 refused, is timed. No library entry gives either. The process generator's code
-  changed (`schema.py`, `model.py`): the example sheets are regenerated, no drawn output
-  changes.
-- Library effect of ADR 0073 (`process propagate --check`, `recipe`, `reactors`,
-  `reactor-hazards`, `stills`, `crystallizers --json` and the process and recipe findings of
-  `validate`, on the 17 batch entries of the process library and
-  tert-butyldimethylsilyl-chloride-1, `propagate --check` and `validate` on all 106 entries too,
-  against the base at rel 1e-9): no number changes. New
-  findings only:
-  - p-toluenesulfonyl-chloride-1: `cheme.recipe-vessel` (warning). R102 takes in 3.202 m3 per
-    batch, more than the 2.044 m3 of the batch steps, 80.04 % of the given 4 m3 vessel: just
-    over its fill fraction 0.8 (its L-1 gives the 4 m3 for this portion, 78 % full by the
-    entry's own 3.11 m3), so `process recipe` exits 1.
-  - sodium-azide-1: `cheme.process-reactor` (warning), MEONO passing R-102 without ideal-gas
-    data (its L-9). Also `cheme.process-coupled-dosing` (info): R-102's dose follows R-101's
-    gas to within 0.00665 (its L-11).
-- The committed example sheets are regenerated for `model.py` (the new rules' call); only
-  `generator_sha256` changes.
 
 ## 1.11.0 (2026-11-06)
 

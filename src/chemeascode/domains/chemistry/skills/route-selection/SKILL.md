@@ -67,8 +67,10 @@ not support, and do not fill the gap with assumed values to make one look better
      do not take a rate law outside the range it was fitted in, unless an assumption names
      the gap and `validation` says how it will be tested.
 4. **Hand over to the model.** A reported per-pass conversion with its selectivities goes
-   onto the reactor step as `selectivity: {key, conversion, products}` (molar, relative to
-   the key converted, the observation in `source`): no per-reaction conversions need to be
+   onto the reactor step as `selectivity: {key, conversion, products, provenance: given,
+   source: "reaction-evidence O1 (S2, Table 2)"}` (products in kmol formed per kmol key
+   converted, conversion as a fraction 0-1; `provenance` is required, `assumed` with the
+   assumption in `source` for a working value beyond the evidence): no per-reaction conversions need to be
    invented for the side reactions. Write or extend `process/reactions.yaml` and
    `process/catalysts.yaml` (skill `reactions`). Each `conversion`, `heat_of_reaction` and
    `rate` taken from the evidence gets `provenance: given` and a `source` naming the

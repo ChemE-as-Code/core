@@ -740,8 +740,9 @@ def props(
         bool, typer.Option("--json", help="The run as an adapter result (JSON).")
     ] = False,
 ) -> None:
-    """Stream properties (phase, vapour fraction, molar mass, density, enthalpy) through thermo
-    (extra `props`), with the process's property package, inside its validated range only.
+    """Stream properties (phase, vapour fraction, molar mass, density, enthalpy, exergy) with the
+    process's property package, inside its validated range only: thermo (extra `props`) or, for
+    `water-methanol-pcsaft-liquid`, feos PC-SAFT (extra `saft`; liquid density only).
 
     --fill never overwrites given or assumed values; a state outside the range is refused and
     not written, and values calculated earlier stay and are reported stale. --fill exits 3 when
@@ -821,9 +822,11 @@ def propagate(
 
     A batch or semi-batch, still, crystallizer or conversion step writes its year-average duty
     on its energy stream (`energy_port:`, else its one stream to a heating or cooling utility);
-    a given duty is compared (cheme.process-duty, ADR 0059; validate compares it too). Other
-    separators (without `recovery:`) and reactors without conversions are only checked, never
-    solved. Derived values are `calculated`
+    a given duty is compared (cheme.process-duty, ADR 0059; validate compares it too). A
+    reactor solves by its model (conversions, `selectivity:`, equilibrium, gibbs, pfr, cstr,
+    batch or semibatch); a crystallizer, filter, dryer or still fills its outlets. Other
+    separators (without `recovery:`) and reactors with none of these models are only checked,
+    never solved. Derived values are `calculated`
     with an input fingerprint; given and assumed values are never overwritten. --check exits 1
     on a warning (stale propagated values, a duty that differs from its model). --json prints
     the run as an adapter result (cheme/adapter-result/v1) per case, same exit codes."""

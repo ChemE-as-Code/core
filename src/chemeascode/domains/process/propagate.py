@@ -35,8 +35,9 @@ is fully determined by their streams, by the DEXPI class:
   its fraction of every component's inlet flow, the one outlet left out the rest
   (:mod:`.separator`).
 
-Other separators (without ``recovery:``), and reactors without conversions, are only checked
-(``cheme validate`` balances them), never solved.
+Other separators (without ``recovery:``), and reactors with none of their models
+(conversions, ``selectivity:``, equilibrium, Gibbs, a fixed bed, a stirred tank or a batch), are
+only checked (``cheme validate`` balances them), never solved.
 
 - recycle loops torn at the streams the flowsheet names in ``tears:``: the sweep is repeated
   from a guess of each tear stream until what the loop gives back matches it within the
