@@ -282,6 +282,10 @@ Exporters write it into the reference product's name or properties.
    - **brightway:** the activity's score per unit of its reference product (bw2calc: the
      technosphere factorised once, solved per activity, per method; a treatment activity, whose
      reference product is produced -1, is solved for one unit treated), or the method's characterisation factor of the biosphere flow.
+     The row and the background must be in the same kind of unit (Brightway's `kilogram`,
+     `kilowatt hour`, `cubic meter`, `square meter-year` for m2*a, `kilo Becquerel` for kBq,
+     ...), except an elementary water flow counted in kg whose biosphere3 flow is in m3: it
+     is converted with the crosswalk's `per_kg` (0.001 m3 per kg).
 
    The Brightway project is only read: cheme writes no foreground database into it.
 
@@ -686,7 +690,8 @@ size and a sha256 of each method's characterisation factors); the categories and
 (major.minor); and the result's class and policy. It has no commit, time or absolute path, so
 it changes only when what the results rest on changes: the gate's `lca-current` then fails
 until the outputs are rewritten. The take-off and the equipment list are fingerprinted only
-when the construction reads them. Recording the software is deliberate: a new cheme-as-code
+when the results count from them: a construction entry's `takeoff`, or an equipment-leak
+estimate's `count_from`. Recording the software is deliberate: a new cheme-as-code
 (or bw2data) minor version asks for one `cheme assess lca --write`, as the calculation may
 have changed.
 
