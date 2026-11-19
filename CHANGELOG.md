@@ -130,15 +130,25 @@
   - A displacement wash on a filter, `solid_separation.wash:` (its own inlet port, `R = (1 -
     E)^n` of the cake's liquor stays, a `wash_filtrate` outlet), with the crystals the wash
     dissolves up to a stated approach to their solubility (`dissolution:`, balanced as a phase
-    change) and the wash's time in a recipe `filter`.
+    change) and the wash's time in a recipe `filter` (Ruth's and the wash's on the unwashed
+    cake's solid); the recipe vessel of a washed filter holds the slurry or, later, the unwashed
+    cake with the wash, the larger of the two, not their sum.
   - A second liquid phase, `second_liquid:`: a filter's cake holds it at its own cake liquid, a
-    crystallizer leaves it out of its mother liquor.
+    crystallizer leaves it out of its mother liquor (no `liquor.mass_fraction` of it; with no
+    other spectator a pure-solvent solubility, also a carried one, holds there).
   - The dryer's `pressure`, `selectivity: raoult` (the volatiles kept by their vapour
-    pressures), `sublimation:` (the vapour saturated with a subliming product, its heat in the
-    duty), `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
+    pressures, found on the least volatile's share, so that a volatile 100 times less volatile
+    than the main one still dries to the residual moisture; a split that misses it is refused),
+    `sublimation:` (the vapour saturated with a subliming product, its heat in the duty),
+    `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
     flash at the condenser's temperature, its duty, a `condensate` outlet). With `cooling:` or
     `condenser:`, propagate writes the outlets' temperatures, and their duties are compared with
     their energy streams (`cheme.process-dryer-duty`).
+  - The model basis: a filter is not sourced while its `wash`, the wash's `dissolution` (and its
+    solubility) or its `second_liquid` is assumed, a dryer while its `sublimation`, `cooling`
+    or `condenser` is, a crystallizer while its `second_liquid` is (`not sourced: ...` in the
+    detail, as a crystallizer's `transfer`); a dryer with `cooling:` or `condenser:` states the
+    outlet temperatures propagate writes.
   - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
     library entries with a crystallizer, filter or dryer gave the same results as the base for
     `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,

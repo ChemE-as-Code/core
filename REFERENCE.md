@@ -1366,11 +1366,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     dissolved component) up to `saturation` (1: saturated, the upper bound of the loss) of its
     solubility per kg of wash. `outlets.wash_filtrate` may keep the washings apart. A recipe
     `filter` `from:` it adds the wash's time at the final filtration rate, `mu V_w (alpha M /
-    A^2 + R_m / A) / dP`, to Ruth's. `validate` balances the dissolution as a phase change.
+    A^2 + R_m / A) / dP`, to Ruth's, M the unwashed cake's solid in both; the recipe's vessel
+    holds the slurry or, later, the unwashed cake with the wash (the larger, not the sum).
+    `validate` balances the dissolution as a phase change. The model basis is not sourced while
+    the wash, its dissolution or that solubility (or a filter's `second_liquid`) is assumed.
   - **A second liquid phase**: `solid_separation.second_liquid: {components, cake_liquid}` (an
     oil the cake holds at its own cake liquid); `crystallizer.second_liquid: {components}`
-    (spectators in a phase of their own, left out of a per-liquor solubility basis and the
-    salting-out molality; no `salting_out` coefficient for them).
+    (spectators in a phase of their own, left out of a per-liquor solubility basis, the
+    salting-out molality and the liquor's composition; no `salting_out` coefficient or
+    `liquor.mass_fraction` for them, and with no other spectator a pure-solvent solubility
+    holds; the model basis is not sourced while the second liquid is assumed).
   - **The dryer**: `pressure` (kPa(a)); `selectivity: raoult` (the volatiles kept are what an
     open evaporation of an ideal cake liquid at the drying temperature leaves, `n_i / n_i0 =
     f^(P_i / P_max)`, each volatile's `vapour_pressure`); `sublimation: {components: {solid:
@@ -1380,10 +1385,13 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     product cooled before discharge and the vessel's metal back for the next batch, which then
     heats it from there); `condenser: {temperature, heat_capacity, port}` (the vapour flashed at
     the condenser's temperature and the dryer's pressure over an ideal condensate, its duty the
-    latent heat of what condenses and the condensate's cooling; `outlets.condensate` takes the
+    latent heat of what condenses and all of the vapour cooled as liquid, what passes
+    re-evaporated at the same latent heat, as the vent condenser's; `outlets.condensate` takes the
     condensate, the vapour outlet then what passes to the pump). With `cooling:` or
-    `condenser:` propagate writes the outlets' temperatures. The cooling's and condenser's duties
-    are compared with the energy streams at their (outlet) ports (`cheme.process-dryer-duty`).
+    `condenser:` propagate writes the outlets' temperatures (and the model basis states them).
+    The cooling's and condenser's duties are compared with the energy streams at their (outlet)
+    ports (`cheme.process-dryer-duty`). The model basis is not sourced while the sublimation,
+    cooling or condenser is assumed.
   - The tests are `tests/test_solids_followups.py`, the decision
     `docs/adr/0072-crystallizer-wash-and-dryer-follow-ups.md`.
 

@@ -62,8 +62,9 @@ without the new fields solves, fingerprints and reports as before.
   - The wash enters by its own material inlet `port`, so the filter takes two inlets. The
     slurry is separated as before.
   - The unwashed cake's liquor `L` stays in the washed cake by `R = (1 - E)^n`, where `E` is the
-    wash efficiency and `n` the mass wash ratio, the wash fed over `L`. This is the wash-ratio
-    form of the SysCAD filter-press model, which cites Merritt.
+    wash efficiency and `n` the mass wash ratio, the wash fed over `L`. This is the mass-ratio
+    wash form of the SysCAD filter-press model; that section of its documentation cites no
+    source.
   - The washed cake holds its `cake_liquid` (default: the separation's): at most `R L` of its
     liquor, the rest wash. Everything else leaves as the wash filtrate, which goes to
     `outlets.wash_filtrate` or joins the filtrate.
@@ -75,20 +76,30 @@ without the new fields solves, fingerprints and reports as before.
     reversible phase change `<step>:dissolution`, as ADR 0056 does a crystallization.
   - A recipe `filter` `from:` a washed filter takes Ruth's time for the slurry's own filtrate,
     plus the wash at the final filtration rate: `t_w = mu V_w (alpha M / A^2 + R_m / A) / dP`,
-    from `dV/dt = A dP / (mu (alpha M / A + R_m))` at the end of Ruth's filtration.
+    from `dV/dt = A dP / (mu (alpha M / A + R_m))` at the end of Ruth's filtration. `M` in
+    both is the unwashed cake's solid: the slurry builds the cake before the wash dissolves
+    any of it.
+  - The recipe vessel of a washed filter holds the slurry, or later the unwashed cake with the
+    wash on it, never both: the slurry's filtrate drains before the wash passes. Its content
+    is the larger of the two, not the sum of the inlets (a reslurry's).
   - A crystallizer's own `separation:` takes no wash.
 - **A second liquid.**
   - `SolidSeparation.second_liquid: {components, cake_liquid}`: the cake holds that oil at its
     own cake liquid, and the rest of the liquid at the separation's.
   - `Crystallizer.second_liquid: {components}`: spectators in a phase of their own. They are
     left out of a per-liquor solubility basis, the salting-out molality and the liquor's
-    composition, and they take no Setschenow coefficient.
+    composition, and they take no Setschenow coefficient and no `liquor.mass_fraction`.
+    With no other spectator the mother liquor is the solute in its solvent, so a pure-solvent
+    solubility (also one carried by `transfer:`) holds there.
   - A filter that holds a second liquid takes no wash. That combination is refused.
 - **The dryer.** New fields: `pressure` (kPa(a)), `selectivity`, `sublimation`, `cooling`,
   `condenser`, and a `condensate` outlet role.
   - `selectivity: raoult` replaces the inlet-ratio rule. The cake liquid evaporates as an open
     (Rayleigh) evaporation of an ideal liquid at the drying temperature, so `n_i = n_i0 f^(P_i
-    / P_max)`. `f` is found by bisection so that the volatiles kept are the residual moisture.
+    / P_max)`. `f` is found so that the volatiles kept are the residual moisture, by bisection
+    on the least volatile's share `f^(P_min / P_max)` (`f` itself can be far below the
+    smallest step of a bisection over [0, 1]); a split that does not leave the moisture is
+    refused, never returned.
     A volatile without a vapour pressure at that temperature stays; if what stays is more than
     the moisture, the case is refused.
   - `sublimation: {components: {solid: vapour component}, heat: {solid: kJ/kg}}` needs the
@@ -120,6 +131,12 @@ without the new fields solves, fingerprints and reports as before.
     outlet ports (`cheme.process-dryer-duty`), as the heating's is.
   - Their fingerprints include the new fields and the vapour pressures they use, only when they
     are given.
+- **The model basis** treats every new part that sets the outlets as the crystallizer's
+  `transfer` and `salting_out`: a filter is not sourced while its `wash`, the wash's
+  `dissolution` and its solubility (and that solubility's `transfer`) or its `second_liquid`
+  are not given with a source, a dryer not while its `sublimation`, `cooling` or `condenser`
+  is not, a crystallizer not while its `second_liquid` is not; the detail names them (`not sourced: ...`). A dryer with `cooling:` or `condenser:`
+  states the outlet temperatures propagate writes, not the drying temperature's.
 
 ## Consequences
 
@@ -169,8 +186,9 @@ without the new fields solves, fingerprints and reports as before.
 - The wash ratio form `R = (1 - E)^n`, `n` the mass of wash over the mass of liquor in the
   unwashed cake: SysCAD documentation, "Filter Press", section "Model Theory", "Wash
   Efficiency", "Based on Wash Ratio (Mass Ratio)", help.syscad.net/FiltPrss (read 2026-11-13).
-  That page cites Merritt, R. C., *The Extractive Metallurgy of Uranium*. Only the form is used;
-  no value is taken from it.
+  The mass-ratio section cites no source; the page's only reference (Merritt, R. C., *The
+  Extractive Metallurgy of Uranium*) is attached to its volume-ratio method ("Based on Wash
+  Volume Ratio"), which is not used here. Only the form is used; no value is taken from it.
 - Ruth, B. F. (1935), Studies in filtration, Ind. Eng. Chem. 27, 708-723 (the filtration time
   of ADR 0057, here differentiated for the final rate). The Rachford-Rice flash and the
   condenser duty's path are the vent condenser's of ADR 0062.
