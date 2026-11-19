@@ -8,7 +8,9 @@
   `heat_up_time`, the charge's heat-up takes the jacket's own time); and a non-ideal liquid,
   `volatility: {model: raoult, activity: unifac}`, on modified Raoult's law with UNIFAC from
   the components' CAS numbers (extra `props`; `cheme.process-still` names a component without
-  one). Both are opt-in: a still without them solves, reports and fingerprints as before. A
+  one). The still holds one liquid: a liquid UNIFAC splits into two (a component's activity
+  above 1, or Michelsen's tangent-plane test) is refused, and so is a pair of UNIFAC main
+  groups without interaction parameters (thermo would take them as 0). Both are opt-in: a still without them solves, reports and fingerprints as before. A
   reaction in a still is not modelled; the ADR says why. Every BFD/PFD needs `cheme process
   build` once (only `generator_sha256` changes).
 

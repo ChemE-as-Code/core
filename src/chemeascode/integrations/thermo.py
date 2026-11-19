@@ -258,10 +258,11 @@ def unifac_gammas(cas: list[str]) -> Any:
     numbers), set up once: a function of the temperature K and the mole fractions (in the
     order of *cas*, summing to 1, zeros allowed: infinite dilution) that returns the activity
     coefficients. For a batch still's many evaluations (ADR 0078): thermo's ``to_T_xs`` on the
-    groups found once. Raises ValueError without thermo or naming a component without UNIFAC
-    groups."""
+    groups found once. Raises ValueError without thermo, naming a component without UNIFAC
+    groups, or naming a pair of the liquid's main groups without interaction parameters
+    (thermo would take them as 0, part of an ideal liquid)."""
     try:
-        from thermo.unifac import UFIP, UFSG, UNIFAC, UNIFAC_group_assignment_DDBST
+        from thermo.unifac import UFIP, UFMG, UFSG, UNIFAC, UNIFAC_group_assignment_DDBST
     except ImportError as failure:
         raise ValueError(
             "activity coefficients need thermo: pip install 'cheme-as-code[props]'"
@@ -274,6 +275,19 @@ def unifac_gammas(cas: list[str]) -> Any:
         groups.append(dict(found))
     if len(cas) == 1:
         return lambda temperature, fractions: [1.0]
+    owners: dict[int, list[str]] = {}  # main group -> the CAS numbers holding it
+    for number, found in zip(cas, groups, strict=True):
+        for subgroup in found:
+            owners.setdefault(UFSG[subgroup].main_group_id, []).append(number)
+    for first in sorted(owners):
+        for second in sorted(owners):
+            if first != second and second not in UFIP.get(first, {}):
+                names = [UFMG[m][0] if m in UFMG else str(m) for m in (first, second)]
+                raise ValueError(
+                    f"UNIFAC has no interaction parameters between main groups {first} "
+                    f"({names[0]}, of CAS {', '.join(dict.fromkeys(owners[first]))}) and "
+                    f"{second} ({names[1]}, of CAS {', '.join(dict.fromkeys(owners[second]))})"
+                )
     base = UNIFAC.from_subgroups(
         T=298.15,
         xs=[1.0 / len(cas)] * len(cas),

@@ -1363,19 +1363,28 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     input `UA (T_m - T)` at the still's bubble point T, `V = UA (T_m - T) / lambda(y)`, falling
     as the pot heats (UA and the medium constant: the wetted area does not fall as it empties).
     An end at or above the medium's temperature is refused when read; a still that reaches its
-    end only near the medium stalls with that reason. With `heat_up_time` the heat-up takes the
+    end only near the medium (its driving force below 1 % of the one its run started at) stalls
+    with that reason, any other stall with the pace's. With `heat_up_time` the heat-up takes the
     jacket's mean input over the charge's heat-up, `UA` times the log-mean of `T_m - T_in` and
     `T_m - T_0`, so the charge and the metal to `T_0` take `C / UA ln((T_m - T_in) / (T_m -
-    T_0))`. A time end with it puts `medium_temperature` in the outlets' fingerprint.
+    T_0))` (the still's jacket, or one jacket on every cut). A time end with it puts
+    `medium_temperature` in the outlets' fingerprint. `process stills` puts the jacket's
+    boil-up in place of the constant one in the assumptions.
   - `volatility: {model: raoult, activity: unifac}` (ADR 0078): a non-ideal liquid on modified
     Raoult's law, `y_i P = gamma_i x_i P_i(T)`, with original UNIFAC (thermo's DDBST groups,
     extra `props`) at the still's liquid (without the `separate_phase`) and temperature; the
     bubble point is solved again at the coefficients of the last one until it settles to 1e-11.
     Each component of the liquid, dissolved non-volatiles and solids too, needs its `cas` in
-    `materials.yaml` (`cheme.process-still`, error); one without UNIFAC groups is refused. A
-    column takes the K-values `gamma_i P_i / P` at the still for the whole column. `process
-    stills` names the model in `detail`, and the volatility's own provenance decides whether
-    the activity coefficients count as sourced. The CAS numbers enter the fingerprint. The
+    `materials.yaml` (`cheme.process-still`, error); one without UNIFAC groups is refused, and
+    so is a liquid with a pair of UNIFAC main groups that has no interaction parameters (thermo
+    would take them as 0). The still holds one liquid: a liquid that splits into two is
+    refused (a heteroazeotrope is not modelled), where a component's activity `gamma_i x_i`
+    exceeds 1 at a bubble point, or Michelsen's tangent-plane test (from a trial liquid of each
+    component nearly pure) finds a second liquid below the tangent plane at a point of the
+    profile. A column takes the K-values `gamma_i P_i / P` at the still for the whole column.
+    `process stills` names the model in `detail` and its assumptions (with a column too), and
+    the volatility's own provenance decides whether the activity coefficients count as
+    sourced. The CAS numbers enter the fingerprint. The
     latent heat is the components' (no heat of mixing).
   - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
     `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
@@ -1444,9 +1453,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `still.heat_up_time: true` (raoult, ADR 0068): the duty's terms besides the boil-up (the
     charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the still's own
     boil-up's heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` over the cuts
-    collected at it (a boil-up in kW: its value; a cut's own boil-up, a forerun the vacuum pump
+    collected at it (a boil-up in kW: its value; a jacket in kW/K, ADR 0078: `UA` times the
+    log-mean of `T_m - T_in` and `T_m - T_0`; a cut's own boil-up, a forerun the vacuum pump
     limits, limits the vapour, not the heating; every cut with its own: the mean over the whole
-    boil-up); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
+    boil-up, or with one jacket, the same `UA` and medium, on every cut: that jacket's log-mean);
+    `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
     heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a

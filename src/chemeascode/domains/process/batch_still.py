@@ -148,6 +148,11 @@ STALL_STEPS = 500
 #: and a phase never takes more than MAX_STEPS accepted steps (a few hundred is usual; an end
 #: next to the point where a column's still boils dry took 255217 in core 1.11.0)
 MAX_STEPS = 1_000_000
+#: A jacket's still that stalls with its driving force T_medium - T below this share of the
+#: one it started its run at stalls on its medium (ADR 0078); otherwise on its pace.
+JACKET_SPENT = 1e-2
+#: Successive substitutions of a trial liquid in the tangent-plane test (ADR 0078).
+STABILITY_ITERATIONS = 200
 #: K: the still's temperature is searched below this.
 HOTTEST = 2000.0
 #: kJ/kmol: a heat of vaporization below this is taken for one in kJ/mol (2 kJ/mol: only
@@ -281,7 +286,59 @@ class _Phase:
                 "the bubble point with the activity coefficients does not converge (UNIFAC)"
             )
         self.gamma = gamma
+        for i, (xi, gi) in enumerate(zip(x, gamma, strict=True)):
+            # the tangent-plane distance of component i pure, -ln(gamma_i x_i), below 0
+            if xi > 0 and xi * gi > 1.0 + 1e-9:
+                raise self._splits(t, f"the activity of {self.names[i]}, {xi * gi:.4g}, is above 1")
         return t
+
+    def one_liquid(self, x: list[float], t: float) -> None:
+        """Raises StillError where the liquid *x* at *t* K splits into two liquids on the
+        activity model (ADR 0078): Michelsen's tangent-plane test, by successive substitution
+        from a trial liquid of each component nearly pure, until it settles or nears the
+        still's own liquid; a trial liquid below the tangent plane of the still's (its
+        distance sum w_i (ln w_i + ln gamma_i(w) - ln x_i - ln gamma_i(x)) below 0) is more
+        stable than one liquid. Nothing to test without an activity model."""
+        if self.activity is None:
+            return
+        present = [i for i, xi in enumerate(x) if xi > 0]
+        if len(present) < 2:
+            return
+        gamma = self.activity(t, x)
+        d = {i: math.log(x[i] * gamma[i]) for i in present}
+        rest = 1e-3 / (len(present) - 1)
+        for j in present:
+            w = [0.0] * len(x)
+            for i in present:
+                w[i] = 1.0 - 1e-3 if i == j else rest
+            for _ in range(STABILITY_ITERATIONS):
+                g = self.activity(t, w)
+                distance = sum(w[i] * (math.log(w[i]) + math.log(g[i]) - d[i]) for i in present)
+                if distance < -1e-9:
+                    rich = max(present, key=lambda i: w[i] / x[i])
+                    raise self._splits(
+                        t,
+                        f"a second liquid with {w[rich]:.3g} {self.names[rich]} against "
+                        f"{x[rich]:.3g} lies below the tangent plane",
+                    )
+                big = {i: math.exp(d[i] - math.log(g[i])) for i in present}
+                total = sum(big.values())
+                new = [0.0] * len(x)
+                for i in present:
+                    new[i] = big[i] / total
+                moved = max(abs(a - b) for a, b in zip(new, w, strict=True))
+                w = new
+                # settled, or on its way to the still's own liquid (the trivial solution)
+                if moved < 1e-10 or max(abs(a - b) for a, b in zip(w, x, strict=True)) < 1e-4:
+                    break
+
+    def _splits(self, t: float, why: str) -> StillError:
+        return StillError(
+            f"the still's liquid splits into two liquids at {t:.5g} K (UNIFAC: {why}); the "
+            "still holds one liquid, so a heterogeneous distillation (a heteroazeotrope) is "
+            "not modelled: separate_phase would keep its component from boiling, and an ideal "
+            "liquid misses the split"
+        )
 
     def _bubble(self, x: list[float], gamma: list[float] | None) -> float:
         """K: sum gamma_i x_i P_i(T) = P at fixed *gamma* (None: 1): bracketed from the last
@@ -953,6 +1010,8 @@ def solve_still(
         moles = state[:k]
         total = sum(moles)
         y, t = phase.vapour(moles) if any(moles) else ([0.0] * k, None)
+        if t is not None and phase.activity is not None:  # one liquid (ADR 0078)
+            phase.one_liquid(phase.fractions(moles), t)
         if column is not None:
             at = column.top(moles) if any(moles) else None
             refluxes.append(at.reflux if at is not None else None)
@@ -990,12 +1049,19 @@ def solve_still(
         h = max(target - boiled, 1e-12) / 100.0
         steps = 0
         run = _Run(boiled, state[:k], target)
+        began = result.profile[-1][2]  # K of the still as this run starts
 
         def stalls() -> StillError:
             left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
             medium = getattr(active["boilup"], "medium_temperature", None)
             now = result.profile[-1][2]
-            if medium is not None and now is not None:  # a jacket's (ADR 0078)
+            # a jacket's (ADR 0078): its driving force down to JACKET_SPENT of the run's start
+            if (
+                medium is not None
+                and now is not None
+                and began is not None
+                and medium - now <= JACKET_SPENT * (medium - began)
+            ):
                 return StillError(
                     f"the still's boil-up stalls before its end: at {now:.5g} K it nears its "
                     f"jacket's medium at {medium:g} K, and the heat input UA (T_medium - T) "
@@ -1709,13 +1775,14 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
     """``still.heat_up_time`` (ADR 0068): the heat terms of the still's duty besides the
     boil-up (the charge's and a swap's feed's heat-up, a recipe vessel's metal; ADR 0063) take
     time at the still's own boil-up's heat input, ``t = (Q_whole - Q_boil-up) / (Q_boil-up /
-    t_boil)`` over the cuts that run at it (a boil-up in kW: its value; a cut's own boil-up, a
+    t_boil)`` over the cuts that run at it (a boil-up in kW: its value; a jacket in kW/K, ADR
+    0078: UA times the log-mean of ``T_m - T_in`` and ``T_m - T_0``; a cut's own boil-up, a
     forerun the vacuum pump limits, limits its vapour, not the heating; every cut with its own:
-    over the whole boil-up), s per batch; or why it is not known. A term that gives heat back
-    takes no time. The metal (``C_m``, kJ/K) heats with the charge from its start to the
-    still's first bubble point ``T_0``, then over the boil-up as far as the still ends above
-    ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0, 0)]``; one that ends colder (a vacuum
-    ramp) gives no time back."""
+    over the whole boil-up, or one jacket on every cut: that jacket's), s per batch; or why it
+    is not known. A term that gives heat back takes no time. The metal (``C_m``, kJ/K) heats
+    with the charge from its start to the still's first bubble point ``T_0``, then over the
+    boil-up as far as the still ends above ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0,
+    0)]``; one that ends colder (a vacuum ramp) gives no time back."""
     from chemeascode.domains.process.duties import still_duty
 
     rate = _heat_input(node.still, result)  # kW
@@ -1740,12 +1807,18 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
 
 
 def _heat_input(spec: Any, result: StillResult) -> float | None:
-    """kW: the heat input the still's heat-up takes (ADR 0068): its own boil-up in kW, else the
-    mean over the cuts collected at its own boil-up (their latent heat over their time); the
-    mean over the whole boil-up where every cut has its own, or a cut's heat is not known."""
+    """kW: the heat input the still's heat-up takes (ADR 0068): its own boil-up in kW, a jacket
+    (kW/K, ADR 0078) its mean input over the charge's heat-up (:func:`_jacket_heat_input`),
+    else the mean over the cuts collected at its own boil-up (their latent heat over their
+    time); the mean over the whole boil-up where every cut has its own (one jacket on every
+    cut: that jacket's), or a cut's heat is not known."""
     own = {c.outlet for c in spec.cuts if c.boilup is not None}
     if spec.cuts and spec.feed is None and len(own) == len(spec.cuts):
-        return result.duty  # the still's own boil-up is not used
+        # the still's own boil-up is not used
+        jackets = {(c.boilup.value, c.boilup.medium_temperature) for c in spec.cuts}
+        if len(jackets) == 1 and spec.cuts[0].boilup.unit == "kW/K":  # one jacket on each
+            return _jacket_heat_input(spec.cuts[0].boilup, result)
+        return result.duty
     if spec.boilup.unit == "kW":
         return spec.boilup.value
     if spec.boilup.unit == "kW/K":
@@ -2125,7 +2198,8 @@ def rules(process: Any) -> list[Finding]:
                 node.id,
                 "run cheme process propagate: the still asks it of a component its charge holds",
             )
-        in_kw = any(b.unit in ("kW", "kW/K") for b in _boilups(spec))
+        # the heat-input boil-ups, by unit: kW, a jacket's kW/K (ADR 0078)
+        in_kw = " and ".join(sorted({b.unit for b in _boilups(spec)} & {"kW", "kW/K"}))
         latent = [
             n for n in volatile if getattr(comps.get(n), "heat_of_vaporization", None) is None
         ]
@@ -2133,7 +2207,7 @@ def rules(process: Any) -> list[Finding]:
             add(
                 "error" if in_kw else "info",
                 f"{node.id}: no heat_of_vaporization of {', '.join(latent)}"
-                + (": the boil-up in kW is not known" if in_kw else ": no duty"),
+                + (f": the boil-up in {in_kw} is not known" if in_kw else ": no duty"),
                 [*loc, "boilup"],
                 node.id,
                 "give heat_of_vaporization (kJ/kmol near the still's temperature) in "

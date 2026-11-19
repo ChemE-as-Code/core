@@ -40,24 +40,46 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   circle between propagate and the recipe, and needs the liquid's volume along the path. An
   end at or above the medium's temperature is refused when the flowsheet is read. A still
   that would reach its end only above it (a residue end past it) stalls with the reason (the
-  heat input falls towards 0 near the medium), not as a still that boils dry.
+  heat input falls towards 0 near the medium), not as a still that boils dry. A stall is put
+  down to the medium only where the driving force `T_m - T` has fallen below 1 % of the one
+  the run started at; any other stall (a column crawling on a trace it enriches, ADR 0061)
+  keeps the pace's reason.
 - **The heat-up's time with a jacket** (`heat_up_time`, ADR 0068). It takes the jacket's mean
   input over the charge's heat-up: UA times the log-mean of `T_m - T_in` and `T_m - T_0`. The
   charge and the vessel's metal heated to the first bubble point `T_0` then take the jacket's
   own time, `C / UA ln((T_m - T_in) / (T_m - T_0))`, which is the recipe's `heat` time with
   `temperatures`. The other terms (a swap's feed, the metal above `T_0`) take the same mean
   rate. With a charge at or above `T_0`, or of unknown temperature, the input is
-  `UA (T_m - T_0)`.
+  `UA (T_m - T_0)`. Where every cut has its own boil-up (ADR 0068: the mean over the whole
+  boil-up stands in) and they are one jacket, the same UA and medium on each, that jacket
+  heats the charge and the log-mean holds as on the still. Cuts at different jackets, or a
+  jacket on some only, keep ADR 0068's mean: there is no one jacket to take a log-mean of.
 - **`volatility.activity: unifac`** (raoult only): modified Raoult's law, `y_i P = gamma_i x_i
   P_i(T)`, with original UNIFAC (DDBST groups, `thermo`) at the still's liquid and
   temperature. The liquid is without the `separate_phase` components and includes dissolved
   non-volatiles and solids. The bubble point is solved at the coefficients of the last
   temperature, again until it moves by less than 1e-11 of itself. Each component of the
   liquid needs its `cas` (`cheme.process-still`, error; the solve refuses it too), and a
-  component without UNIFAC groups is refused, never taken as ideal. thermo's UNIFAC is set
+  component without UNIFAC groups is refused, never taken as ideal. So is a liquid with a pair
+  of main groups that UNIFAC's table (UFIP) has no parameters for, in either direction:
+  thermo's `from_subgroups` would take that interaction as 0, part of an ideal liquid (water
+  and iodomethane, main groups 7 and 32, have none). thermo's UNIFAC is set
   up once per solve and evaluated with `to_T_xs`
-  (`integrations.thermo.unifac_gammas`, about 40 times faster than setting it up per call). A
-  column takes the K-values `gamma_i P_i / P` at the still for the whole column. The latent
+  (`integrations.thermo.unifac_gammas`, about 40 times faster than setting it up per call).
+  The still holds one liquid. A liquid that UNIFAC splits into two (water and toluene, a
+  heteroazeotrope) has no single bubble point on this model: a homogeneous liquid of water
+  0.1 in toluene at 1 atm would start boiling at 324.1 K on UNIFAC, while any liquid of the
+  two boils at or above 357.5 K, where `P_water + P_toluene = P` (water's Antoine constants
+  as acetyl-chloride-1 gives them, NIST WebBook after Stull 1947; toluene's as
+  `examples/process-solvent-swap`). It is refused, never
+  solved: at each bubble point where a component's activity `gamma_i x_i` exceeds 1 (the
+  tangent-plane distance of that component pure, `-ln(gamma_i x_i)`, below 0), and at each
+  point of the profile by Michelsen's tangent-plane test, by successive substitution from a
+  trial liquid of each component nearly pure. The test catches a split whose activities all
+  stay below 1 (1-butanol 0.1 in water at 360 K). It is not a global minimisation: a gap the
+  successive substitution does not reach from these trials passes. `separate_phase` is no way
+  around it, as it keeps its component from boiling; a heterogeneous distillation needs a
+  specified split or `process simulate`. A column takes the K-values `gamma_i P_i / P` at the still for the whole column. The latent
   heat stays the components' (no heat of mixing). NRTL (option 2) is not taken now. It needs
   sourced VLE pairs for every pair of the still's liquid; the library's stills hold three to
   six components, and core ships NRTL pairs only for LLE systems fitted to tie lines, which do
@@ -90,7 +112,10 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   of vaporization. With activity coefficients, the CAS numbers enter it (the
   activity model itself is in the still's own dump). `process stills` names the model in its
   `detail` ("modified Raoult's law, UNIFAC activity coefficients", "(jacket, medium at T K)"),
-  replaces the ideal liquid in the assumptions and adds the jacket's. The volatility's own
+  replaces the ideal liquid in the assumptions (with a column, where there is no ideal liquid
+  to replace, adds the modified Raoult's law beside the column's K-values), and adds the
+  jacket's, in place of the constant boil-up where every boil-up is a jacket (beside it where
+  some are). The volatility's own
   provenance decides whether the activity coefficients count as sourced.
 
 ## Consequences
@@ -113,8 +138,9 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   neither field is used there, and an ideal still runs the same bubble point as before.
 - Negative: UNIFAC is predictive. Its error for a given mixture is not known here, and a
   still on it is not more sourced than its volatility's provenance says. Each solve
-  evaluates UNIFAC a few times per bubble point (methanol-toluene: 0.34 s against 0.02 s
-  ideal).
+  evaluates UNIFAC a few times per bubble point, and the tangent-plane test some tens to a
+  few hundred times per point of the profile (methanol-toluene: 0.34 s against 0.02 s ideal
+  without the test, about 1.6 times that with it).
 - Negative: the jacket's UA and medium are constant. The wetted area does not fall as the pot
   empties, so a still that empties below its jacket boils up too fast towards the end. The
   sensible heat of the content as T rises is not taken from the jacket.

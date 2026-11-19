@@ -314,3 +314,204 @@ def test_a_plant_without_cas_numbers_is_told_which(tmp_path):
     assert "none of A, B, P" in found[0].message
     process, _ = load(_plant(tmp_path / "ideal", cas=False, activity=False).root)
     assert not [f for f in rules(process) if "CAS number" in f.message]
+
+
+def test_a_plant_on_a_jacket_reports_no_constant_boilup(tmp_path):
+    """Review of #323: a jacket's boil-up falls as the pot heats, so the still's assumptions
+    put it in place of the constant boil-up (with heat_up too), not beside it."""
+    (unit,) = still_report(_plant(tmp_path, activity=False).root).units
+    assert not any("constant boil-up" in a for a in unit["assumptions"])
+    assert any(a.startswith("the jacket's boil-up from the start") for a in unit["assumptions"])
+    heated = still.FLOWSHEET.replace(
+        "boilup: {value: 20, unit: kmol/h,",
+        "heat_up: true\n      boilup: {value: 3, unit: kW/K, medium_temperature: 433.15,",
+    )
+    materials = still.MATERIALS.replace(
+        "molar_mass: 128.17}", "molar_mass: 128.17, liquid_heat_capacity: 200}"
+    )
+    plant = still._plant(tmp_path / "heated", flowsheet=heated, materials=materials)
+    (unit,) = still_report(plant.root).units
+    assert not any("constant boil-up" in a for a in unit["assumptions"])
+    assert any("then the jacket's boil-up" in a for a in unit["assumptions"])
+
+
+def test_a_column_plant_reports_its_activity_coefficients(tmp_path):
+    """Review of #323: a column's assumptions have no ideal liquid to replace; the modified
+    Raoult's law with UNIFAC is added, and the column's volatilities say they take the
+    activity coefficients, not 'raoult or constant'."""
+    ws = _plant(tmp_path)
+    path = ws.root / "process/flowsheet.yaml"
+    path.write_text(
+        path.read_text().replace(
+            "      outlets: {distillate: top, residue: bottom}",
+            "      column: {stages: 3, reflux: constant, ratio: 2.0, provenance: assumed}\n"
+            "      outlets: {distillate: top, residue: bottom}",
+        )
+    )
+    (unit,) = still_report(ws.root).units
+    assert unit["problem"] is None
+    assumptions = unit["assumptions"]
+    assert any(a.startswith("a non-ideal liquid: modified Raoult's law") for a in assumptions)
+    assert any(a.startswith("the K-values gamma_i P_i(T) / P") for a in assumptions)
+    assert not any("(raoult) or constant" in a for a in assumptions)
+    assert not any("constant boil-up" in a for a in assumptions)
+
+
+def test_validate_names_the_jackets_unit_without_a_latent_heat(tmp_path):
+    materials = still.MATERIALS.replace("    heat_of_vaporization: 33180\n", "")
+    flowsheet = still.FLOWSHEET.replace(
+        "boilup: {value: 20, unit: kmol/h,",
+        "boilup: {value: 3, unit: kW/K, medium_temperature: 433.15,",
+    )
+    found = still._findings(still._plant(tmp_path, flowsheet=flowsheet, materials=materials))
+    (latent,) = [f for f in found if "heat_of_vaporization" in f.message]
+    assert latent.level == "error"
+    assert latent.message.endswith("no heat_of_vaporization of B: the boil-up in kW/K is not known")
+
+
+def test_one_jacket_on_every_cut_times_the_heat_up_as_on_the_still():
+    """Review of #323: where every cut has its own boil-up (ADR 0068: the mean over the
+    boil-up), one jacket on each heats the charge as it would on the still: the jacket's own
+    C / UA ln((T_m - T_in) / (T_m - T_0)). Different jackets keep ADR 0068's mean."""
+    from types import SimpleNamespace
+
+    comps = dict(COMPONENTS)
+    comps["P"] = Component.model_validate(
+        {"id": "P", "name": "product", "molar_mass": 128.17, "liquid_heat_capacity": 200}
+    )
+    plain = {"value": 10.0, "unit": "kmol/h", "provenance": "assumed"}
+
+    def timed(cuts):
+        spec = _raoult(
+            boilup=plain,
+            end=None,
+            cuts=cuts,
+            outlets={"residue": "bottom"},
+            heat_up=True,
+            heat_up_time=True,
+        )
+        result = solve_still(spec, {"A": 8.0, "P": 2.0}, None, comps, P_ATM, hours=4.0)
+        result.charge_temperature = 300.0
+        _heat_up(result, comps)
+        _heat_up_time(None, SimpleNamespace(id="S", still=spec), result, "design")
+        return result
+
+    one = timed([{"outlet": "c1", "end": {"distilled": 0.5}, "boilup": JACKET}])
+    bubble = _boiling(BENZENE, P_ATM / 0.8)
+    capacity = (8.0 * 136 + 2.0 * 200) * 4.0  # kJ/K per batch
+    exact = capacity / 2.0 * math.log((450.0 - 300.0) / (450.0 - bubble))
+    assert one.heat_up_time == pytest.approx(exact, rel=1e-9)
+    two = timed(
+        [
+            {"outlet": "c1", "end": {"distilled": 0.25}, "boilup": JACKET},
+            {"outlet": "c2", "end": {"distilled": 0.5}, "boilup": JACKET | {"value": 3.0}},
+        ]
+    )
+    assert two.heat_up_time == pytest.approx(capacity * (bubble - 300.0) / two.duty, rel=1e-9)
+
+
+# -- one liquid ---------------------------------------------------------------------------------
+
+# water as acetyl-chloride-1 (process-library) gives it: NIST WebBook (C7732185), fitted by NIST
+# to Stull (1947); log10(P/bar) = a - b / (T/K + c)
+WATER = {"a": 4.6543, "b": 1435.264, "c": -64.848, "temperature_range": [255.9, 373.0]}
+
+
+def test_a_liquid_that_splits_into_two_is_refused():
+    """Review of #323: water 0.1 in toluene at 1 atm. UNIFAC puts water's activity far above
+    1, so a homogeneous liquid would boil some 30 K below the heteroazeotrope, where P_water +
+    P_toluene = P and below which no liquid of the two boils. The still refuses it."""
+    comps = {
+        "W": Component.model_validate(
+            {
+                "id": "W",
+                "name": "water",
+                "cas": "7732-18-5",
+                "molar_mass": 18.015,
+                "vapour_pressure": WATER | {"provenance": "given"},
+            }
+        ),
+        "T": PAIR["T"],
+    }
+    lo, hi = 300.0, 400.0
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if _antoine(WATER, mid) + _antoine(TOL, mid) > P_ATM else (mid, hi)
+    assert 357.0 < lo < 358.0  # the heteroazeotrope at 1 atm on these constants
+    for charge in ({"W": 10.0, "T": 90.0}, {"W": 50.0, "T": 50.0}):
+        with pytest.raises(StillError, match=r"splits into two liquids at .* is above 1"):
+            solve_still(_pair_still("unifac", {"distilled": 0.3}), charge, None, comps, P_ATM)
+    # a trace of water dissolves: one liquid
+    trace = solve_still(
+        _pair_still("unifac", {"distilled": 0.3}), {"W": 1e-4, "T": 100.0}, None, comps, P_ATM
+    )
+    assert trace.temperatures[0] > lo
+
+
+def test_the_tangent_plane_finds_a_split_below_unit_activities():
+    """1-butanol 0.1 in water at 360 K: on UNIFAC both activities stay below 1, but a liquid
+    rich in butanol lies below the tangent plane; the liquid at 0.01 or 0.6 butanol is one."""
+    from chemeascode.domains.process.batch_still import _Phase
+    from chemeascode.integrations.thermo import unifac_gammas
+
+    gammas = unifac_gammas(["71-36-3", "7732-18-5"])
+    phase = _Phase(
+        ["BUOH", "W"],
+        [True, True],
+        "raoult",
+        None,
+        [None, None],
+        P_ATM,
+        [None, None],
+        activity=gammas,
+    )
+    x = [0.1, 0.9]
+    assert all(g * xi < 1.0 for g, xi in zip(gammas(360.0, x), x, strict=True))
+    with pytest.raises(StillError, match="BUOH .* lies below the tangent plane"):
+        phase.one_liquid(x, 360.0)
+    phase.one_liquid([0.01, 0.99], 360.0)
+    phase.one_liquid([0.6, 0.4], 360.0)
+
+
+def test_a_pair_of_groups_without_unifac_parameters_is_refused():
+    """Review of #323: UNIFAC's table has no water-iodide (main groups 7 and 32) parameters;
+    thermo would take them as 0, part of an ideal liquid. Refused, naming the pair."""
+    from chemeascode.integrations.thermo import unifac_gammas
+
+    with pytest.raises(
+        ValueError, match=r"between main groups 7 \(H2O.* and 32 \(I, of CAS 74-88-4"
+    ):
+        unifac_gammas(["67-56-1", "74-88-4", "7732-18-5"])
+    unifac_gammas(["67-56-1", "108-88-3"])  # a pair it has
+
+
+# -- the stall ----------------------------------------------------------------------------------
+
+
+def test_a_jacket_still_that_crawls_on_a_trace_stalls_on_its_pace(tmp_path, monkeypatch):
+    """Review of #323: the batch-rectification example's crawl near empty (the column on its
+    ACCL trace) with a jacket far above the still (medium 600 K, the still near 414 K) stalls
+    with the pace's reason, not the medium's."""
+    from chemeascode.domains.process import batch_still
+    from chemeascode.domains.process.batch_still import inlets_of, solve_node
+    from tests.test_batch_rectification import PRODUCT, _copy
+
+    boil = (
+        "{value: 150, unit: kW, provenance: assumed, "
+        'source: "the reboiler\'s heat input: illustrative"}'
+    )
+
+    def edit(text):
+        assert PRODUCT in text and boil in text
+        text = text.replace(PRODUCT, "{outlet: product, end: {distilled: 0.9982}}")
+        return text.replace(
+            boil, "{value: 1, unit: kW/K, medium_temperature: 600, provenance: assumed}"
+        )
+
+    monkeypatch.setattr(batch_still, "MAX_STEPS", 20000)
+    process, _ = load(_copy(tmp_path, edit).root)
+    node = process.nodes["ST1"]
+    with pytest.raises(StillError) as failure:
+        solve_node(process, node, inlets_of(process, node), "design")
+    assert "crawls near empty" in str(failure.value)
+    assert "jacket's medium" not in str(failure.value)

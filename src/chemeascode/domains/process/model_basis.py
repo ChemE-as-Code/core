@@ -529,16 +529,30 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
     found = _still_heat_assumptions(process, node, assumptions)
     spec = node.still
     if getattr(spec.volatility, "activity", None) is not None:
-        found = [
-            ACTIVITY_ASSUMPTION if text.startswith("an ideal liquid (Raoult") else text
-            for text in found
-        ]
-        if spec.column is not None:
-            found.append(
-                "the activity coefficients at the still's liquid for the whole column (no "
-                "azeotrope inside the column)"
-            )
-    if any(b.unit == "kW/K" for b in spec.boilups()):
+        liquid = []
+        for text in found:
+            if text.startswith("an ideal liquid (Raoult"):
+                liquid.append(ACTIVITY_ASSUMPTION)
+            elif text.startswith("the relative volatilities of the still at its bubble point"):
+                # a column's (COLUMN_ASSUMPTIONS): no ideal liquid of its own to replace
+                liquid += [
+                    ACTIVITY_ASSUMPTION,
+                    "the K-values gamma_i P_i(T) / P of the still at its bubble point, with the "
+                    "activity coefficients at the still's liquid, for the whole column (no "
+                    "azeotrope inside the column); constant molar overflow",
+                ]
+            else:
+                liquid.append(text)
+        found = liquid
+    jackets = [b.unit == "kW/K" for b in spec.boilups()]
+    if any(jackets):
+        # a jacket's boil-up falls as the still heats: not the constant one
+        boilup = (
+            "the jacket's boil-up"
+            if all(jackets)
+            else "constant boil-up (or a jacket's, where a cut or the still has one)"
+        )
+        found = [text.replace("constant boil-up", boilup) for text in found]
         found.append(JACKET_ASSUMPTION)
     return found
 
