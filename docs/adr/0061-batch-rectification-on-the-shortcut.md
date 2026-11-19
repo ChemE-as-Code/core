@@ -2,6 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-06
+- **Amended:** 2026-11-13, the qualification deferred to core#195 (see "Amendment" below)
 
 ## Context
 
@@ -201,3 +202,74 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
   `separations/shortcut.py`.
 - process-library `acetyl-chloride-1` and `benzoyl-chloride-1` DESIGN.md D-007, D-008, L-1
   (scratch copies, not committed).
+
+## Amendment (2026-11-13): qualification against published examples and DWSIM (core#195)
+
+The qualification this record deferred, done in `tests/test_batch_rectification.py`. Nothing in
+the model, the schema or the commands changes (no new ADR; 0076 was left unused). The papers
+are the authors' copies on https://www.vri-custom.org/pdfs/ (paper94, paper59); only single
+facts of their worked examples (stages, reflux, charge, relative volatilities, reported
+amounts and compositions) are used, with their table in the tests.
+
+- **Diwekar, Malik and Madhavan (1987)**, Comput. Chem. Eng. 11, 629-637, Tables 1 to 4: a
+  binary at alpha 2.0, N = 4 (3 plates and the reboiler), 110 mol/h boiled up for 1 h; J, the
+  moles distilled, sets R = V T / J - 1. At the printed J the shortcut's cut holds the paper's
+  short-cut mean (x_D*) within 1.2e-3 (cases 1 to 6; case 1 at N = 4, 6, 10 and 20 of Table 4),
+  and `constant_distillate` at x_D* distils the printed variable-reflux J within 0.6 %. The
+  tests' plate-to-plate column gives the paper's rigorous means within 2.3e-3 (0.9579, 0.9059,
+  0.9382, 0.9325, 0.9573, 0.9440 against 0.958, 0.906, 0.938, 0.932, 0.957, 0.942), so the
+  reference of the bound tests is the paper's rigorous column too; the shortcut is never purer
+  than it.
+- **Lotter and Diwekar (1997)**, Ind. Eng. Chem. Res. 36, 760-770, Table 4 (the rectifier):
+  alpha 1.7, R 4, 8 plates above the still, 50 mol/h for 3 h from an equimolar charge (100 mol
+  by the printed balance); MultiBatchDS's 0.9194 mean distillate and 0.3202 still are the
+  plate-to-plate column's 0.9195 and 0.3202. The shortcut gives 0.9023.
+- **Not reproducible from the printed inputs**, and so no qualification: 1987 case 7 (at its
+  printed J of 36.283 the shortcut gives 0.916 and the rigorous column 0.933, against 0.900
+  and 0.919; both are met at J = 42.6, and holding 0.90 distils 42.7 against the printed
+  36.762); 1987 Table 5, a quaternary at alpha 2.0/1.5/1.0/0.5 (at the printed J the rigorous
+  column gives 0.677 and 0.741 of component 1 at 8 and 10 stages, not 0.90; a test keeps the
+  reason checked). Diwekar and Madhavan (1991), Ind. Eng. Chem. Res. 30, 713-721, print no
+  relative volatilities or stages for their BATCHFRAC quaternary (Table III) and no charge for
+  their constant-reflux cases (Table II); Narváez-García et al. (Rev. Mex. Ing. Quím. 12 (2013)
+  621-637; InTech 2017, doi 10.5772/66830) give their results in figures only. No published
+  multicomponent example with complete inputs and tabulated results was found: the
+  multicomponent qualification stays the rigorous ternary columns above.
+- **DWSIM** (9.0.5, the `cheme-dwsim` image, behind `CHEME_DWSIM_TESTS=1`): a continuous column
+  of the still's stages and a total condenser, fed at the reboiler with the still's saturated
+  liquid (1 % of it distilled, the shortcut evaluated at the bottoms' composition), NRTL at
+  101.325 kPa(a), at x_B of about 0.1, 0.3 and 0.5 with 5 stages at R 2, 8 at R 1 and 10 at
+  R 3, the shortcut at the relative volatility of DWSIM's incipient vapour at the still:
+  - benzene and toluene (nearly ideal, alpha 2.40 to 2.50 at the still, 2.46 to 2.59 at the
+    top): the shortcut is not purer (to 1.5e-3, at 8 stages and R 1, near the minimum reflux;
+    DWSIM's molar overflow is not constant) and leaner by up to 0.053. Here the relative
+    volatility rises towards the top, and at the top's the shortcut is purer by up to 0.027
+    (0.542 against 0.515 at x_B 0.096, 10 stages, R 3): the still's is the column's smallest;
+  - methanol and water (non-ideal, no azeotrope: alpha 3.7 to 6.7 at the still, 2.4 to 3.0 at
+    the top): the shortcut is purer than DWSIM at most points, by up to 0.020 (0.725 against
+    0.704 at x_B 0.096, 8 stages, R 1; 0.982 against 0.962 at x_B 0.295, 5 stages, R 2). It is
+    no bound for a liquid whose relative volatility falls towards the top. At the top's
+    relative volatility (the column's smallest) it is never purer, often far leaner (0.39
+    against 0.90 at x_B 0.095, 5 stages, R 2).
+    Raoult's law (the still's `raoult`, thermo's vapour pressures; not in the tests) is no
+    bound either: at x_B 0.5 it gives up to 0.017 more than DWSIM, at 0.09 up to 0.35 less.
+  - `cheme process simulate` refuses a feed at the reboiler (a feed stage between the
+    condenser's and the reboiler's). The column it takes instead, one stage more with the
+    still's saturated liquid fed to the stage above the reboiler (99 % of it the bottoms), gives
+    the reboiler-fed column's distillate within 1.5e-3 at all eighteen points: the feed stage
+    holds nearly the still's liquid, and the reboiler below it only boils its own small share.
+- **Plate to plate at a relative volatility varying along the column** (constant molar
+  overflow, alpha = 1.2 + x rising towards the top, 2.2 - x falling): the shortcut at the
+  smallest relative volatility along the column is never purer (it bounds the column at that
+  constant one, which separates less than the varying one). At the largest it is no bound: at
+  alpha = 1.2 + x the column gives 0.653, 0.835 and 0.818 (x_B 0.3, 8 stages, R 3; 0.5, 5, 2;
+  0.3, 10, 5) where the shortcut gives 0.784, 0.867 and 0.966 at the distillate's relative
+  volatility and 0.618, 0.790 and 0.748 at the still's.
+- Consequence: "the shortcut is conservative" holds for a constant relative volatility. Where
+  it varies along the column, give `volatility: constant` at its smallest along the column
+  over the run for a bound: the distillate's (at its purest) where it falls towards the top,
+  as for methanol-water, but the still's (at the end of the cut) where it rises, as for a
+  negative deviation from Raoult's law or the light side of a maximum-boiling azeotrope, where
+  the distillate's makes the cut purer than the column gives. Or check the column with `cheme
+  process simulate`, one stage more and fed above the reboiler as above. The skills
+  `process-design` and `unit-ops-distillation` say so.
