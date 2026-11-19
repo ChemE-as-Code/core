@@ -2109,7 +2109,7 @@
       },
       "DryerCondenser": {
         "additionalProperties": false,
-        "description": "The dryer's vacuum condenser (ADR 0072): the vapour, at the drying temperature and the\ndryer's ``pressure``, cooled to ``temperature``, where an ideal condensate is in\nequilibrium with what passes to the vacuum pump (Raoult's law, each vapour's Antoine\n``vapour_pressure``). Its duty is the vapour's latent heat (the dryer's) of what condenses\nand the condensate's cooling at ``heat_capacity``; a sublimate passes it uncounted.",
+        "description": "The dryer's vacuum condenser (ADR 0072): the vapour, at the drying temperature and the\ndryer's ``pressure``, cooled to ``temperature``, where an ideal condensate is in\nequilibrium with what passes to the vacuum pump (Raoult's law, each vapour's Antoine\n``vapour_pressure``). Its duty is the vapour's latent heat (the dryer's) of what condenses\nand all of the vapour cooled as liquid at ``heat_capacity`` (what passes re-evaporated at\nthe same latent heat, as a vent condenser's); a sublimate passes it uncounted.",
         "properties": {
           "temperature": {
             "description": "K: the condensate and the gas leave at it.",
@@ -2118,7 +2118,7 @@
             "type": "number"
           },
           "heat_capacity": {
-            "description": "kJ/(kg K) of the condensate, constant",
+            "description": "kJ/(kg K) of the vapour cooled as liquid (condensate), constant",
             "exclusiveMinimum": 0,
             "title": "Heat Capacity",
             "type": "number"
