@@ -4,6 +4,18 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- The stirred tank's integrator clipped every running total at zero with the amounts, so an
+  endothermic absorption (a positive `vent.heat_of_absorption`, ADR 0071) gave a `-0.0`
+  `absorption` heat term and added nothing to the semi-batch's peak cooling duty (#298), and a
+  head space that expands (a shrinking liquid, a cooling adiabatic batch) held its
+  `expelled_kmol` at zero while it drew gas back, so pad + inflow no longer equalled end +
+  expelled and the "drew back more gas from the vent line" note never fired (#299). Only the
+  amounts are clipped now; the head space's expelled totals and the absorption heat keep their
+  sign. Library results are unchanged: no library entry declares a head space or a heat of
+  absorption (`cheme process reactors` identical to 1.12.0 on the vented batches checked).
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,

@@ -225,21 +225,44 @@ def test_the_head_space_follows_the_vapour_pressure_rise():
     assert result.outlet["B"] + result.vent["B"] == pytest.approx(result.extents["R1"], rel=1e-9)
 
 
-def test_a_formed_gas_releases_its_heat_of_absorption():
+def test_a_shrinking_liquid_draws_gas_back_into_the_head_space():
+    """A -> B, B denser than A: the liquid shrinks, the head space expands and draws gas back
+    from the vent line (ADR 0071). Its expelled total goes negative, not held at zero with the
+    amounts, so the gas held at the end and the expelled add up to the pad, and the note says
+    so (#299)."""
+    vent = _vent(inerts=["N"], head_space={"stream": "PAD", "provenance": "assumed"})
+    volumes = {"A": 0.1, "B": 0.05, "S": 0.1}
+    result = _solve(vent, {"S": 4.0, "A": 1.0}, [], None, {"N": 0.4}, volumes=volumes, time=3600)
+    head = result.head_space
+    # no vapour: the head space holds P (V_vessel - V) / (R T) at the end
+    assert head["end_kmol"]["N"] == pytest.approx(P * head["end_m3"] / (R * T), rel=1e-8)
+    assert head["end_kmol"]["N"] > 0.4
+    assert head["expelled_kmol"]["N"] == pytest.approx(0.4 - head["end_kmol"]["N"], rel=1e-6)
+    assert head["end_kmol"]["N"] + head["expelled_kmol"]["N"] == pytest.approx(0.4, rel=1e-9)
+    assert any("drew back more gas from the vent line" in n for n in result.notes)
+    assert result.vent["N"] == pytest.approx(0.4, rel=1e-12)  # the whole pad, in the end
+
+
+@pytest.mark.parametrize("h_abs", [-50000.0, 50000.0])
+def test_a_formed_gas_releases_its_heat_of_absorption(h_abs):
     """A -> B + G, 40 % of G vented: its dissolved 60 % releases its heat of absorption as it
-    forms, a term of the isothermal duty and heat in the adiabatic balance."""
+    forms, a term of the isothermal duty and heat in the adiabatic balance. An endothermic
+    absorption (a positive heat_of_absorption) takes the heat in: its term is positive, not
+    clipped at zero with the amounts (#298)."""
     volumes, cp = V | {"G": 0.05}, CP | {"G": 60.0}
     vent = {
         "stream": "V",
         "components": ["G"],
         "fraction": {"G": 0.4},
-        "heat_of_absorption": {"values": {"G": -50000.0}, "provenance": "assumed"},
+        "heat_of_absorption": {"values": {"G": h_abs}, "provenance": "assumed"},
     }
     batch = Batch.model_validate({"time": 1800, "vent": vent, "provenance": "assumed"})
     args = (_reactions(1e-3), {"S": 5.0, "A": 1.0}, T, P)
     result = solve_batch(*args, batch, {}, Liquid(volumes), cp)
     extent = result.extents["R1"]
-    assert result.heat_terms["absorption"] == pytest.approx(0.6 * extent * -50000.0, rel=1e-7)
+    assert result.heat_terms["absorption"] == pytest.approx(0.6 * extent * h_abs, rel=1e-7)
+    if h_abs > 0:
+        return
     assert result.heat_terms["reaction"] == pytest.approx(-extent * -HEAT, rel=1e-7)
     hot = solve_batch(
         *args, batch.model_copy(update={"heat": "adiabatic"}), {}, Liquid(volumes), cp
@@ -252,15 +275,17 @@ def test_a_formed_gas_releases_its_heat_of_absorption():
     assert hot.temperature > cool.temperature + 1.0
 
 
-def test_a_semibatchs_peak_cooling_duty_takes_the_heat_of_absorption():
+@pytest.mark.parametrize("h_abs", [-50000.0, 50000.0])
+def test_a_semibatchs_peak_cooling_duty_takes_the_heat_of_absorption(h_abs):
     """A -> B + G dosed into an isothermal semi-batch, 40 % of G vented: the dissolved 60 %
     releases its heat of absorption as it forms, so the peak cooling duty is the one without
-    it times 1 + (1 - f) |h_abs| / |dH_r| (the same trajectory, every step's heat scaled)."""
+    it times 1 - (1 - f) h_abs / |dH_r| (the same trajectory, every step's heat scaled); an
+    endothermic absorption lowers it (#298)."""
     from tests.test_semibatch_vent import _batch as _dosed
 
     volumes, cp = V | {"G": 0.05}, CP | {"G": 60.0}
     vent = {"stream": "V", "components": ["G"], "fraction": {"G": 0.4}}
-    absorbing = vent | {"heat_of_absorption": {"values": {"G": -50000.0}, "provenance": "assumed"}}
+    absorbing = vent | {"heat_of_absorption": {"values": {"G": h_abs}, "provenance": "assumed"}}
 
     def solved(spec):
         return solve_batch(
@@ -278,7 +303,7 @@ def test_a_semibatchs_peak_cooling_duty_takes_the_heat_of_absorption():
     plain, heated = solved(vent), solved(absorbing)
     assert plain.peak_cooling_duty > 0
     assert heated.peak_cooling_duty == pytest.approx(
-        plain.peak_cooling_duty * (1 + 0.6 * 50000.0 / abs(HEAT)), rel=1e-9
+        plain.peak_cooling_duty * (1 - 0.6 * h_abs / abs(HEAT)), rel=1e-9
     )
 
 
