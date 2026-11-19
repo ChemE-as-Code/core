@@ -2,7 +2,46 @@
 
 ## Unreleased
 
+### Added
+
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
+  optional:
+  - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
+    {heat_of_solution}` (van 't Hoff on the solute's mole fraction, an ideal solution),
+    reported as not at the operating conditions (`solubility_transfer`, info
+    `cheme.process-crystallizer-transfer`, an unsourced basis while assumed).
+  - The liquor a `measured_in: mother_liquor` solubility holds at, `solubility.liquor:
+    {mass_fraction, tolerance}`, compared with the solved mother liquor (warning
+    `cheme.process-crystallizer-liquor`).
+  - A displacement wash on a filter, `solid_separation.wash:` (its own inlet port, `R = (1 -
+    E)^n` of the cake's liquor stays, a `wash_filtrate` outlet), with the crystals the wash
+    dissolves up to a stated approach to their solubility (`dissolution:`, balanced as a phase
+    change) and the wash's time in a recipe `filter` (Ruth's and the wash's on the unwashed
+    cake's solid); the recipe vessel of a washed filter holds the slurry or, later, the unwashed
+    cake with the wash, the larger of the two, not their sum.
+  - A second liquid phase, `second_liquid:`: a filter's cake holds it at its own cake liquid, a
+    crystallizer leaves it out of its mother liquor (no `liquor.mass_fraction` of it; with no
+    other spectator a pure-solvent solubility, also a carried one, holds there).
+  - The dryer's `pressure`, `selectivity: raoult` (the volatiles kept by their vapour
+    pressures, found on the least volatile's share, so that a volatile 100 times less volatile
+    than the main one still dries to the residual moisture; a split that misses it is refused),
+    `sublimation:` (the vapour saturated with a subliming product, its heat in the duty),
+    `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
+    flash at the condenser's temperature, its duty, a `condensate` outlet). With `cooling:` or
+    `condenser:`, propagate writes the outlets' temperatures, and their duties are compared with
+    their energy streams (`cheme.process-dryer-duty`).
+  - The model basis: a filter is not sourced while its `wash`, the wash's `dissolution` (and its
+    solubility) or its `second_liquid` is assumed, a dryer while its `sublimation`, `cooling`
+    or `condenser` is, a crystallizer while its `second_liquid` is (`not sourced: ...` in the
+    detail, as a crystallizer's `transfer`); a dryer with `cooling:` or `condenser:` states the
+    outlet temperatures propagate writes.
+  - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
+    library entries with a crystallizer, filter or dryer gave the same results as the base for
+    `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,
+    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative; only the generator code
+    hash that `cheme.generated-version` names changes (schema.py and model.py are generator
+    modules).
 
 ## 1.12.0 (2026-11-13)
 

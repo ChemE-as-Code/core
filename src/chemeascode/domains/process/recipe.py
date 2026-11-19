@@ -1113,8 +1113,9 @@ def _step_contents(
     process: Any, recipe: Recipe, up: UnitProcedure, case: str, skip: str | None = None
 ) -> float | None:
     """m3: the largest material that one batch brings into a step of *up* (the slurry a
-    filter-dryer takes, the reslurry wash), each member's material inlets per batch from their
-    components' liquid molar volumes; None when none can be calculated. *skip*: a step whose
+    filter-dryer takes, the reslurry wash; a displacement wash: :func:`_displaced`), each
+    member's material inlets per batch from their components' liquid molar volumes; None when
+    none can be calculated. *skip*: a step whose
     content is known otherwise (the dryer with a cake_density)."""
     from chemeascode.domains.process.model import stream_flows
 
@@ -1128,16 +1129,43 @@ def _step_contents(
             continue
         flow = 0.0
         known = False
-        for stream in _inlets(process, node.id):
-            if stream.kind != "material":
-                continue
+        volumes = []
+        inlets = [s for s in _inlets(process, node.id) if s.kind == "material"]
+        for stream in inlets:
             volume = _volume_flow(process, stream_flows(process, stream, case).components)
             if volume is not None:
                 flow += volume
                 known = True
+                volumes.append((stream, volume))
+        if known and getattr(getattr(node, "solid_separation", None), "wash", None) is not None:
+            flow = _displaced(process, node, inlets, volumes, case, flow)
         if known:
             found = max(found or 0.0, flow * hours)
     return found
+
+
+def _displaced(
+    process: Any,
+    node: Any,
+    inlets: list[Any],
+    volumes: list[tuple[Any, float]],
+    case: str,
+    total: float,
+) -> float:
+    """m3/h that filter *node* with a displacement wash holds at once (ADR 0072): the slurry,
+    or later the unwashed cake with the wash on it, never both (the slurry's filtrate drains
+    before the wash passes). *inlets*: its material inlets, *volumes* the m3/h of those
+    known; *total*, their sum, when the cake cannot be calculated."""
+    from chemeascode.domains.process.crystallization import CrystallizationError, filter_node
+
+    port = node.solid_separation.wash.port
+    wash = sum(v for s, v in volumes if (end := process.ends(s)[1]) and end.port == port)
+    try:
+        _, _, washed = filter_node(process, node, inlets, case)
+    except CrystallizationError:
+        return total
+    cake = _volume_flow(process, washed["unwashed_cake"]) if washed is not None else None
+    return total if cake is None else max(total - wash, cake + wash)
 
 
 def _wet_cake(process: Any, recipe: Recipe, dryer: Any, case: str) -> float | None:
@@ -1229,7 +1257,7 @@ def _solids_time(
     filter *op.from_*, of one batch in the unit procedure's *vessel*. Raises _Reference, or
     ValueError when it cannot be calculated."""
     from chemeascode.domains.process import dryer as drying
-    from chemeascode.domains.process.crystallization import separate_node
+    from chemeascode.domains.process.crystallization import filter_node, separate_node
     from chemeascode.domains.process.solids import solid_components
 
     node = process.nodes.get(op.from_ or "")
@@ -1245,15 +1273,26 @@ def _solids_time(
     sep = getattr(node, "solid_separation", None)
     if sep is None or sep.filtration is None:
         raise _Reference(f"{op.from_} is no solid_separation with filtration:")
-    ports, _ = separate_node(process, node, _one_inlet(process, node), case)
+    if sep.wash is None:
+        ports, _ = separate_node(process, node, _one_inlet(process, node), case)
+        washed = None
+    else:  # ADR 0072: the slurry's filtrate by Ruth, then the wash's at the final rate
+        inlets = [s for s in _inlets(process, node.id) if s.kind == "material"]
+        ports, _, washed = filter_node(process, node, inlets, case)
     hours = batch_hours(process, recipe, case)
-    cake, filtrate = ports[sep.outlets["cake"]], ports[sep.outlets["filtrate"]]
+    # the slurry's filtration builds the cake before the wash dissolves any of it
+    cake = washed["unwashed_cake"] if washed is not None else ports[sep.outlets["cake"]]
+    filtrate = washed["filtrate"] if washed is not None else ports[sep.outlets["filtrate"]]
     solid = sum(v for n, v in cake.items() if n in solid_components(process)) * hours
     volume = drying.filtrate_volume(process, filtrate, sep.filtration) * hours
     area = sep.filtration.area or (drying.filter_area(vessel.diameter) if vessel else None)
     if area is None:
         raise ValueError("no filter area: give filtration.area or the unit procedure's vessel")
-    return drying.ruth_hours(sep.filtration, solid, volume, area)
+    found = drying.ruth_hours(sep.filtration, solid, volume, area)
+    if washed is not None:
+        wash = drying.filtrate_volume(process, washed["wash_filtrate"], sep.filtration) * hours
+        found += drying.wash_hours(sep.filtration, solid, wash, area)
+    return found
 
 
 @dataclass

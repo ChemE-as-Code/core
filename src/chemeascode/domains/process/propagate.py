@@ -577,9 +577,10 @@ def _swept(
             return False
         inlet = ins[0]
         shapes: dict[str, dict[str, float]] = {}
+        temperatures: dict[str, float] = {}
         try:
             if node.dryer is not None:
-                from chemeascode.domains.process.dryer import DryerError
+                from chemeascode.domains.process.dryer import DryerError, outlet_temperatures
                 from chemeascode.domains.process.dryer import node_outlets as dried
                 from chemeascode.domains.process.dryer import solve_node as dry
 
@@ -588,6 +589,7 @@ def _swept(
                 except DryerError as failure:
                     raise CrystallizationError(str(failure)) from failure
                 ports = dried(node.dryer, solved)
+                temperatures = outlet_temperatures(node.dryer)  # ADR 0072: cooling, condenser
             elif node.crystallizer is not None:
                 result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 solutions[node.id] = (result, dict(extra))
@@ -597,7 +599,7 @@ def _swept(
                     for role, port in node.crystallizer.outlets.items()
                 }
             else:
-                ports, extra = separate_node(work, node, inlet, case)
+                ports, extra = separate_node(work, node, ins if len(ins) > 1 else inlet, case)
         except CrystallizationError as failure:
             if (node.id, str(failure)) not in found.solids:
                 found.solids.append((node.id, str(failure)))
@@ -614,6 +616,10 @@ def _swept(
             changed |= put(s, "flow", kg_h(total), kind, node.id, ins, extra)
             shape = mass if total > 0 else shapes.get(port) or mass
             changed |= put(s, "composition", _mix(work, shape), kind, node.id, ins, extra)
+            if port in temperatures:
+                unit = None if fs.units.temperature == "K" else "K"
+                q = Quantity(value=_sig(temperatures[port]), unit=unit, provenance="calculated")
+                changed |= put(s, "temperature", q, kind, node.id, ins, extra)
         return changed
 
     def separator(node: Any, ins: list[StreamDef], outs: list[tuple[StreamDef, str]]) -> bool:
@@ -730,7 +736,10 @@ def _swept(
             if ins and outs:
                 changed |= still(node, ins, outs)
         elif kind in ("crystallizer", "solid-separation", "dryer"):
-            if (len(ins) == 1 or (kind == "crystallizer" and ins)) and outs:
+            several = kind == "crystallizer" or (
+                kind == "solid-separation" and node.solid_separation.wash is not None
+            )
+            if (len(ins) == 1 or (several and ins)) and outs:
                 changed |= solids(node, ins, outs)
         elif kind == "component-separator":
             if ins and outs:
