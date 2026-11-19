@@ -57,6 +57,15 @@ that safeguard references resolve to tags and interlocks; it says nothing about 
    processor, output, wiring, pilot device, final element) is as good as its weakest link, and
    attention tends to go to the programmable part while field devices and wiring get little (9.6.8.2).
    On the drawing look at the tapping, isolation and final element, not the logic symbol.
+8. A semi-batch's screened MTSR (`cheme process reactor-hazards`, skill `reactions`) assumes the
+   dosing stops when the cooling fails: the accumulated reactant at its worst moment reacts out,
+   and no more is fed. Its dT_ad (the whole charge and doses at once) is the case without that
+   stop, a dosing error. When you cite the semi-batch MTSR, name the layer that stops the dose
+   (a temperature or cooling-flow trip on the feed valve or pump) and test it like any other
+   layer. It must not depend on the BPCS loop whose failure is the cause, and it must not share
+   the cooling failure's common mode (power, instrument air). A limited-capacity pump or a
+   restriction orifice only caps the dosing rate: it does not stop the feed and does not replace
+   the stop. Where that layer cannot be credited, the batch case (MTSR = T_p + dT_ad) applies.
 
 Assert from files: that a device exists, where it senses and acts, whether a trip and a control
 loop share a tapping or final element, and whether a physical layer is also present. Do not assert
@@ -67,7 +76,8 @@ independent because it is drawn separately.
 
 Patterns to raise as questions, not defects: a sensor or final element shared between a control
 loop and a trip; redundant sensors on one process connection; a trip driven by a single sensor.
-The first two are exactly the sharing the source permits under conditions. A passing
+The first two are exactly the sharing the source permits under conditions. Also raise a
+semi-batch MTSR quoted without the feed stop it presumes (step 8). A passing
 `cheme safety hazop check` is not evidence of independence.
 
 ## Outputs and provenance

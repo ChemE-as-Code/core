@@ -26,24 +26,32 @@ check goes under "Not checked" in the record.
    `checks/status.json`, a checker without a review record in `reviews/`) and
    `cheme.titleblock-sheet` (SheetNumber or title disagree with `plant.yaml`) are findings;
    a sheet must never show an approval nobody gave. `--ignore RULE` / `--only RULE` filter the
-   report; never filter with `grep -v`.
+   report; never filter with `grep -v`. Run `cheme impact`: each review record it lists, whose
+   scope or basis changed after its `reviewed_commit`, is due for re-review. Carry its open
+   findings forward and say in the record which changes you re-checked.
 2. For a branch: `cheme diff main --list` gives one line per changed plant item with its
    counts (`--verbose` adds each change and the drawing that shows it, `--flat` one line per
    object); `cheme diff main` writes `build/diff.html` to look at. Does every change have a
    reason in the commit messages and `PROGRESS.md`? Is any changed item `not drawn`?
 3. **Drawing** of each changed sheet (each sheet, before a sign-off). Look for overlaps,
    crossings and misplaced labels with evidence, not by impression:
-   - `cheme validate` prints one `drawing <sheet>: N line-through-label, N line-crossing,
-     N label-overlap, N label-far-from-owner` line per sheet (`(+N accepted)` for accepted ones).
+   - `cheme validate` prints one `drawing pid/<sheet>.xml:` line per P&ID with a count for
+     each drawing rule: line-through-label, line-crossing, label-overlap, label-far-from-owner,
+     text-outside-frame, title-text-overflow, line-through-symbol, line-through-valve,
+     line-on-pipe, line-not-orthogonal, offpage-not-on-edge (`(+N accepted)` after a count when
+     some are accepted; BFD/PFD sheets, and a sheet with `cheme.drawing-not-checked`, get no
+     line).
      Each finding carries `[crop X0,Y0,X1,Y1]` and `[id ...]`: render it with
      `cheme render pid/<sheet>.xml --png --crop <crop> --scale 8` and look.
      `cheme render pid/<sheet>.xml --png --findings` marks them all on the sheet.
-   - **Quote the counts** in the record's `## Drawing` section, e.g.
-     `P-04: 0 line-through-label, 1 line-crossing (accepted: D-023), 2 label-far-from-owner`.
+   - **Quote the counts** in the record's `## Drawing` section: the whole line, e.g.
+     `pid/P-04.xml: 0 line-through-label, 1 line-crossing (accepted: D-023), ...,
+     0 offpage-not-on-edge`.
      Every remaining finding is either a finding of the review or accepted with a reason (an
      `accept:` entry in `checks/checks.yaml` with the finding's id; errors cannot be accepted,
-     only fixed). A statement such as "no
-     overlaps" is only allowed with these counts at 0.
+     only fixed). A statement such as "drawing
+     clean" or "no overlaps" is allowed only when every count on the sheet's line is 0, or
+     every remaining finding is accepted.
    - The lint does not see everything (an ambiguous but not overlapping tag, a symbol too small
      to read, a wrong arrow; `--emphasise-inline` draws valves and actuators larger for reading,
      not for judging their size). Sweep each sheet in tiles: `cheme render pid/<sheet>.xml --png
@@ -108,6 +116,22 @@ check goes under "Not checked" in the record.
      `pipe-routing`);
    - what the model cannot show (stress, supports, structural design, the area classification
      study) goes under "Not checked" with who must do it.
+4b. **Process review** (a change under `process/`, a batch, recipe or simulation): `cheme
+   process propagate --check` for each case (`--case <id>`). Every `cheme.process-design-spec`
+   warning (spec not met, beyond its bounds, independent of its variable) is a finding;
+   validate reports only `cheme.process-spec` (the declaration) and stale calculated values
+   (`cheme.process-calculated-stale`). Run `cheme process reactor-hazards` (it screens every
+   reactor): quote each reactor's class, dT_ad, MTSR and the `cheme.reactor-hazard-vent` ratio
+   (since 1.12, for a vented semi-batch, the larger of the release at the MTSR and the largest
+   release over the batch, ADR 0069) and `cheme.reactor-hazard-dissolved`. An earlier record
+   that quotes a lower 1.11 ratio is not evidence. For stills and recipes, run `cheme process
+   stills` and `cheme process recipe`. With `process/simulation.yaml` (DWSIM, IDAES or QSDsan),
+   run `cheme process simulate --check`. Validate checks a BFD/PFD only by its provenance
+   record (ADR 0067), so on a clean tree also run `cheme process build`: a sheet it reports as
+   written was not current, which is a finding. Restore it with `git checkout -- process/` and
+   do not commit the rebuild in the review. Directly after an upgrade to 1.12,
+   `cheme.generated-version` on every BFD/PFD needs a single `cheme process build`, because
+   only `generator_sha256` changes. Record it as one finding, not one per sheet.
 
 ## Validation and failure handling
 
@@ -129,6 +153,9 @@ finding ids or statuses (`cheme.review-*`).
    reviewer_kind: human | agent | self
    branch: <branch reviewed>
    merge: pending                     # or the merge commit to the default branch
+   approved_by: <human>               # only for a self review that a person approved
+   basis:                             # optional: sources relied on but not reviewed
+     - {path: process/flowsheet.yaml, revision: <sha or sha256:<hex>>, relation: analyses}  # derived-from | represents | analyses | depends-on
    ---
    # Review: <topic>
    ## Findings

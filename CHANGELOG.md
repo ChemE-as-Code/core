@@ -27,6 +27,12 @@
   remain in `simulation.qsdsan`. See the framework migration table; no internal alias is kept.
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Bundled skills and REFERENCE.md brought up to 1.12 and the QSDsan integration: QSDsan
+  configuration, refusals and outputs; propagate's `recovery:`, `specs:` and tears beside
+  simulate; still refusals, condenser freezing, `heat_up_time` and `separate_phase`; thermal
+  screening in the safety skills; flowsheet `recovery:` for specified splits; the
+  `adsorption` and `assay` commands, missing CLI flags and unit defaults in REFERENCE.md. No
+  behaviour changes.
 
 ## 1.12.0 (2026-11-13)
 

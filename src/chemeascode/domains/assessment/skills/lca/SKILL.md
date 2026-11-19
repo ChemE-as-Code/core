@@ -52,7 +52,10 @@ gate `lca` fails.
    answer more than most factors. ISO 14044 prefers avoiding allocation (system expansion:
    `method: substitution`, with the avoided production of each co-product); otherwise a
    physical basis (`exergy` when the products differ in pressure, temperature or purity; run
-   `cheme process props --fill` first, or give `properties.<product>.exergy`), then
+   `cheme process props --fill` first, or give `properties.<product>.exergy`; a property
+   package that claims no enthalpy, such as the PC-SAFT liquid-density package
+   `water-methanol-pcsaft-liquid`, fills no exergy: give `properties.<product>.exergy` with its
+   source), then
    economic. Read the allocation comparison in `lca/results.md`: every method whose data is
    complete is computed. Choose one, record why in `allocation.source`, and report the
    spread.
@@ -121,7 +124,10 @@ gate `lca` fails.
    instrument in `source`, on-site), and declares `missing:` or `proxy:` (flow key -> why) where
    no background of that region exists: never a zero, never the baseline's relabelled. A
    physical change (a hot climate, another capacity) needs its own computed flowsheet case
-   (`case:`); never scale a design. `cheme assess lca-scenarios --write` writes one record per
+   (`case:`); never scale a design. `cheme assess lca-cases [<case> ...]` (`--json`) shows the
+   computed cases side by side, each exchange per unit of the product, with each case's
+   capacity and provenance (a case marked `extrapolated` is labelled not predictive). An
+   exchange a case lacks shows as missing, not 0. `cheme assess lca-scenarios --write` writes one record per
    scenario (`lca/scenarios/<id>.json`, docs/framework/lci-scenarios.md). Each record and
    `results.md` carry a verdict against the baseline (`like-for-like`, `proxy`,
    `not comparable`), read from the factors' structured `scope` (basis, delivery, gases, gwp,
@@ -132,7 +138,10 @@ gate `lca` fails.
 7. **Write and gate.** `cheme assess lca --write`; commit `lca/*` with the inputs. The gate
    `kind: lca` requires `mapped`, then `lca-current`, `no-gaps` when the result must not be
    partial, and `factors` once the project's own replace an example. A result meant for
-   publication also requires `factors-published` and passes `cheme assess lca --strict`: every
+   publication also requires `factors-published` and `publishable` (every source `public`, or
+   `restricted` with a person's reviewed `publication: {allow_restricted: true, review,
+   approved_by}` decision, step 8; `local` never; a factor without a `sources:` registry entry
+   counts as `restricted`, step 2) and passes `cheme assess lca --strict`: every
    exchange's factor status (`--json` `factor_status`) is `PUBLISHED`, `EPD`, `database` or
    `none`; an example, `ASSUMED`, `PROXY` or `ESTIMATE` factor or a gap is named as
    `cheme.lca-factor-status`. Never relabel a factor's status to pass it: replace the number
@@ -164,9 +173,15 @@ gate `lca` fails.
    `cheme migrate --write` rewrites a hand-written one.
 
    A batch plant (with `process/recipe.yaml`) gives what it uses per batch and the flowsheet
-   does not carry (cleaning solvent, rinse water, nitrogen purges, off-spec make-up) as
-   `consumables:` with `per_batch:` instead of `per_year`; the batches per year come from the
-   recipe.
+   does not carry (cleaning solvent, rinse water, off-spec make-up, and nitrogen purges only
+   where the flowsheet does not model them) as `consumables:` with `per_batch:` instead of
+   `per_year`; the batches per year come from the recipe. A pad or sweep declared on the
+   batch's vent (`batch.vent.head_space`, or an inert dose named in `batch.vent.inerts`, ADR
+   0071) is a flowsheet feed: map it as a feed and never repeat it as a consumable. The vent
+   stream then carries the stripped vapour as well. Where that stream (after its vent
+   condenser) leaves the plant to atmosphere, map its components under `emission: true` rather
+   than adding an `emission_estimates` entry for the same loss; where it goes on to a scrubber
+   or oxidiser, follow it there.
 
 11. **Wastes and end of life**. What goes in also comes out: give every replaced or
    charged consumable (adsorbent, catalyst) and the construction materials a `disposal:`
@@ -207,6 +222,15 @@ gate `lca` fails.
    CH4, N2O and PM from its fuel. What is negligible goes in `emission_exclusions:`
    with its reason (inert or cryogenic service). Read `cheme.lci-emissions-incomplete`,
    `cheme.lci-emission-*`; the gate requirement `lci-emissions-complete` checks them.
+   A wastewater line simulated with QSDsan (`cheme process simulate`, `simulator: qsdsan`)
+   holds its volumetric flow (m3/day) and its COD, N, P and TSS (mg/L) in
+   `state.<case>.calculated` (`cheme process streams --json`). The LCA does not read them, and
+   such a stream has no mass flow. Give the `effluent` estimate `activity: {value, unit: m3,
+   source}` (the simulated flow converted to m3 per operating hour) and its `factors:` as the
+   simulated concentrations, written in plain `mg/L` without the species tag (e.g. `COD:
+   {value: 50, unit: mg/L, source: "cheme process simulate (qsdsan, <model>), stream <id>, run
+   <fingerprint>"}`). The simulation run is then their source. Re-transcribe them when the run
+   changes, because `--check` does not see it.
 
 ## Validation and failure handling
 

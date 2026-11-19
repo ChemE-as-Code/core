@@ -36,6 +36,9 @@ Keep executable paths, licence configuration and credentials outside engineering
 For QSDsan, select the numerical environment with `CHEME_QSDSAN_PYTHON`; it overrides
 `CHEME_WORKER_PYTHON`, even when invalid. Pin the numerical environment separately. Solver
 settings remain in QSDsan's input; do not invent generic options that its adapter has not declared.
+The QSDsan block names the worker module, primary input and declared files. Its `timeout_s`
+defaults to 300 seconds and may be set up to 3600 seconds. See `examples/process-qsdsan` for
+a minimal project and use `cheme process streams --json` to inspect published quantities.
 
 - Every feed stream with temperature, absolute pressure, flow and composition (given or
   assumed). A missing one is `sim-feed-incomplete`: ask for it or mark an assumption.
@@ -145,6 +148,12 @@ A2/O biological model belongs to process-library.
    component separators (`recoveries`): a specified split (`basis: specified`), not a
    prediction; give `basis_source` (vendor data, a cited module, a DESIGN.md decision) and
    `operating_basis` (the conditions it holds for), else `sim-specified-unsourced` (warning).
+   simulate does not read the flowsheet's `recovery:` (ADR 0070, which `cheme process
+   propagate` solves). A component separator simulated in DWSIM needs its own
+   `specs.<id>.recoveries` (optionally `recovery_outlet`, else the first outlet; two outlets
+   only) in `simulation.yaml`, with the same split: the two declarations are not cross-checked,
+   and a different split shows only as deviations. Where the `recovery:` names more than two
+   outlets, `exclude:` the step and keep propagate's values.
    The run record marks such a unit `basis: specified` with a note: report its converged
    result as the stated split, never as a predicted one (which techniques core predicts:
    skill `separation-method-selection`). An adsorber's recoveries can follow from
@@ -156,7 +165,8 @@ A2/O biological model belongs to process-library.
    `pairs:`.
 2. `cheme validate`: `simulation.yaml` against its schema, specs for unknown steps.
 3. `cheme process simulate --check`: solves and reports, writes nothing. Read every
-   `sim-deviation` (a given or assumed value the simulation contradicts) and the summary lines
+   `sim-deviation` (a given, assumed or propagate-calculated value the simulation
+   contradicts) and the summary lines
    (duties, power, minimum reflux, stages).
 4. Start a column with the shortcut method (keys, reflux ratio); the minimum reflux ratio and
    stages it prints give the rigorous column (`stages`, `feed_stage`, `condenser_spec`,
@@ -194,9 +204,11 @@ producer conflicts; do not bypass validation or remove given/assumed values to m
   `guesses: {stream: {temperature, pressure, flow, composition}}` in `simulation.yaml` if it
   converges slowly. A guess is no stream value: never put one into the flowsheet as `assumed`,
   where it would stay and contradict the result.
-- `sim-deviation`: never overwrite the given or assumed value to silence it. Either the
-  assumption is wrong (change it, with a decision in `DESIGN.md`) or a spec is (change the
-  spec); an engineer decides which.
+- `sim-deviation`: a given, assumed or propagate-calculated value (a recovery outlet, a feed
+  flow solved for `specs:`, a tear, a model duty) that the simulation contradicts. simulate
+  never overwrites any of them. Never overwrite one to silence the deviation. Either the
+  assumption or the propagate model is wrong (change it, with a decision in `DESIGN.md`) or a
+  spec is (change the spec); an engineer decides which.
 - `sim-stale`: feeds, specs, package or DWSIM changed since the values were written; fill again.
 - `sim-run-stale` (`--check`): `process/simulation-run.json` records a run from other inputs;
   fill again (`sim-run-missing`, info: no run recorded for the case yet).
@@ -314,8 +326,9 @@ worker results are v2. A legacy integration flag is not independent convergence 
 
 Simulated streams get `temperature`, `pressure`, `flow` and `composition` (energy streams
 their `duty`) with `provenance: calculated`, source `cheme process simulate: DWSIM
-<version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model. Given and assumed values
-stay; `--save` writes the DWSIM flowsheet (`.dwxmz`, a generated file: commit it only if the
+<version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model
+(DWSIM and IDAES; QSDsan writes only `calculated` quantities, see above). Given and assumed
+values, and values `cheme process propagate` calculated, stay; `--save` writes the DWSIM flowsheet (`.dwxmz`, a generated file: commit it only if the
 project wants it). The specs and their provenance in `simulation.yaml` are the record of what
 was assumed.
 
