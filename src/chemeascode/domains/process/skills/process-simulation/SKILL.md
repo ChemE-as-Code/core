@@ -1,13 +1,35 @@
 ---
 name: process-simulation
-description: Solve the flowsheet in DWSIM, or for a bounded scope in the optional IDAES backend (heat and material balance), with cheme process simulate - write process/simulation.yaml (simulator, property package, step specs), check the deviations from the given and assumed values, and fill the missing stream values. Use when outlet temperatures, pressures, flows or compositions of compressors, exchangers, flash drums, columns or recycle loops are needed, or when assumed stream values should be checked against a rigorous calculation.
+description: Solve the flowsheet in DWSIM, or for a bounded scope in the optional IDAES backend (heat and material balance), or run a declared QSDsan wastewater model (simulator: qsdsan), with cheme process simulate - write process/simulation.yaml (simulator, property package, step specs; or the QSDsan worker), check the deviations from the given and assumed values, and fill the missing stream values. Use when outlet temperatures, pressures, flows or compositions of compressors, exchangers, flash drums, columns or recycle loops are needed, when assumed stream values should be checked against a rigorous calculation, or when wastewater quality results (COD, N, P, TSS) come from a QSDsan model.
 ---
 
 # Process simulation
 
 ## QSDsan wastewater models
 
-For `simulator: qsdsan`, inspect the declared worker and inputs before running either mode. Both execute project Python with the user's permissions. Select the numerical installation with the user-side `CHEME_QSDSAN_PYTHON`. The worker's request and response contract is illustrated in `examples/process-qsdsan`. Use `--check` for a disposable run and `--fill` to publish validated stream measurements. Inspect the saved case's `evidence` path for numerical checks and limitations. Report completion, steady-state evidence and site validation separately.
+For `simulator: qsdsan` (ADR 0065), `process/simulation.yaml` holds only `schema`, `kind`,
+`simulator` and `qsdsan: {model, worker, input, files, timeout_s}`. `model` is the label shown
+with the values, `worker` is a Python module among `files`, `input` is the primary data file,
+`files` lists the worker module and any further data files (`input` need not be repeated), and
+`timeout_s` defaults to 300 with a maximum of 3600. Any other field (`property_package`,
+`method_selection`, `specs`, `exclude`...) is refused (`sim-schema`: "Unsupported fields for
+qsdsan"). Inspect the declared worker and inputs before running either mode, because both
+execute project Python with the user's permissions. Select the interpreter with the user-side
+`CHEME_QSDSAN_PYTHON` (an absolute path). The worker contract is illustrated in
+`examples/process-qsdsan`. Use `--check` for a disposable run and `--fill` to publish. `--save`
+is DWSIM-only. `--fill` writes each returned quantity into `state.<case>.calculated.<name>` as
+`{value, unit}` in the model's own units (mg COD/L, m3/day...), with `origin: simulated` and
+source `cheme process simulate: QSDsan <model>` (ADR 0066). It never touches given or assumed
+fields, and these values do not enter the molecular mass balances. It removes this case's
+earlier QSDsan quantities that the model no longer returns, and refuses to overwrite a
+calculated field another producer owns ("Protected calculated field"). It also records the case
+in `process/simulation-run.json` and a new evidence directory under `process/simulation-runs/`.
+Commit both with the flowsheet. Read the values with `cheme process streams --json`. A failed
+run is `cheme.process-qsdsan` (error; nothing is published). simulate refuses a missing declared
+file with `cheme.process-qsdsan`; `cheme validate` reports it as
+`cheme.process-sim-input-missing`. Editing the input or the worker code makes earlier values
+stale. Inspect the case's `evidence` path for numerical checks and limitations. Report
+completion, steady-state evidence and site validation separately.
 
 ## Purpose and when to use
 
@@ -126,6 +148,12 @@ info): say that their values are not predictive. Switching `simulator` makes fil
    component separators (`recoveries`): a specified split (`basis: specified`), not a
    prediction; give `basis_source` (vendor data, a cited module, a DESIGN.md decision) and
    `operating_basis` (the conditions it holds for), else `sim-specified-unsourced` (warning).
+   simulate does not read the flowsheet's `recovery:` (ADR 0070, which `cheme process
+   propagate` solves). A component separator simulated in DWSIM needs its own
+   `specs.<id>.recoveries` (optionally `recovery_outlet`, else the first outlet; two outlets
+   only) in `simulation.yaml`, with the same split: the two declarations are not cross-checked,
+   and a different split shows only as deviations. Where the `recovery:` names more than two
+   outlets, `exclude:` the step and keep propagate's values.
    The run record marks such a unit `basis: specified` with a note: report its converged
    result as the stated split, never as a predicted one (which techniques core predicts:
    skill `separation-method-selection`). An adsorber's recoveries can follow from
@@ -137,7 +165,8 @@ info): say that their values are not predictive. Switching `simulator` makes fil
    `pairs:`.
 2. `cheme validate`: `simulation.yaml` against its schema, specs for unknown steps.
 3. `cheme process simulate --check`: solves and reports, writes nothing. Read every
-   `sim-deviation` (a given or assumed value the simulation contradicts) and the summary lines
+   `sim-deviation` (a given, assumed or propagate-calculated value the simulation
+   contradicts) and the summary lines
    (duties, power, minimum reflux, stages).
 4. Start a column with the shortcut method (keys, reflux ratio); the minimum reflux ratio and
    stages it prints give the rigorous column (`stages`, `feed_stage`, `condenser_spec`,
@@ -166,9 +195,11 @@ info): say that their values are not predictive. Switching `simulator` makes fil
   `guesses: {stream: {temperature, pressure, flow, composition}}` in `simulation.yaml` if it
   converges slowly. A guess is no stream value: never put one into the flowsheet as `assumed`,
   where it would stay and contradict the result.
-- `sim-deviation`: never overwrite the given or assumed value to silence it. Either the
-  assumption is wrong (change it, with a decision in `DESIGN.md`) or a spec is (change the
-  spec); an engineer decides which.
+- `sim-deviation`: a given, assumed or propagate-calculated value (a recovery outlet, a feed
+  flow solved for `specs:`, a tear, a model duty) that the simulation contradicts. simulate
+  never overwrites any of them. Never overwrite one to silence the deviation. Either the
+  assumption or the propagate model is wrong (change it, with a decision in `DESIGN.md`) or a
+  spec is (change the spec); an engineer decides which.
 - `sim-stale`: feeds, specs, package or DWSIM changed since the values were written; fill again.
 - `sim-run-stale` (`--check`): `process/simulation-run.json` records a run from other inputs;
   fill again (`sim-run-missing`, info: no run recorded for the case yet).
@@ -278,8 +309,9 @@ power stays a given or assumed value.
 
 Simulated streams get `temperature`, `pressure`, `flow` and `composition` (energy streams
 their `duty`) with `provenance: calculated`, source `cheme process simulate: DWSIM
-<version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model. Given and assumed values
-stay; `--save` writes the DWSIM flowsheet (`.dwxmz`, a generated file: commit it only if the
+<version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model
+(DWSIM and IDAES; QSDsan writes only `calculated` quantities, see above). Given and assumed
+values, and values `cheme process propagate` calculated, stay; `--save` writes the DWSIM flowsheet (`.dwxmz`, a generated file: commit it only if the
 project wants it). The specs and their provenance in `simulation.yaml` are the record of what
 was assumed.
 

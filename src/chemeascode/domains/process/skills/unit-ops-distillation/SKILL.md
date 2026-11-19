@@ -36,7 +36,17 @@ Mostly engineering guidance. Core's calculations for this are:
   the product cut with an `end: {purity: ...}`; `cheme process stills` gives its purity,
   recovery, the reflux, the boil-up time and the reboiler's and condenser's duties. The
   shortcut is conservative: a rigorous column at the same stages and reflux gives a purer
-  distillate.
+  distillate;
+- what the still models since 1.12.0 (ADR 0068; details in `process-design`): a suspended
+  solid, a salt or an immiscible non-volatile liquid in `still.separate_phase:` (kept out of
+  Raoult's mole fractions; `nonvolatile:` is a dissolved solute); a vacuum ramp or a forerun
+  limited by the vacuum pump as a sequence of `cuts:`, each with its own `pressure:` (kPa(a))
+  and `boilup:` (`unit: m3/h` is the vapour's volume at the still, the pump's capacity;
+  volatility raoult only), for example each cut ended at the same `temperature` to keep the pot
+  below a decomposition limit; and `heat_up_time: true` (with `heat_up: true`) to give the
+  charge's and the vessel metal's heat-up a time at the boil-up's heat input, added to the
+  recipe's `distil`. The ramp is in steps: the flash and sensible heat between pressures, and a
+  ramp within a cut, are not modelled.
 
 Arrangement:
 
@@ -92,7 +102,22 @@ Questions for a design: no route for non-condensables anywhere in the overhead; 
 no gravity route to its drum; neither a reboiler nor stripping steam (ask first, see above); a
 side draw without a chimney tray; a pumparound returned below its draw; a refluxed column without
 a way to adjust reflux (a reboiled stripper and a flash drum have none to adjust); no way to hold
-pressure; a partial condenser with no vapour destination. `cheme validate` does not check these.
+pressure; a partial condenser with no vapour destination; a condenser whose coolant can freeze
+the distillate. `cheme validate` checks only the last one, and only for a batch still's
+condenser (the energy stream at `still.condenser_port`, or a `still.column`'s one outgoing
+energy stream): `cheme.process-condenser-freezing` warns when the coolant utility's
+`supply_temperature` is below the `melting_point` of a component the distillate carries at
+1 mol% or more (ADR 0071). Give the components' `melting_point` and the coolant utility's
+`supply_temperature` so it can run. It checks none of the others.
+
+A still end it cannot reach is refused (ADR 0068): 'the still boils dry before its end' names
+the volatile kmol left, and 'the still's boil-up stalls before its end' means the end is next
+to the dry point. `cheme process stills` reports either as `cheme.process-still-unsolved`,
+`cheme process propagate` as `cheme.process-propagate-still`. End the cut earlier (a lower
+share distilled, a residue key or a temperature). Never change volatility data to reach an
+end. A temperature or residue end past the dry point is caught only by the pace check, after up
+to 10^6 steps, so check the end against the charge's volatile content first (skill
+`process-design`).
 
 ## Outputs and provenance
 
