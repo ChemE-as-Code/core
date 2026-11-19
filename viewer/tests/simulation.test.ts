@@ -6,6 +6,7 @@ import asuJson from "./fixtures/api/simulation-asu.json";
 import runJson from "./fixtures/api/simulation-run.json";
 import staleJson from "./fixtures/api/simulation-stale.json";
 import failedJson from "./fixtures/api/simulation-failed.json";
+import dynamicJson from "./fixtures/api/simulation-qsdsan.json";
 
 const asu = asuJson as unknown as SimulationView;
 const current = runJson as unknown as SimulationView;
@@ -18,6 +19,18 @@ describe("runState", () => {
     expect(runState(current)).toBe("converged");
     expect(runState(stale)).toBe("converged");
     expect(runState(failed)).toBe("failed");
+  });
+  it("dynamic completion and legacy flags are distinct from convergence", () => {
+    const dynamic = dynamicJson as unknown as SimulationView;
+    expect(runState(dynamic)).toBe("completed");
+    const partial = structuredClone(dynamic);
+    partial.run!.outcome!.integration!.completed = false;
+    partial.run!.status = "not-converged";
+    expect(runState(partial)).toBe("failed");
+    const legacy = structuredClone(dynamic);
+    delete legacy.run!.outcome;
+    legacy.run!.converged = true;
+    expect(runState(legacy)).toBe("completed");
   });
 });
 

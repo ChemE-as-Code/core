@@ -2453,4 +2453,17 @@ The same text is in `NOTICE`. Which licence applies where:
 
 Set `simulator: qsdsan` in `process/simulation.yaml`. Its `qsdsan` block declares `model`, `worker` (Python module), `input`, `files` and optionally `timeout_s` (default 300). Use slash-separated project-relative paths. Both modes execute trusted project code using the interpreter named by `CHEME_QSDSAN_PYTHON`. The module receives two JSON file paths, request and response. See the [worker contract](docs/adr/0065-qsdsan-a2o-process-worker.md).
 
-`cheme process simulate --fill` publishes quantities under each stream's `state.<case>.calculated`. The record points to `process/simulation-runs/<id>/`. Inspect the original numerical evidence there. `--check` runs against staged inputs. Validation reports `cheme.process-sim-run-stale` when declared sources change. Invalid input or unsuccessful execution produces `cheme.process-qsdsan`; an unavailable model input can also produce `cheme.process-sim-input-missing`. The API exposes optional `calculated_columns`, `spec.molecular`, `spec.model`, `spec.qsdsan` (the declared worker inputs), `run.evidence` and `run.integration_completed`.
+`cheme process simulate --fill` publishes quantities under each stream's `state.<case>.calculated`.
+The record points to `process/simulation-runs/<id>/`. `--check` uses disposable staging.
+Validation reports `cheme.process-sim-run-stale` when sources change. Invalid input or unsuccessful
+execution produces `cheme.process-worker`; a missing asset also names its path. Rejected fills
+retain separate diagnostics under `process/simulation-attempts/` and keep accepted results intact.
+
+The common worker interface (ADR 0072) accepts `mode`, `mappings` and bounded adapter `options`;
+QSDsan supports dynamic mode with solver settings in its declared input. `CHEME_QSDSAN_PYTHON`
+overrides the optional `CHEME_WORKER_PYTHON` fallback. New results declare `cheme/adapter-result/v2`,
+with `execution`, `outcome` and optional `trajectories`. `status: completed` means the requested
+integration interval completed; it does not establish steady state. The API exposes these fields,
+`spec.capabilities`, structured cell producers and original measured units. Old records remain
+readable. See [the author guide](docs/framework/project-workers.md) for exchange and publication
+rules and the next-major result migration; no commercial adapter is registered yet.

@@ -1407,6 +1407,17 @@
             "title": "Source",
             "type": "string"
           },
+          "producer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Producer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "fingerprint": {
             "anyOf": [
               {
@@ -2723,6 +2734,33 @@
         "title": "Port",
         "type": "object"
       },
+      "Producer": {
+        "additionalProperties": false,
+        "properties": {
+          "tool": {
+            "const": "cheme process simulate",
+            "default": "cheme process simulate",
+            "title": "Tool",
+            "type": "string"
+          },
+          "adapter": {
+            "minLength": 1,
+            "title": "Adapter",
+            "type": "string"
+          },
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "adapter",
+          "model"
+        ],
+        "title": "Producer",
+        "type": "object"
+      },
       "PurityEnd": {
         "additionalProperties": false,
         "properties": {
@@ -2795,6 +2833,17 @@
             "default": "",
             "title": "Source",
             "type": "string"
+          },
+          "producer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Producer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "fingerprint": {
             "anyOf": [

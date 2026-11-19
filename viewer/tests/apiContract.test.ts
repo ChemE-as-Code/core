@@ -183,6 +183,7 @@ const ISSUE_KEYS: (keyof Issue)[] = [
 const SHEET_KEYS: (keyof Sheet)[] = ["id", "file", "title", "kind", "generator", "status"];
 const TREE_KEYS: (keyof TreeEntry)[] = ["path", "type", "kind"];
 import simulationWater from "./fixtures/api/simulation-qsdsan.json";
+import simulationPartial from "./fixtures/api/simulation-worker-partial.json";
 import streamWater from "./fixtures/api/streams-qsdsan.json";
 
 const TABLE_KEYS: (keyof StreamTable)[] = [
@@ -922,10 +923,11 @@ describe("the end-to-end mocks look like the real responses", () => {
 });
 
 const SIMULATION_KEYS: (keyof SimulationView)[] = ["rev", "file", "run_file", "case", "cases", "spec", "run", "stale", "staleness", "units", "problem", "findings"];
-const SIM_SPEC_KEYS: (keyof SimulationView["spec"])[] = ["simulator", "property_package", "model", "molecular", "qsdsan", "components", "tolerance", "tear_streams", "exclude", "guesses", "specs"];
+const SIM_SPEC_KEYS: (keyof SimulationView["spec"])[] = ["simulator", "property_package", "model", "molecular", "qsdsan", "worker", "capabilities", "components", "tolerance", "tear_streams", "exclude", "guesses", "specs"];
 const SIM_UNIT_KEYS: (keyof SimulationUnit)[] = ["id", "unit", "status", "reason", "spec", "run", "basis"];
 const SIM_RUN_KEYS: (keyof SimulationRun)[] = [
   "schema", "evidence", "integration_completed", "verification", "steady_state_screen",
+  "producer", "execution", "outcome", "trajectories",
   "case",
   "run_at",
   "tool",
@@ -951,7 +953,8 @@ describe("real /api/simulation", () => {
   const stale = simulationStaleJson as unknown as SimulationView;
   const failed = simulationFailedJson as unknown as SimulationView;
   const water = simulationWater as unknown as SimulationView;
-  const all = [asu, current, stale, failed, water];
+  const partial = simulationPartial as unknown as SimulationView;
+  const all = [asu, current, stale, failed, water, partial];
   it("carries declared quantities alongside given properties", () => {
     expectKnown([streamWater], TABLE_KEYS, "dynamic stream table");
     expectKnown(streamWater.streams, STREAM_KEYS, "dynamic streams");
@@ -965,7 +968,7 @@ describe("real /api/simulation", () => {
     expectKnown(all.map((v) => v.spec), SIM_SPEC_KEYS, "simulation spec");
     expectKnown(all.flatMap((v) => v.units), SIM_UNIT_KEYS, "simulation unit");
     expectKnown(all.map((v) => v.staleness), ["model_fingerprint", "current_fingerprint", "changed_files"], "staleness");
-    const runs = [current.run!, stale.run!, failed.run!];
+    const runs = [current.run!, stale.run!, failed.run!, water.run!, partial.run!];
     expectKnown(runs, SIM_RUN_KEYS, "simulation run");
     expectKnown(runs.flatMap((r) => r.units), SIM_RUN_UNIT_KEYS, "run unit");
     expectKnown(current.run!.streams, SIM_RUN_STREAM_KEYS, "run stream");

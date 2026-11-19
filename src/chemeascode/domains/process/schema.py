@@ -16,6 +16,7 @@ from chemeascode.domains.chemistry.eos import Critical
 from chemeascode.domains.chemistry.thermochemistry import IdealGas
 from chemeascode.domains.process import SCHEMA
 from chemeascode.foundation.schema_base import INCHIKEY_RE, Origin, unsupported_schema
+from chemeascode.foundation.schemas.worker import Producer
 from chemeascode.foundation.uncertainty import Uncertainty
 from chemeascode.foundation.units import PRESSURE_UNITS as PRESSURE_UNITS  # the unit convention
 from chemeascode.foundation.units import TEMPERATURE_UNITS as TEMPERATURE_UNITS
@@ -1780,6 +1781,7 @@ class Quantity(Strict):
     basis: FlowBasis | None = None
     provenance: Provenance
     source: str = ""
+    producer: Producer | None = Field(default=None, exclude_if=lambda v: v is None)
     fingerprint: str | None = Field(
         default=None,
         description="Calculated values: the inputs (T, P, composition, method) they were "
@@ -1877,6 +1879,7 @@ class CompositionValue(Strict):
     values: dict[str, float] = Field(min_length=1)
     provenance: Provenance
     source: str = ""
+    producer: Producer | None = Field(default=None, exclude_if=lambda v: v is None)
     fingerprint: str | None = Field(
         default=None,
         description="Calculated compositions: the inputs they were derived from (cheme "

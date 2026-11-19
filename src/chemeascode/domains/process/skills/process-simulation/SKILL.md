@@ -1,15 +1,17 @@
 ---
 name: process-simulation
-description: Solve the flowsheet in DWSIM, or for a bounded scope in the optional IDAES backend (heat and material balance), with cheme process simulate - write process/simulation.yaml (simulator, property package, step specs), check the deviations from the given and assumed values, and fill the missing stream values. Use when outlet temperatures, pressures, flows or compositions of compressors, exchangers, flash drums, columns or recycle loops are needed, or when assumed stream values should be checked against a rigorous calculation.
+description: Run process simulations through DWSIM, bounded IDAES or a registered project-worker adapter such as QSDsan; prepare declared inputs, execution environment and mappings, inspect convergence and dynamic completion separately, and publish protected stream results with evidence. Use when stream states or measured-basis process results need calculation or verification.
 ---
 
 # Process simulation
 
-## QSDsan wastewater models
-
-For `simulator: qsdsan`, inspect the declared worker and inputs before running either mode. Both execute project Python with the user's permissions. Select the numerical installation with the user-side `CHEME_QSDSAN_PYTHON`. The worker's request and response contract is illustrated in `examples/process-qsdsan`. Use `--check` for a disposable run and `--fill` to publish validated stream measurements. Inspect the saved case's `evidence` path for numerical checks and limitations. Report completion, steady-state evidence and site validation separately.
-
 ## Purpose and when to use
+
+For a registered project-worker adapter, the same command stages its native inputs and publishes
+validated results. QSDsan is the first implementation; Aspen Plus, HYSYS and Dymola are not yet
+supported. Report execution completion, numerical convergence, dynamic interval completion,
+steady-state evidence and plant validation separately. The molecular workflow below remains
+the existing DWSIM/IDAES route.
 
 `cheme process simulate` builds a DWSIM flowsheet from `process/flowsheet.yaml` and
 `process/simulation.yaml`, solves it headless and writes the results back as `calculated` values.
@@ -25,6 +27,15 @@ specified `recovery:` (skill `process-design`); simulate covers
 the other energy balances and the separations.
 
 ## Required inputs and missing inputs
+
+For project workers, inspect the declared source/model assets before either mode: they execute
+trusted code with the user's permissions. Declare project-relative `model`, `input`, `files`,
+mode and any native-to-ChemE mappings in `process/simulation.yaml`. Native files can be binary;
+do not rewrite them as text. Missing assets, unmapped IDs or unsupported modes are refusals.
+Keep executable paths, licence configuration and credentials outside engineering YAML.
+For QSDsan, select the numerical environment with `CHEME_QSDSAN_PYTHON`; it overrides
+`CHEME_WORKER_PYTHON`, even when invalid. Pin the numerical environment separately. Solver
+settings remain in QSDsan's input; do not invent generic options that its adapter has not declared.
 
 - Every feed stream with temperature, absolute pressure, flow and composition (given or
   assumed). A missing one is `sim-feed-incomplete`: ask for it or mark an assumption.
@@ -59,7 +70,7 @@ the other energy balances and the separations.
   docker/dwsim/Dockerfile .` in the cheme-as-code repository) or `CHEME_DWSIM_PATH`. Without
   it, `sim-unavailable`: report it, do not estimate the values instead.
 
-## The optional IDAES backend
+### The optional IDAES backend
 
 `simulator: idaes` in `process/simulation.yaml` solves the flowsheet in IDAES (idaes-pse with
 IPOPT) instead of DWSIM; the choice lives in the file, not on the command line, because it is
@@ -81,6 +92,14 @@ info): say that their values are not predictive. Switching `simulator` makes fil
 `examples/process-hda-idaes`; details in the cheme-as-code docs (`docs/framework/idaes.md`).
 
 ## Workflow and tools
+
+For project workers, first inspect the case, declared inputs, mappings and supported capabilities.
+Use `cheme process simulate --check` for a disposable calculation. Inspect its numerical outcome,
+not just the exit code. Use `--fill` when the result is appropriate to publish; it protects
+authored/foreign values and retains earlier evidence. Review `/api/simulation` through the viewer,
+the stream table/PFD cells and the archived entry. A changed input requires a new run; do not
+manually relabel stale results as current. The demo is `examples/process-qsdsan`; the production
+A2/O biological model belongs to process-library.
 
 1. Write `process/simulation.yaml`:
 
@@ -149,6 +168,15 @@ info): say that their values are not predictive. Switching `simulator` makes fil
    values, input fingerprints), which the viewer shows; commit it with the flowsheet.
 
 ## Validation and failure handling
+
+Project-worker errors use `cheme.process-worker` with the refused input/result or execution
+reason. Check the separate failed-attempt evidence; do not replace accepted cells from a partial
+trajectory. A v2 dynamic `completed` result must reach the requested end time. Numerical
+convergence and independently assessed steady state are separate fields. CSV trajectories must
+match their hashes, finite columns, interval and explicit final instantaneous snapshot; repeated
+event times require ordered `before`/`after` samples. Never call the snapshot an average or a
+steady-state result without separate evidence. Resolve invalid units, changed inputs or protected
+producer conflicts; do not bypass validation or remove given/assumed values to make a fill pass.
 
 - `sim-unmapped`: a step's class maps to no unit, a unit has the wrong number of streams, or
   energy streams do not fit; give `unit:` or split the step.
@@ -276,6 +304,14 @@ power stays a given or assumed value.
 
 ## Outputs and provenance
 
+Project workers archive accepted runs under `process/simulation-runs/<id>/`, including exact
+staged inputs, logs, the request and the case entry. Rejected fills use `process/simulation-attempts/`
+and do not replace the last accepted record. Check mode saves nothing to the plant. New cells
+carry a tool/adapter/model producer and a fingerprint; only the matching producer's derived
+cells can be replaced. Measured bases keep their original units under `calculated`; a molecular
+adapter targets explicit molecular state fields. Old v1 records remain readable; newly emitted
+worker results are v2. A legacy integration flag is not independent convergence evidence.
+
 Simulated streams get `temperature`, `pressure`, `flow` and `composition` (energy streams
 their `duty`) with `provenance: calculated`, source `cheme process simulate: DWSIM
 <version>, <property package>` (`IDAES <version>` with the IDAES backend) and a fingerprint of the simulator model. Given and assumed values
@@ -285,12 +321,20 @@ was assumed.
 
 ## Required human judgment
 
+For a project worker: whether its model, environment, declared inputs and simulator diagnostics
+justify the intended engineering use. Completion does not establish calibration, conservation,
+robustness, design feasibility or site validity. Commercial adapters must first demonstrate their
+actual native API, supported modes and session cleanup; their names are not usable capabilities.
+
 The property package and its validity for the mixture and conditions; every assumed spec
 (efficiencies, pressure drops, approach temperatures, reflux ratio, column stages and key
 specs); whether a deviation means the assumption or the spec is wrong; whether a converged
 recycle or column is physically sensible. A simulated value is no more certain than its specs.
 
 ## References
+
+- Core `docs/framework/project-workers.md` and ADR 0072: typed exchange, publication guarantees,
+  trajectory semantics, compatibility and adapter qualification tests.
 
 - `process-design`, `thermodynamic-model-selection`, `separation-method-selection`
 - `cheme schema process-simulation`; examples `examples/process-simulation` and

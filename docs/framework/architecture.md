@@ -8,6 +8,15 @@ see [migration-table.md](migration-table.md).
 
 ## Layout
 
+Project simulators follow [ADR 0072](../adr/0072-shared-project-worker-execution-and-results.md):
+typed exchange models live in `foundation/schemas/worker.py` and `run.py`; transport/staging
+in `integrations/workers.py`; adapter semantics and shared fingerprint, evidence validation,
+publication and orchestration in `domains/process/simulation/`. `ProjectWorkerBackend` binds
+an adapter to the existing registry. CLI/API/viewer consumers use the same process results and
+never start a worker while viewing. QSDsan-specific interpretation stays in its adapter.
+The adapter selects a transport, so a future native/session worker need not launch Python.
+See [the adapter guide](project-workers.md) for hooks, boundaries and required tests.
+
 ```
 src/chemeascode/
   foundation/      artifact-independent infrastructure: findings, workspace, git queries, reviews

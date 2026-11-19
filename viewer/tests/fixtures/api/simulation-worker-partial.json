@@ -1,0 +1,142 @@
+{
+  "rev": null,
+  "file": "process/simulation.yaml",
+  "run_file": "process/simulation-run.json",
+  "case": "design",
+  "cases": [
+    "design"
+  ],
+  "spec": {
+    "simulator": "qsdsan",
+    "property_package": null,
+    "molecular": false,
+    "model": "contract-demonstration",
+    "capabilities": {
+      "modes": [
+        "dynamic"
+      ],
+      "publication": "measured",
+      "trajectory_formats": [
+        "csv"
+      ]
+    },
+    "qsdsan": {
+      "model": "contract-demonstration",
+      "worker": "demo_worker",
+      "input": "results.json",
+      "files": [
+        "demo_worker.py"
+      ],
+      "timeout_s": 300.0,
+      "mode": "dynamic",
+      "options": {},
+      "mappings": {
+        "streams": {},
+        "units": {},
+        "instruments": {}
+      }
+    },
+    "components": {},
+    "tolerance": {
+      "temperature": 1.0,
+      "pressure_rel": 0.01,
+      "composition": 0.001
+    },
+    "tear_streams": [],
+    "exclude": [],
+    "guesses": {},
+    "specs": {}
+  },
+  "run": {
+    "schema": "cheme/adapter-result/v2",
+    "case": "design",
+    "status": "not-converged",
+    "model_fingerprint": "4345b8a439c63d84",
+    "inputs": {
+      "commit": null,
+      "dirty": [],
+      "fingerprints": {
+        "demo_worker.py": "sha256:bb8827befa59aefc6130f0fc0294be2ae19cf1c70f17aee4f5d0b200445c290b",
+        "process/flowsheet.yaml": "sha256:78e364f0dde598ec2d22ff422b8395bafa4912b36fe98c197f0597076351e76b",
+        "process/materials.yaml": "sha256:65550753d13871886b192500309194b68c0a7bf4ab01e6eab4296b17ed9422ea",
+        "process/simulation.yaml": "sha256:e61a5ec45d4c193c23d47e7e8c5c63f6755cc286b66478fe4614a27178e1300d",
+        "results.json": "sha256:af68905d0716cc2a198bbba40958a06f0a9162819fbc4fcbb1519db6e298889d"
+      }
+    },
+    "iterations": null,
+    "messages": [
+      "Imported diagnostic record: requested interval was not completed."
+    ],
+    "units": [
+      {
+        "id": "TANK",
+        "status": "simulated",
+        "converged": null,
+        "results": {}
+      }
+    ],
+    "streams": [],
+    "findings": [],
+    "execution": {
+      "state": "completed",
+      "transport": "local-python",
+      "exit_code": 0,
+      "elapsed_s": 0.1,
+      "message": ""
+    },
+    "outcome": {
+      "mode": "dynamic",
+      "convergence": "not-applicable",
+      "integration": {
+        "start": 0.0,
+        "requested_end": 1.0,
+        "achieved_end": 0.5,
+        "time_unit": "day",
+        "completed": false
+      },
+      "steady_state": {
+        "state": "not-evaluated",
+        "evidence": [],
+        "method": null
+      }
+    },
+    "run_at": "2026-10-28T12:00:00Z",
+    "converged": false,
+    "integration_completed": false,
+    "producer": {
+      "tool": "cheme process simulate",
+      "adapter": "qsdsan",
+      "model": "contract-demonstration"
+    },
+    "simulator": {
+      "name": "QSDsan",
+      "version": "fixture",
+      "method": "recorded data"
+    },
+    "property_package": null,
+    "tool": "cheme-as-code fixture"
+  },
+  "stale": false,
+  "staleness": {
+    "model_fingerprint": "4345b8a439c63d84",
+    "current_fingerprint": "4345b8a439c63d84",
+    "changed_files": []
+  },
+  "units": [
+    {
+      "id": "TANK",
+      "unit": null,
+      "status": "simulated",
+      "reason": "",
+      "spec": null,
+      "run": {
+        "id": "TANK",
+        "status": "simulated",
+        "converged": null,
+        "results": {}
+      }
+    }
+  ],
+  "problem": null,
+  "findings": []
+}

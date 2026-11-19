@@ -971,7 +971,7 @@ def qsdsan_fixtures(core: Path, tmp: Path) -> None:
     plant, _ = load(root)
     with (
         patch.dict(os.environ, {"CHEME_QSDSAN_PYTHON": sys.executable}),
-        patch("chemeascode.domains.process.simulation.qsdsan.uuid4", return_value=UUID(int=1)),
+        patch("chemeascode.domains.process.simulation.worker_run.uuid4", return_value=UUID(int=1)),
     ):
         outcome = run(Workspace(root), plant, "design", write=True)
     if outcome.findings:
@@ -983,7 +983,26 @@ def qsdsan_fixtures(core: Path, tmp: Path) -> None:
         if sim["stale"] is not False:
             raise RuntimeError(sim["staleness"])
         sim["run"]["tool"] = "cheme-as-code fixture"
+        sim["run"]["execution"]["elapsed_s"] = 0.1
         write(out / "simulation-qsdsan.json", sim)
+        # Reader compatibility with an imported partial record. Production worker fill
+        # retains partial responses under simulation-attempts and never accepts them here.
+        from chemeascode.domains.process.simulation import record
+
+        record_path = root / record.RUN_FILE
+        accepted = record_path.read_bytes()
+        data = json.loads(accepted)
+        entry = data["cases"]["design"]
+        entry.update(status="not-converged", integration_completed=False, converged=False)
+        entry["outcome"]["integration"].update(achieved_end=0.5, completed=False)
+        entry["messages"] = ["Imported diagnostic record: requested interval was not completed."]
+        entry["streams"] = []
+        entry.pop("evidence", None)
+        entry["execution"]["elapsed_s"] = 0.1
+        entry["tool"] = "cheme-as-code fixture"
+        record_path.write_text(json.dumps(data), encoding="utf-8")
+        write(out / "simulation-worker-partial.json", get(client, "/api/simulation"))
+        record_path.write_bytes(accepted)
         with (root / "results.json").open("a", encoding="utf-8") as f:
             f.write("\n")
         write(out / "streams-qsdsan-stale.json", get(client, "/api/streams"))

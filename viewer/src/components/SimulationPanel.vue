@@ -19,8 +19,9 @@ const { withRev } = useRev();
 
 const run = computed(() => props.view.run);
 const state = computed(() => runState(props.view));
-const badge = computed(() => run.value?.integration_completed && state.value === "converged"
-  ? { badge: "pass", label: "integration completed", title: "Completed the requested integration" }
+const dynamic = computed(() => run.value?.outcome?.mode === "dynamic" || run.value?.integration_completed === true);
+const badge = computed(() => state.value === "failed" && dynamic.value
+  ? { badge: "fail", label: "integration incomplete", title: "The requested dynamic interval did not complete successfully" }
   : RUN_BADGE[state.value]);
 /** `dwsim 9.0.5.0`: the recorded run's simulator and version, else the spec's simulator. */
 const simulatorText = computed(() => {
@@ -44,7 +45,7 @@ const findings = computed<Finding[]>(() => {
   });
 });
 const tolerance = computed(() =>
-  Object.entries(props.view.spec.tolerance)
+  Object.entries(props.view.spec.capabilities ? {} : props.view.spec.tolerance)
     .map(([k, v]) => `${k.replace(/_/g, " ")} ${v}`)
     .join(", "),
 );
@@ -113,12 +114,31 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
     <p v-else-if="view.staleness.changed_files.length" class="muted hint" data-changed>
       Changed since the run, the simulator model the same: {{ view.staleness.changed_files.join(", ") }}.
     </p>
-    <p v-if="run?.integration_completed" class="muted">{{ run.messages.join(" ") }}</p>
-    <p v-if="state === 'failed'" class="notice error" role="note" data-failed>
-      The run did not converge<template v-if="run?.messages.length">: {{ run.messages.join("; ") }}</template>. No stream value was written.
+    <dl v-if="run?.outcome" class="facts" aria-label="Calculation outcome">
+      <dt>Execution</dt><dd>{{ run.execution?.state }} · {{ run.execution?.transport }}</dd>
+      <dt>Numerical convergence</dt><dd>{{ run.outcome.convergence }}</dd>
+      <template v-if="run.outcome.integration">
+        <dt>Integration interval</dt>
+        <dd>{{ run.outcome.integration.start }} → {{ run.outcome.integration.achieved_end }} / {{ run.outcome.integration.requested_end }} {{ run.outcome.integration.time_unit }}</dd>
+      </template>
+      <dt>Steady-state assessment</dt><dd>{{ run.outcome.steady_state.state }}<span v-if="run.outcome.steady_state.method">: {{ run.outcome.steady_state.method }}</span></dd>
+    </dl>
+    <p v-else-if="run?.integration_completed" class="muted" data-legacy-outcome>Legacy integration completion record. Independent numerical convergence and steady state were not established by this flag.</p>
+    <p v-if="run?.evidence" class="muted">
+      <RouterLink :to="fileLink(`${run.evidence}/cheme-simulation-entry.json`)">Saved run evidence</RouterLink>
     </p>
-    <p v-if="run && state === 'converged'" class="muted hint" data-filled-count>
-      {{ filledCount }} stream value{{ filledCount === 1 ? "" : "s" }} hold the simulated value (marked <span class="sim-mark">sim</span> in the stream table).
+    <ul v-if="run?.trajectories?.length" aria-label="Time-series evidence">
+      <li v-for="series in run.trajectories" :key="series.path">
+        <RouterLink v-if="run.evidence" :to="fileLink(`${run.evidence}/${series.path}`)">{{ series.path }}</RouterLink>
+        · {{ series.start }}–{{ series.end }} {{ series.time_unit }} · Final instantaneous snapshot: {{ series.final_snapshot.time }} {{ series.time_unit }}
+      </li>
+    </ul>
+    <p v-if="state === 'failed'" class="notice error" role="note" data-failed>
+      {{ dynamic ? "The dynamic run did not complete successfully" : "The run did not converge" }}<template v-if="run?.messages.length">: {{ run.messages.join("; ") }}</template>. No stream value was written.
+    </p>
+    <p v-if="run && (state === 'converged' || state === 'completed')" class="muted hint" data-filled-count>
+      <template v-if="run.outcome">{{ filledCount }} stream value{{ filledCount === 1 ? "" : "s" }} were published by this run. See the stream table for values, units and provenance.</template>
+      <template v-else>{{ filledCount }} stream value{{ filledCount === 1 ? "" : "s" }} hold the simulated value (marked <span class="sim-mark">sim</span> in the stream table).</template>
     </p>
 
     <p class="muted hint spec-line">
@@ -152,7 +172,7 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
             <td class="status">
               <span class="badge" :class="UNIT_STATUS[u.status].badge" :title="UNIT_STATUS[u.status].title">{{ u.status }}</span>
               <span
-                v-if="unitConvergence(u.run)"
+                v-if="unitConvergence(u.run) && (!dynamic || u.run?.converged != null)"
                 class="badge conv"
                 :class="{ pass: unitConvergence(u.run) === 'converged', fail: unitConvergence(u.run) === 'failed' }"
                 :title="unitConvergence(u.run) === 'unknown' ? 'The run did not converge; no message names this unit' : `In the recorded run: ${unitConvergence(u.run)}`"
