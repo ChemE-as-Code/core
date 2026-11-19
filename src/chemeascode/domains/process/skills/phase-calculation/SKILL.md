@@ -48,10 +48,13 @@ Models: `{"eos_model": "Peng-Robinson" | "Redlich-Kwong" | "Redlich-Kwong-Soave"
 (`pip install 'cheme-as-code[props]'`). `accepted_zeros=[("A", "B")]` records pairs whose
 missing parameter the engineer accepts as zero.
 
-CLI: `cheme process phase ethanol water --liquid NRTL --vapor ideal_gas` prints the parameter
-coverage per pair; add `--z 0.25,0.75 --temperature 343.15 --pressure 1` (units: 
-`--temperature-unit`, `--pressure-unit`, default K and bar(a)) for the flash, `--accept-zero
+CLI: `cheme process phase ethanol water --liquid NRTL --vapor ideal_gas` (or `--model
+Peng-Robinson` for an equation of state; give `--model`, or `--liquid` with `--vapor`) prints
+the parameter coverage per pair. Add `--z 0.25,0.75 --temperature 343.15 --pressure 1` (units:
+`--temperature-unit`, `--pressure-unit`, default K and bar(a)) for the flash, and
+`--two-liquids` to allow a second liquid (a stated assumption), `--accept-zero
 A:B` for an accepted zero, `--check` to exit 1 on a missing pair, `--json` for the result.
+Invalid input exits 2.
 Coverage alone in Python: `thermodynamics.coverage.interaction_parameter_coverage(components,
 model, accepted_zeros)`.
 
@@ -98,6 +101,13 @@ needs confirmation from data. For a stream at its dew or bubble point that the f
 fraction of a kelvin into the other phase, do not shift its temperature: state its phase, and
 `cheme process props --fill` calculates it on that phase's EOS root, marked phase-constrained,
 within a metastability tolerance (`process-design`).
+
+With the PC-SAFT package `water-methanol-pcsaft-liquid` (extra `saft`, ADR 0064), `props
+--fill` uses PC-SAFT's own bubble pressure, not this flash. A stream counts as liquid only at
+1.2 times that pressure or above. Nearer, give or assume its `phase: liquid` with the reason
+(this flash can be the evidence). It is then calculated down to the bubble pressure divided by
+1.2, phase-constrained below the bubble pressure. Further below, it is refused
+(`property-phase`). Vapour and two-phase water-methanol are never calculated by that package.
 
 ## References
 

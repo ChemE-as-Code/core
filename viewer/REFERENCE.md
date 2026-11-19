@@ -1,5 +1,13 @@
 # cheme-as-code-viewer
 
+Project-worker runs (ADR 0072) display execution outcome, numerical convergence, requested and
+achieved integration interval, and independent steady-state assessment. A completed dynamic
+run is labelled **integration completed**, including legacy integration flags without inventing
+a steady-state claim. The simulation panel links to the archived run entry and declared CSV
+trajectories, identifies their final instantaneous snapshot and keeps arrays out of the API.
+Stream/PFD cells retain original units and shared staleness. Reading these pages never launches
+a worker. Full trajectory plotting, live operation and commercial adapters are not implemented.
+
 Milestone 2 of cheme-as-code: a web viewer over a plant repository in git.
 
 Renamed from chemeascode-viewer with core 0.7.0 (`plantcode` became the command `cheme`): the

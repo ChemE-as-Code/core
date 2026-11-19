@@ -246,6 +246,78 @@ def test_dry_mass_closes_on_the_residual_moisture():
         dry_mass(CAKE, ["H2O"], N(value=0.5, basis="per_kg_solid"))
 
 
+DRY_INLET = """\
+schema: cheme/process/v1
+kind: flowsheet
+units: {temperature: K, pressure: kPa(a), flow: kg/h, duty: kW}
+feeds:
+  - {id: F, ports: [{id: out, direction: out}]}
+products:
+  - {id: P, ports: [{id: in, direction: in}]}
+  - {id: V, ports: [{id: in, direction: in}]}
+blocks:
+  - id: D1
+    class: Drying
+    ports:
+      - {id: in, direction: in}
+      - {id: product, direction: out}
+      - {id: vapour, direction: out}
+    dryer:
+      volatiles: [H2O]
+      residual_moisture: {value: MOISTURE, basis: mass_fraction, provenance: assumed}
+      temperature: 333.15
+      outlets: {product: product, vapour: vapour}
+streams:
+  - id: S1
+    from: F.out
+    to: D1.in
+    state:
+      design:
+        temperature: {value: 300, provenance: given, source: test}
+        flow: {value: 1000, provenance: given, source: test}
+        composition: {basis: mass_fraction, values: COMPOSITION, provenance: given, source: test}
+  - id: S2
+    from: D1.product
+    to: P.in
+  - id: S3
+    from: D1.vapour
+    to: V.in
+"""
+
+
+def test_a_cake_without_the_volatiles_is_reported_not_a_crash(tmp_path):
+    """#309: an inlet that holds none of the volatiles is a dryer finding ("nothing to dry"),
+    whatever the residual moisture, instead of an empty vapour (a ValidationError in propagate)
+    or a vapour written with a composition of zeros."""
+    for moisture in (0.0, 0.01):
+        with pytest.raises(DryerError, match="none of the volatiles"):
+            dry_mass({"X_s": 100.0}, ["H2O"], N(value=moisture, basis="mass_fraction"))
+        with pytest.raises(DryerError, match="none of the volatiles"):
+            dry_mass({"X_s": 100.0, "H2O": 0.0}, ["H2O"], N(value=moisture, basis="mass_fraction"))
+    for composition in ("{X_s: 1.0}", "{X_s: 1.0, H2O: 0.0}"):
+        flowsheet = DRY_INLET.replace("MOISTURE", "0.0").replace("COMPOSITION", composition)
+        ws = _plant(tmp_path / str(len(composition)), flowsheet, recipe=None, propagate=False)
+        process, found = load(ws.root)
+        assert process is not None, [f.format() for f in found]
+        result = run(ws, process, "design", write=True)
+        assert any("none of the volatiles" in f.message for f in result.findings), [
+            f.format() for f in result.findings
+        ]
+        assert _streams(ws)["S3"] is None
+
+
+def test_a_dryer_that_evaporates_nothing_gives_a_vapour_of_the_volatiles(tmp_path):
+    """#309: residual moisture equal to the inlet's: the vapour has no flow and the inlet's
+    volatile composition (not fractions summing to 0)."""
+    flowsheet = DRY_INLET.replace("MOISTURE", "0.1").replace("COMPOSITION", "{X_s: 0.9, H2O: 0.1}")
+    ws = _plant(tmp_path, flowsheet, recipe=None)
+    data = yaml.safe_load((ws.root / "process/flowsheet.yaml").read_text())
+    (vapour,) = [s for s in data["streams"] if s["id"] == "S3"]
+    state = vapour["state"]["design"]
+    assert state["flow"]["value"] == 0.0
+    assert state["composition"]["values"] == {"H2O": 1.0}
+
+
 def test_propagate_fills_the_dryer_and_the_report_closes_the_balance(tmp_path):
     ws = _plant(tmp_path)
     process, found = load(ws.root)

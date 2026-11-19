@@ -12,8 +12,9 @@ cause a device answers, whether something protects against that cause, and what 
 the model or the files cannot settle. A hazard is a property of the plant, its fluids and its
 operation; a P&ID or a flowsheet shows a fraction of that, so many answers end in a design
 basis, a study or a datasheet that the project does not hold. Saying so is a valid answer.
-This skill indexes its members and sets what may be claimed. Engineering guidance only; core has
-no calculation for relief sizing, layer independence or hazard identification.
+This skill indexes its members and sets what may be claimed. Engineering guidance only. Apart
+from the reactor thermal screening (`cheme process reactor-hazards`), core has no calculation
+for relief sizing, layer independence or hazard identification.
 
 ## Required inputs and missing inputs
 
@@ -23,7 +24,8 @@ study or area classification. Ask for the ones that decide the answer rather tha
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this. Members, by flat name:
+Engineering guidance only. Apart from the reactor thermal screening (`cheme process
+reactor-hazards`), core has no calculation for this. Members, by flat name:
 
 | Skill | Use it for |
 |---|---|
@@ -32,6 +34,7 @@ Engineering guidance only; core has no calculation for this. Members, by flat na
 | `hazop-equipment-causes` | Which deviations and causes are credible for pumps, compressors, separators, heaters, exchangers, reactors, tanks |
 | `area-classification` | Release sources, zones in `layout/zones.yaml`, purged and pressurised enclosures |
 | `hazop-study`, `hazop-assessment`, `hazop-review` | Drafting, rating and reviewing a HAZOP study file with `cheme safety hazop ...` |
+| `reactions` (step 8), `cheme process reactor-hazards` | Thermal screening of a reactor: dT_ad, MTSR after a cooling failure, MTT, TD24 and Stoessel's class (`cheme.reactor-hazard-class`/`-mtsr`), a semi-batch's accumulation of each dosed reactant (dosing stopped at the failure), for a vented batch the gas release at the MTSR and its largest over the batch against `hazard.vent_capacity` (`cheme.reactor-hazard-vent`), a content's boil-up at the MTSR, and the gases a cooling failure can release (`cheme.reactor-hazard-dissolved`) (ADR 0058, 0069, 0071). These are screening values for the HAZOP, not a reaction-hazard assessment or a relief sizing |
 
 Working rules for every member:
 

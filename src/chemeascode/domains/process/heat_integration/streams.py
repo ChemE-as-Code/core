@@ -938,6 +938,7 @@ def out_from_record(entry: dict[str, Any], model: dict[str, Any]) -> dict[str, A
     streams' recorded temperatures, the feeds' from the model. The record keeps no stream
     enthalpies or vapour fractions: an exchanger's sides then take its duty, and a phase change
     is known only where the run's energy audit found one in an exchanger (``phase_change``)."""
+    from chemeascode.domains.process.simulation.record import numerically_converged
     from chemeascode.foundation.units import to_kelvin
 
     units = {
@@ -965,7 +966,7 @@ def out_from_record(entry: dict[str, Any], model: dict[str, Any]) -> dict[str, A
         }
     )
     return {
-        "converged": entry.get("converged", False),
+        "converged": numerically_converged(entry),
         "units": units,
         "streams": streams,
         # the exchanger inlets the run's energy audit found changing phase (no vapour fractions

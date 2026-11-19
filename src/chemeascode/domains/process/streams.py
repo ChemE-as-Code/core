@@ -191,6 +191,7 @@ def _property(quantity: Any, unit: str, is_stale: bool = False) -> dict[str, Any
         "basis": quantity.basis,
         "provenance": quantity.provenance,
         "source": quantity.source,
+        **({"producer": quantity.producer.model_dump()} if quantity.producer is not None else {}),
         "stale": is_stale,
     }
 
@@ -398,13 +399,13 @@ def stream_table(
                 "links": _links(stream, lists, sheet_ids),
             }
         )
-    from chemeascode.domains.process.simulation.worker_model import VALUE_SOURCE
+    from chemeascode.domains.process.simulation.worker_model import is_worker_value
     from chemeascode.foundation.units import WASTEWATER_LABELS
 
     measured = {}
     for stream in streams:
         for key, cell in stream["calculated"].items():
-            if (cell.get("source") or "").startswith(VALUE_SOURCE):
+            if is_worker_value(cell):
                 measured.setdefault(key, set()).add(cell["unit"])
     columns = [
         {

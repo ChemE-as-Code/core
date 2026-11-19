@@ -27,8 +27,8 @@ R10 preferred numbers (ISO 3) of m3, or a given volume; its ``jacket`` (U, area 
 shell and flat bottom of a vessel of the given aspect ratio, the media's temperatures) is checked
 against the model's peak duty, and a ``heat`` or ``cool`` operation may give ``temperatures``
 instead of a duration: ``t = C / (U A) ln((T_m - T_0) / (T_m - T_1))`` with the medium at a
-constant temperature, the content's heat capacity C (the charge's before a dose, else the
-end's).
+constant temperature, the content's heat capacity C (the charge's before the first ``dose``
+or ``react``, else the end's; a unit procedure with neither: the end's).
 
 A vessel's ``metal_heat_capacity`` (kJ/K, ADR 0063) heats and cools with the content: in the
 jacket times (``C + C_m``) and each of its jacket-timed operations' heat per batch (``heats``,
@@ -163,7 +163,8 @@ class Operation(Strict):
                     f"operation {self.id}: temperatures give a heat-up's or a cool-down's time only"
                 )
             start, end = self.temperatures
-            if min(start, end) <= 0 or (end > start) != (self.kind == "heat"):
+            # a heat rises, a cool falls: equal temperatures are neither (core#302)
+            if min(start, end) <= 0 or end == start or (end > start) != (self.kind == "heat"):
                 raise ValueError(
                     f"operation {self.id}: temperatures in K, rising to heat, falling to cool"
                 )
@@ -643,10 +644,20 @@ def _vessel(up: UnitProcedure, content: _Content) -> VesselResult:
     return found
 
 
+def _before_dose(up: UnitProcedure, index: int) -> bool:
+    """Whether *up*'s operation at *index* holds the charge rather than the end's content: it
+    comes before the first ``dose`` or ``react`` (core#301: a batch has no dose, its heat-up
+    before ``react`` is the charge's, as the model duty's ``heat_up``, ADR 0063). A unit
+    procedure with neither keeps the end's content."""
+    changes = [j for j, o in enumerate(up.operations) if o.kind in ("dose", "react")]
+    return bool(changes) and index < changes[0]
+
+
 def _jacket_time(up: UnitProcedure, op: Operation, content: _Content, before_dose: bool) -> float:
     """h to heat or cool the content by *op*'s temperatures in *up*'s jacketed vessel: ``t = C
     / (U A) ln((T_m - T_0) / (T_m - T_1))``, the medium at its constant temperature, the
-    charge's content before the dose, else the end's. Raises ValueError."""
+    charge's content before the first dose or reaction (*before_dose*, :func:`_before_dose`),
+    else the end's. Raises ValueError."""
     jacket = up.vessel.jacket if up.vessel is not None else None
     if jacket is None:
         raise ValueError(f"{up.id} has no vessel.jacket for a {op.kind} time")
@@ -673,7 +684,8 @@ def _jacket_heat(
     up: UnitProcedure, op: Operation, content: _Content, before_dose: bool, hours: float
 ) -> HeatResult:
     """The heat of *op* (a heat or cool with temperatures) per batch: the content's (the
-    charge's before the dose, else the end's) and the vessel's metal times the change."""
+    charge's before the first dose or reaction, else the end's) and the vessel's metal times
+    the change."""
     start, end = op.temperatures or (0.0, 0.0)
     capacity = (content.charge_capacity if before_dose else content.end_capacity) or 0.0
     metal = (up.vessel.metal_heat_capacity if up.vessel is not None else None) or 0.0
@@ -1129,9 +1141,7 @@ def evaluate(
                 except ValueError:
                     heated = None  # the dry operation says what is missing
                 solids_vessel = replace(found, jacket_area=heated)
-        dosed = False
         for j, op in enumerate(up.operations):
-            dosed |= op.kind == "dose"
             if op.id in names:
                 add(
                     "error",
@@ -1144,7 +1154,7 @@ def evaluate(
             if op.temperatures is not None:
                 if content is None:
                     continue
-                before = not dosed and any(o.kind == "dose" for o in up.operations)
+                before = _before_dose(up, j)
                 try:
                     hours = _jacket_time(up, op, content, before_dose=before)
                 except ValueError as failure:

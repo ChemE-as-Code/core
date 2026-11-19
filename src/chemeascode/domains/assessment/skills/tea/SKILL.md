@@ -134,7 +134,14 @@ decision depends on the economics.
   success_rate, source}` (the flowsheet's rates are those of one batch over `basis_hours`), or,
   with a batch recipe in `process/recipe.yaml`, `operation.batch: {recipe: true, source}`: the
   cycle time and batches per year then come from `cheme process recipe` and the flowsheet's
-  rates are its year averages. Variable items may be `per: batch`. An ISBL from a reference plant gives `isbl: {source: given,
+  rates are its year averages. Variable items may be `per: batch`, or `per: hour` (an amount per
+  operating hour). Use it for a quantity the flowsheet holds only as a volume, such as a
+  wastewater flow and its loads that `cheme process simulate` (QSDsan) writes to
+  `state.<case>.calculated`, which the TEA does not read: `{id: discharge, per: hour, amount:
+  {value: <m3/h>, source: "cheme process simulate (qsdsan), stream <id>"}, unit: m3, value:
+  <price per m3>, category: disposal, ...}`. A product with no mass flow is reported as
+  `cheme.tea-flow-incomplete`, not as unpriced; a product that also has a mass flow still needs
+  `free:` with the reason, because a `per: hour` item does not count as costing it. An ISBL from a reference plant gives `isbl: {source: given,
   value, scaling: {reference, unit, exponent}}`.
 
 - **Never invent a price.** Every price, factor and rate needs `status` (`ASSUMED`, or `QUOTED`
@@ -151,13 +158,24 @@ decision depends on the economics.
    detailed tax model.
 2. **Fix the basis.** Product specification (purity, pressure, state at the battery limit),
    boundary, scale, location and the cost year, and the unit the product's cost is stated in.
-   Two analyses compare only on the same basis.
+   Two analyses compare only on the same basis. When the flowsheet's capacity is solved by a
+   design specification on an annual amount (`specs:` in `process/flowsheet.yaml`, target
+   `annual`, ADR 0070), set `operation.hours_per_year` to the hours that spec uses (its
+   `hours`, else the recipe's `hours_per_year`). The TEA does not compare them, and different
+   hours change the annual production the TEA prices. Express availability through
+   `utilisation`, not through other hours.
 3. **Capital.** `cheme assess equipment` first; resolve its findings (skill `mto-estimate`).
    Then `isbl` in `tea.yaml`: convert currency and year explicitly, a location factor, an
    installation factor for purchased-only items, an allowance for items no correlation covers
    (with the reason). The bare module cost includes installation and indirects: never add the
    take-off estimate on top. OSBL, owner's cost and contingency each as a fraction with its
-   source.
+   source. With `source: equipment` the ISBL already includes each reactor's first catalyst
+   fill (priced in `process/catalysts.yaml`) and the own costs of `cost-basis.yaml`. Do not add
+   the first fill as an event or a capex item; model only later fills as `kind: replacement`
+   events. A fill in the estimate's currency but another year is kept unescalated
+   (`tea-cost-year`); a fill in another currency counts only in the TEA's currency and cost
+   year, and an own cost only in the TEA's or the estimate's currency and year, otherwise it is
+   left out (`tea-capex-own-cost`): restate it in one of them.
 4. **Estimate class against the stage.** `class_by_stage` (default concept 5, basic 4, detail
    3). The report warns when the estimate claims a finer class than the stage supports, or a
    coarser one than the stage needs (`cheme.tea-class-stage`). With no `isbl.uncertainty` the
@@ -173,6 +191,7 @@ decision depends on the economics.
    `tea-lca-price-mismatch` (the products' relative prices differ from the prices of the
    LCA's economic allocation, `allocation.prices` in `lca/lca.yaml`: price them alike),
    `tea-capex-range` (an uncertainty narrower than the class supports), `tea-confidence`,
+   `tea-capex-own-cost` (a catalyst fill or own cost left out of the ISBL),
    and `boundary-*`: an incomplete boundary means the operating cost leaves something out.
 7. **Read what dominates.** The cost of production shows where the money goes; the tornado (one
    input at a time) and the Monte Carlo's Spearman ranks name the premises that drive the

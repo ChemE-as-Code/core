@@ -905,6 +905,17 @@ def _solve_batch(
     absorb = [absorption.get(names[i], 0.0) for i in vented]
     absorbing = any(absorb)
     absorb_at = head_at + 2 * ng
+    # running totals that may go negative, kept out of the integrator's clip at zero: the
+    # vapour's heats (the vessel's and the condenser's: a condenser warmer than the batch warms
+    # the gas), the head space's expelled gas (an expanding head space draws gas back, ADR 0071)
+    # and the heat its dissolved share released (an endothermic absorption takes heat in)
+    signed = frozenset(
+        [
+            *(range(head_at - 2, head_at) if nv else ()),
+            *range(head_at + ng, head_at + 2 * ng),
+            *([absorb_at] if absorbing else ()),
+        ]
+    )
     molar_volume = (
         [(mix.liquid.molar_volumes.get(n) or 0.0) for n in names] if mix.liquid is not None else []
     )
@@ -1241,7 +1252,7 @@ def _solve_batch(
         while True:
             if t_end is not None:
                 h = min(h, t_end - clock)
-            new, error = _dopri_step(derivatives, state, h)
+            new, error = _dopri_step(derivatives, state, h, signed)
             scale = [
                 max(abs(a), abs(b), 1e-9 * total0)
                 for a, b in zip(state[:-2], new[:-2], strict=True)
@@ -1255,14 +1266,14 @@ def _solve_batch(
                 lo, hi = 0.0, h
                 for _ in range(60):
                     mid = (lo + hi) / 2
-                    trial, _ = _dopri_step(derivatives, state, mid)
+                    trial, _ = _dopri_step(derivatives, state, mid, signed)
                     if conversion(trial, clock + mid) >= target:
                         hi = mid
                     else:
                         lo = mid
-                new, _ = _dopri_step(derivatives, state, hi)
+                new, _ = _dopri_step(derivatives, state, hi, signed)
                 h = hi
-            new[:-2] = [max(v, 0.0) for v in new[:-2]]
+            new[:-2] = [v if i in signed else max(v, 0.0) for i, v in enumerate(new[:-2])]
             # what reacted in this step: the change of moles less what was dosed, and what left
             d_moles = [
                 b - a - s * h for a, b, s in zip(state[:size], new[:size], source, strict=True)
