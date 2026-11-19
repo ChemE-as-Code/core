@@ -32,6 +32,9 @@
   solid phase). `cheme datasheets fill` of the entries with compressor or expander datasheets
   (asu-1, ammonia-1, co2-electrolysis-bpm-1, lng-terminal-1, set to draft) writes identical
   datasheets: their machine powers are given from the simulation or a sizing script.
+  `props.py` is a process generator module, so `generator_fingerprint()` changes: every
+  BFD/PFD needs `cheme process build` once (only `generator_sha256` changes; the examples are
+  rebuilt).
 
 ## 1.12.0 (2026-11-13)
 
