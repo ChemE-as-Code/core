@@ -158,6 +158,74 @@
   with `uncertainty:` give identical outputs on this branch and at 1.12.0 + core#254
   (`lca_report` and every file `cheme assess lca --write` writes, compared byte for byte).
 
+### Fixed
+
+- A batch stopped integrating once its key reactant was used up, although another reaction
+  was still running (core#297). The stall test looked at the key's conversion alone, so in
+  A -> B -> C the B -> C reaction froze when A ran out, while the batch still reported its full
+  time: B came out 100 times too high (4.28e-3 instead of 4.54e-5 kmol with k1 = 10/s,
+  k2 = 1e-3/s, 1e4 s), and the extents, heat released and heat terms were wrong with it. The
+  stall test now looks at every component's change, so the batch, the plain post-reaction and
+  the semi-batch hold after the dosing run to their end while any reaction progresses. A step
+  held short (a reactant running out) counts as idle only when its change at its pace over the
+  time left would be nothing as well.
+- A rate law of zero order in a reactant (or one that leaves a reactant out) kept converting
+  after that reactant was used up, and the step-end clip kept what it formed (core#300): 1 kmol
+  of A gave 389.65 kmol of B. `rates.rate` now gives 0 while a reactant is absent (without
+  `reverse: equilibrium`), the stirred tank treats a used-up reactant as absent rather than as
+  its trace, and a batch whose clip would add more than 1e-6 of what was charged and dosed is
+  refused ("the balance does not close"). A law of positive order in every reactant changes
+  only by the trace it gave a used-up reactant.
+  A used-up reactant that is still supplied, by a dose or another reaction, is consumed as fast
+  as it comes by a law of zero order in it (or one that leaves it out): such a law runs at that
+  supply, not at its full rate or 0 by turns, which held the step size at its 1e-12 s floor
+  (core#333 review). A semi-batch dosing A into A + B -> C of rate k c_B at k n_B above the dose
+  rate never finished its dosing; it now converts the 1 kmol dosed (extent 1.0). In A -> B
+  (first order, k = 1e-3/s), B -> C (zero order in B) a 1000 s batch stopped at 3e-11 s with A
+  unconverted while reporting its full time; it now gives A = exp(-1) = 0.368, C = 0.632. A
+  batch whose steps keep being taken at that floor over the tolerance is refused ("cannot
+  pass") instead of crawling on.
+  Library (process-library 51ecc8a, the 19 entries with rate laws, `cheme process reactors
+  --json` and `cheme process propagate --fill` against the 0e85885 pin): no entry has
+  consecutive reactions that outlive their key, and pvc-1's law of zero order in VCM ends at
+  its 90 % conversion target before the VCM runs out, so no published value changes beyond
+  round-off (largest relative change 2.8e-6, of a 4e-23 accumulation), except in
+  copper-i-chloride-1: the CL2 trace of its recycle loop (mole fraction 1.4e-19 to 2.9e-19 in
+  S4, S6, S7, S7A and S17) is now 0.0, which changes the input fingerprints of those streams,
+  S9 and Q2 (their values unchanged): `propagate --check` reports them stale until refilled.
+- The thermo adapter solves a pure component inside its two-phase region (#314). A (P, S),
+  (P, H) or (P, vapour fraction between 0 and 1) flash of a single component failed in thermo's
+  FlashVL (division by zero, unbound locals) and was refused, so an expander or compressor
+  datasheet of a pure fluid that condenses took the ideal-gas route (pure nitrogen 600 to
+  130 kPa(a) from 120 K: 42.4 kJ/kg and 70.96 K, below saturation, instead of 40.8 kJ/kg and
+  79.45 K at vapour fraction 0.98). Those flashes of a single component now go to thermo's
+  pure-component flasher on the same constants and Peng-Robinson parameters; temperature-pressure
+  flashes and saturation points stay on FlashVL. `Adapter.flash_ps` and `flash_ph` return the
+  state their flash found instead of a new flash at its temperature and pressure (which for a
+  pure component on its saturation line does not fix the vapour fraction), and the polytropic
+  steps of `cheme datasheets fill` take each step's entropy from its (P, H) state, not from a
+  flash at its temperature and pressure (with the two-phase flash alone, the nitrogen expander
+  above at polytropic efficiency 0.95 would have given 231.7 kW instead of about 39 kW).
+- Component ids that share a CAS number add up in the thermo adapter and in the stream exergy
+  instead of the last one overwriting the others (#315): the mole fractions passed to thermo
+  summed to less than 1 and thermo does not normalise them (two nitrogen ids at 0.395 each with
+  oxygen 0.21: M 17.79 instead of 28.85 kg/kmol, written by `cheme process props --fill`).
+- Library effect of #314 and #315: none. Branch against the pinned CLI on the library's
+  `origin/main`, `cheme process props --check` of the eight entries with component ids that
+  share a CAS number (carbon-tetrabromide-1, copper-i-chloride-1, kraft-pulp-1,
+  methyltriphenylphosphonium-bromide-1, n-bromosuccinimide-1, p-toluenesulfonyl-chloride-1,
+  sodium-azide-1, sodium-cyanide-1) gives identical output: each pair is a dissolved and a solid
+  id (or, in kraft-pulp-1, never in one stream), and a stream holding the solid is refused (no
+  solid phase). `cheme datasheets fill` of the entries with compressor or expander datasheets
+  (asu-1, ammonia-1, co2-electrolysis-bpm-1, lng-terminal-1, set to draft) writes identical
+  datasheets: their machine powers are given from the simulation or a sizing script.
+  `props.py` is a process generator module, so `generator_fingerprint()` changes: every
+  BFD/PFD needs `cheme process build` once (only `generator_sha256` changes; the examples are
+  rebuilt). The rebuilt examples change the commit hashes of the test repos the viewer's API
+  fixtures are made from, so seven fixtures are regenerated (CI's `api-fixtures` artifact:
+  `control-separation`, `impact`, `repo`, `repo-issues`, `simulation-failed`, `simulation-run`,
+  `simulation-stale`; one commit hash each).
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,

@@ -1271,6 +1271,40 @@ def test_exchanger_duty_and_area_through_the_adapter(sized: Path):
     assert datasheet_size(sheet, "area")[0] == pytest.approx(area["value"])
 
 
+def _pure_nitrogen_expander(plant: Path) -> None:
+    """K-1 expanding pure nitrogen, 1 kg/s, from 120 K and 600 kPa(a) to 130 kPa(a)."""
+    path = plant / "process" / "flowsheet.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for stream in data["streams"]:
+        if stream["id"] in ("S4", "S5"):
+            p, t = (600, 120) if stream["id"] == "S4" else (130, 80)
+            stream["state"] = _state(p, t, 3600, {"N2": 1})
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+
+@pytest.mark.parametrize("efficiency", ["isentropic_efficiency", "polytropic_efficiency"])
+def test_pure_nitrogen_expander_into_the_two_phase_region(sized: Path, efficiency: str):
+    # issue 314: the isentropic outlet at 130 kPa(a) is two-phase (VF 0.98); thermo's FlashVL
+    # failed there and the ideal-gas route took over (42.4 kJ/kg, 70.96 K, below saturation).
+    # Real gas, Peng-Robinson: h1 -5404.10, isentropic h2s -6547.58 kJ/kmol, so
+    # w_s = -1143.48 / 28.0134 = -40.82 kJ/kg; at eta 0.95 the outlet is still inside the dome,
+    # at the saturation temperature 79.45 K
+    pytest.importorskip("thermo")
+    _pure_nitrogen_expander(sized)
+    result = fill_datasheets(sized, ["K-1"], parameters={efficiency: "0.95"})
+    spec = _specific(sized, "K-1")
+    power = spec["fluid_power_kw"]
+    assert "real gas" in power["source"], (power, result.findings)
+    assert spec["discharge_temperature_k"]["value"] == pytest.approx(79.448, abs=0.01)
+    if efficiency == "isentropic_efficiency":
+        assert power["value"] == pytest.approx(0.95 * 40.819, abs=0.01)
+    else:
+        # small steps at eta_p 0.95 along the expansion, each from the entropy of the (P, H)
+        # state itself (two-phase steps are not fixed by T and P): between eta_p w_s and w_s,
+        # the reheat of the earlier steps' losses recovered in the later ones
+        assert 0.95 * 40.819 < power["value"] < 40.819
+
+
 def test_column_shortcut_through_the_adapter(sized: Path):
     pytest.importorskip("thermo")
     result = fill_datasheets(sized, ["C-1"], parameters={"reflux_ratio_factor": "1.3"})
