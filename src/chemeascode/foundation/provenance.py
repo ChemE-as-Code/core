@@ -67,7 +67,7 @@ DIGEST = re.compile(rb"(?<![0-9A-Za-z])(?:sha256:)?(?:[0-9a-f]{64}|[0-9a-f]{40})
 VALUE_FINGERPRINT_LENGTH = 16
 #: The fields of a value that describe it rather than state it: no :func:`value_fingerprint`
 #: of a value calculated from it includes them, so adding or changing one marks nothing stale.
-NOT_INPUTS = frozenset({"provenance", "source", "fingerprint", "uncertainty", "origin"})
+NOT_INPUTS = frozenset({"provenance", "source", "fingerprint", "uncertainty", "origin", "producer"})
 
 
 def value_fingerprint(data: Any) -> str:

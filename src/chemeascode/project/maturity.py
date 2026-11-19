@@ -542,7 +542,8 @@ def _predictive(
                 **state,
             }
             converged.evidence[case] = {
-                "converged": entry.get("converged"),
+                "converged": record.numerically_converged(entry),
+                **({"outcome": entry["outcome"]} if entry.get("outcome") else {}),
                 "status": entry.get("status"),
                 "iterations": entry.get("iterations"),
                 "messages": entry.get("messages", [])[:5],
@@ -557,7 +558,7 @@ def _predictive(
             }
             if state["stale"] is not False:
                 stale.append(case)
-            if not entry.get("converged") or errors:
+            if not record.numerically_converged(entry) or errors:
                 unconverged.append(case)
             if not simulator.get("version") or not entry.get("tool"):
                 unpinned.append(case)

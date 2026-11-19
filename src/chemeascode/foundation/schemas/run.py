@@ -1,4 +1,4 @@
-"""The adapter result (``cheme/adapter-result/v1``): what one run of a model or solver adapter
+"""The versioned adapter result: what one run of a model or solver adapter
 gave for one case, in the same shape whichever adapter ran it (docs/framework/contract.md).
 
 Emitted by ``cheme process simulate --fill`` (DWSIM; each entry of
@@ -12,6 +12,10 @@ The DWSIM run record predates this model: its entries name the solver ``simulato
 ``converged``, and entries written before the model have no ``status``; both are read here
 (``status`` then follows ``converged``). ``schema`` is the default where an entry sits inside
 a file with its own ``schema`` (``cheme/simulation-run/v1``).
+
+Project workers emit v2 with execution and numerical outcomes plus optional trajectory
+manifests. Its additional ``completed`` status means a dynamic interval completed, not
+steady-state convergence. The established adapters keep emitting v1 unchanged.
 """
 
 from __future__ import annotations
@@ -21,9 +25,10 @@ from typing import Any, Literal
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from chemeascode.foundation.findings import Finding
+from chemeascode.foundation.schemas.worker import ExecutionOutcome, NumericalOutcome, Trajectory
 
 ADAPTER_SCHEMA = "cheme/adapter-result/v1"
-AdapterStatus = Literal["converged", "not-converged", "refused", "failed"]
+AdapterStatus = Literal["converged", "not-converged", "refused", "failed", "completed"]
 
 
 class Solver(BaseModel):
@@ -74,7 +79,9 @@ class AdapterResult(BaseModel):
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
-    schema_: Literal["cheme/adapter-result/v1"] = Field(default=ADAPTER_SCHEMA, alias="schema")
+    schema_: Literal["cheme/adapter-result/v1", "cheme/adapter-result/v2"] = Field(
+        default=ADAPTER_SCHEMA, alias="schema"
+    )
     case: str
     status: AdapterStatus
     solver: Solver = Field(validation_alias=AliasChoices("solver", "simulator"))
@@ -89,6 +96,29 @@ class AdapterResult(BaseModel):
     units: list[UnitResult] = Field(default_factory=list)
     streams: list[StreamResult] = Field(default_factory=list)
     findings: list[dict[str, Any]] = Field(default_factory=list)
+    execution: ExecutionOutcome | None = Field(default=None, exclude_if=lambda v: v is None)
+    outcome: NumericalOutcome | None = Field(default=None, exclude_if=lambda v: v is None)
+    trajectories: list[Trajectory] = Field(default_factory=list, exclude_if=lambda v: not v)
+
+    @model_validator(mode="after")
+    def _outcome_semantics(self):
+        if self.schema_ == ADAPTER_SCHEMA:
+            if self.status == "completed" or self.outcome is not None or self.trajectories:
+                raise ValueError("Explicit dynamic outcomes require cheme/adapter-result/v2")
+            return self
+        if self.outcome is None:
+            raise ValueError("Adapter result v2 requires an explicit numerical outcome")
+        if self.status == "completed":
+            progress = self.outcome.integration
+            if self.outcome.mode != "dynamic" or progress is None or not progress.completed:
+                raise ValueError(
+                    "Completed dynamic result requires a completed integration interval"
+                )
+            if self.outcome.convergence == "not-converged":
+                raise ValueError("A numerically failed result cannot be completed")
+        if self.status == "converged" and self.outcome.convergence != "converged":
+            raise ValueError("Converged status requires explicit numerical convergence")
+        return self
 
     @model_validator(mode="before")
     @classmethod

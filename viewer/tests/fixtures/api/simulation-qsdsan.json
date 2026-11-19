@@ -11,6 +11,15 @@
     "property_package": null,
     "molecular": false,
     "model": "contract-demonstration",
+    "capabilities": {
+      "modes": [
+        "dynamic"
+      ],
+      "publication": "measured",
+      "trajectory_formats": [
+        "csv"
+      ]
+    },
     "qsdsan": {
       "model": "contract-demonstration",
       "worker": "demo_worker",
@@ -18,7 +27,14 @@
       "files": [
         "demo_worker.py"
       ],
-      "timeout_s": 300
+      "timeout_s": 300.0,
+      "mode": "dynamic",
+      "options": {},
+      "mappings": {
+        "streams": {},
+        "units": {},
+        "instruments": {}
+      }
     },
     "components": {},
     "tolerance": {
@@ -32,16 +48,16 @@
     "specs": {}
   },
   "run": {
-    "schema": "cheme/adapter-result/v1",
+    "schema": "cheme/adapter-result/v2",
     "case": "design",
-    "status": "converged",
-    "model_fingerprint": "4ffd3af85386864b",
+    "status": "completed",
+    "model_fingerprint": "1177b6fa127bd2bd",
     "inputs": {
       "commit": null,
       "dirty": [],
       "fingerprints": {
-        "demo_worker.py": "sha256:fb320a2bdbf4d1aa0bf56757204614c72ab4f413f8e7cdb9e8c7f0e048c71b4a",
-        "process/flowsheet.yaml": "sha256:d887bb2d3a75043b5eb6033876ac8ce9d158c935b90c0da5d24ec5505e7dfff9",
+        "demo_worker.py": "sha256:488a6c0355fadaa1cf57210ce23ef136a1faef725fedd66ae9dfc720f09a4955",
+        "process/flowsheet.yaml": "sha256:60e29e1827e6c90a13738e07bd8b1c8a3eb68b964a7108276c6188cd0c4a1a15",
         "process/materials.yaml": "sha256:504177589498dd2e62f5c0596d0481071103a1cdb708290294a7b890003d2b0f",
         "process/simulation.yaml": "sha256:6e3244bbb6dd2ce714aa13d4b6295551f11be7270492d1f2fb9473c46f1f0313",
         "results.json": "sha256:44a3433ba3da660873c7d23671bd4aa9548246162e6d0b234aa56a58ab98fc61"
@@ -101,9 +117,37 @@
       }
     ],
     "findings": [],
+    "execution": {
+      "state": "completed",
+      "transport": "local-python",
+      "exit_code": 0,
+      "elapsed_s": 0.1,
+      "message": ""
+    },
+    "outcome": {
+      "mode": "dynamic",
+      "convergence": "not-applicable",
+      "integration": {
+        "start": 0.0,
+        "requested_end": 1.0,
+        "achieved_end": 1.0,
+        "time_unit": "day",
+        "completed": true
+      },
+      "steady_state": {
+        "state": "not-evaluated",
+        "evidence": [],
+        "method": null
+      }
+    },
     "run_at": "2026-10-28T12:00:00Z",
+    "converged": false,
     "integration_completed": true,
-    "converged": true,
+    "producer": {
+      "tool": "cheme process simulate",
+      "adapter": "qsdsan",
+      "model": "contract-demonstration"
+    },
     "simulator": {
       "name": "QSDsan",
       "version": "fixture",
@@ -115,8 +159,8 @@
   },
   "stale": false,
   "staleness": {
-    "model_fingerprint": "4ffd3af85386864b",
-    "current_fingerprint": "4ffd3af85386864b",
+    "model_fingerprint": "1177b6fa127bd2bd",
+    "current_fingerprint": "1177b6fa127bd2bd",
     "changed_files": []
   },
   "units": [

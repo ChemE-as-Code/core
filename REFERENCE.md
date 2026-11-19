@@ -1799,7 +1799,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   refused or uncalculable streams in `messages`; `iterations` null, one flash per stream).
 - **`cheme process simulate --fill | --check [--case C] [--save x.dwxmz]`** runs the simulator
   `process/simulation.yaml` selects: DWSIM (default), the optional IDAES backend (`simulator:
-  idaes`) or a project-defined QSDsan model (`simulator: qsdsan`, below). `--save` is DWSIM
+  idaes`) or a registered project-worker adapter such as QSDsan (below). `--save` is DWSIM
   only. For DWSIM, `process/simulation.yaml` gives the property package and what each step
   needs beyond its streams (every value with its provenance):
 
@@ -1840,24 +1840,28 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (IPOPT). See [docs/framework/idaes.md](docs/framework/idaes.md) and
   `examples/process-hda-idaes`.
 
-  `simulator: qsdsan` runs a project-defined QSDsan model instead (ADR 0065). The file then
-  holds only `schema`, `kind`, `simulator` and the `qsdsan` block (any other key, such as
-  `property_package`, `specs` or `method_selection`, is a schema error,
-  `cheme.process-sim-schema`). The block declares `model`, `worker` (a Python module among
-  `files`), `input`, `files` (at least one) and optionally `timeout_s` (default 300, at most
-  3600). Use slash-separated project-relative paths. Both modes execute trusted project code
-  using the interpreter named by `CHEME_QSDSAN_PYTHON`. The module receives two JSON file paths,
-  request and response. See the [worker contract](docs/adr/0065-qsdsan-a2o-process-worker.md).
-  `cheme process simulate --fill` publishes quantities under each stream's
-  `state.<case>.calculated` (ADR 0066). The run record in `process/simulation-run.json` points
-  to `process/simulation-runs/<id>/`. Inspect the original numerical evidence there. `--check`
-  runs against staged inputs. Validation reports `cheme.process-sim-run-stale` when declared
-  sources change. Invalid input or unsuccessful execution produces `cheme.process-qsdsan`; an
-  unavailable model input can also produce `cheme.process-sim-input-missing`. `--save` is
-  refused (DWSIM only) with `cheme.process-qsdsan`, exit 1. On any error nothing is published
-  (the staged result is discarded). The API exposes optional `calculated_columns`,
-  `spec.molecular`, `spec.model`, `spec.qsdsan` (the declared worker inputs), `run.evidence`
-  and `run.integration_completed`.
+  `simulator: qsdsan` runs a project-defined dynamic model through the shared worker interface
+  (ADRs 0065 and 0072). The `qsdsan` block declares `model`, `worker` (a Python module among
+  `files`), `input` and `files`. It also accepts `mode`, `mappings`, bounded adapter `options`
+  and `timeout_s` (default 300 seconds, at most 3600). Use slash-separated project-relative
+  paths. QSDsan solver settings stay in its input.
+  Both modes execute trusted project code. `CHEME_QSDSAN_PYTHON` overrides the optional
+  `CHEME_WORKER_PYTHON` fallback. The module receives JSON request and response file paths.
+
+  `--check` runs against disposable staged inputs. `--fill` records accepted results in
+  `process/simulation-run.json`, publishes the measured quantities in
+  `state.<case>.calculated` in their original units and archives evidence under
+  `process/simulation-runs/<id>/`. Validation reports `cheme.process-sim-run-stale` when
+  declared sources change. Worker errors use `cheme.process-worker`. Rejected fills retain
+  separate diagnostics under `process/simulation-attempts/` and keep accepted results intact.
+  `--save` is DWSIM-only.
+
+  The API exposes worker capabilities, structured cell producers, evidence and original units.
+  New worker results use `cheme/adapter-result/v2` with `execution`, `outcome` and optional
+  `trajectories`. `status: completed` means the requested dynamic interval completed.
+  Steady-state assessment has its own outcome and evidence. Older records remain readable.
+  See the [worker author guide](docs/framework/project-workers.md) for the request contract,
+  publication rules and migration requirements.
 
   `--fill` also records the run in `process/simulation-run.json` (generated, committed with the
   flowsheet; schema `cheme/simulation-run/v1`, one entry per case): simulator and version,

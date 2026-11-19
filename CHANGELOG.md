@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Breaking (next major release, ADR 0072)
+
+- New project-worker results use `cheme/adapter-result/v2` and `completed` for dynamic interval
+  completion. Read `execution` and `outcome` instead of assuming `converged` from a completed
+  dynamic run. Historical v1 results remain readable; DWSIM/IDAES/props/propagate keep v1.
+  Worker failures use `cheme.process-worker`. Existing QSDsan configuration and
+  `CHEME_QSDSAN_PYTHON` remain supported. Rerun old worker results to adopt contract-2 fingerprints;
+  no historical evidence is rewritten. See `docs/framework/project-workers.md`.
+
+### Added
+
+- Shared typed worker exchange, local Python transport, producer-aware provenance and protected
+  measured/molecular publication. Native model inputs are copied and hashed as bytes.
+- CSV trajectory metadata, event-side samples, final instantaneous snapshot checks and generic
+  outcome/evidence presentation. Failed attempts cannot replace successful stream values.
+- Adapter/session extension seam tested without QSDsan or commercial software. Aspen Plus,
+  HYSYS and Dymola adapters remain future work; no SDK/COM/remote service was added.
+
+### Internal moves
+
+- `integrations.qsdsan` execution moved to `integrations.workers`; process orchestration moved
+  from `simulation.qsdsan` to `simulation.worker_run` and `worker_publication`. QSDsan semantics
+  remain in `simulation.qsdsan`. See the framework migration table; no internal alias is kept.
+
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 - Bundled skills and REFERENCE.md brought up to 1.12 and the QSDsan integration: QSDsan
   configuration, refusals and outputs; propagate's `recovery:`, `specs:` and tears beside
