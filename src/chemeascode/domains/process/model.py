@@ -775,8 +775,10 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _reaction_rules(out)
     _reactor_rules(out)
     _catalyst_rules(out)
+    from chemeascode.domains.process.dosing import rules as dosing_rules
     from chemeascode.domains.process.recipe import rules as recipe_rules
 
+    out.findings += dosing_rules(process)
     out.findings += recipe_rules(process)
     _id_rules(out)
     _unit_rules(out)
