@@ -1869,8 +1869,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `process/simulation-run.json`, publishes the measured quantities in
   `state.<case>.calculated` in their original units and archives evidence under
   `process/simulation-runs/<id>/`. Validation reports `cheme.process-sim-run-stale` when
-  declared sources change. Worker errors use `cheme.process-worker`. Rejected fills retain
-  separate diagnostics under `process/simulation-attempts/` and keep accepted results intact.
+  declared sources change. Worker errors use `cheme.process-worker`; the findings the worker
+  returns are reported under that rule at their level (an unknown level as a warning), so
+  `--check` exits 1 on a worker warning. Rejected fills retain separate diagnostics under
+  `process/simulation-attempts/` and keep accepted results intact. `--fill` holds an
+  operating-system lock on `process/simulation-run.lock` while it publishes: a lock file left by
+  a killed run is taken over, and only a publication still running refuses. A stale calculated
+  value whose name is also a state field (the wastewater `flow` in m3/day) is listed as
+  `calculated.<name>` in the stale names, so it never marks the stream's own `flow` stale, nor
+  the other way round. `cheme serve` fingerprints the declared inputs whatever their size, as
+  the CLI does (the 5 MB limit applies to files it returns, parses or renders).
   `--save` is DWSIM-only.
 
   The API exposes worker capabilities, structured cell producers, evidence and original units.

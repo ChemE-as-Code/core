@@ -6,6 +6,7 @@ exclusive writer lock, concurrent-input check and archived entry make that bound
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -22,6 +23,21 @@ from chemeascode.domains.process.simulation import SOURCE, record, worker_model
 from chemeascode.foundation.project_paths import local_path
 from chemeascode.foundation.units import same_unit
 from chemeascode.integrations.workers import evidence_files
+
+
+def _flow(value):
+    """*value* as a YAML flow node that reads back equal: JSON, except that a float in exponent
+    form gets a decimal point (``1e-05`` -> ``1.0e-05``), since YAML 1.1 reads ``1e-05`` as a
+    string (#316)."""
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{_flow(k)}: {_flow(v)}" for k, v in value.items()) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(_flow(v) for v in value) + "]"
+    text = json.dumps(value, ensure_ascii=False)
+    if isinstance(value, float) and "e" in text and "." not in text:
+        mantissa, exponent = text.split("e")
+        text = f"{mantissa}.0e{exponent}"
+    return text
 
 
 def _render_cells(content, case, document, measured=True):
@@ -44,7 +60,7 @@ def _render_cells(content, case, document, measured=True):
             end = node.end_mark.index
             if not node.flow_style:
                 end = offsets[_last_line(node)] + len(lines[_last_line(node)].rstrip("\r\n"))
-            edits.append((start, end, json.dumps(after, ensure_ascii=False)))
+            edits.append((start, end, _flow(after)))
             return
         key, *rest = keys
         pair = _child(node, key)
@@ -54,17 +70,7 @@ def _render_cells(content, case, document, measured=True):
             line = _last_line(node)
             end = offsets[line] + len(lines[line].rstrip("\r\n"))
             pad = " " * node.value[0][0].start_mark.column
-            edits.append(
-                (
-                    end,
-                    end,
-                    newline
-                    + pad
-                    + json.dumps(key)
-                    + ": "
-                    + json.dumps(after[key], ensure_ascii=False),
-                )
-            )
+            edits.append((end, end, newline + pad + _flow(key) + ": " + _flow(after[key])))
 
     for node, old, new in zip(nodes, original["streams"], document["streams"], strict=True):
         patch(node, ["state", case, *(["calculated"] if measured else [])], old, new)
@@ -165,6 +171,60 @@ def _scalar(sid, key, cell, measured, doc):
     return cell
 
 
+def _try_lock(fd):
+    """Take an exclusive lock on *fd* without waiting (False: another process holds it). The
+    operating system releases it when the process ends, however it ends."""
+    if os.name == "nt":
+        import msvcrt
+
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+@contextlib.contextmanager
+def _publication_lock(lock):
+    """Hold *lock* while publishing. A lock file left by a killed run holds no lock and is taken
+    over; only a live publication refuses (#320)."""
+    while True:
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o644)
+        try:
+            if not _try_lock(fd):
+                raise ValueError(
+                    f"Another simulate --fill is publishing ({lock.name}); retry when it ends"
+                )
+            try:
+                same = os.path.samestat(os.fstat(fd), os.stat(lock))
+            except FileNotFoundError:
+                same = False
+        except BaseException:
+            os.close(fd)
+            raise
+        if same:  # else the holder removed the file between our open and lock: open the new one
+            break
+        os.close(fd)
+    try:
+        yield
+    finally:
+        if os.name == "nt":  # an open file cannot be removed; another run may hold it by now
+            os.close(fd)
+            with contextlib.suppress(OSError):
+                lock.unlink()
+        else:
+            with contextlib.suppress(FileNotFoundError):
+                lock.unlink()
+            os.close(fd)
+
+
 def publish(root, case, entry, evidence, original, content, inputs_before, config, previous):
     for name in (FLOWSHEET_FILE, record.RUN_FILE, "process/simulation-runs"):
         if local_path(root, name) != root.resolve() / name:
@@ -173,58 +233,51 @@ def publish(root, case, entry, evidence, original, content, inputs_before, confi
     run_file = local_path(root, record.RUN_FILE)
     evidence_root = local_path(root, "process/simulation-runs")
     evidence_root.mkdir(exist_ok=True)
-    lock = run_file.with_suffix(".lock")
-    with lock.open("x") as guard:
-        try:
-            if (
-                worker_model.hashes(root, config) != inputs_before
-                or flowsheet.read_bytes() != original
-                or (run_file.read_bytes() if run_file.exists() else None) != previous
-            ):
-                raise ValueError("Model inputs changed during execution; retry with current inputs")
-            data = (
-                record.parse(previous)
-                if previous is not None
-                else {"schema": record.RUN_SCHEMA, "kind": "simulation-run", "cases": {}}
+    with _publication_lock(run_file.with_suffix(".lock")):
+        if (
+            worker_model.hashes(root, config) != inputs_before
+            or flowsheet.read_bytes() != original
+            or (run_file.read_bytes() if run_file.exists() else None) != previous
+        ):
+            raise ValueError("Model inputs changed during execution; retry with current inputs")
+        data = (
+            record.parse(previous)
+            if previous is not None
+            else {"schema": record.RUN_SCHEMA, "kind": "simulation-run", "cases": {}}
+        )
+        if data is None:
+            raise ValueError("Existing run record is unreadable; refusing to overwrite it")
+        destination = evidence_root / evidence.name
+        entry["evidence"] = destination.relative_to(root).as_posix()
+        data["cases"][case] = entry
+        encoded = json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False).encode() + b"\n"
+        with tempfile.TemporaryDirectory(dir=evidence_root) as temporary:
+            temp = Path(temporary)
+            (temp / "sheet").write_bytes(content)
+            (temp / "previous-sheet").write_bytes(original)
+            (temp / "record").write_bytes(encoded)
+            shutil.copytree(evidence, temp / "evidence")
+            evidence_files(temp / "evidence")
+            (temp / "evidence" / "cheme-simulation-entry.json").write_text(
+                json.dumps(entry, indent=2, allow_nan=False), encoding="utf-8"
             )
-            if data is None:
-                raise ValueError("Existing run record is unreadable; refusing to overwrite it")
-            destination = evidence_root / evidence.name
-            entry["evidence"] = destination.relative_to(root).as_posix()
-            data["cases"][case] = entry
-            encoded = (
-                json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False).encode() + b"\n"
-            )
-            with tempfile.TemporaryDirectory(dir=evidence_root) as temporary:
-                temp = Path(temporary)
-                (temp / "sheet").write_bytes(content)
-                (temp / "previous-sheet").write_bytes(original)
-                (temp / "record").write_bytes(encoded)
-                shutil.copytree(evidence, temp / "evidence")
-                evidence_files(temp / "evidence")
-                (temp / "evidence" / "cheme-simulation-entry.json").write_text(
-                    json.dumps(entry, indent=2, allow_nan=False), encoding="utf-8"
-                )
-                os.replace(temp / "evidence", destination)
+            os.replace(temp / "evidence", destination)
+            try:
+                os.replace(temp / "sheet", flowsheet)
                 try:
-                    os.replace(temp / "sheet", flowsheet)
-                    try:
-                        os.replace(temp / "record", run_file)
-                    except OSError:
-                        try:
-                            os.replace(temp / "previous-sheet", flowsheet)
-                        except OSError as rollback_error:
-                            recovery = evidence_root / (evidence.name + "-recovery")
-                            os.replace(temp, recovery)
-                            raise ValueError(
-                                "Publication and rollback failed; "
-                                f"recover previous-sheet from {recovery}"
-                            ) from rollback_error
-                        raise
+                    os.replace(temp / "record", run_file)
                 except OSError:
-                    shutil.rmtree(destination)
+                    try:
+                        os.replace(temp / "previous-sheet", flowsheet)
+                    except OSError as rollback_error:
+                        recovery = evidence_root / (evidence.name + "-recovery")
+                        os.replace(temp, recovery)
+                        raise ValueError(
+                            "Publication and rollback failed; "
+                            f"recover previous-sheet from {recovery}"
+                        ) from rollback_error
                     raise
-            return destination
-        finally:
-            guard.close()
-            lock.unlink()
+            except OSError:
+                shutil.rmtree(destination)
+                raise
+        return destination

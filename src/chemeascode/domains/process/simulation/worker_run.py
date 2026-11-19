@@ -91,6 +91,29 @@ def _failed_attempt(root, evidence, request, execution, message):
     return target
 
 
+def _worker_findings(response, adapter):
+    """The findings the worker reported, located at the simulation: an unknown level counts
+    as a warning, so ``--check`` exits 1 on it (#319)."""
+    found = []
+    for i, finding in enumerate(response.findings):
+        level = finding.get("level")
+        rule = finding.get("rule")
+        ids = finding.get("ids")
+        found.append(
+            Finding(
+                SIMULATION_FILE,
+                level if level in ("error", "warning", "info") else "warning",
+                "cheme.process-worker",
+                f"{adapter.title} worker{f' ({rule})' if isinstance(rule, str) and rule else ''}: "
+                + str(finding.get("message") or "finding without a message"),
+                ids=[x for x in ids if isinstance(x, str)] if isinstance(ids, list) else [],
+                hint=str(finding.get("hint") or f"Reported by the {adapter.title} worker."),
+                key=f"worker-{i}",
+            )
+        )
+    return found
+
+
 def run(root, case, sim, *, write, save, adapter):
     from chemeascode.domains.process.model import load
 
@@ -150,6 +173,7 @@ def run(root, case, sim, *, write, save, adapter):
                 evidence_files(evidence)
                 response = adapter.normalize(attempt.result, request, evidence)
                 response.execution = execution
+                result.findings.extend(_worker_findings(response, adapter))
                 _map_results(response, request)
                 (evidence / "cheme-adapter-result.json").write_text(
                     response.model_dump_json(by_alias=True, indent=2), encoding="utf-8"

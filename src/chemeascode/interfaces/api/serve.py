@@ -665,6 +665,17 @@ def create_app(
             raise ApiError(400, f"{path} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
         return snapshot.read_with_id(path)
 
+    def _simulation_input(snapshot: Snapshot, path: str) -> tuple[bytes, str] | None:
+        """A declared simulation input, read whatever its size: only its fingerprint is used,
+        as ``cheme process simulate`` hashes it, so :data:`MAX_FILE_BYTES` does not apply
+        (``None`` when absent or not served, e.g. a symlink out of the repository)."""
+        try:
+            found = snapshot.read_with_id(path)
+        except ApiError:
+            found = None
+        _record(path)
+        return found
+
     def _need(snapshot: Snapshot, path: str) -> tuple[bytes, str]:
         found = _small(snapshot, path)
         if found is None:
@@ -1692,10 +1703,7 @@ def create_app(
             for path in declared_inputs(texts[SIMULATION_FILE][0]):
                 if path in texts:
                     continue
-                try:
-                    found = _small(snapshot, path)
-                except ApiError:
-                    continue
+                found = _simulation_input(snapshot, path)
                 if found is not None:
                     texts[path] = found
         if FLOWSHEET_FILE not in texts:
@@ -1792,15 +1800,19 @@ def create_app(
         texts = {}
         from chemeascode.domains.process.simulation.backends import declared_inputs
 
+        # a worker's inputs are fingerprinted without reading them; another simulator's declared
+        # inputs are read whatever their size (only their fingerprint is used, #318)
         worker_hashes = _worker_fingerprints(snapshot, sim_text[0])
-        paths = () if worker_hashes is not None else declared_inputs(sim_text[0])
-        for path in (*paths, record.RUN_FILE):
-            try:
-                found = _small(snapshot, path)
-            except ApiError:
-                continue  # too large or not served: counts as absent
+        for path in () if worker_hashes is not None else declared_inputs(sim_text[0]):
+            found = _simulation_input(snapshot, path)
             if found is not None:
                 texts[path] = found
+        try:
+            found = _small(snapshot, record.RUN_FILE)
+        except ApiError:
+            found = None  # too large or not served: counts as absent
+        if found is not None:
+            texts[record.RUN_FILE] = found
         try:
             process, problem = _process(snapshot), ""
         except ApiError as failure:

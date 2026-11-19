@@ -1,6 +1,7 @@
 """Second, test-only adapter proves that the worker path has no wastewater dependency."""
 
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from chemeascode.domains.process.model import load
-from chemeascode.domains.process.simulation import record, worker_model
+from chemeascode.domains.process.simulation import record, worker_model, worker_publication
 from chemeascode.domains.process.simulation.backends import BACKENDS, ProjectWorkerBackend
 from chemeascode.domains.process.simulation.run import run
 from chemeascode.domains.process.simulation.schema import Simulation
@@ -269,8 +270,14 @@ def test_lock_and_concurrent_input_change_refuse_publication(plant, monkeypatch)
     old = (plant / record.RUN_FILE).read_bytes()
     lock = (plant / record.RUN_FILE).with_suffix(".lock")
     lock.write_text("other writer")
-    assert any(f.level == "error" for f in simulate(plant).findings)
-    assert lock.read_text() == "other writer"
+    # a publication still running holds the lock (a file alone is taken over, #320)
+    fd = os.open(lock, os.O_RDWR)
+    try:
+        assert worker_publication._try_lock(fd)
+        assert any(f.level == "error" for f in simulate(plant).findings)
+        assert lock.read_text() == "other writer"
+    finally:
+        os.close(fd)
     lock.unlink()
     execute = LocalPythonTransport.execute
 

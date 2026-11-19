@@ -59,7 +59,7 @@ def _cell(quantity: Any, unit: str, is_stale: bool = False) -> str:
 
 
 def rows(process: Process, case: str) -> list[dict[str, str]]:
-    from chemeascode.domains.process.props import stale
+    from chemeascode.domains.process.props import calculated_name, stale
 
     fs = process.flowsheet
     out = []
@@ -99,7 +99,7 @@ def rows(process: Process, case: str) -> list[dict[str, str]]:
                 else "",
                 "duty": _cell(state.duty if state else None, fs.units.duty, "duty" in old),
                 "calculated": ", ".join(
-                    f"{name} {_cell(q, '', name in old)}"
+                    f"{name} {_cell(q, '', calculated_name(name) in old)}"
                     for name, q in (state.calculated.items() if state else [])
                 ),
             }
@@ -346,7 +346,7 @@ def stream_table(
     unit, basis, provenance and stale flag, the balances of blocks and steps, the links with
     their status, and the BFD connections with the streams each represents."""
     from chemeascode.domains.process.build import connection_streams
-    from chemeascode.domains.process.props import stale
+    from chemeascode.domains.process.props import calculated_name, stale
 
     fs = process.flowsheet
     found = balances(process, case)
@@ -391,7 +391,7 @@ def stream_table(
                 if phase
                 else None,
                 "calculated": {
-                    name: _property(q, "", name in old)
+                    name: _property(q, "", calculated_name(name) in old)
                     for name, q in (state.calculated.items() if state else [])
                 },
                 "stale": sorted(old),
