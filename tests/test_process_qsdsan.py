@@ -178,11 +178,13 @@ def test_fill_writes_floats_json_writes_in_exponent_form(plant, values):
         assert all(type(written[k]["value"]) is float for k in ("NH4", "flow"))
 
 
-def test_stale_wastewater_flow_is_not_the_stream_flow(plant):
+def test_stale_wastewater_flow_is_not_the_stream_flow(plant, monkeypatch):
     # the calculated "flow" (m3/day) and the state's "flow" are different values (#317)
+    from chemeascode.domains.process import props
+    from chemeascode.domains.process.build import _calculated
     from chemeascode.domains.process.pfd_sheet import stream_table as pfd_table
     from chemeascode.domains.process.props import stale
-    from chemeascode.domains.process.streams import stream_table
+    from chemeascode.domains.process.streams import rows, stream_table
 
     assert not simulate(plant).findings
     sheet = plant / "process/flowsheet.yaml"
@@ -203,6 +205,27 @@ def test_stale_wastewater_flow_is_not_the_stream_flow(plant):
     assert row["calculated"]["flow"]["stale"] is True
     assert row["calculated"]["TN"]["stale"] is True
     assert pfd_table(process, ["FEED"], [], "design").columns[0][1][3] == "1 000"
+    # the DEXPI export leaves the stale QSDsan flow out
+    lines = _calculated(process, feed)["lines"]
+    assert "stale, not exported (design): TN, calculated.flow" in lines
+    assert not [line for line in lines if line.startswith("calculated, simulated flow")]
+    # the CLI table marks the calculated flow stale, not the given one
+    cli = rows(process, "design")[0]
+    assert cli["flow"] == "1000 kg/h [G]"
+    assert "flow 100 m3/day [C STALE]" in cli["calculated"]
+
+    # the reverse: a stale state flow does not mark the calculated one
+    current = stale(process, feed, "design")
+    monkeypatch.setattr(
+        props, "stale", lambda *a: [n for n in current if n != "calculated.flow"] + ["flow"]
+    )
+    row = stream_table(process, "design", {}, set())["streams"][0]
+    assert row["properties"]["flow"]["stale"] is True
+    assert row["calculated"]["flow"]["stale"] is False
+    cli = rows(process, "design")[0]
+    assert cli["flow"] == "1000 kg/h [G STALE]"
+    assert "flow 100 m3/day [C]" in cli["calculated"]
+    assert [line for line in _calculated(process, feed)["lines"] if "simulated flow" in line]
 
 
 def test_worker_findings_are_reported(plant, monkeypatch):
