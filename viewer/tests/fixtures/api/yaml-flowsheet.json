@@ -4085,6 +4085,12 @@
             "title": "Heat Up Time",
             "type": "boolean"
           },
+          "flash": {
+            "default": false,
+            "description": "A charge that enters above its bubble point at the still's pressure (the first cut's without a feed) flashes adiabatically to it first, differentially (the vapour leaving as it forms, at the liquid's bubble point): the charge cools to the flashed liquid's bubble point on its own sensible heat (liquid_heat_capacity), the vapour (heat_of_vaporization) joins the first cut through the condenser, and the boil-up starts from the flashed liquid, so its duty no longer evaporates it (volatility raoult, the charge's temperature; ADR 0077); default: no flash.",
+            "title": "Flash",
+            "type": "boolean"
+          },
           "column": {
             "anyOf": [
               {

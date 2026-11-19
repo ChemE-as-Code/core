@@ -72,6 +72,18 @@ def test_reverse_by_equilibrium_is_zero_at_equilibrium():
         rate(law, WGS, y, 600.0, 2000.0)
 
 
+def test_a_used_up_reactant_stops_a_law_of_zero_order_in_it():
+    """#300: 0.0 ** 0 == 1, so a zero order (or a reactant the law leaves out) kept the rate
+    at k with the reactant gone."""
+    y = {"CO": 0.0, "H2O": 0.4, "CO2": 0.1, "H2": 0.1}
+    assert rate(_law(orders={"CO": 0, "H2O": 0.5}), WGS, y, 600.0, 2000.0) == 0.0
+    assert rate(_law(orders={"H2O": 0.5}), WGS, y, 600.0, 2000.0) == 0.0
+    present = y | {"CO": 1e-6}
+    assert rate(_law(orders={"CO": 0, "H2O": 0.5}), WGS, present, 600.0, 2000.0) > 0
+    # an absent product does not stop the forward rate
+    assert rate(_law(orders={"CO": 0}), WGS, present | {"CO2": 0.0}, 600.0, 2000.0) > 0
+
+
 def test_concentrations_are_ideal_gas():
     law = _law(driving="concentration")
     c = driving_forces(law, {"CO": 1.0}, 500.0, 831.4462618)

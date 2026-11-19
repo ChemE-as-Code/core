@@ -1621,6 +1621,17 @@ class Still(Strict):
         "time and to the recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
+    flash: bool = Field(
+        default=False,
+        description="A charge that enters above its bubble point at the still's pressure (the "
+        "first cut's without a feed) flashes adiabatically to it first, differentially (the "
+        "vapour leaving as it forms, at the liquid's bubble point): the charge cools to the "
+        "flashed liquid's bubble point on its own sensible heat (liquid_heat_capacity), the "
+        "vapour (heat_of_vaporization) joins the first cut through the condenser, and the "
+        "boil-up starts from the flashed liquid, so its duty no longer evaporates it (volatility "
+        "raoult, the charge's temperature; ADR 0077); default: no flash.",
+        exclude_if=lambda value: not value,  # a still's fingerprint stays as it was
+    )
     column: Column | None = Field(
         default=None,
         description="A rectifying column on the still (batch rectification, ADR 0061).",
@@ -1652,6 +1663,8 @@ class Still(Strict):
             raise ValueError("heat_up needs volatility raoult (the charge's bubble point)")
         if self.heat_up_time and self.volatility.model == "constant":
             raise ValueError("heat_up_time needs volatility raoult (a still's temperatures)")
+        if self.flash and self.volatility.model == "constant":
+            raise ValueError("flash needs volatility raoult (the charge's bubble point)")
         raoult = self.volatility.model == "raoult"
         if not raoult and any(c.pressure is not None for c in self.cuts):
             raise ValueError("a cut's pressure needs volatility raoult")
