@@ -38,6 +38,7 @@ from chemeascode.domains.assessment.lca.schemas import (
     FactorFile,
 )
 from chemeascode.foundation.findings import Finding
+from chemeascode.foundation.units import LCI_UNITS
 
 FACTORS_FILE = "lca/factors.yaml"
 #: ``elementary: none`` on a category: the plant's direct emissions do not contribute to it
@@ -498,13 +499,26 @@ def characterise(
     return list(chosen), impacts, findings
 
 
-def _biosphere3_uuid(cas: str | None, spec: Any) -> str | None:
-    """The biosphere3 UUID of the elementary flow *spec* maps (the packaged crosswalk), or None
-    when the crosswalk does not hold it."""
+def _biosphere3_identity(cas: str | None, spec: Any) -> Any:
+    """The biosphere3 identity (:class:`~.schemas.FlowIdentity`: UUID, unit, ``per_unit``) of
+    the elementary flow *spec* maps (the packaged crosswalk), or None when the crosswalk does not
+    hold it."""
     from chemeascode.domains.assessment.lca.elementary import identities
 
     found, _ = identities(cas, spec)
-    return next((f.uuid for f in found if f.list == "biosphere3"), None)
+    return next((f for f in found if f.list == "biosphere3"), None)
+
+
+def _per_row_unit(identity: Any, row_unit: str) -> tuple[str, float] | None:
+    """When the crosswalk counts a flow in a unit of another kind than the row's (water in m3,
+    the row in kg): that kind and the amount of its base unit per unit of the row (the
+    crosswalk's ``per_kg``, 0.001 m3 per kg of water); else None."""
+    if identity is None or not identity.unit or identity.unit not in LCI_UNITS:
+        return None
+    kind, to_base = LCI_UNITS[identity.unit]
+    if kind == _KIND.get(row_unit) or _KIND.get(row_unit) != "mass":
+        return None
+    return kind, identity.per_unit * to_base
 
 
 def characterise_brightway(
@@ -533,6 +547,9 @@ def characterise_brightway(
     rows = _rows(inventory)
     activities: dict[int, bw.ActivityRef] = {}
     flows: dict[int, bw.FlowRef] = {}
+    #: Elementary rows the crosswalk counts in another kind of unit (water: m3 per kg of the
+    #: row): that kind and the amount of its base unit per unit of the row.
+    conversions: dict[int, tuple[str, float]] = {}
     linked: list[InventoryRow] = []
     for index, row in enumerate(rows):
         background = inventory.backgrounds[row.key]
@@ -558,13 +575,16 @@ def characterise_brightway(
             e = background.elementary
             # the compartment (a resource: natural resource), and the sub-compartment preferred
             compartment = "natural resource" if e.compartment == "resource" else e.compartment
+            identity = _biosphere3_identity(row.cas, e)
+            if (converted := _per_row_unit(identity, row.unit)) is not None:
+                conversions[index] = converted
             flows[index] = bw.FlowRef(
                 replace.get(brightway.biosphere, brightway.biosphere),
                 row.key,
                 BIOSPHERE3_CATEGORIES.get((e.compartment, e.subcompartment), (compartment,)),
                 cas=row.cas,
                 origin=e.origin,
-                uuid=_biosphere3_uuid(row.cas, e),
+                uuid=identity.uuid if identity is not None else None,
             )
         elif background.activity is not None:
             a = background.activity
@@ -648,7 +668,10 @@ def characterise_brightway(
             continue
         unit, values = scores.found[index]
         kind, per = bw.UNITS.get(unit, (None, 1.0))
-        if kind is None or kind != _KIND.get(row.unit):
+        if index in conversions and kind is not None and kind == conversions[index][0]:
+            # the background is per m3 of water, the row in kg: per kg, 0.001 m3
+            per /= conversions[index][1]
+        elif kind is None or kind != _KIND.get(row.unit):
             error(
                 "cheme.lca-activity-unit",
                 f"{row.key} is counted in {row.unit}, its Brightway background is per {unit!r}",

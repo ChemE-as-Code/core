@@ -1482,7 +1482,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - The module is `domains/process/dryer.py`, the tests `tests/test_dryer.py`, the decision
     `docs/adr/0057-filter-dryer-and-recipe-units-over-several-steps.md`.
 
-- **Crystallizer, wash and dryer options** (ADR 0072; each optional, a flowsheet without them
+- **Crystallizer, wash and dryer options** (ADR 0076; each optional, a flowsheet without them
   solves and reports as before):
   - **One solubility point carried to the crystallizer's temperature**:
     `solubility: {unit, points: [[T0, s0]], transfer: {heat_of_solution: kJ/kmol, provenance,
@@ -1534,7 +1534,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     ports (`cheme.process-dryer-duty`). The model basis is not sourced while the sublimation,
     cooling or condenser is assumed.
   - The tests are `tests/test_solids_followups.py`, the decision
-    `docs/adr/0072-crystallizer-wash-and-dryer-follow-ups.md`.
+    `docs/adr/0076-crystallizer-wash-and-dryer-follow-ups.md`.
 
 - **Batch still and solvent swap**: a block or step with `still:` (ADR 0055,
   `domains/process/batch_still.py`) is a batch (Rayleigh) still: one equilibrium stage, total
@@ -1638,6 +1638,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     (`heat losses`, `heat_loss_kWh_per_batch`; not over the heat-up or a hold);
     `still.agitator_power: {value: kW, provenance}` the agitator's heat over the boil-up's time
     (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does.
+  - `still.flash: true` (raoult, ADR 0077): a charge that enters above its bubble point at the
+    still's pressure (the first cut's without a feed) first flashes adiabatically and
+    differentially to it. The vapour leaves as it forms, at the liquid's bubble point, and the
+    content's sensible heat (`liquid_heat_capacity` of every charged component; a swap's
+    feed-only one needs none) evaporates it (`heat_of_vaporization` of every charged volatile
+    one): `dN_i/dT = y_i C / lambda(y)`, down to where the flashed liquid
+    boils at the still's pressure. The vapour joins the first cut through the condenser (with a
+    column, not rectified). The boil-up, its time and its duty start from the flashed liquid,
+    so the boil-up no longer evaporates that vapour. An end at a share distilled counts it, the
+    charge's heat-up (`heat_up`) is 0, and the condenser's duty (`condenser_port`) adds a
+    `flash` term. The flash takes no time and leaves out the vessel's metal. It needs the
+    charge's temperature. `process stills` gives `flash` (its cut, pressure, inlet temperature,
+    bubble point, end temperature, vapour, `heat_kWh_per_batch`, `year_average_kW`). A charge
+    below its bubble point solves as without the field. A flash that runs outside a charged
+    volatile component's `vapour_pressure` range gives a note, as the boil-up does. Without the
+    field a hotter charge is not flashed, as before (with `heat_up`, a note); a swap's feed above
+    the still's temperature keeps its note with the field on (the feed is not flashed).
   - An end at a temperature (or any end) stops where the integrator found it (core#198: a
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
@@ -2006,7 +2023,7 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   refused or uncalculable streams in `messages`; `iterations` null, one flash per stream).
 - **`cheme process simulate --fill | --check [--case C] [--save x.dwxmz]`** runs the simulator
   `process/simulation.yaml` selects: DWSIM (default), the optional IDAES backend (`simulator:
-  idaes`) or a project-defined QSDsan model (`simulator: qsdsan`, below). `--save` is DWSIM
+  idaes`) or a registered project-worker adapter such as QSDsan (below). `--save` is DWSIM
   only. For DWSIM, `process/simulation.yaml` gives the property package and what each step
   needs beyond its streams (every value with its provenance):
 
@@ -2047,24 +2064,36 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (IPOPT). See [docs/framework/idaes.md](docs/framework/idaes.md) and
   `examples/process-hda-idaes`.
 
-  `simulator: qsdsan` runs a project-defined QSDsan model instead (ADR 0065). The file then
-  holds only `schema`, `kind`, `simulator` and the `qsdsan` block (any other key, such as
-  `property_package`, `specs` or `method_selection`, is a schema error,
-  `cheme.process-sim-schema`). The block declares `model`, `worker` (a Python module among
-  `files`), `input`, `files` (at least one) and optionally `timeout_s` (default 300, at most
-  3600). Use slash-separated project-relative paths. Both modes execute trusted project code
-  using the interpreter named by `CHEME_QSDSAN_PYTHON`. The module receives two JSON file paths,
-  request and response. See the [worker contract](docs/adr/0065-qsdsan-a2o-process-worker.md).
-  `cheme process simulate --fill` publishes quantities under each stream's
-  `state.<case>.calculated` (ADR 0066). The run record in `process/simulation-run.json` points
-  to `process/simulation-runs/<id>/`. Inspect the original numerical evidence there. `--check`
-  runs against staged inputs. Validation reports `cheme.process-sim-run-stale` when declared
-  sources change. Invalid input or unsuccessful execution produces `cheme.process-qsdsan`; an
-  unavailable model input can also produce `cheme.process-sim-input-missing`. `--save` is
-  refused (DWSIM only) with `cheme.process-qsdsan`, exit 1. On any error nothing is published
-  (the staged result is discarded). The API exposes optional `calculated_columns`,
-  `spec.molecular`, `spec.model`, `spec.qsdsan` (the declared worker inputs), `run.evidence`
-  and `run.integration_completed`.
+  `simulator: qsdsan` runs a project-defined dynamic model through the shared worker interface
+  (ADRs 0065 and 0072). The `qsdsan` block declares `model`, `worker` (a Python module among
+  `files`), `input` and `files`. It also accepts `mode`, `mappings`, bounded adapter `options`
+  and `timeout_s` (default 300 seconds, at most 3600). Use slash-separated project-relative
+  paths. QSDsan solver settings stay in its input.
+  Both modes execute trusted project code. `CHEME_QSDSAN_PYTHON` overrides the optional
+  `CHEME_WORKER_PYTHON` fallback. The module receives JSON request and response file paths.
+
+  `--check` runs against disposable staged inputs. `--fill` records accepted results in
+  `process/simulation-run.json`, publishes the measured quantities in
+  `state.<case>.calculated` in their original units and archives evidence under
+  `process/simulation-runs/<id>/`. Validation reports `cheme.process-sim-run-stale` when
+  declared sources change. Worker errors use `cheme.process-worker`; the findings the worker
+  returns are reported under that rule at their level (an unknown level as a warning), so
+  `--check` exits 1 on a worker warning. Rejected fills retain separate diagnostics under
+  `process/simulation-attempts/` and keep accepted results intact. `--fill` holds an
+  operating-system lock on `process/simulation-run.lock` while it publishes: a lock file left by
+  a killed run is taken over, and only a publication still running refuses. A stale calculated
+  value whose name is also a state field (the wastewater `flow` in m3/day) is listed as
+  `calculated.<name>` in the stale names, so it never marks the stream's own `flow` stale, nor
+  the other way round. `cheme serve` fingerprints the declared inputs whatever their size, as
+  the CLI does (the 5 MB limit applies to files it returns, parses or renders).
+  `--save` is DWSIM-only.
+
+  The API exposes worker capabilities, structured cell producers, evidence and original units.
+  New worker results use `cheme/adapter-result/v2` with `execution`, `outcome` and optional
+  `trajectories`. `status: completed` means the requested dynamic interval completed.
+  Steady-state assessment has its own outcome and evidence. Older records remain readable.
+  See the [worker author guide](docs/framework/project-workers.md) for the request contract,
+  publication rules and migration requirements.
 
   `--fill` also records the run in `process/simulation-run.json` (generated, committed with the
   flowsheet; schema `cheme/simulation-run/v1`, one entry per case): simulator and version,

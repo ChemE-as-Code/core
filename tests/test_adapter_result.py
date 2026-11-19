@@ -105,3 +105,36 @@ def test_an_old_dwsim_entry_reads_as_an_adapter_result():
     assert result.as_dict()["solver"] == {"name": "dwsim", "version": "9.0.5.0", "method": None}
     with pytest.raises(ValueError):
         AdapterResult.model_validate({**entry, "status": "maybe"})
+
+
+def test_versioned_dynamic_outcome_does_not_change_v1_semantics():
+    old = AdapterResult(case="design", status="converged", solver={"name": "IDAES"})
+    assert old.schema_ == ADAPTER_SCHEMA
+    assert "outcome" not in old.as_dict() and "execution" not in old.as_dict()
+    data = {
+        "schema": "cheme/adapter-result/v2",
+        "case": "design",
+        "solver": {"name": "Independent dynamics"},
+        "status": "completed",
+        "outcome": {
+            "mode": "dynamic",
+            "convergence": "not-applicable",
+            "integration": {
+                "start": 0,
+                "requested_end": 10,
+                "achieved_end": 10,
+                "time_unit": "s",
+                "completed": True,
+            },
+        },
+    }
+    new = AdapterResult.model_validate(data)
+    assert new.outcome.steady_state.state == "not-evaluated"
+    assert AdapterResult.model_validate(new.as_dict()) == new
+    with pytest.raises(ValueError, match="require cheme/adapter-result/v2"):
+        AdapterResult.model_validate({**data, "schema": ADAPTER_SCHEMA})
+    with pytest.raises(ValueError, match="explicit numerical convergence"):
+        AdapterResult.model_validate({**data, "status": "converged"})
+    data["outcome"]["integration"].update(achieved_end=5, completed=False)
+    with pytest.raises(ValueError, match="completed integration interval"):
+        AdapterResult.model_validate(data)

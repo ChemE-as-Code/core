@@ -337,6 +337,14 @@ still:
   stills`. Do not also write a hand `heat` operation for it. A jacket that heats at another
   rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a `heat` with
   `temperatures` has no batch content on a still).
+- A charge that enters hotter than its bubble point at the still's pressure (charged hot from a
+  reactor, then evacuated) takes `flash: true` (ADR 0077). It flashes to that pressure first,
+  its vapour goes to the first cut, and the boil-up and its duty are credited. Do not type the
+  flash by hand in a script or as an extra duty. It needs the charge's temperature and the
+  charged components' `liquid_heat_capacity`; `cheme process stills` reports the flash. The
+  charge's note "the charge enters at ... (its flash is not modelled)" means the field is off.
+  A swap's feed that enters above the still's temperature keeps its own note with the field
+  on: the feed is not flashed.
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time

@@ -209,7 +209,14 @@ def rate(
     when it is missing, when a species with a negative order is absent, and with ``reverse:
     equilibrium`` when a reactant is absent (the reverse rate is then not defined by the law).
     A photochemical law takes *photons*, the photons the content absorbs (kmol/(m3 s)); without
-    them it raises ValueError (ADR 0074)."""
+    them it raises ValueError (ADR 0074).
+    Without ``reverse: equilibrium`` the rate is 0 while a reactant is absent, whatever the law's
+    order in it: a zero order (``0.0 ** 0 == 1``) or a reactant the law leaves out would
+    otherwise keep converting what is no longer there."""
+    if law.reverse != "equilibrium" and any(
+        nu < 0 and fractions.get(n, 0.0) <= 0 for n, nu in stoichiometry.items()
+    ):
+        return 0.0
     c = driving_forces(law, fractions, temperature, pressure, liquid)
     for n, a in law.orders.items():
         if a < 0 and c.get(n, 0.0) <= 0:

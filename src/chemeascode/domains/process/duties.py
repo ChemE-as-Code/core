@@ -607,14 +607,22 @@ def _still_extras(spec: Any, result: Any, duty: ModelDuty, process: Any) -> str:
 
 def still_condenser_duty(node: Any, result: Any) -> ModelDuty:
     """The duty of batch still *node*'s condenser from its solution: minus its boil-up's latent
-    heat (what boils up is condensed, the reflux with the distillate); the charge's heat-up
-    and the vessel's metal (ADR 0063) stay in the pot and are not condensed."""
+    heat (what boils up is condensed, the reflux with the distillate), and with ``flash`` the
+    latent heat of the vapour the charge flashes (ADR 0077); the charge's heat-up and the
+    vessel's metal (ADR 0063) stay in the pot and are not condensed."""
     if result.energy is None or not result.hours:
         boil = still_duty(node, result)
         return ModelDuty(
             node.id, "condenser", None, basis=STILL_CONDENSER_BASIS, missing=boil.missing
         )
     heat = result.energy / (result.hours * 3600.0)
+    flash = getattr(result, "flash", None)
+    if flash is not None and flash.heat > 0:
+        # the charge's flash (ADR 0077): its vapour is condensed too, on the charge's own heat
+        flashed = flash.heat / (result.hours * 3600.0)
+        terms = {"condensation": -heat, "flash": -flashed}
+        basis = STILL_CONDENSER_BASIS + "; and the vapour the charge flashes to it as it starts"
+        return ModelDuty(node.id, "condenser", -heat - flashed, terms, basis)
     return ModelDuty(node.id, "condenser", -heat, {"condensation": -heat}, STILL_CONDENSER_BASIS)
 
 

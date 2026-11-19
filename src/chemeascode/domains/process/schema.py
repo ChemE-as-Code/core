@@ -16,6 +16,7 @@ from chemeascode.domains.chemistry.eos import Critical
 from chemeascode.domains.chemistry.thermochemistry import IdealGas
 from chemeascode.domains.process import SCHEMA
 from chemeascode.foundation.schema_base import INCHIKEY_RE, Origin, unsupported_schema
+from chemeascode.foundation.schemas.worker import Producer
 from chemeascode.foundation.uncertainty import Uncertainty
 from chemeascode.foundation.units import PRESSURE_UNITS as PRESSURE_UNITS  # the unit convention
 from chemeascode.foundation.units import TEMPERATURE_UNITS as TEMPERATURE_UNITS
@@ -1203,7 +1204,7 @@ class SaltingOut(Strict):
 
 
 class SolubilityTransfer(Strict):
-    """The transfer of one solubility point to the crystallizer's temperature (ADR 0072): the
+    """The transfer of one solubility point to the crystallizer's temperature (ADR 0076): the
     temperature dependence of an ideal solution's solubility at a constant heat of solution,
     ``ln(x / x0) = -(dH_sol / R) (1 / T - 1 / T0)``, on the solute's mole fraction ``x`` in the
     solute and its solvent. The value it gives is not a measurement at the operating
@@ -1220,7 +1221,7 @@ class SolubilityTransfer(Strict):
 
 
 class LiquorComposition(Strict):
-    """The mother liquor a ``measured_in: mother_liquor`` solubility was measured in (ADR 0072):
+    """The mother liquor a ``measured_in: mother_liquor`` solubility was measured in (ADR 0076):
     each named spectator's mass fraction in the saturated liquor (solute, solvent and
     spectators), as its source states. ``cheme process crystallizers`` compares the solved
     mother liquor with it (``cheme.process-crystallizer-liquor``)."""
@@ -1248,7 +1249,7 @@ class Solubility(Strict):
     one ``value`` that holds at the crystallizer's conditions as stated by its source (the
     saturated mother liquor; no temperature dependence claimed). One point away from the
     crystallizer's temperature is refused unless ``transfer:`` states how it is carried there
-    (ADR 0072).
+    (ADR 0076).
 
     With spectator solutes (``crystallizer.spectators``), the solubility is either measured in
     that mother liquor (``measured_in: mother_liquor``) or the pure solvent's corrected by a
@@ -1399,7 +1400,7 @@ class Filtration(Strict):
 
 
 class WashDissolution(Strict):
-    """The crystals a cake wash dissolves (ADR 0072): the wash leaves the cake at
+    """The crystals a cake wash dissolves (ADR 0076): the wash leaves the cake at
     ``saturation`` of its solubility (1: saturated, the upper bound of the loss), the
     ``crystal`` going into its dissolved ``solute`` (the same formula: an anhydrous crystal)
     until the crystals are gone. The ``solubility`` is per kg of the wash liquid as fed
@@ -1438,7 +1439,7 @@ class WashDissolution(Strict):
 
 
 class CakeWash(Strict):
-    """A displacement wash of the cake on the filter (ADR 0072): the wash liquid enters by the
+    """A displacement wash of the cake on the filter (ADR 0076): the wash liquid enters by the
     step's material inlet ``port``, passes through the cake and displaces its liquor. The
     fraction of the unwashed cake's liquor left in the washed cake is ``R = (1 - E)^n``, with
     ``E`` the wash ``efficiency`` and ``n`` the mass wash ratio (kg of wash per kg of liquor
@@ -1462,7 +1463,7 @@ class CakeWash(Strict):
 
 
 class SecondLiquid(Strict):
-    """A second liquid phase in a slurry (ADR 0072): an oil of the listed ``components``, apart
+    """A second liquid phase in a slurry (ADR 0076): an oil of the listed ``components``, apart
     from the liquor. A filter's cake holds its own ``cake_liquid`` of it (per kg of solid, or
     its mass fraction of the wet cake); a crystallizer leaves them out of its mother liquor
     (its solubility basis and the salting-out molality)."""
@@ -1503,7 +1504,7 @@ class SolidSeparation(Strict):
     )
     wash: CakeWash | None = Field(
         default=None,
-        description="A displacement wash of the cake, with the wash's dissolution (ADR 0072).",
+        description="A displacement wash of the cake, with the wash's dissolution (ADR 0076).",
         exclude_if=lambda value: value is None,
     )
     second_liquid: SecondLiquid | None = Field(
@@ -1585,7 +1586,7 @@ class Crystallizer(Strict):
     second_liquid: SecondLiquid | None = Field(
         default=None,
         description="Spectators that form a liquid phase of their own (an oil): carried "
-        "unchanged, left out of the mother liquor's solubility basis and molality (ADR 0072).",
+        "unchanged, left out of the mother liquor's solubility basis and molality (ADR 0076).",
         exclude_if=lambda value: value is None,
     )
     outlets: dict[Literal["slurry", "cake", "mother_liquor", "vapour"], str] = Field(
@@ -1722,7 +1723,7 @@ class DryerEnergy(Strict):
 
 
 class DryerCooling(Strict):
-    """What the dryer cools after drying, in the vessel (ADR 0072): the dried product to its
+    """What the dryer cools after drying, in the vessel (ADR 0076): the dried product to its
     discharge ``product_temperature`` (default: it leaves at the drying temperature) and the
     vessel's metal (``energy.vessel_heat_capacity``) back to ``vessel_temperature`` for the next
     batch (default: the wet cake's inlet temperature, from which the next batch heats it). With
@@ -1753,7 +1754,7 @@ class DryerCooling(Strict):
 
 
 class DryerCondenser(Strict):
-    """The dryer's vacuum condenser (ADR 0072): the vapour, at the drying temperature and the
+    """The dryer's vacuum condenser (ADR 0076): the vapour, at the drying temperature and the
     dryer's ``pressure``, cooled to ``temperature``, where an ideal condensate is in
     equilibrium with what passes to the vacuum pump (Raoult's law, each vapour's Antoine
     ``vapour_pressure``). Its duty is the vapour's latent heat (the dryer's) of what condenses
@@ -1772,7 +1773,7 @@ class DryerCondenser(Strict):
 
 
 class Sublimation(Strict):
-    """Solid components of the product that sublime as the vapour leaves (ADR 0072): the
+    """Solid components of the product that sublime as the vapour leaves (ADR 0076): the
     vapour leaves saturated with them at the drying temperature and the dryer's pressure (an
     upper bound of the loss), each solid's ``vapour_pressure`` in materials.yaml its
     sublimation pressure. Each solid is counted in the vapour as the component it maps to (the
@@ -1805,7 +1806,7 @@ class Dryer(Strict):
     the drying ``temperature``, the latent heat of the volatiles evaporated and the vessel's
     heat per batch. The drying time (a recipe's ``dry`` ``from:`` this step) is the vapour of a
     batch over the ``drying_rate`` times the heated area of the recipe's vessel, or the given
-    ``drying_time``. ADR 0072 adds, each optional: the volatiles kept by their vapour pressures
+    ``drying_time``. ADR 0076 adds, each optional: the volatiles kept by their vapour pressures
     (``selectivity: raoult``), a subliming product, the cooling after drying and the vacuum
     condenser (with a ``condensate`` outlet)."""
 
@@ -2153,6 +2154,17 @@ class Still(Strict):
         "time and to the recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
+    flash: bool = Field(
+        default=False,
+        description="A charge that enters above its bubble point at the still's pressure (the "
+        "first cut's without a feed) flashes adiabatically to it first, differentially (the "
+        "vapour leaving as it forms, at the liquid's bubble point): the charge cools to the "
+        "flashed liquid's bubble point on its own sensible heat (liquid_heat_capacity), the "
+        "vapour (heat_of_vaporization) joins the first cut through the condenser, and the "
+        "boil-up starts from the flashed liquid, so its duty no longer evaporates it (volatility "
+        "raoult, the charge's temperature; ADR 0077); default: no flash.",
+        exclude_if=lambda value: not value,  # a still's fingerprint stays as it was
+    )
     column: Column | None = Field(
         default=None,
         description="A rectifying column on the still (batch rectification, ADR 0061).",
@@ -2208,6 +2220,8 @@ class Still(Strict):
             raise ValueError(
                 "sensible_heat and heat_loss need volatility raoult (a still's temperatures)"
             )
+        if self.flash and self.volatility.model == "constant":
+            raise ValueError("flash needs volatility raoult (the charge's bubble point)")
         raoult = self.volatility.model == "raoult"
         if not raoult and any(c.pressure is not None for c in self.cuts):
             raise ValueError("a cut's pressure needs volatility raoult")
@@ -2344,6 +2358,7 @@ class Quantity(Strict):
     basis: FlowBasis | None = None
     provenance: Provenance
     source: str = ""
+    producer: Producer | None = Field(default=None, exclude_if=lambda v: v is None)
     fingerprint: str | None = Field(
         default=None,
         description="Calculated values: the inputs (T, P, composition, method) they were "
@@ -2441,6 +2456,7 @@ class CompositionValue(Strict):
     values: dict[str, float] = Field(min_length=1)
     provenance: Provenance
     source: str = ""
+    producer: Producer | None = Field(default=None, exclude_if=lambda v: v is None)
     fingerprint: str | None = Field(
         default=None,
         description="Calculated compositions: the inputs they were derived from (cheme "

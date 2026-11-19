@@ -546,8 +546,9 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
     spec = node.still
     metal = vessel_metal(process, node.id)
     extras = _still_extras(spec)
+    flash = [FLASH] if getattr(spec, "flash", False) else []  # ADR 0077
     if not spec.heat_up and metal is None and not extras:
-        return list(assumptions)
+        return list(assumptions) + flash
     duty = _LATENT
     if spec.heat_up:
         duty += " and the heat-up"
@@ -587,7 +588,7 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
         if spec.heat_loss is not None:
             text = text.replace(", no heat losses", "")
         found.append(text)
-    return found + extras
+    return found + extras + flash
 
 
 def _still_extras(spec: Any) -> list[str]:
@@ -612,6 +613,15 @@ def _still_extras(spec: Any) -> list[str]:
         )
     return found
 
+
+#: What a still's ``flash`` assumes (ADR 0077).
+FLASH = (
+    "flash: a charge above its bubble point at the still's pressure flashes adiabatically and "
+    "differentially to it first (the vapour leaving as it forms, in equilibrium with the "
+    "liquid at its bubble point, on the content's sensible heat at constant "
+    "liquid_heat_capacity; the vessel's metal not in it), its vapour to the first cut without "
+    "the column's separation, in no time; the boil-up starts from the flashed liquid"
+)
 
 _LATENT = "the duty is the vapour's latent heat (heat_of_vaporization near the still's temperature)"
 
@@ -759,7 +769,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         moisture = dryer.residual_moisture
         given = _sourced(moisture)
         sources = [moisture.source] if given else []
-        lacking = _lacking(  # ADR 0072: the parts that set the outlets
+        lacking = _lacking(  # ADR 0076: the parts that set the outlets
             [
                 ("sublimation", dryer.sublimation),
                 ("cooling", dryer.cooling),
@@ -773,7 +783,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
             f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
             + ("" if given else " (not given with a source: assumed)")
         )
-        if dryer.selectivity == "raoult":  # ADR 0072
+        if dryer.selectivity == "raoult":  # ADR 0076
             assumptions[1] = (
                 "the volatiles kept are what an open evaporation of an ideal cake liquid at the "
                 "drying temperature leaves (Raoult's law, Antoine vapour pressures)"
@@ -801,7 +811,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
                 "capacities"
             )
         if dryer.cooling is not None or dryer.condenser is not None:
-            assumptions[3] = "; ".join(  # the temperatures propagate writes (ADR 0072)
+            assumptions[3] = "; ".join(  # the temperatures propagate writes (ADR 0076)
                 [
                     "the product leaves at its discharge temperature"
                     if dryer.cooling is not None and dryer.cooling.product_temperature is not None
@@ -831,7 +841,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         sources = [sep.source] if given else []
         dissolution = sep.wash.dissolution if sep.wash is not None else None
         solubility = dissolution.solubility if dissolution is not None else None
-        lacking = _lacking(  # ADR 0072: the parts that set the cake and the filtrate
+        lacking = _lacking(  # ADR 0076: the parts that set the cake and the filtrate
             [
                 ("second_liquid", sep.second_liquid),
                 ("wash", sep.wash),
@@ -847,7 +857,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
             f"{sep.cake_liquid.value:g} ({sep.cake_liquid.basis})"
             + ("" if given else " (not given with a source: assumed)")
         )
-        if sep.second_liquid is not None:  # ADR 0072
+        if sep.second_liquid is not None:  # ADR 0076
             held = sep.second_liquid.cake_liquid
             detail += (
                 f"; second liquid {', '.join(sep.second_liquid.components)}, cake liquid "
@@ -903,7 +913,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     if spec.basis == "solubility":
         sol = spec.solubility
         basis, predictive = "solubility-equilibrium", True
-        if sol.transfer is not None:  # ADR 0072
+        if sol.transfer is not None:  # ADR 0076
             ((t0, _),) = sol.points
             t = spec.temperature
             detail = (
@@ -957,7 +967,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         detail += f"; spectators {', '.join(spec.spectators)} ({how})"
         if pure_solvent_only(spec):
             lacking.append("a solubility in the mixed liquor")
-        if sol is not None and sol.liquor is not None:  # ADR 0072
+        if sol is not None and sol.liquor is not None:  # ADR 0076
             detail += "; the solved liquor compared with the data's"
         if spec.second_liquid is not None:
             detail += f"; second liquid {', '.join(spec.second_liquid.components)}"

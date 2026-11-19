@@ -39,7 +39,7 @@ The model:
   crystals dissolve until the liquid is saturated (all of them when it stays undersaturated),
   followed by its own or a separate filter.
 
-ADR 0072 adds, each only where the flowsheet asks for it:
+ADR 0076 adds, each only where the flowsheet asks for it:
 
 - **one solubility point carried** to the crystallizer's temperature (``transfer:``) by the
   temperature dependence of an ideal solution's solubility at a constant heat of solution,
@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -105,6 +106,21 @@ SEPARATION_ASSUMPTIONS = (
 #: Relative tolerance of the recycle loop, on the fresh feed's mass flow.
 RECYCLE_TOLERANCE = 1e-10
 MAX_ITERATIONS = 200_000
+#: A recycle of the whole filtrate (fraction 1) grows without bound when a component of the
+#: feed cannot leave the loop as fast as it is fed: its outflow (evaporated, as crystals or in
+#: the liquid the cake holds) does not grow as it accumulates. Checked every STALL_WINDOW
+#: passes, for each component whose growth per pass is steady (at least STALL_RATIO of the one
+#: a window earlier): the pass is run again with those components carried on at their current
+#: growth for STALL_PROJECTION more passes (a growth dying away is not carried on); a component
+#: whose outflow then grows by less than STALL_RESPONSE of what it gains is refused. A steady
+#: growth alone is not enough: with the solvent evaporated, the solute builds up at its feed
+#: rate for thousands of passes until the liquor saturates, then crystallizes and converges.
+#: A fraction below 1 always keeps a purge and so a bounded recycle (at most r / (1 - r) times
+#: the fresh feed), whatever its size.
+STALL_WINDOW = 1000
+STALL_RATIO = 0.999
+STALL_PROJECTION = 10 * MAX_ITERATIONS
+STALL_RESPONSE = 1e-7
 #: The salting-out correction with a hydrate: successive substitution on the free solvent.
 SALTING_TOLERANCE = 1e-13
 SALTING_ITERATIONS = 1000
@@ -239,10 +255,10 @@ class Liquor:
     atoms: dict[str, dict[str, int]] = field(default_factory=dict)
     basis: Literal["solvent", "liquor"] = "solvent"
     salting_out: dict[str, float] = field(default_factory=dict)
-    #: spectators in a liquid phase of their own (ADR 0072): not in the mother liquor
+    #: spectators in a liquid phase of their own (ADR 0076): not in the mother liquor
     second_liquid: tuple[str, ...] = ()
     #: the mass fractions of the liquor the solubility was measured in, and how far (relative)
-    #: the solved mother liquor may be from them (ADR 0072); empty: not checked
+    #: the solved mother liquor may be from them (ADR 0076); empty: not checked
     measured: dict[str, float] = field(default_factory=dict)
     tolerance: float = 0.0
 
@@ -312,6 +328,8 @@ def solubility_at(
                 f"the crystallizer's temperature {temperature:g} K is outside the solubility "
                 f"data ({low:g}-{high:g} K): no extrapolation"
             )
+        # within the tolerance of an end point: that end point's value
+        temperature = min(max(temperature, low), high)
         value = points[-1][1]
         for (t0, v0), (t1, v1) in zip(points, points[1:], strict=False):
             if t0 <= temperature <= t1:
@@ -461,7 +479,7 @@ def separate_solids(
     """(cake, filtrate) kg/h by component: *recovery* of every solid component to the cake with
     the liquid it holds, the liquid divided with one composition; CrystallizationError when the
     cake would hold more liquid than there is. A *second_liquid* (:class:`~.schema.SecondLiquid`,
-    ADR 0072) is a phase of its own that the cake holds at its own cake liquid."""
+    ADR 0076) is a phase of its own that the cake holds at its own cake liquid."""
     solid = {n: v for n, v in mass.items() if n in solids}
     to_cake = recovery * sum(solid.values())
     oil = set(second_liquid.components) if second_liquid is not None else set()
@@ -493,7 +511,7 @@ def wash_cake(
     solubility: float | None = None,
 ) -> tuple[dict[str, float], dict[str, float], dict[str, Any]]:
     """(washed cake, wash filtrate, what the wash did) kg/h by component: a displacement wash
-    (:class:`~.schema.CakeWash`, ADR 0072) of *cake* by the *wash* liquid. With a dissolution,
+    (:class:`~.schema.CakeWash`, ADR 0076) of *cake* by the *wash* liquid. With a dissolution,
     the wash first dissolves crystals up to ``saturation`` x *solubility* (kg per kg of the
     wash liquid as fed, net of the solute it brings). The unwashed cake's liquor ``L`` then
     stays in the washed cake by ``R = (1 - E)^n``, n the mass wash ratio (wash fed over ``L``),
@@ -571,6 +589,59 @@ def _separate(slurry: Slurry, separation: Any) -> tuple[Slurry, Slurry]:
     return rebuilt(cake), rebuilt(filtrate)
 
 
+def _species(slurry: Slurry, form: CrystalForm, minus: Slurry | None = None) -> dict[str, float]:
+    """kg/h of each component (the anhydrous solute and the solvent, dissolved or in the
+    crystals, and each spectator) of *slurry*, less those of *minus* when given."""
+    a = form.solute_fraction
+    found = {
+        "solute": slurry.solute + a * slurry.crystal,
+        "solvent": slurry.solvent + (1.0 - a) * slurry.crystal,
+    } | dict(slurry.spectators)
+    if minus is not None:
+        for name, value in _species(minus, form).items():
+            found[name] = found.get(name, 0.0) - value
+    return found
+
+
+def _without_way_out(
+    feed: Slurry,
+    returned: Slurry,
+    stage: Stage,
+    cake: Slurry,
+    growth: dict[str, float],
+    marks: dict[str, float],
+    form: CrystalForm,
+    run: Callable[[Slurry], tuple[Stage, Slurry]],
+) -> list[str]:
+    """With the whole filtrate returned: the components of the feed that grow steadily and whose
+    outflow does not grow with them (see STALL_WINDOW); none when the loop may still converge.
+    *growth* is each component's growth per pass, *marks* the one a window earlier, *run* one
+    pass of the train (the stage and the cake) on a combined feed."""
+    floor = RECYCLE_TOLERANCE * max(feed.total, 1e-9)
+    steady = [
+        n for n, g in growth.items() if g > floor and g >= STALL_RATIO * marks.get(n, math.inf)
+    ]
+    if not steady:
+        return []
+    # only the steady growth is carried on: a growth that is dying away (the solvent settling
+    # while the solute builds up toward saturation) is not
+    grown = {n: growth[n] for n in steady}
+    step = Slurry(grown.pop("solute", 0.0), grown.pop("solvent", 0.0), spectators=grown).scaled(
+        STALL_PROJECTION
+    )
+    try:
+        ahead, ahead_cake = run(feed + returned + step)
+    except CrystallizationError:
+        return []  # not a state the loop reaches by growing steadily: no verdict
+    now = _species(cake + Slurry(solvent=stage.vapour), form)
+    later = _species(ahead_cake + Slurry(solvent=ahead.vapour), form)
+    return [
+        n
+        for n in steady
+        if later.get(n, 0.0) - now.get(n, 0.0) <= STALL_RESPONSE * STALL_PROJECTION * growth[n]
+    ]
+
+
 @dataclass
 class TrainResult:
     """The solved train: its streams (kg/h), yields, balances and energy."""
@@ -599,7 +670,7 @@ class TrainResult:
     #: liquor's per kg of free solvent), the salting-out factor and the spectators' molality
     #: (ADR 0056); None for one solute in one solvent.
     liquor: dict[str, Any] | None = None
-    #: One solubility point carried to the crystallizer's temperature (ADR 0072): from where,
+    #: One solubility point carried to the crystallizer's temperature (ADR 0076): from where,
     #: the value there, the heat of solution; None without a transfer.
     transfer: dict[str, Any] | None = None
 
@@ -656,7 +727,23 @@ def solve_train(
     cake = filtrate = Slurry()
     residual = 0.0
     iterations = 0
-    for iterations in range(1, MAX_ITERATIONS + 1):  # noqa: B007 (reported)
+    # recycle of the whole filtrate: each component's growth per pass a STALL_WINDOW earlier
+    marks: dict[str, float] | None = None
+    previous = returned
+
+    def run(combined: Slurry) -> tuple[Stage, Slurry]:
+        """One pass on *combined* (fresh feed and recycle): the stage and the cake."""
+        found = crystallize(
+            combined,
+            form,
+            solubility=solubility,
+            imposed_yield=imposed_yield,
+            evaporation=evaporation,
+            liquor=liquor,
+        )
+        return found, _separate(found.slurry, separation)[0]
+
+    for iterations in range(1, MAX_ITERATIONS + 1):
         stage = crystallize(
             feed + returned,
             form,
@@ -670,14 +757,28 @@ def solve_train(
         cake, filtrate = _separate(stage.slurry, separation)
         new = filtrate.scaled(recycle)
         residual = new.distance(returned)
-        returned = new
+        previous, returned = returned, new
         if residual <= tolerance or not recycle:
             break
-        if returned.total > 1e3 * max(feed.total, 1e-9):
-            raise CrystallizationError(
-                "the recycle grows without bound (beyond 1000 times the feed): nothing leaves the "
-                "loop at steady state (no crystals form and no purge)"
+        if recycle >= 1.0 and iterations % STALL_WINDOW == 0:
+            growth = _species(returned, form, minus=previous)
+            trapped = (
+                _without_way_out(feed, returned, stage, cake, growth, marks, form, run)
+                if marks is not None
+                else []
             )
+            if trapped:
+                rates = ", ".join(f"{n} {growth[n]:.3g}" for n in trapped)
+                raise CrystallizationError(
+                    f"the recycle grows without bound ({returned.total:.6g} kg/h after "
+                    f"{iterations} passes, growing by about {rates} kg/h per pass): with the "
+                    "whole filtrate returned (fraction 1) and no purge, the "
+                    f"{' and '.join(trapped)} of the feed cannot leave the loop as fast as "
+                    f"{'it is' if len(trapped) == 1 else 'they are'} fed: what is evaporated, "
+                    "carried by the crystals or held in the cake's liquid does not grow as "
+                    f"{'it accumulates' if len(trapped) == 1 else 'they accumulate'}"
+                )
+            marks = growth
     else:
         raise CrystallizationError(
             f"the recycle did not converge in {MAX_ITERATIONS} iterations "
@@ -762,7 +863,7 @@ def solve_train(
             "molality_mol_per_kg_solvent": liquor.molality(ml.spectators, free),
             "solute_mass_fraction": ml.solute / mother if mother > 0 else None,
         }
-        if liquor.second_liquid:  # ADR 0072: an oil apart from the mother liquor
+        if liquor.second_liquid:  # ADR 0076: an oil apart from the mother liquor
             result.liquor["second_liquid"] = list(liquor.second_liquid)
         if liquor.measured:
             result.liquor["composition"] = liquor_check(liquor, dissolved, mother)
@@ -775,7 +876,7 @@ def solve_train(
 
 def liquor_check(liquor: Liquor, dissolved: dict[str, float], mother: float) -> dict[str, Any]:
     """The solved mother liquor (*dissolved* spectators, kg/h, in *mother* kg/h of it) against
-    the liquor the solubility was measured in (ADR 0072): each spectator's mass fraction, the
+    the liquor the solubility was measured in (ADR 0076): each spectator's mass fraction, the
     declared one and the relative difference, and those beyond the tolerance (``outside``)."""
     found: dict[str, Any] = {"tolerance": liquor.tolerance, "mass_fraction": {}, "outside": []}
     for name, declared in liquor.measured.items():
@@ -978,7 +1079,7 @@ def liquor_of(process: Any, spec: Any) -> Liquor | None:
 
 def dissolved_spectators(spec: Any) -> list[str]:
     """The crystallizer's spectators in its mother liquor: all but the second liquid's (ADR
-    0072)."""
+    0076)."""
     oil = set(spec.second_liquid.components) if spec.second_liquid is not None else set()
     return [n for n in spec.spectators if n not in oil]
 
@@ -1067,7 +1168,7 @@ def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TrainRes
 
 
 def transfer_entry(spec: Any, temperature: float | None, value: float | None) -> dict[str, Any]:
-    """A solubility point's transfer (ADR 0072) as the report gives it."""
+    """A solubility point's transfer (ADR 0076) as the report gives it."""
     ((t0, v0),) = spec.points
     transfer = spec.transfer
     return {
@@ -1642,7 +1743,7 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
             _metal_entry(process, node, case, result, entry["solution"])
         else:
             ports, _, washed = filter_node(process, node, inlet, case)
-            if washed is not None:  # ADR 0072: what the wash did
+            if washed is not None:  # ADR 0076: what the wash did
                 entry["solution"] = {"wash": washed}
         volatiles = list(node.dryer.volatiles) if node.dryer is not None else None
         entry["outlets"] = _slurry_entries(process, ports, volatiles)

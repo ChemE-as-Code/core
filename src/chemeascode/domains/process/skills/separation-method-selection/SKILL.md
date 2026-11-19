@@ -136,7 +136,7 @@ with units, fallback, notes and the test that solves each arrangement):
   not at the operating conditions), never entered as a `value` at another temperature; data
   measured in a mother liquor state that liquor (`liquor: {mass_fraction, tolerance}`) so that
   `cheme process crystallizers` warns when the solved liquor drifts from it; an oil apart from
-  the liquor is a `second_liquid:` (ADR 0072). In a batch plant, a batch still as `still:` on
+  the liquor is a `second_liquid:` (ADR 0076). In a batch plant, a batch still as `still:` on
   the flowsheet step (Rayleigh, Raoult's law or a constant alpha; cuts, solvent swaps, a vacuum
   ramp of cuts at their own pressure, components in a phase of their own (solids, salts, an
   immiscible non-volatile liquid) in `separate_phase`; `cheme process propagate` fills it and
@@ -153,7 +153,7 @@ with units, fallback, notes and the test that solves each arrangement):
   efficiency, optionally the crystals it dissolves); a dryer may give its `pressure`, keep its
   volatiles by their vapour pressures (`selectivity: raoult`), lose a subliming product
   (`sublimation:`), cool the product and the vessel after drying (`cooling:`) and condense its
-  vapour (`condenser:`, a `condensate` outlet) (ADR 0072). Each of these needs its data with a
+  vapour (`condenser:`, a `condensate` outlet) (ADR 0076). Each of these needs its data with a
   source, or ASSUMED and said so;
   In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
   holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps

@@ -2,8 +2,23 @@
 
 ## Unreleased
 
+### Breaking (next major release, ADR 0072)
+
+- New project-worker results use `cheme/adapter-result/v2` and `completed` for dynamic interval
+  completion. Read `execution` and `outcome` instead of assuming `converged` from a completed
+  dynamic run. Historical v1 results remain readable; DWSIM/IDAES/props/propagate keep v1.
+  Worker failures use `cheme.process-worker`. Existing QSDsan configuration and
+  `CHEME_QSDSAN_PYTHON` remain supported. Rerun old worker results to adopt contract-2 fingerprints;
+  no historical evidence is rewritten. See `docs/framework/project-workers.md`.
+
 ### Added
 
+- Shared typed worker exchange, local Python transport, producer-aware provenance and protected
+  measured/molecular publication. Native model inputs are copied and hashed as bytes.
+- CSV trajectory metadata, event-side samples, final instantaneous snapshot checks and generic
+  outcome/evidence presentation. Failed attempts cannot replace successful stream values.
+- Adapter/session extension seam tested without QSDsan or commercial software. Aspen Plus,
+  HYSYS and Dymola adapters remain future work; no SDK/COM/remote service was added.
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 - Bundled skills and REFERENCE.md brought up to 1.12 and the QSDsan integration: QSDsan
   configuration, refusals and outputs; propagate's `recovery:`, `specs:` and tears beside
@@ -11,7 +26,7 @@
   screening in the safety skills; flowsheet `recovery:` for specified splits; the
   `adsorption` and `assay` commands, missing CLI flags and unit defaults in REFERENCE.md. No
   behaviour changes.
-- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
+- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0076, core#183), each
   optional:
   - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
     {heat_of_solution}` (van 't Hoff on the solute's mole fraction, an ideal solution),
@@ -160,6 +175,27 @@
   batch without them solves, propagates and fingerprints as in 1.12.0: the library's batch and
   semi-batch entries' `propagate --check`, `recipe`, `reactors`, `reactor-hazards`, `stills`
   and `crystallizers` (which reports the dryers) output is unchanged (rel 1e-9).
+- Batch still (ADR 0077, core#279): `still.flash: true` flashes a charge that enters above its
+  bubble point at the still's pressure (the first cut's without a feed) adiabatically and
+  differentially to it before the boil-up. The vapour goes to the first cut through the
+  condenser (not rectified by a column). The charge cools on its own sensible heat to the
+  flashed liquid's bubble point, and the boil-up, its time and its duty start from there, so
+  they are credited. The condenser's duty adds a `flash` term. `cheme process stills` reports
+  it (`flash`: cut, pressure, temperatures, vapour, heat per batch and year average). It needs
+  the charge's temperature and the charged components' `liquid_heat_capacity` and
+  `heat_of_vaporization` (a swap's feed-only component needs neither); with the field they
+  enter the outlets' fingerprint. A flash outside a charged component's `vapour_pressure`
+  range gives a note, as the boil-up does. It is opt-in: a still without it solves, reports and
+  fingerprints as before, and the process library's results are unchanged.
+  methanesulfonyl-chloride-1's ST101 with it gives the entry's own cross-check (321.1 K, 25.0
+  kWh a batch). `schema.py` changed, so every BFD/PFD needs `cheme process build` once (only
+  `generator_sha256` changes).
+
+### Internal moves
+
+- `integrations.qsdsan` execution moved to `integrations.workers`; process orchestration moved
+  from `simulation.qsdsan` to `simulation.worker_run` and `worker_publication`. QSDsan semantics
+  remain in `simulation.qsdsan`. See the framework migration table; no internal alias is kept.
 
 ### Changed
 
@@ -187,6 +223,214 @@
 
 ### Fixed
 
+- `cheme process propagate`: the tear values' fingerprint (`recycle.loop_inputs`) includes the
+  recipe's batch size, and the given and assumed values its stream's rate depends on, when a
+  still upstream of a tear has an end at a time with a boil-up that takes the recipe's hours of
+  flows per batch (ADR 0068). A recipe-only change now makes such a tear stale in
+  `stale_fields` and `cheme validate` (core#295). Every other tear keeps its fingerprint. Library:
+  no loop in the library has such a still upstream of a tear, so no entry changes
+  (`cheme process propagate --check` gives the same findings on the 9 entries with tears).
+- `cheme process propagate`: a tear named twice reports its loop problems (a first guess that
+  cannot be converted, a loop that does not close) at the entry that is iterated, the first, not
+  at the duplicate left out (core#296). Only the finding's line changes; no library entry names
+  a tear twice.
+
+- The stirred tank's integrator clipped every running total at zero with the amounts, so an
+  endothermic absorption (a positive `vent.heat_of_absorption`, ADR 0071) gave a `-0.0`
+  `absorption` heat term and added nothing to the semi-batch's peak cooling duty (#298), and a
+  head space that expands (a shrinking liquid, a cooling adiabatic batch) held its
+  `expelled_kmol` at zero while it drew gas back, so pad + inflow no longer equalled end +
+  expelled and the "drew back more gas from the vent line" note never fired (#299). The same
+  clip held an adiabatic batch's vent-condenser duty (`condenser_heat`, the integral) at zero
+  while the condenser was warmer than the batch and warmed the gas: a batch starting at 300 K
+  with its condenser at 330 K reported 1181 kJ instead of the 757 kJ its closed form gives. Only
+  the amounts are clipped now; the vapour's heats, the head space's expelled totals and the
+  absorption heat keep their sign. Library results are unchanged: no library entry declares a
+  head space or a heat of absorption, and `cheme process reactors --json` is identical to the
+  pin's on all 62 entries whose flowsheet has a vent vapour or condenser (process-library
+  01ba8b7).
+
+- Recipe (core#301): a heat or cool operation with `temperatures` before the first `dose` or
+  `react` now takes the charge's heat capacity and wetted area; before, only a unit procedure
+  with a `dose` did, so a plain `reactor: batch` heated up its end content (after the reaction,
+  and after a vent took gas off), and its heat-up time, `heats[].content_kJ`, cycle time and
+  batches per year were off by C_end/C_charge. It now agrees with the model duty's `heat_up`
+  (ADR 0063). A unit procedure with neither a dose nor a react keeps the end's content. Library
+  results are unchanged: `cheme process recipe` gives the same JSON on all 13 entries with
+  jacket-timed operations (all semi-batches whose first `dose` comes before their first `react`,
+  so every heat or cool sits on the same side of it under both rules; two of them cool before
+  the dose, and some cool after the react).
+- Recipe (core#302): a `cool` (as a `heat` already was) whose `temperatures` start and end at
+  the same value is refused by `cheme/recipe/v1` (`cheme.recipe-schema`); before, it passed the
+  schema and then failed the whole recipe with "the medium cannot cool the content", leaving no
+  cycle time. No library entry has one.
+
+- The crystallizer's recycle no longer refuses a valid steady state at a recycle fraction above
+  about 0.999 as "growing without bound (beyond 1000 times the feed)" (#307). A fraction below
+  1 always keeps a purge, so its recycle is bounded (at most r / (1 - r) times the feed) and is
+  solved whatever its size (0.9995: about 1900 times the feed). Only a recycle of the whole
+  filtrate (fraction 1) is checked for growth without bound: every 1000 passes, a component
+  whose growth per pass is steady is carried on at that growth for 2,000,000 more passes, and
+  the loop is refused only when that component's outflow (evaporated, as crystals or in the
+  liquid the cake holds) does not grow with it. The error names that component instead of
+  saying that no crystals form and nothing is purged. A steady growth alone is not refused:
+  with part of the solvent evaporated, the solute builds up at its feed rate for thousands of
+  passes until the liquor saturates, and then converges. KNO3 (100 kg/h in 900 kg/h of water,
+  the cake holding 0.1 kg of liquor per kg of crystals, the whole filtrate returned) is now
+  solved at 0.05 % of the solvent evaporated and 1 kg/kg (51,705 passes, 95.238 kg/h of
+  crystals; refused before) and at 0.1 % and 0.5 kg/kg (21,432 passes, 96.774 kg/h; refused
+  before). Library results are unchanged (no library crystallizer declares a mother-liquor
+  recycle).
+- A crystallizer temperature within the 1e-9 K tolerance below the lowest solubility point gets
+  that point's solubility, not the highest temperature's (#308). Library results are unchanged.
+- A dryer whose inlet holds none of its volatiles (not listed, or listed at 0) is a dryer
+  finding ("nothing to dry") in `cheme process propagate` instead of a crash with a pydantic
+  ValidationError (residual moisture 0) or a vapour written with fractions summing to 0 (#309).
+  A dryer that evaporates nothing (the residual moisture equals the inlet's) writes its vapour
+  of no flow with the inlet's volatile composition. Library results are unchanged.
+
+- The Monte Carlo of a study with one product (`cheme assess lca` with `uncertainty:`) failed
+  with a TypeError or KeyError under allocation by `economic`, `energy`, `exergy` or `shares`
+  when the product had no price, energy, exergy or share (core#310), and the whole report
+  stopped with it. One product takes the whole burden whatever the method, as the
+  deterministic allocation already had it. A study that ran before gives the same numbers.
+- Brightway backend: a water flow mapped `elementary:` (counted in kg, as every flowsheet
+  resource and emission) was refused against its biosphere3 flow in m3
+  (`cheme.lca-activity-unit`, core#311), so river, lake, sea, well or cooling water and water
+  emitted to air or water had no impacts. The row is now characterised per kg with the
+  crosswalk's `per_kg` (0.001 m3 per kg).
+- Brightway backend: rows in m2*a (land occupation) and kBq (radioactivity) were refused for
+  any biosphere flow, since `square meter-year`, `kilo Becquerel` and `Becquerel` were unknown
+  units (core#312); they are characterised as under the factors backend.
+- `lca/manifest.json` (and the scenario records' input files) fingerprinted
+  `estimate/mto.csv` and the equipment list only when a construction entry read them, not when
+  only an equipment-leak estimate counted its valves, flanges or seals from them (core#313).
+  They are now fingerprinted whenever the results count from them.
+- Library effect: none. Of the 67 LCA studies of the process library (main 34c233d), none uses
+  the Brightway backend, none has an equipment-leak estimate (they exclude leaks), and the 12
+  with `uncertainty:` give identical outputs on this branch and at 1.12.0 + core#254
+  (`lca_report` and every file `cheme assess lca --write` writes, compared byte for byte).
+
+- A batch stopped integrating once its key reactant was used up, although another reaction
+  was still running (core#297). The stall test looked at the key's conversion alone, so in
+  A -> B -> C the B -> C reaction froze when A ran out, while the batch still reported its full
+  time: B came out 100 times too high (4.28e-3 instead of 4.54e-5 kmol with k1 = 10/s,
+  k2 = 1e-3/s, 1e4 s), and the extents, heat released and heat terms were wrong with it. The
+  stall test now looks at every component's change, so the batch, the plain post-reaction and
+  the semi-batch hold after the dosing run to their end while any reaction progresses. A step
+  held short (a reactant running out) counts as idle only when its change at its pace over the
+  time left would be nothing as well.
+- A rate law of zero order in a reactant (or one that leaves a reactant out) kept converting
+  after that reactant was used up, and the step-end clip kept what it formed (core#300): 1 kmol
+  of A gave 389.65 kmol of B. `rates.rate` now gives 0 while a reactant is absent (without
+  `reverse: equilibrium`), the stirred tank treats a used-up reactant as absent rather than as
+  its trace, and a batch whose clip would add more than 1e-6 of what was charged and dosed is
+  refused ("the balance does not close"). A law of positive order in every reactant changes
+  only by the trace it gave a used-up reactant.
+  A used-up reactant that is still supplied, by a dose or another reaction, is consumed as fast
+  as it comes by a law of zero order in it (or one that leaves it out): such a law runs at that
+  supply, not at its full rate or 0 by turns, which held the step size at its 1e-12 s floor
+  (core#333 review). A semi-batch dosing A into A + B -> C of rate k c_B at k n_B above the dose
+  rate never finished its dosing; it now converts the 1 kmol dosed (extent 1.0). In A -> B
+  (first order, k = 1e-3/s), B -> C (zero order in B) a 1000 s batch stopped at 3e-11 s with A
+  unconverted while reporting its full time; it now gives A = exp(-1) = 0.368, C = 0.632. A
+  batch whose steps keep being taken at that floor over the tolerance is refused ("cannot
+  pass") instead of crawling on.
+  Library (process-library 51ecc8a, the 19 entries with rate laws, `cheme process reactors
+  --json` and `cheme process propagate --fill` against the 0e85885 pin): no entry has
+  consecutive reactions that outlive their key, and pvc-1's law of zero order in VCM ends at
+  its 90 % conversion target before the VCM runs out, so no published value changes beyond
+  round-off (largest relative change 2.8e-6, of a 4e-23 accumulation), except in
+  copper-i-chloride-1: the CL2 trace of its recycle loop (mole fraction 1.4e-19 to 2.9e-19 in
+  S4, S6, S7, S7A and S17) is now 0.0, which changes the input fingerprints of those streams,
+  S9 and Q2 (their values unchanged): `propagate --check` reports them stale until refilled.
+- The thermo adapter solves a pure component inside its two-phase region (#314). A (P, S),
+  (P, H) or (P, vapour fraction between 0 and 1) flash of a single component failed in thermo's
+  FlashVL (division by zero, unbound locals) and was refused, so an expander or compressor
+  datasheet of a pure fluid that condenses took the ideal-gas route (pure nitrogen 600 to
+  130 kPa(a) from 120 K: 42.4 kJ/kg and 70.96 K, below saturation, instead of 40.8 kJ/kg and
+  79.45 K at vapour fraction 0.98). Those flashes of a single component now go to thermo's
+  pure-component flasher on the same constants and Peng-Robinson parameters; temperature-pressure
+  flashes and saturation points stay on FlashVL. `Adapter.flash_ps` and `flash_ph` return the
+  state their flash found instead of a new flash at its temperature and pressure (which for a
+  pure component on its saturation line does not fix the vapour fraction), and the polytropic
+  steps of `cheme datasheets fill` take each step's entropy from its (P, H) state, not from a
+  flash at its temperature and pressure (with the two-phase flash alone, the nitrogen expander
+  above at polytropic efficiency 0.95 would have given 231.7 kW instead of about 39 kW).
+- Component ids that share a CAS number add up in the thermo adapter and in the stream exergy
+  instead of the last one overwriting the others (#315): the mole fractions passed to thermo
+  summed to less than 1 and thermo does not normalise them (two nitrogen ids at 0.395 each with
+  oxygen 0.21: M 17.79 instead of 28.85 kg/kmol, written by `cheme process props --fill`).
+- Library effect of #314 and #315: none. Branch against the pinned CLI on the library's
+  `origin/main`, `cheme process props --check` of the eight entries with component ids that
+  share a CAS number (carbon-tetrabromide-1, copper-i-chloride-1, kraft-pulp-1,
+  methyltriphenylphosphonium-bromide-1, n-bromosuccinimide-1, p-toluenesulfonyl-chloride-1,
+  sodium-azide-1, sodium-cyanide-1) gives identical output: each pair is a dissolved and a solid
+  id (or, in kraft-pulp-1, never in one stream), and a stream holding the solid is refused (no
+  solid phase). `cheme datasheets fill` of the entries with compressor or expander datasheets
+  (asu-1, ammonia-1, co2-electrolysis-bpm-1, lng-terminal-1, set to draft) writes identical
+  datasheets: their machine powers are given from the simulation or a sizing script.
+  `props.py` is a process generator module, so `generator_fingerprint()` changes: every
+  BFD/PFD needs `cheme process build` once (only `generator_sha256` changes; the examples are
+  rebuilt). The rebuilt examples change the commit hashes of the test repos the viewer's API
+  fixtures are made from, so seven fixtures are regenerated (CI's `api-fixtures` artifact:
+  `control-separation`, `impact`, `repo`, `repo-issues`, `simulation-failed`, `simulation-run`,
+  `simulation-stale`; one commit hash each).
+- `cheme process reactor-hazards` no longer understates the MTSR in four cases:
+  - a gas-phase batch is closed, at constant volume as the batch model runs it: its dT_ad
+    takes the ideal-gas cv (`cp - R`) and the internal energy of reaction `dH - dnu R T`, so it
+    matches the model's adiabatic run, about cp/cv (1.4 for a diatomic gas) larger than before
+    (#303);
+  - an isothermal batch is screened at the temperature the model holds it at (its outlet's
+    given or assumed temperature) instead of its charge's (#304);
+  - a conversion, equilibrium or gibbs step whose outlet is given or assumed hotter than its
+    feed is screened from the larger of the fresh feed at its inlet and the outlet's
+    unconverted reactants at the outlet's temperature (without the outlets' composition: the
+    fresh feed at that temperature). An adiabatic step's two states agree, so the converted
+    share's heat is not counted twice. A plug-flow bed stays at its inlet, where its model
+    starts (#305);
+  - a CSTR takes each reaction's accumulation from its own limiting reactant, not the first
+    reactant of the first reaction for all of them, and its MTSR is the largest
+    `T_p + X_ac dT_ad` of one counted reaction (#306). The `X_ac` reported is that
+    reaction's; where no counted reaction is exothermic, the largest of a counted reaction,
+    not the 0 of one whose reactants the feed lacks.
+
+  Library entries (`process-library` main, branch against the 1.12.0 + #254 pin; no class or
+  finding changes, no batch or CSTR entry changes): ammonia-1 R101 MTSR 910.5 -> 1098.4 K
+  (T_p 893.2 -> 1083.2 K) and R501 1163.9 -> 1171.7 K; cumene-1 R101 588.8 -> 603.3 K;
+  ethylene-1 H101 343.6 -> 1113.2 K and H103 344.5 -> 1113.2 K (endothermic: the MTSR is the
+  furnace outlet's temperature); hydrogen-1 R102 893.2 -> 1143.2 K (endothermic);
+  methylamines-1 R101 689.9 -> 714.7 K; sulfuric-acid-1 R204 705.27 -> 705.35 K. Reported
+  `X_ac`: ammonia-1 R501 1 -> 0.70, methylamines-1 R101 1 -> 0.04, sulfuric-acid-1 R204
+  1 -> 0.06, and for the endothermic steps the outlet's unconverted share: ethylene-1 H101
+  1 -> 0.30 and H103 1 -> 0.18, hydrogen-1 R102 1 -> 0.25.
+- Project-worker `cheme process simulate` (QSDsan): a value JSON writes in exponent form
+  (`1e-05`, `2e+16`, trace effluent concentrations) is written as a YAML float (`1.0e-05`)
+  instead of refusing the whole `--fill` and `--check` ("cannot be written without changing
+  other YAML values") (#316).
+- A stale calculated value whose name is also a state field (QSDsan's wastewater `flow` in
+  m3/day) is named `calculated.flow` in the stale names (`cheme.process-calculated-stale`, the
+  stream table's `stale`), so it no longer marks stale, blanks in the PFD stream table or leaves
+  out of the DEXPI export the stream's given `flow`, and a stale state `flow` no longer marks the
+  calculated one (#317).
+- `cheme serve` fingerprints declared simulation inputs over 5 MB as the CLI does, instead of
+  treating them as missing and showing every simulated value and the run stale while
+  `simulate --check` reports it current (#318). A project worker's inputs (a long QSDsan
+  influent series) are fingerprinted unread since the shared worker path; this covers the other
+  simulators' declared inputs, in `/api/simulation` and the stream tables.
+- Project-worker `cheme process simulate` (QSDsan) reports the findings the worker returns
+  (`cheme.process-worker`, at their level), so `--check` prints a worker warning and exits 1 on
+  it (#319).
+- Project-worker `--fill` locks `process/simulation-run.lock` with an operating-system lock, released
+  when the process ends however it ends: a lock file left by a killed run no longer refuses every
+  later fill; a publication still running is refused by name (#320).
+
+Library effect: no published number changes. `props.py` and `build.py` are generator modules, so
+every BFD/PFD sheet (the 136 of the library's 68 flowsheets and the examples) needs
+`cheme process build` once; only `generator_sha256` changes. No library flowsheet has a
+calculated value named like a state field, and `processes/wwtp-a2o`, the only QSDsan entry,
+publishes no QSDsan values yet.
+
 Where two of this release's features meet (none of these was in 1.12.0; no library entry uses
 both sides of any, and the library gives the same results):
 
@@ -207,7 +451,7 @@ both sides of any, and the library gives the same results):
   from the wet cake's temperature, as documented, not from the dryer's
   `cooling.vessel_temperature`, which the merge had taken (the cooling does not cool that metal
   back to it); the dryer's basis text says which start it took.
-- A vessel holding a batch step and a filter with a displacement wash (ADR 0072) takes the
+- A vessel holding a batch step and a filter with a displacement wash (ADR 0076) takes the
   filter's content as the slurry or the cake with the wash, the larger, in its intake of the
   other steps (`cheme.recipe-vessel`, `size_from: steps`), as its own content does, not their
   sum.

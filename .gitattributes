@@ -3,3 +3,5 @@
 src/chemeascode/templates/** text=auto eol=lf
 src/chemeascode/**/skills/** text=auto eol=lf
 src/chemeascode/domains/assessment/lca/data/** text=auto eol=lf
+# Viewer download fixtures are compared byte-for-byte with generated LF output too.
+viewer/tests/fixtures/** text=auto eol=lf

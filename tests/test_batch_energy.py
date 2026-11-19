@@ -548,7 +548,7 @@ def test_a_warm_up_before_the_drying_is_the_recipes_and_the_dryer_heats_the_cake
 
 
 def _dryer_cooling(ws, cooling):
-    """*ws*'s dryer D1 with ``cooling: {cooling}`` (ADR 0072), propagated again."""
+    """*ws*'s dryer D1 with ``cooling: {cooling}`` (ADR 0076), propagated again."""
     from chemeascode.foundation.workspace import Workspace
 
     path = ws.root / "process/flowsheet.yaml"

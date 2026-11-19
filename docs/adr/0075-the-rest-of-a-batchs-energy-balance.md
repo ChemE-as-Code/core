@@ -51,8 +51,8 @@ propagates, fingerprints and reports as in 1.12.0.
   `energy_port` or its `heat_up_port`, already. A heat or cool after the run is a heat of its
   own and is written.
   `recipe.stream_heats` gives its heat into the content, `(C + C_m)(T_1 - T_0)` per batch (C
-  the batch's charge before its dose, else its end, as the jacket time takes it; a dryer's wet
-  cake before the `dry`, else its product; `C_m` the vessel's `metal_heat_capacity`, or 0),
+  the batch's charge before its first `dose` or `react` (core#301), else its end, as the jacket
+  time takes it; a dryer's wet cake before the `dry`, else its product; `C_m` the vessel's `metal_heat_capacity`, or 0),
   over the batch's hours of flows, as the models' duties (not the recipe's cycle: the two agree
   within the `cheme.recipe-basis` tolerance). `cheme process propagate` writes it `calculated`
   in the stream's direction, its fingerprint the operation, the content's and metal's kJ/K,
@@ -103,7 +103,7 @@ propagates, fingerprints and reports as in 1.12.0.
   (`recipe.dryer_metal`): `C_m (T - T_left) / h_batch`, `T_left` the end temperature of the
   last operation with `temperatures` before the `dry` in the procedure's cycle (a cool-down
   before the discharge), else the wet cake's; never the dryer's `cooling.vessel_temperature`
-  (ADR 0072), which is for its own `energy.vessel_heat_capacity`: the dryer's cooling does not
+  (ADR 0076), which is for its own `energy.vessel_heat_capacity`: the dryer's cooling does not
   cool the recipe vessel's metal back to it. With the dryer's own `energy.vessel_heat_capacity`
   too it is an error (`cheme.recipe-vessel`, and the dryer's energy lists it as missing). A
   `heat` or `cool` with `temperatures` in a dryer's vessel, refused by 1.12.0, takes its time
@@ -116,7 +116,7 @@ propagates, fingerprints and reports as in 1.12.0.
   cake from there (`recipe.dryer_cake`, `recipe_heat` in its report), so the cake's heat-up is
   the operation's (on its stream, or reported) and the dryer's, each part once. A heat or cool
   after the `dry` acts on the dried product, as the dryer's `cooling.product_temperature` (ADR
-  0072) does: both together count the product's cool-down twice, so it is an error
+  0076) does: both together count the product's cool-down twice, so it is an error
   (`cheme.recipe-vessel`, `recipe.dryer_cooled`) and the dryer's cooling lists it as missing.
   A filter's vessel keeps the refusal.
 - **Fingerprints.** Every new field is left out of its dump when not given (`exclude_if`).

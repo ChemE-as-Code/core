@@ -694,7 +694,7 @@ def _reactive_balance(
 
 def _solid_phase_changes(item: Any) -> list[tuple[str, str, str]]:
     """(name, solid, dissolved or vapour component) of a cake wash's dissolution and a dryer's
-    sublimation (ADR 0072) in block or step *item*."""
+    sublimation (ADR 0076) in block or step *item*."""
     sep = getattr(item, "solid_separation", None)
     dissolution = getattr(getattr(sep, "wash", None), "dissolution", None)
     found = [("dissolution", dissolution.crystal, dissolution.solute)] if dissolution else []
@@ -718,7 +718,7 @@ def _crystallizations(process: Process, node: str) -> list[Reaction]:
             or (process.kinds.get(other) in ("block", "step") and process.within(other, node))
         ):
             continue
-        for name, solid, into in _solid_phase_changes(item):  # ADR 0072
+        for name, solid, into in _solid_phase_changes(item):  # ADR 0076
             found.append(
                 Reaction(
                     id=f"{other}:{name}",

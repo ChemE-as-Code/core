@@ -1,4 +1,4 @@
-# 0072. Crystallizer, wash and dryer follow-ups: a carried solubility point, the liquor checked, a displacement wash, a second liquid, the dryer's selectivity, sublimation, cooling and condenser
+# 0076. Crystallizer, wash and dryer follow-ups: a carried solubility point, the liquor checked, a displacement wash, a second liquid, the dryer's selectivity, sublimation, cooling and condenser
 
 - **Status:** Proposed
 - **Date:** 2026-11-13

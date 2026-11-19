@@ -1,5 +1,6 @@
 """Portable configuration, read-only serving and publication on a real worker boundary."""
 
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -150,3 +151,124 @@ def test_keeps_authored_yaml_comment_and_accepts_volume_unit_alias(plant):
         ]
         == "m3/d"
     )
+
+
+def _worker_action(root, action):
+    worker = root / "demo_worker.py"
+    worker.write_text(
+        worker.read_text().replace(
+            "    Path(sys.argv[2])", "    " + action + "\n    Path(sys.argv[2])"
+        )
+    )
+
+
+@pytest.mark.parametrize("values", [(1e-05, 2e16), (5e-05, 1.5e-07)])
+def test_fill_writes_floats_json_writes_in_exponent_form(plant, values):
+    # json.dumps writes 1e-05 and 2e+16, which YAML 1.1 reads back as strings (#316)
+    data = plant / "results.json"
+    cells = yaml.safe_load(data.read_bytes())
+    for small, large in (values, (values[1], values[0])):
+        cells["WATER"]["NH4"]["value"] = small
+        cells["WATER"]["flow"]["value"] = large
+        data.write_text(json.dumps(cells))
+        assert not simulate(plant).findings
+        doc = yaml.safe_load((plant / "process/flowsheet.yaml").read_bytes())
+        written = doc["streams"][1]["state"]["design"]["calculated"]
+        assert (written["NH4"]["value"], written["flow"]["value"]) == (small, large)
+        assert all(type(written[k]["value"]) is float for k in ("NH4", "flow"))
+
+
+def test_stale_wastewater_flow_is_not_the_stream_flow(plant, monkeypatch):
+    # the calculated "flow" (m3/day) and the state's "flow" are different values (#317)
+    from chemeascode.domains.process import props
+    from chemeascode.domains.process.build import _calculated
+    from chemeascode.domains.process.pfd_sheet import stream_table as pfd_table
+    from chemeascode.domains.process.props import stale
+    from chemeascode.domains.process.streams import rows, stream_table
+
+    assert not simulate(plant).findings
+    sheet = plant / "process/flowsheet.yaml"
+    sheet.write_text(
+        sheet.read_text().replace(
+            "        pressure: {value: 101.325, unit: kPa(a), provenance: given, "
+            "source: design basis}\n",
+            "        pressure: {value: 101.325, unit: kPa(a), provenance: given, "
+            "source: design basis}\n"
+            "        flow: {value: 1000, unit: kg/h, provenance: given, source: design basis}\n",
+        )
+    )
+    process, _ = load(plant)  # the model changed: the QSDsan cells are stale
+    feed = process.flowsheet.streams[0]
+    assert sorted(stale(process, feed, "design")) == ["TN", "calculated.flow"]
+    row = stream_table(process, "design", {}, set())["streams"][0]
+    assert row["properties"]["flow"]["stale"] is False
+    assert row["calculated"]["flow"]["stale"] is True
+    assert row["calculated"]["TN"]["stale"] is True
+    assert pfd_table(process, ["FEED"], [], "design").columns[0][1][3] == "1 000"
+    # the DEXPI export leaves the stale QSDsan flow out
+    lines = _calculated(process, feed)["lines"]
+    assert "stale, not exported (design): TN, calculated.flow" in lines
+    assert not [line for line in lines if line.startswith("calculated, simulated flow")]
+    # the CLI table marks the calculated flow stale, not the given one
+    cli = rows(process, "design")[0]
+    assert cli["flow"] == "1000 kg/h [G]"
+    assert "flow 100 m3/day [C STALE]" in cli["calculated"]
+
+    # the reverse: a stale state flow does not mark the calculated one
+    current = stale(process, feed, "design")
+    monkeypatch.setattr(
+        props, "stale", lambda *a: [n for n in current if n != "calculated.flow"] + ["flow"]
+    )
+    row = stream_table(process, "design", {}, set())["streams"][0]
+    assert row["properties"]["flow"]["stale"] is True
+    assert row["calculated"]["flow"]["stale"] is False
+    cli = rows(process, "design")[0]
+    assert cli["flow"] == "1000 kg/h [G STALE]"
+    assert "flow 100 m3/day [C]" in cli["calculated"]
+    assert [line for line in _calculated(process, feed)["lines"] if "simulated flow" in line]
+
+
+def test_worker_findings_are_reported(plant, monkeypatch):
+    # a worker warning reaches the findings and makes --check exit 1 (#319)
+    from typer.testing import CliRunner
+
+    from chemeascode.interfaces.cli import app
+
+    _worker_action(
+        plant,
+        "result['findings']=[{'level': 'warning', 'rule': 'n-balance', "
+        "'message': 'N balance off by 8%', 'ids': ['TANK']}]",
+    )
+    found = [f for f in simulate(plant, False).findings if f.ids != ["design"]]  # not the record's
+    assert [(f.level, f.ids) for f in found] == [("warning", ["TANK"])]
+    assert "N balance off by 8%" in found[0].message
+    monkeypatch.chdir(plant)
+    result = CliRunner().invoke(app, ["process", "simulate", "--check"])
+    assert result.exit_code == 1, result.output
+    assert "N balance off by 8%" in result.output
+
+
+def test_lock_left_by_a_killed_run_is_taken_over(plant):
+    # a SIGKILL during publication leaves the lock file; it must not refuse every later fill
+    (plant / "process/simulation-run.lock").write_bytes(b"")
+    assert not simulate(plant).findings
+    assert record.read(plant)["cases"]["design"]
+    assert not (plant / "process/simulation-run.lock").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="flock")
+def test_live_publication_lock_refuses(plant):
+    import fcntl
+    import os
+
+    lock = plant / "process/simulation-run.lock"
+    fd = os.open(lock, os.O_RDWR | os.O_CREAT)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        sheet = (plant / "process/flowsheet.yaml").read_bytes()
+        found = simulate(plant).findings
+        assert any("Another simulate --fill is publishing" in f.message for f in found)
+        assert (plant / "process/flowsheet.yaml").read_bytes() == sheet
+        assert lock.exists()
+    finally:
+        os.close(fd)

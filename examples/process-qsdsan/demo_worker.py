@@ -9,10 +9,22 @@ def main():
     request = json.loads(Path(sys.argv[1]).read_bytes())
     values = json.loads(Path(request["input"]).read_bytes())
     result = {
-        "schema": "cheme/adapter-result/v1",
+        "schema": "cheme/adapter-result/v2",
         "case": request["case"],
         "solver": {"name": "QSDsan", "version": "fixture", "method": "recorded data"},
-        "status": "converged",
+        "status": "completed",
+        "outcome": {
+            "mode": "dynamic",
+            "convergence": "not-applicable",
+            "integration": {
+                "start": 0,
+                "requested_end": 1,
+                "achieved_end": 1,
+                "time_unit": "day",
+                "completed": True,
+            },
+            "steady_state": {"state": "not-evaluated"},
+        },
         "units": [{"id": "TANK", "status": "simulated"}],
         "streams": [{"id": name, "values": cells} for name, cells in values.items()],
         "messages": ["Protocol example with recorded quantities."],

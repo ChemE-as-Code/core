@@ -27,8 +27,8 @@ R10 preferred numbers (ISO 3) of m3, or a given volume; its ``jacket`` (U, area 
 shell and flat bottom of a vessel of the given aspect ratio, the media's temperatures) is checked
 against the model's peak duty, and a ``heat`` or ``cool`` operation may give ``temperatures``
 instead of a duration: ``t = C / (U A) ln((T_m - T_0) / (T_m - T_1))`` with the medium at a
-constant temperature, the content's heat capacity C (the charge's before a dose, else the
-end's).
+constant temperature, the content's heat capacity C (the charge's before the first ``dose``
+or ``react``, else the end's; a unit procedure with neither: the end's).
 
 A vessel's ``metal_heat_capacity`` (kJ/K, ADR 0063) heats and cools with the content: in the
 jacket times (``C + C_m``) and each of its jacket-timed operations' heat per batch (``heats``,
@@ -203,7 +203,8 @@ class Operation(Strict):
                     f"operation {self.id}: temperatures give a heat-up's or a cool-down's time only"
                 )
             start, end = self.temperatures
-            if min(start, end) <= 0 or (end > start) != (self.kind == "heat"):
+            # a heat rises, a cool falls: equal temperatures are neither (core#302)
+            if min(start, end) <= 0 or end == start or (end > start) != (self.kind == "heat"):
                 raise ValueError(
                     f"operation {self.id}: temperatures in K, rising to heat, falling to cool"
                 )
@@ -759,6 +760,16 @@ def _vessel(up: UnitProcedure, content: _Content, working: float | None = None) 
     return found
 
 
+def _before_dose(up: UnitProcedure, index: int, kinds: tuple[str, ...] = ("dose", "react")) -> bool:
+    """Whether *up*'s operation at *index* holds the charge rather than the end's content: it
+    comes before the first ``dose`` or ``react`` (core#301: a batch has no dose, its heat-up
+    before ``react`` is the charge's, as the model duty's ``heat_up``, ADR 0063). A unit
+    procedure with neither keeps the end's content. In a dryer's vessel *kinds* is ``("dry",)``
+    (ADR 0075): the wet cake before the drying, else the product."""
+    changes = [j for j, o in enumerate(up.operations) if o.kind in kinds]
+    return bool(changes) and index < changes[0]
+
+
 def _jacket_time(
     up: UnitProcedure,
     op: Operation,
@@ -769,9 +780,10 @@ def _jacket_time(
 ) -> float:
     """h to heat or cool the content by *op*'s temperatures in *up*'s jacketed vessel (of
     *vessel_volume* m3, else sized for *content*): ``t = C / (U A) ln((T_m - T_0) / (T_m -
-    T_1))``, the medium at its constant temperature, the charge's content before the dose, else
-    the end's; in a dryer's vessel *cake* (ADR 0075) the wet cake before the drying, else the
-    product, on the jacket's area or the vessel's heated area. Raises ValueError."""
+    T_1))``, the medium at its constant temperature, the charge's content before the first dose
+    or reaction (*before_dose*, :func:`_before_dose`), else the end's; in a dryer's vessel
+    *cake* (ADR 0075) the wet cake before the drying, else the product, on the jacket's area or
+    the vessel's heated area. Raises ValueError."""
     jacket = up.vessel.jacket if up.vessel is not None else None
     if jacket is None:
         raise ValueError(f"{up.id} has no vessel.jacket for a {op.kind} time")
@@ -967,7 +979,8 @@ def _jacket_heat(
     up: UnitProcedure, op: Operation, content: _Content, before_dose: bool, hours: float
 ) -> HeatResult:
     """The heat of *op* (a heat or cool with temperatures) per batch: the content's (the
-    charge's before the dose, else the end's) and the vessel's metal times the change."""
+    charge's before the first dose or reaction, else the end's) and the vessel's metal times
+    the change."""
     start, end = op.temperatures or (0.0, 0.0)
     capacity = (content.charge_capacity if before_dose else content.end_capacity) or 0.0
     metal = (up.vessel.metal_heat_capacity if up.vessel is not None else None) or 0.0
@@ -1178,7 +1191,7 @@ def _displaced(
     case: str,
     total: float,
 ) -> float:
-    """m3/h that filter *node* with a displacement wash holds at once (ADR 0072): the slurry,
+    """m3/h that filter *node* with a displacement wash holds at once (ADR 0076): the slurry,
     or later the unwashed cake with the wash on it, never both (the slurry's filtrate drains
     before the wash passes). *inlets*: its material inlets, *volumes* the m3/h of those
     known; *total*, their sum, when the cake cannot be calculated."""
@@ -1302,7 +1315,7 @@ def _solids_time(
     if sep.wash is None:
         ports, _ = separate_node(process, node, _one_inlet(process, node), case)
         washed = None
-    else:  # ADR 0072: the slurry's filtrate by Ruth, then the wash's at the final rate
+    else:  # ADR 0076: the slurry's filtrate by Ruth, then the wash's at the final rate
         inlets = [s for s in _inlets(process, node.id) if s.kind == "material"]
         ports, _, washed = filter_node(process, node, inlets, case)
     hours = batch_hours(process, recipe, case)
@@ -1556,7 +1569,7 @@ def evaluate(
                     "cooling.product_temperature both cool the dried product",
                     [*at, "operations"],
                     "cool the product once: with the recipe's cool (on the jacket, with the "
-                    "vessel's metal, ADR 0075), or with the dryer's cooling (ADR 0072)",
+                    "vessel's metal, ADR 0075), or with the dryer's cooling (ADR 0076)",
                     [up.id],
                 )
         elif (
@@ -1652,11 +1665,9 @@ def evaluate(
                 except ValueError:
                     heated = None  # the dry operation says what is missing
                 solids_vessel = replace(found, jacket_area=heated)
-        dosed = False
         drying = cake is not None and content is not None  # a dryer's content (ADR 0075)
-        first = "dry" if drying else "dose"  # the content changes with it
+        changing = ("dry",) if drying else ("dose", "react")  # the content changes with them
         for j, op in enumerate(up.operations):
-            dosed |= op.kind == first
             if op.id in names:
                 add(
                     "error",
@@ -1685,7 +1696,7 @@ def evaluate(
                     )
             if op.temperatures is not None:
                 heated = content
-                before = not dosed and any(o.kind == first for o in up.operations)
+                before = _before_dose(up, j, changing)
                 if contents:  # several batch steps: the one it comes before (ADR 0073)
                     try:
                         step, before = _jacketed_step(up.operations, j, tanks)
@@ -2244,11 +2255,11 @@ def _stream_end(process: Any, up: UnitProcedure, op: Operation) -> tuple[Any, st
 
 def stream_heats(process: Any, case: str) -> list[StreamHeat]:
     """The heat of every ``heat`` or ``cool`` operation with ``temperatures`` and a ``stream``
-    (ADR 0075): its content's heat capacity (a batch's charge before its dose, else its end; a
-    dryer's wet cake before the drying, else its product) and the vessel's
-    ``metal_heat_capacity`` times the change, per batch over the hours of flows one batch makes
-    (as the models' duties). An operation whose stream is wrong is left out (``process recipe``
-    and validate report it)."""
+    (ADR 0075): its content's heat capacity (a batch's charge before its first dose or react,
+    else its end, as the jacket time; a dryer's wet cake before the drying, else its product)
+    and the vessel's ``metal_heat_capacity`` times the change, per batch over the hours of
+    flows one batch makes (as the models' duties). An operation whose stream is wrong is left
+    out (``process recipe`` and validate report it)."""
     from chemeascode.domains.process.stirred_tank import split_inlets
 
     recipe, _, _ = load_recipe(process.root)
@@ -2259,7 +2270,7 @@ def stream_heats(process: Any, case: str) -> list[StreamHeat]:
         named = [op for op in up.operations if op.stream is not None and op.temperatures]
         if not named:
             continue
-        content, first, used, why = None, "dose", [], ""
+        content, changing, used, why = None, ("dose", "react"), [], ""
         try:
             hours = batch_hours(process, recipe, case)
             tank = process.nodes.get(_tank(process, up))
@@ -2271,7 +2282,7 @@ def stream_heats(process: Any, case: str) -> list[StreamHeat]:
                 if tank.reactor == "semibatch":
                     used = [split_inlets(tank, used)[0]]
             elif dryer is not None:
-                content, first = _dryer_content(process, recipe, up, case), "dry"
+                content, changing = _dryer_content(process, recipe, up, case), ("dry",)
                 used = [_one_inlet(process, dryer)]
             else:
                 raise ValueError(f"{up.label} holds no batch, semibatch or dryer")
@@ -2289,9 +2300,8 @@ def stream_heats(process: Any, case: str) -> list[StreamHeat]:
             if content is None:
                 heat.missing = why
                 continue
-            before = any(o.kind == first for o in up.operations) and not any(
-                o.kind == first for o in up.operations[: up.operations.index(op)]
-            )
+            # the charge before the first dose or reaction, as the jacket time (core#301)
+            before = _before_dose(up, up.operations.index(op), changing)
             capacity = content.charge_capacity if before else content.end_capacity
             if capacity is None:
                 heat.missing = "the liquid_heat_capacity of the content"

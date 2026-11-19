@@ -581,7 +581,11 @@ def _swept(
         temperatures: dict[str, float] = {}
         try:
             if node.dryer is not None:
-                from chemeascode.domains.process.dryer import DryerError, outlet_temperatures
+                from chemeascode.domains.process.dryer import (
+                    DryerError,
+                    outlet_temperatures,
+                    vapour_shape,
+                )
                 from chemeascode.domains.process.dryer import node_outlets as dried
                 from chemeascode.domains.process.dryer import solve_node as dry
 
@@ -590,7 +594,8 @@ def _swept(
                 except DryerError as failure:
                     raise CrystallizationError(str(failure)) from failure
                 ports = dried(node.dryer, solved)
-                temperatures = outlet_temperatures(node.dryer)  # ADR 0072: cooling, condenser
+                temperatures = outlet_temperatures(node.dryer)  # ADR 0076: cooling, condenser
+                shapes = {node.dryer.outlets["vapour"]: vapour_shape(node.dryer, solved)}
             elif node.crystallizer is not None:
                 result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 solutions[node.id] = (result, dict(extra))

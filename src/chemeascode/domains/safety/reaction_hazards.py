@@ -4,14 +4,27 @@ fixed beds, the parametric sensitivity of the hot spot (``cheme process reactor-
 
 Per reactor (a block or step that names reactions or a reactor model), from its inlet stream:
 
-- ``T_p``, the process temperature: a batch's charge temperature, a CSTR's solved temperature,
-  else the outlet's given temperature or the inlet's;
+- ``T_p``, the process temperature: an isothermal batch's held temperature (its outlet's given
+  or assumed one, as the batch model holds it from the start), else a batch's charge
+  temperature; a CSTR's solved temperature; a plug-flow bed's inlet temperature (the bed model
+  starts there); else (conversion, equilibrium, gibbs) the inlet's, or the outlet's given or
+  assumed temperature where hotter and its MTSR larger (below);
 - ``dT_ad``, the adiabatic rise: the largest heat of one reaction run to completion of its
   limiting reactant, over the heat capacity of the feed (a liquid's ``liquid_heat_capacity``,
-  a gas's ideal-gas cp; ``heat_of_reaction``, else the ideal-gas data's);
+  a gas's ideal-gas cp; ``heat_of_reaction``, else the ideal-gas data's). A gas-phase batch is
+  closed, at constant volume as the batch model treats it: its cv (``cp - R``) and the
+  internal energy of reaction ``dH - dnu R T``;
 - the accumulation ``X_ac``: 1 for a batch (all charged; cooling fails at the start) and for
-  a plug-flow or conversion reactor (fresh feed at its inlet), the unconverted fraction of the
-  key for a CSTR; ``MTSR = T_p + X_ac dT_ad``;
+  a plug-flow or conversion reactor (fresh feed at its inlet); for a CSTR each reaction's own,
+  the extent its limiting reactant still allows in the (first) tank over the feed's; the MTSR
+  the largest ``T_p + X_ac dT_ad`` of one counted reaction (``X_ac`` reported: that
+  reaction's). A conversion, equilibrium or gibbs step whose outlet is given or assumed hotter
+  than its feed is screened from the larger of two states: the fresh feed at the inlet, and the
+  outlet's, its unconverted reactants (each reaction's ``X_ac`` as for a CSTR, from the
+  outlets' composition) at its temperature. An adiabatic step's two agree; a heated one's
+  outlet is the larger, without counting the converted share's heat twice. Without the
+  outlets' composition the outlet's state is the fresh feed at its temperature (on the safe
+  side);
 - a semi-batch (Stoessel's treatment of dosing-controlled reactions): ``X_ac`` the largest
   accumulation of the dosed reactant over the run, the MTSR the cooling-failure temperature at
   its worst moment (the dosing stopped; :mod:`.process.stirred_tank`), ``T_p`` the temperature
@@ -249,12 +262,19 @@ def _location(process: Any, node: str) -> list[Any]:
 
 
 def _heats(
-    reactions: list[Any], moles: dict[str, float], t: float, comps: dict[str, Any], data: Any
+    reactions: list[Any],
+    moles: dict[str, float],
+    t: float,
+    comps: dict[str, Any],
+    data: Any,
+    closed: bool = False,
 ) -> tuple[float | None, dict[str, float], list[str]]:
     """The feed's heat capacity kJ/K (None when not known), each reaction's heat of reaction
     kJ/kmol whose heat is known (``heat_of_reaction``, else a gas's ideal-gas data) and what
-    is lacking."""
-    from chemeascode.domains.chemistry.thermochemistry import missing, reaction_enthalpy
+    is lacking. A *closed* gas (a gas-phase batch, never vented) is at constant volume, as the
+    batch model treats it (:mod:`.process.stirred_tank`): its capacity is the ideal-gas
+    ``cp - R`` and its heat the internal energy of reaction, ``dH - dnu R T``."""
+    from chemeascode.domains.chemistry.thermochemistry import R, missing, reaction_enthalpy
 
     lacking: list[str] = []
     liquid = any(r.phase == "liquid" for r in reactions)
@@ -267,7 +287,8 @@ def _heats(
     else:
         if lack := missing(list(present), data):
             return None, {}, ["ideal_gas data of " + ", ".join(lack)]
-        capacity = sum(v * data[n].cp(t) for n, v in present.items())
+        capacity = sum(v * (data[n].cp(t) - (R if closed else 0.0)) for n, v in present.items())
+    closed = closed and not liquid
     if capacity <= 0:
         return None, {}, lacking
     heats: dict[str, float] = {}
@@ -278,16 +299,23 @@ def _heats(
             heats[r.id] = reaction_enthalpy(r.stoichiometry, data, t)
         else:
             lacking.append(f"heat_of_reaction of {r.id}")
+        if closed and r.id in heats:
+            heats[r.id] -= sum(r.stoichiometry.values()) * R * t
     return capacity, heats, lacking
 
 
 def _reaction_rises(
-    reactions: list[Any], moles: dict[str, float], t: float, comps: dict[str, Any], data: Any
+    reactions: list[Any],
+    moles: dict[str, float],
+    t: float,
+    comps: dict[str, Any],
+    data: Any,
+    closed: bool = False,
 ) -> tuple[dict[str, float] | None, list[str]]:
     """K of each reaction whose heat is known: its heat run to completion of its limiting
-    reactant, over the feed's heat capacity (negative: endothermic), and what is lacking.
-    None when the heat capacity is not known."""
-    capacity, heats, lacking = _heats(reactions, moles, t, comps, data)
+    reactant, over the feed's heat capacity (negative: endothermic; *closed*: a gas at constant
+    volume, :func:`_heats`), and what is lacking. None when the heat capacity is not known."""
+    capacity, heats, lacking = _heats(reactions, moles, t, comps, data, closed)
     if capacity is None:
         return None, lacking
     rises: dict[str, float] = {}
@@ -309,12 +337,14 @@ def _adiabatic_rise(
     comps: dict[str, Any],
     data: Any,
     counted: list[str] | None = None,
+    closed: bool = False,
 ) -> tuple[float | None, list[str], dict[str, float]]:
     """K: the largest heat of one reaction (of the *counted*, default every one) run to
-    completion, over the feed's heat capacity; what is lacking; each reaction's rise."""
+    completion, over the feed's heat capacity (*closed*: a gas at constant volume); what is
+    lacking; each reaction's rise."""
     if counted is not None:
         reactions = [r for r in reactions if r.id in counted]
-    rises, lacking = _reaction_rises(reactions, moles, t, comps, data)
+    rises, lacking = _reaction_rises(reactions, moles, t, comps, data, closed)
     if rises is None:
         return None, lacking, {}
     best = max([0.0, *rises.values()])
@@ -387,6 +417,90 @@ def heated_phase_changes(process: Any, node: str) -> list[str]:
     return sorted(k for k in _phase_changes(process, node) if k not in skipped)
 
 
+def _left_accumulation(
+    reactions: list[Any], moles: dict[str, float], left: dict[str, float]
+) -> dict[str, float]:
+    """Each reaction's accumulation where *left* (kmol) is what is left of the feed *moles*:
+    the extent its limiting reactant still allows over the feed's (a reaction whose reactants
+    the feed lacks has none, and is left out)."""
+    found: dict[str, float] = {}
+    for r in reactions:
+        reactants = [(n, -nu) for n, nu in r.stoichiometry.items() if nu < 0]
+        feed = min((moles.get(n, 0.0) / nu for n, nu in reactants), default=0.0)
+        if feed <= 0:
+            continue
+        rest = min(left.get(n, 0.0) / nu for n, nu in reactants)
+        found[r.id] = min(max(rest / feed, 0.0), 1.0)
+    return found
+
+
+def _share(held: dict[str, float] | None) -> Any:
+    """Reaction id -> its accumulation in *held* (None: 1 for every reaction; 0 for one not in
+    it)."""
+    return lambda r: 1.0 if held is None else held.get(r, 0.0)
+
+
+def _outlet_moles(process: Any, item: Any, case: str) -> dict[str, float] | None:
+    """kmol (per the flows' time basis) of each component leaving *item* by its material
+    outlets in *case*; None where an outlet's composition and flow are not known."""
+    from chemeascode.domains.process.model import stream_flows
+
+    comps = process.components()
+    found: dict[str, float] = {}
+    outlets = [
+        s
+        for s in process.flowsheet.streams
+        if s.kind == "material" and (e := process.ends(s)[0]) is not None and e.node == item.id
+    ]
+    for stream in outlets:
+        flows = stream_flows(process, stream, case)
+        if flows.components is None:
+            return None
+        for n, kg in flows.components.items():
+            if kg and getattr(comps.get(n), "molar_mass", None):
+                found[n] = found.get(n, 0.0) + kg / comps[n].molar_mass
+    return found if outlets else None
+
+
+def _held_temperature(process: Any, item: Any, case: str) -> tuple[float, str] | None:
+    """K and stream id of the given or assumed temperature of *item*'s outlet, the one an
+    isothermal batch is held at (:func:`.process.stirred_tank.outlet_temperature`)."""
+    from chemeascode.domains.process.stirred_tank import outlet_temperature
+
+    return outlet_temperature(process, item, case)
+
+
+def _moving_start(
+    item: Any,
+    moles: dict[str, float],
+    comps: dict[str, Any],
+    pressure: float | None,
+    charge: float,
+) -> tuple[float, str] | None:
+    """K a batch whose temperature moves (ADR 0074) starts at in its model, and the note: a
+    programme's first point (its outlet's temperature is the programme's end), at reflux the
+    charge's bubble point at the inlet's pressure (its solid phase left out), else (no vapour
+    pressure: the model refuses it) the *charge*'s temperature; None for any other batch."""
+    from chemeascode.domains.process.batch_kinetics import bubble_point
+
+    batch = item.batch
+    tail = (
+        ", the MTSR that of a cooling failure at the start; the process reactors profile gives "
+        "the temperature over the batch"
+    )
+    if batch.program is not None:
+        start = batch.program.points[0][1]
+        return start, f"the batch's temperature follows its programme: T_p is its start{tail}"
+    if batch.heat != "reflux":
+        return None
+    liquid = {n: v for n, v in moles.items() if n not in (batch.solids or {})}
+    found, _ = bubble_point(liquid, comps, pressure if pressure is not None else 101.325)
+    lead = "the batch's temperature follows its bubble point (reflux): T_p is the charge's "
+    if found is None:
+        return charge, f"{lead}temperature, its bubble point not known{tail}"
+    return found, f"{lead}bubble point{tail}"
+
+
 def screen_node(process: Any, node: str, case: str) -> HazardEntry:
     """The screening of reactor *node* in *case* (see the module docstring); its phase
     changes take no part in dT_ad and the MTT (a semi-batch's MTSR is its model's, phase
@@ -446,17 +560,9 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         for n, kg in flows.components.items()
         if kg and getattr(comps.get(n), "molar_mass", None)
     }
-    t_p = t_in
-    accumulation = 1.0
-    batch = getattr(item, "batch", None) if model == "batch" else None
-    if batch is not None and (batch.program is not None or batch.heat == "reflux"):
-        # ADR 0074: the batch's temperature moves; X_ac = 1 holds at the start only
-        entry.notes.append(
-            "the batch's temperature follows "
-            + ("its programme" if batch.program is not None else "its bubble point (reflux)")
-            + ": T_p is the charge's, the MTSR that of a cooling failure at the start; the "
-            "process reactors profile gives the temperature over the batch"
-        )
+    # the states a cooling failure may start from: (T_p, each reaction's accumulation, None:
+    # 1 for every one, the note); the one giving the largest MTSR is screened
+    states: list[tuple[float, dict[str, float] | None, str]] = []
     if model == "cstr":
         from chemeascode.domains.process.stirred_tank import TankError, solve_node
 
@@ -465,45 +571,100 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         except TankError as failure:
             entry.missing.append(f"the tank: {failure}")
         else:
-            # the first tank of a series holds the most unconverted key: its temperature and
-            # accumulation give the largest MTSR
+            # the first tank of a series holds the most unconverted reactants: its temperature
+            # and accumulation give the largest MTSR
             first = solved.tanks[0]
-            t_p = first["temperature_K"]
-            key = next(
+            left = {n: v * (1.0 - first["conversion"].get(n, 0.0)) for n, v in moles.items()}
+            states.append(
                 (
-                    n
-                    for r in reactions
-                    for n, v in r.stoichiometry.items()
-                    if v < 0 and moles.get(n, 0) > 0
-                ),
-                None,
+                    first["temperature_K"],
+                    _left_accumulation(reactions, moles, left),
+                    "accumulation: each reaction's unconverted limiting reactant in the (first) "
+                    "tank",
+                )
             )
-            if key is not None:
-                accumulation = 1.0 - first["conversion"].get(key, 0.0)
-            entry.notes.append("accumulation: the unconverted key in the (first) tank")
-    if model == "batch":
-        entry.notes.append("accumulation 1: all charged, cooling fails at the start")
-        _vent_note(process, item, entry, inlet, case)
-    elif model != "cstr":
-        entry.notes.append("accumulation 1: the fresh feed, at the inlet's temperature")
-    entry.process_temperature = t_p
-    entry.accumulation = accumulation
-    rise, lacking, rises = _adiabatic_rise(
-        reactions, moles, t_p, comps, process.ideal_gas(), counted
+    elif model == "batch" and (moving := _moving_start(item, moles, comps, p_in, t_in)) is not None:
+        # ADR 0074: a programme or reflux moves the batch's temperature; the model starts at the
+        # programme's first point or the charge's bubble point, where X_ac = 1 holds
+        states.append((moving[0], None, "accumulation 1: all charged, cooling fails at the start"))
+        entry.notes.append(moving[1])
+    elif model == "batch":
+        hold = _held_temperature(process, item, case) if item.batch.heat == "isothermal" else None
+        # the model holds an isothermal batch at its outlet's temperature from the start
+        # (ADR 0063): a cooling failure at the start begins there
+        states.append(
+            (
+                hold[0] if hold else t_in,
+                None,
+                "accumulation 1: all charged, cooling fails at the start"
+                + (f", at the isothermal batch's temperature (of {hold[1]})" if hold else ""),
+            )
+        )
+    elif model != "pfr" and (out := _held_temperature(process, item, case)) and out[0] > t_in:
+        # a conversion, equilibrium or gibbs step whose outlet is hotter than its feed: the
+        # cooling failure from the fresh feed, or from the outlet's state, its unconverted
+        # reactants at the step's temperature (an adiabatic step: the two agree; a heated one:
+        # the outlet's is larger). Without the outlet's composition, the fresh feed at the
+        # step's temperature (on the safe side)
+        left = _outlet_moles(process, item, case)
+        states.append((t_in, None, "accumulation 1: the fresh feed, at the inlet's temperature"))
+        states.append(
+            (
+                out[0],
+                _left_accumulation(reactions, moles, left) if left is not None else None,
+                f"accumulation: the outlet's unconverted reactants, at its temperature (of "
+                f"{out[1]})"
+                if left is not None
+                else f"accumulation 1: the fresh feed, at the step's temperature (of {out[1]}; the "
+                "outlet's composition not known)",
+            )
+        )
+    if not states:
+        states.append((t_in, None, "accumulation 1: the fresh feed, at the inlet's temperature"))
+    # a gas-phase batch is closed (a vent takes its gas from a liquid only): constant volume
+    closed = model == "batch"
+    data = process.ideal_gas()
+    ids = [r.id for r in reactions if counted is None or r.id in counted]
+    best: tuple[Any, ...] | None = None
+    for t_state, held, note in states:
+        rise_s, lacking_s, rises_s = _adiabatic_rise(
+            reactions, moles, t_state, comps, data, counted, closed
+        )
+        share = _share(held)
+        mtsr_s = None
+        if rise_s is not None:
+            # the largest T_p + X_ac dT_ad of one counted reaction, each with its own X_ac
+            mtsr_s = t_state + max([0.0, *(share(r) * max(x, 0.0) for r, x in rises_s.items())])
+        if best is None or (mtsr_s is not None and (best[5] is None or mtsr_s > best[5])):
+            best = (t_state, held, note, rise_s, lacking_s, mtsr_s, rises_s, share)
+    t_p, held, note, rise, lacking, mtsr, rises, share = best
+    # the accumulation reported: of the exothermic reaction setting the MTSR (none, every one
+    # endothermic or its rise not known: the largest of a counted reaction, not the share of
+    # one the feed cannot run)
+    heating = {r: x for r, x in rises.items() if x > 0}
+    setting = max(heating, key=lambda r: (share(r) * heating[r], heating[r]), default=None)
+    accumulation = (
+        share(setting) if setting is not None else max([share(r) for r in ids], default=1.0)
     )
+    entry.notes.append(note)
+    if model == "batch":
+        _vent_note(process, item, entry, inlet, case)
+    entry.process_temperature = t_p
     entry.missing += lacking
     entry.adiabatic_rise = rise
-    if rise is not None:
-        entry.mtsr = t_p + accumulation * rise
+    entry.mtsr = mtsr
+    entry.accumulation = accumulation
     shares = item.batch.vent.shares() if _vented(item) else {}
     counted_rx = [r for r in reactions if counted is None or r.id in counted]
-    extents = _batch_network(entry, item, counted_rx, moles, t_p, accumulation, comps, process)
+    # the network's content: the largest accumulation of a counted reaction
+    whole = max([share(r.id) for r in counted_rx], default=accumulation)
+    extents = _batch_network(entry, item, counted_rx, moles, t_p, whole, comps, process, closed)
     if entry.counted_reactions:
-        everyone, _ = _reaction_rises(reactions, moles, t_p, comps, process.ideal_gas())
+        everyone, _ = _reaction_rises(reactions, moles, t_p, comps, data, closed)
         # an endothermic reaction alone does not heat the content: its MTSR is T_p, as in
         # the semi-batch's model
         entry.per_reaction = {
-            r: {"adiabatic_rise": x, "mtsr": t_p + accumulation * max(x, 0.0)}
+            r: {"adiabatic_rise": x, "mtsr": t_p + share(r) * max(x, 0.0)}
             for r, x in (everyone or {}).items()
         }
     label, end = _end_state(counted_rx, moles, rises, shares, extents)
@@ -984,11 +1145,13 @@ def _batch_network(
     accumulation: float,
     comps: dict[str, Any],
     process: Any,
+    closed: bool = False,
 ) -> dict[str, float] | None:
     """``entry.network`` of a batch, CSTR, PFR or conversion step (ADR 0069), given with
     hazard.potential: network or a consecutive reaction among the counted ones: the counted
-    reactions' largest heat together from the feed over its heat capacity. With
-    hazard.potential: network it sets dT_ad and the MTSR (its extents are returned)."""
+    reactions' largest heat together from the feed over its heat capacity (*closed*: a gas
+    batch at constant volume). With hazard.potential: network it sets dT_ad and the MTSR (its
+    extents are returned)."""
     from chemeascode.domains.safety.reaction_network import network_heat
 
     potential = _potential(item)
@@ -997,7 +1160,7 @@ def _batch_network(
     if potential != "network" and not (pairs and getattr(item, "reactor", None) == "batch"):
         return None
     shares = item.batch.vent.shares() if _vented(item) else {}
-    capacity, heats, lacking = _heats(counted_rx, moles, t_p, comps, process.ideal_gas())
+    capacity, heats, lacking = _heats(counted_rx, moles, t_p, comps, process.ideal_gas(), closed)
     solved = network_heat(counted_rx, moles, heats, shares) if capacity else None
     if solved is None or capacity is None:
         if potential == "network":

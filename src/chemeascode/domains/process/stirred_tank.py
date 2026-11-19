@@ -287,14 +287,19 @@ class _Mixture:
     def nu(self) -> list[list[float]]:
         return [[r.stoichiometry.get(n, 0.0) for r in self.reactions] for n in self.names]
 
-    def rates(self, moles: Sequence[float], t: float, p: float) -> list[float]:
+    def rates(self, moles: Sequence[float], t: float, p: float, absent: bool = True) -> list[float]:
         """kmol/(m3 s), kmol/(kg s) or kmol/(m2 s) per reaction at the composition *moles*; none
-        while the liquid is empty (a solid phase charged, the liquid dosed later, ADR 0074)."""
+        while the liquid is empty (a solid phase charged, the liquid dosed later, ADR 0074).
+        *absent* False gives a used-up reactant its trace to every law (what
+        :meth:`batch_rates` limits)."""
         solid = self.solids
         x = self.fractions(moles)
         if not any(x.values()):
             return [0.0] * len(self.reactions)
         photons = self.absorbed(moles, x)[0] if self.light is not None else None
+        # a reactant used up (or overshot by a trial stage) is absent, not a trace, to a law
+        # without (1 - Q/K): its rate stops there, whatever its order in the reactant (#300)
+        used_up = {n for n, v in zip(self.names, moles, strict=True) if v <= 0} if absent else ()
         found = []
         for r in self.reactions:
             law = r.rate
@@ -303,7 +308,10 @@ class _Mixture:
             stoich = r.stoichiometry
             if solid:  # a solid's activity is 1: no part of Q (ADR 0074)
                 stoich = {n: v for n, v in stoich.items() if n not in solid}
-            value = rate(law, stoich, x, t, p, ln_k, self.liquid, basis, photons)
+            at = x
+            if law.reverse != "equilibrium":
+                at = x | {n: 0.0 for n in used_up if r.stoichiometry.get(n, 0.0) < 0}
+            value = rate(law, stoich, at, t, p, ln_k, self.liquid, basis, photons)
             if solid and value:
                 # a solid that is not there neither reacts nor dissolves
                 held = dict(zip(self.names, moles, strict=True))
@@ -312,6 +320,64 @@ class _Mixture:
                     value = 0.0
             found.append(value)
         return found
+
+    def batch_rates(
+        self,
+        moles: Sequence[float],
+        t: float,
+        p: float,
+        multipliers: Sequence[float],
+        source: Sequence[float],
+    ) -> tuple[list[float], list[int]]:
+        """The rates of :meth:`rates` in a batch of *multipliers* (:meth:`multipliers`), dosed
+        *source* kmol/s of each component: a used-up reactant (moles <= 0) of a law without
+        (1 - Q/K) is consumed no faster than the doses and the other reactions supply it
+        (#300). A law of zero order in it, or one that leaves it out, so runs at that supply,
+        where a rate switching between its full value and 0 at each step would hold the step
+        size at its floor. Also returns the components so held at zero: their net rate is 0."""
+        found = self.rates(moles, t, p, absent=False)
+        used = [
+            i
+            for i, (n, v) in enumerate(zip(self.names, moles, strict=True))
+            if v <= 0 and n not in self.gone
+        ]
+        if not used:
+            return found, []
+        limited = [r.rate.reverse != "equilibrium" for r in self.reactions]
+        nus = [[r.stoichiometry.get(self.names[i], 0.0) for r in self.reactions] for i in used]
+        extent = [x * r for x, r in zip(multipliers, found, strict=True)]
+
+        def balance(k: int) -> tuple[float, float, list[int]]:
+            """kmol/s supplied to and consumed of used[k], and the reactions consuming it."""
+            supply, demand, consumers = source[used[k]], 0.0, []
+            for j, (a, e) in enumerate(zip(nus[k], extent, strict=True)):
+                if a * e < 0 and limited[j]:
+                    demand -= a * e
+                    consumers.append(j)
+                else:
+                    supply += a * e
+            return max(supply, 0.0), demand, consumers
+
+        # a reaction limited by one reactant supplies another less: until none changes (the
+        # shares only fall)
+        for _ in range(len(used) * len(found) + 1):
+            changed = False
+            for k in range(len(used)):
+                supply, demand, consumers = balance(k)
+                if demand > supply * (1 + 1e-12) and demand > 0:
+                    share = supply / demand
+                    for j in consumers:
+                        extent[j] *= share
+                        found[j] *= share
+                    changed = True
+            if not changed:
+                break
+        held = []
+        for k, i in enumerate(used):
+            supply, demand, _ = balance(k)
+            if demand > 0 and demand >= supply * (1 - 1e-9):
+                held.append(i)
+        return found, held
 
     def fractions(self, moles: Sequence[float]) -> dict[str, float]:
         """The liquid's mole fractions at *moles*: a vented gas (``gone``) and a solid phase
@@ -1215,6 +1281,17 @@ def _solve_batch(
     absorb = [absorption.get(names[i], 0.0) for i in vented]
     absorbing = any(absorb)
     absorb_at = head_at + 2 * ng
+    # running totals that may go negative, kept out of the integrator's clip at zero: the
+    # vapour's heats (the vessel's and the condenser's: a condenser warmer than the batch warms
+    # the gas), the head space's expelled gas (an expanding head space draws gas back, ADR 0071)
+    # and the heat its dissolved share released (an endothermic absorption takes heat in)
+    signed = frozenset(
+        [
+            *(range(head_at - 2, head_at) if nv else ()),
+            *range(head_at + ng, head_at + 2 * ng),
+            *([absorb_at] if absorbing else ()),
+        ]
+    )
     molar_volume = (
         [mix.solids.get(n) or (mix.liquid.molar_volumes.get(n) or 0.0) for n in names]
         if mix.liquid is not None
@@ -1455,13 +1532,17 @@ def _solve_batch(
                 t = boiling(moles)
             v = volume_of(moles, t)
             mult = mix.multipliers(v, moles)
-            rates = mix.rates(moles, t, pressure_of(moles, t))
+            if regime.factors is not None:  # ADR 0074: an initiation's or a lamp's factor
+                mult = [x * f for x, f in zip(mult, regime.factors, strict=True)]
+            # with the factors, so that a used-up reactant is consumed no faster than it is
+            # supplied at the extents the batch runs (#300)
+            rates, held = mix.batch_rates(moles, t, pressure_of(moles, t), mult, source)
             extent = [mult[j] * rates[j] for j in range(m)]
-            if regime.factors is not None:
-                extent = [e * f for e, f in zip(extent, regime.factors, strict=True)]
             dn = [
                 sum(nu[i][j] * extent[j] for j in range(m)) + source[i] for i in range(len(names))
             ]
+            for i in held:  # used up, consumed as fast as it comes: none of it, not round-off
+                dn[i] = 0.0
             leaving = []  # kmol/s of each vented component leaving as it forms
             dissolving = 0.0  # kW its dissolved share releases (a heat of absorption, ADR 0071)
             for i, f, h_abs in zip(vented, vent_share, absorb, strict=True):
@@ -1607,6 +1688,8 @@ def _solve_batch(
             moving["light"] += 0.5 * (a[1] + b[1]) * h
             moving["photons"] += 0.5 * (a[2] + b[2]) * h
 
+    dosing: list[list[float]] = [[0.0] * len(names)]  # kmol/s dosed now
+
     def run(
         state: list[float],
         clock: float,
@@ -1621,17 +1704,19 @@ def _solve_batch(
         """From *state* at *clock* s to *t_end* s or the *target* conversion, *source* kmol/s
         dosed meanwhile and *mixing* kW released as it mixes in (a heat of solution), in the
         ADR 0074 *regime*; the accepted steps go into the result."""
-        nonlocal heat, peak, cooling, stalled
+        nonlocal heat, peak, cooling, stalled, clipped
 
+        forced = 0  # steps taken at the floor of the step size, over the tolerance
         derivatives = make_derivatives(source, sensible, mixing, regime)
         active[:] = [derivatives]
         current[:] = [regime]
+        dosing[:] = [source]
 
         h = ((t_end - clock) if t_end is not None else 1.0) / 1000.0
         while True:
             if t_end is not None:
                 h = min(h, t_end - clock)
-            new, error = _dopri_step(derivatives, state, h)
+            new, error = _dopri_step(derivatives, state, h, signed)
             scale = [
                 max(abs(a), abs(b), 1e-9 * total0)
                 for a, b in zip(state[:-2], new[:-2], strict=True)
@@ -1640,19 +1725,30 @@ def _solve_batch(
             if err > 1e-7 and h > 1e-12:
                 h *= max(0.2, 0.9 * (1e-7 / err) ** 0.2)
                 continue
+            if err > 1e-7:
+                # taken at the floor of the step size, over the tolerance: a rate that jumps
+                # there. Refused when it keeps doing so, rather than crawling on (#300)
+                forced += 1
+                if forced > 1000:
+                    raise TankError(
+                        f"the integration cannot pass {clock:.4g} s: its step size stays at "
+                        "its floor, a rate that switches on and off there"
+                    )
             if target is not None and conversion(new, clock + h) >= target:
                 # the target lies inside this step: bisect the step size
                 lo, hi = 0.0, h
                 for _ in range(60):
                     mid = (lo + hi) / 2
-                    trial, _ = _dopri_step(derivatives, state, mid)
+                    trial, _ = _dopri_step(derivatives, state, mid, signed)
                     if conversion(trial, clock + mid) >= target:
                         hi = mid
                     else:
                         lo = mid
-                new, _ = _dopri_step(derivatives, state, hi)
+                new, _ = _dopri_step(derivatives, state, hi, signed)
                 h = hi
-            new[:-2] = [max(v, 0.0) for v in new[:-2]]
+            # what the clip below adds: a component a step overshot below zero (#300)
+            clipped += sum(-v for i, v in enumerate(new[:size]) if v < 0 and i not in signed)
+            new[:-2] = [v if i in signed else max(v, 0.0) for i, v in enumerate(new[:-2])]
             if reflux:  # the content at its bubble point (ADR 0074)
                 new[-2] = boiling(new[:size])
             # what reacted in this step: the change of moles less what was dosed, and what left
@@ -1682,9 +1778,16 @@ def _solve_batch(
                     cooling = max(cooling, released / h + warming + mixing)
             if varying:
                 account(state, new, h, sensible, regime, clock)
-            previous = conversion(state, clock)
+            # the step's progress: the largest change of any component, not of the key's
+            # conversion alone, which stops when the key is used up while another reaction
+            # still runs (A -> B -> C, #297)
+            progress = max(abs(b - a) for a, b in zip(state[:size], new[:size], strict=True))
+            progress /= total0
+            # nor a step held short: its change at its pace over the time left (at least the
+            # time so far) must be nothing as well
+            ahead = max(t_end - clock - h if t_end is not None else 0.0, clock + h)
+            idle = progress < 1e-12 and progress * ahead / h < 1e-9
             clock += h
-            progress = abs(conversion(new, clock) - previous)
             state = new
             record(state, clock)
             if t_end is not None and clock >= t_end * (1 - 1e-12):
@@ -1694,7 +1797,7 @@ def _solve_batch(
             if not post:
                 h = min(h * 2, max(clock, h) * 10)
                 continue
-            stalled = stalled + 1 if progress < 1e-12 else 0
+            stalled = stalled + 1 if idle else 0
             if target is None and stalled > 50:
                 result.notes.append(
                     f"converts no further after {clock:.4g} s (equilibrium, or a reactant used up)"
@@ -1720,10 +1823,10 @@ def _solve_batch(
             return max(out, 0.0) + (sum(rates[at : at + nv]) if nv else 0.0)
         moles, t = state[:size], state[-2]
         mult = mix.multipliers(volume_of(moles, t), moles)
-        rates = mix.rates(moles, t, pressure_of(moles, t))
-        extent = [mult[j] * rates[j] for j in range(m)]
         if (factors := current[0].factors) is not None:  # ADR 0074
-            extent = [e * f for e, f in zip(extent, factors, strict=True)]
+            mult = [x * f for x, f in zip(mult, factors, strict=True)]
+        rates, _ = mix.batch_rates(moles, t, pressure_of(moles, t), mult, dosing[0])
+        extent = [mult[j] * rates[j] for j in range(m)]
         leaving = [
             f * sum(max(nu[i][j] * extent[j], 0.0) for j in range(m))
             for i, f in zip(vented, vent_share, strict=True)
@@ -1797,6 +1900,7 @@ def _solve_batch(
     peak = 0.0
     cooling = 0.0
     stalled = 0
+    clipped = 0.0  # kmol the step-end clip added
     clock = 0.0
     peak_vent = 0.0
     peak_vent_time = 0.0
@@ -1854,6 +1958,12 @@ def _solve_batch(
         )
     elif batch.time is not None or target is not None:
         finish(clock + batch.time if batch.time is not None else None, target)
+    if clipped > 1e-6 * (total0 + sum(dosed)):
+        # the clip made matter: a rate that kept converting a component no longer there (#300)
+        raise TankError(
+            f"the balance does not close: the integration took {clipped:.4g} kmol of components "
+            "below zero and clipped them, a rate law that converts a used-up reactant"
+        )
     result.outlet = dict(zip(names, state[:size], strict=True))
     change = [b - a - d for a, b, d in zip(n0, state[:size], dosed, strict=True)]
     for k, i in enumerate(vented):  # what formed and left by the vent formed all the same

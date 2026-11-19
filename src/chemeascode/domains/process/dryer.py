@@ -29,10 +29,10 @@ the dried product and the vapour:
 - **filtration time** (a recipe's ``filter`` ``from:`` a ``solid_separation:`` with
   ``filtration:``): Ruth's constant-pressure cake filtration, ``t = mu (alpha M V / (2 A^2) +
   R_m V / A) / dP``, M the dry solid of one batch's cake, V its filtrate's volume; a cake wash
-  (ADR 0072) then passes its filtrate at the final filtration rate, ``t_w = mu V_w (alpha M /
+  (ADR 0076) then passes its filtrate at the final filtration rate, ``t_w = mu V_w (alpha M /
   A^2 + R_m / A) / dP``.
 
-ADR 0072 adds, each only where the dryer asks for it:
+ADR 0076 adds, each only where the dryer asks for it:
 
 - **selective drying** (``selectivity: raoult``): the cake liquid evaporates as an open
   (Rayleigh) evaporation of an ideal liquid at the drying temperature, ``dn_i / n_i = (P_i /
@@ -102,13 +102,18 @@ def dry_mass(
     pressures: dict[str, float] | None = None,
 ) -> tuple[dict[str, float], dict[str, float]]:
     """(product, vapour) kg/h by component of drying *mass* to *moisture*
-    (:class:`~.schema.ResidualMoisture`); DryerError when the cake is already drier. The
-    volatiles kept have the inlet's ratio, or with *pressures* (kPa of each volatile at the
-    drying temperature) what an open evaporation of an ideal liquid leaves (:func:`kept_by`)."""
+    (:class:`~.schema.ResidualMoisture`); DryerError when the cake holds no volatiles or is
+    already drier. The volatiles kept have the inlet's ratio, or with *pressures* (kPa of each
+    volatile at the drying temperature) what an open evaporation of an ideal liquid leaves
+    (:func:`kept_by`)."""
     solid = sum(v for n, v in mass.items() if n not in volatiles)
     wet = sum(v for n, v in mass.items() if n in volatiles)
     if solid <= 0:
         raise DryerError("the inlet holds nothing but volatiles: nothing is left to dry")
+    if wet <= 0:
+        raise DryerError(
+            f"the cake holds none of the volatiles ({', '.join(volatiles)}): nothing to dry"
+        )
     x = moisture.value
     kept = x * solid if moisture.basis == "per_kg_solid" else x / (1 - x) * solid
     if kept > wet * (1 + 1e-12) + 1e-12:
@@ -213,7 +218,7 @@ class DryerResult:
     latent_heat: dict[str, tuple[float, str]] = field(default_factory=dict)
     energy: dict[str, Any] | None = None
     batch_hours: float | None = None  # of flows one batch makes (process/recipe.yaml)
-    #: ADR 0072, each left out of the entry when the dryer does not ask for it: solid -> kg/h
+    #: ADR 0076, each left out of the entry when the dryer does not ask for it: solid -> kg/h
     #: sublimed (in ``vapour`` as the component it maps to), the cooling after drying, the
     #: vacuum condenser, and notes (a vapour pressure used outside its range)
     sublimed: dict[str, float] = field(default_factory=dict)
@@ -296,7 +301,7 @@ def energy_balance(
 ) -> dict[str, Any]:
     """The dryer's duty (kW, heat supplied) with its terms, or what is missing. With
     ``cooling.vessel_temperature`` the vessel's ``vessel_heat_capacity`` is heated from there;
-    *sublimed* (kg/h by solid) takes its ``sublimation.heat`` (ADR 0072). *metal*: the recipe
+    *sublimed* (kg/h by solid) takes its ``sublimation.heat`` (ADR 0076). *metal*: the recipe
     vessel's (:func:`.recipe.dryer_metal`, ADR 0075) instead of ``vessel_heat_capacity``, heated
     from the temperature the vessel was left at, else from the wet cake's (never from
     ``cooling.vessel_temperature``: the dryer's cooling cools back only its own
@@ -381,7 +386,7 @@ def energy_balance(
         + ", over the efficiency; the vapour's superheat and the heats of desorption not "
         "included",
     }
-    if spec.sublimation is not None:  # ADR 0072: only where asked for
+    if spec.sublimation is not None:  # ADR 0076: only where asked for
         found["sublimation_kJ_h"] = sublimation
     if spec.cooling is not None:
         found["vessel_from_K"] = start
@@ -396,7 +401,7 @@ def cooling_duty(
     recipe_cool: str | None = None,
 ) -> dict[str, Any]:
     """The heat (kW, removed) of cooling the product to its discharge temperature and the
-    vessel's metal back for the next batch (:class:`~.schema.DryerCooling`, ADR 0072), or what
+    vessel's metal back for the next batch (:class:`~.schema.DryerCooling`, ADR 0076), or what
     is missing. *recipe_cool*: a recipe operation that heats or cools the dried product after
     the drying (:func:`.recipe.dryer_cooled`): with ``product_temperature`` too the product's
     cooling would be counted twice, so it is missing (ADR 0075)."""
@@ -443,7 +448,7 @@ def cooling_duty(
 def condense_vapour(
     process: Any, spec: Any, vapour: dict[str, float], latent: dict[str, tuple[float, str]]
 ) -> dict[str, Any]:
-    """The vacuum condenser (:class:`~.schema.DryerCondenser`, ADR 0072) on the volatiles'
+    """The vacuum condenser (:class:`~.schema.DryerCondenser`, ADR 0076) on the volatiles'
     *vapour* (kg/h): what condenses and what passes (``condensate_kg_h``, ``gas_kg_h``), its
     duty (kW, removed) or what is missing, and notes."""
     data = spec.condenser
@@ -636,7 +641,7 @@ def solve_node(
             "outlets": dict(spec.outlets),
         }
     }
-    # ADR 0072: only what the dryer asks for, so that other dryers' fingerprints stay
+    # ADR 0076: only what the dryer asks for, so that other dryers' fingerprints stay
     for name in ("pressure", "selectivity", "sublimation", "cooling", "condenser"):
         dumped = spec.model_dump(mode="json", include={name})
         if dumped:
@@ -669,7 +674,7 @@ def node_outlets(spec: Any, result: DryerResult) -> dict[str, dict[str, float]]:
 
 
 def outlet_temperatures(spec: Any) -> dict[str, float]:
-    """Outlet port -> K that ``cheme process propagate`` writes (ADR 0072): with ``cooling:``
+    """Outlet port -> K that ``cheme process propagate`` writes (ADR 0076): with ``cooling:``
     or ``condenser:`` only, the product at its discharge temperature (else the drying
     temperature), the vapour at the drying temperature (past a condenser with a condensate
     outlet: the condenser's), the condensate at the condenser's."""
@@ -681,6 +686,14 @@ def outlet_temperatures(spec: Any) -> dict[str, float]:
         found[spec.outlets["vapour"]] = spec.condenser.temperature
         found[spec.outlets["condensate"]] = spec.condenser.temperature
     return found
+
+
+def vapour_shape(spec: Any, result: DryerResult) -> dict[str, float]:
+    """The vapour's composition as kg/h of each volatile (the inlet's volatile composition),
+    also when nothing evaporates (a vapour outlet of no flow)."""
+    if result.evaporated_kg_h > 0:
+        return result.vapour
+    return {n: v for n, v in result.product.items() if n in spec.volatiles}
 
 
 def _recipe_hours(process: Any, case: str) -> float | None:
@@ -727,7 +740,7 @@ def dryer_entry(
     differ = []
     spec = node.dryer
     tol = process.flowsheet.tolerance
-    # the heat in (energy.port), and (ADR 0072) the cooling's and the condenser's heat out
+    # the heat in (energy.port), and (ADR 0076) the cooling's and the condenser's heat out
     for data, part, out in (
         (spec.energy, result.energy, False),
         (spec.cooling, result.cooling, True),
@@ -834,7 +847,7 @@ def wash_hours(filtration: Any, solid_kg: float, wash_m3: float, area: float) ->
     """h to pass *wash_m3* of wash filtrate through the cake of *solid_kg* at the pressure and
     the filtrate's viscosity of *filtration*: at the final filtration rate of Ruth's equation,
     ``dV/dt = A dP / (mu (alpha M / A + R_m))``, so ``t_w = mu V_w (alpha M / A^2 + R_m / A) /
-    dP`` (ADR 0072)."""
+    dP`` (ADR 0076)."""
     mu = filtration.viscosity * 1e-3
     dp = filtration.pressure_difference * 1e3
     cake = filtration.specific_cake_resistance * solid_kg * wash_m3 / area**2

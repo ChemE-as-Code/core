@@ -268,11 +268,50 @@ def loop_inputs(process: Process, case: str, tears: list[str]) -> str:
     material stream upstream of a tear's source (the loop and what feeds it), those nodes as
     declared but for what no sweep reads (:data:`NOT_SWEPT`), their reactions, the components,
     the catalysts, the tears and the convergence settings with the tolerance; with design
-    specifications (ADR 0070), those too (the flows they set are calculated, not inputs)."""
+    specifications (ADR 0070), those too (the flows they set are calculated, not inputs); with
+    a node among them whose outlets take the recipe's hours of flows per batch (a still's end
+    at a time, ADR 0068), the recipe's batch size and what the rate of its stream depends on
+    (core#295)."""
     data = upstream(process, case, tears)
+    if (size := _batch_size(process, data["nodes"])) is not None:
+        # the hours of flows are the batch size over its stream's rate (recipe.batch_hours)
+        data = upstream(process, case, [*tears, size.stream])
+        data["recipe"] = {
+            "batch_size": size.model_dump(mode="json", exclude=NOT_INPUTS),
+            "stream": _declared(process, size.stream, case),
+        }
     if process.flowsheet.specs:
         data["specs"] = [s.model_dump(mode="json", by_alias=True) for s in process.flowsheet.specs]
     return value_fingerprint(data)
+
+
+def _batch_size(process: Process, nodes: Any) -> Any:
+    """The recipe's batch size (``process/recipe.yaml``) when one of *nodes* is a still whose
+    outlets depend on the hours of flows per batch (an end at a time, ADR 0068), else None."""
+    from chemeascode.domains.process.batch_still import outlets_need_hours
+    from chemeascode.domains.process.recipe import load_recipe
+
+    stills = [getattr(process.nodes.get(n), "still", None) for n in nodes]
+    if not any(s is not None and outlets_need_hours(s) for s in stills):
+        return None
+    try:
+        recipe, _, _ = load_recipe(process.root)
+    except (OSError, ValueError):  # as batch_still._circular_hours
+        return None
+    return recipe.batch_size if recipe is not None else None
+
+
+def _declared(process: Process, sid: str, case: str) -> dict[str, Any]:
+    """The given and assumed flow and composition of stream *sid* in *case*."""
+    from chemeascode.domains.process.propagate import ours
+
+    stream = next((s for s in process.flowsheet.streams if s.id == sid), None)
+    state = stream.state.get(case) if stream is not None else None
+    return {
+        name: getattr(state, name).model_dump(mode="json", exclude=NOT_INPUTS)
+        for name in ("composition", "flow")
+        if state is not None and getattr(state, name) is not None and not ours(getattr(state, name))
+    }
 
 
 def upstream(process: Process, case: str, streams_from: list[str]) -> dict[str, Any]:
@@ -419,7 +458,8 @@ def converge(
 
     if not tears:
         return plain()
-    index = {t.stream: i for i, t in enumerate(fs.tears)}
+    # the entry iterated: a stream named twice is iterated at its first (core#296)
+    index = {t.stream: i for i, t in enumerate(fs.tears) if i not in bad}
     x: dict[str, dict[str, float]] = {}
     for sid, tear in tears.items():
         try:

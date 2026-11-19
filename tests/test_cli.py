@@ -382,6 +382,8 @@ def test_schema_lists_kinds(plant: Path, monkeypatch):
         "lci_estimate",
         "lca_mapping_profile",
         "adapter-result",
+        "worker-request",
+        "trajectory",
         "risk-matrix",
         "hazop-study",
         "narrative",

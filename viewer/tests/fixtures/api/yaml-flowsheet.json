@@ -1596,6 +1596,17 @@
             "title": "Source",
             "type": "string"
           },
+          "producer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Producer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "fingerprint": {
             "anyOf": [
               {
@@ -3347,6 +3358,33 @@
         "title": "Port",
         "type": "object"
       },
+      "Producer": {
+        "additionalProperties": false,
+        "properties": {
+          "tool": {
+            "const": "cheme process simulate",
+            "default": "cheme process simulate",
+            "title": "Tool",
+            "type": "string"
+          },
+          "adapter": {
+            "minLength": 1,
+            "title": "Adapter",
+            "type": "string"
+          },
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "adapter",
+          "model"
+        ],
+        "title": "Producer",
+        "type": "object"
+      },
       "PurityEnd": {
         "additionalProperties": false,
         "properties": {
@@ -3419,6 +3457,17 @@
             "default": "",
             "title": "Source",
             "type": "string"
+          },
+          "producer": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Producer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "fingerprint": {
             "anyOf": [
@@ -4856,6 +4905,12 @@
             "default": false,
             "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; every cut with its own boil-up: the mean over the boil-up), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
             "title": "Heat Up Time",
+            "type": "boolean"
+          },
+          "flash": {
+            "default": false,
+            "description": "A charge that enters above its bubble point at the still's pressure (the first cut's without a feed) flashes adiabatically to it first, differentially (the vapour leaving as it forms, at the liquid's bubble point): the charge cools to the flashed liquid's bubble point on its own sensible heat (liquid_heat_capacity), the vapour (heat_of_vaporization) joins the first cut through the condenser, and the boil-up starts from the flashed liquid, so its duty no longer evaporates it (volatility raoult, the charge's temperature; ADR 0077); default: no flash.",
+            "title": "Flash",
             "type": "boolean"
           },
           "column": {
