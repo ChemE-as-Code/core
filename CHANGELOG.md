@@ -458,6 +458,31 @@ both sides of any, and the library gives the same results):
 - The `separation-method-selection` skill no longer says a vessel holds at most one batch or
   semi-batch step (ADR 0073).
 
+Where this release's features meet the fixes above (none of these was in 1.12.0; no library
+entry uses both sides of any, and the library gives the same results):
+
+- A batch's initiation factor or an unlit lamp (ADR 0074) scales the extents core#300's limit
+  on a used-up reactant balances against its supply. It multiplied the extents after that
+  limit, so a dose of a reactant a zero-order law uses up was taken as consumed in full while
+  only the factor's share of it reacted: dosing 1 kmol A into A -> B (zero order, k V above
+  the dose rate) held at a factor 0.1 for the whole dosing gave 0.55 kmol B and lost the rest
+  of the A; it now gives 1.0 kmol B, as it does held at 0.01 until it initiates mid-dosing
+  (0.7525 before).
+- A recipe `heat` or `cool` with `temperatures` and a `stream:` (ADR 0075) writes the heat of
+  the content its jacket time takes: core#301's charge before the first `dose` or `react`. A
+  plain batch's heat-up before `react` was written at its end content (1 kmol/h of C where its
+  jacket time and `heats[].content_kJ` took the 2 kmol/h charged).
+- `cheme process reactor-hazards` screens a batch with a temperature `program` (ADR 0074) from
+  the programme's first point, where its model starts, all charged, and one at `heat: reflux`
+  from its charge's bubble point at the inlet's pressure (its temperature where the volatility
+  data are lacking), each with a note. With core#304 a programme's batch was screened at its
+  outlet's temperature, the programme's end, and a reflux batch, like a programme's before,
+  at its charge's temperature.
+- A dryer with a `condenser:` and a `condensate` outlet (ADR 0076) whose cake evaporates
+  nothing, or whose condenser condenses all of the vapour or none, writes the outlet of no
+  flow at the inlet's volatile composition, as core#309 writes the vapour; propagate stopped
+  with a ValidationError on the condensate's empty composition.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,

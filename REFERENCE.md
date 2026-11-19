@@ -1041,7 +1041,10 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   reactor), Stoessel's criticality class; a cooled bed's hot-spot sensitivity
   (`domains/safety/reaction_hazards.py`, findings `cheme.reactor-hazard-*`). A semi-batch's
   accumulation `X_ac` is the dosed reactant's largest over the run and its MTSR the
-  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`. A
+  cooling-failure temperature at the worst moment (ADR 0050); a batch keeps `X_ac = 1`, from
+  where its model starts: an isothermal batch at its outlet's given or assumed temperature
+  (core#304), one with a `program` at its first point, one at `heat: reflux` at its charge's
+  bubble point (ADR 0074), else the charge's temperature. A
   reaction with `kind: phase-change` (or one component into one other of the same formula, one
   of them `phase: solid`, declaring no `heat_of_reaction`) is a phase change: a step whose
   reactions are all phase changes is not screened (`cheme.reactor-hazard-phase-change`, info;

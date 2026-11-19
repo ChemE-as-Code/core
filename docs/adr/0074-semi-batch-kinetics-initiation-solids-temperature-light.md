@@ -100,7 +100,10 @@ solves exactly as before: same break points, same arithmetic.
   photochemical rate's light (a light without one: warning), and that these terms sit on
   liquid-phase reactions. The screening's gas release takes the particles and the light from
   the charge in the case screened (`extent_rates(..., case)`). A batch (not semi-batch) with a
-  programme or at reflux keeps `T_p` the charge's, with a note.
+  programme or at reflux is screened from where its model starts, all charged, with a note: a
+  programme's first point (its outlet's temperature, at which core#304 screens an isothermal
+  batch, is the programme's end), at reflux the charge's bubble point at the inlet's pressure
+  (the charge's temperature where its volatility data are lacking).
 
 ## Consequences
 

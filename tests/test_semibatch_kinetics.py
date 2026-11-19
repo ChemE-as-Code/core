@@ -799,3 +799,134 @@ def test_process_reactors_leaves_a_photochemical_rate_to_the_tank(tmp_path):
     assert entry["rate"] is None and "photochemical" in entry["rate_note"]
     assert not [m for m in row["missing"] if "light" in m]
     assert row["tank"]["light"]["photons_absorbed_kmol_h"] > 0
+
+
+# -- where ADR 0074 meets core#297-#300 (merged with main) -----------------------------------------
+
+
+@pytest.mark.parametrize("start", [7200.0, 1800.0])
+def test_an_initiation_s_factor_limits_a_used_up_dosed_reactant_at_its_supply(start):
+    """A zero-order rate (core#300) on a dosed reactant under an initiation's factor (ADR
+    0074): the factor scales the extents ``batch_rates`` balances a used-up reactant's supply
+    against. Held at 0.1 the whole dosing (``0.1 k V`` still above the dose rate) the dose
+    reacts as it comes; held at 0.01 until 1800 s, A accumulates (``0.01 k V`` below it) and
+    is used up after the initiation. Either way every kmol dosed ends as B."""
+    k, q = 1e-2, 1.0 / 3600.0  # kmol/(m3 s) at V of about 0.5 m3; kmol/s dosed
+    factor = 0.1 if start > 3600.0 else 0.01
+    batch = _batch(
+        dosing=[{"stream": "D", "time": 3600}],
+        time=600.0,
+        initiation={"time": start, "factor": factor, "provenance": "assumed"},
+    )
+    dose = Dose({"A": 1.0}, 300.0, [(0.0, 3600.0, 1.0)])
+    zero = _reactions({"form": "power_law", "k": {"A": k}, "orders": {}})
+    result = _solve(zero, batch, {"S": 5.0}, doses=[dose])
+    assert result.outlet["B"] == pytest.approx(1.0, rel=1e-6)
+    assert result.outlet["A"] == pytest.approx(0.0, abs=1e-9)
+    assert result.extents["R1"] == pytest.approx(1.0, rel=1e-6)
+    if start < 3600.0:  # the accumulation before the initiation: dosed less what reacted
+        assert result.max_accumulation > 0.4
+    else:
+        assert result.max_accumulation == pytest.approx(0.0, abs=1e-6)
+    # q is below 0.1 k V at the charge: the dose's supply is what limits it
+    assert 0.1 * k * 0.5 > q
+
+
+def test_a_surface_rate_runs_its_solid_out_inside_the_step_end_clip():
+    """The shrinking sphere run past its end, ``tau = 3 n_0 / (k A_0)``: the solid used up
+    (ADR 0074) neither reacts on nor trips the step-end clip's balance check (core#300); the
+    liquid gets exactly the solid charged."""
+    k, d, n0 = 1e-6, 1e-4, 0.5
+    area = 6.0 * n0 * M_MASS / (DENSITY * d)
+    tau = 3.0 * n0 / (k * area)
+    batch = _batch(
+        time=2.0 * tau,
+        solids={"M": {"density": DENSITY, "diameter": d, "provenance": "assumed"}},
+    )
+    result = _solve(
+        _surface_reactions(k), batch, {"M": n0, "A": 2.0, "S": 3.0}, components=_components()
+    )
+    assert result.outlet["M"] == pytest.approx(0.0, abs=1e-9)
+    assert result.outlet["P"] == pytest.approx(n0, rel=1e-9)
+    assert result.outlet["A"] == pytest.approx(2.0 - n0, rel=1e-9)
+    assert result.solids["M"]["area_end_m2"] == pytest.approx(0.0, abs=1e-6)
+
+
+PROGRAMMED = (
+    dosed.FLOWSHEET.replace("reactor: semibatch", "reactor: batch")
+    .replace(
+        "batch: {dosing: [{stream: S2, time: 3600}], provenance: assumed}",
+        "batch: {time: 3600, program: {points: [[0, 300], [3600, 340]], provenance: assumed},\n"
+        "           provenance: assumed}",
+    )
+    .replace(
+        "    ports: [{id: in, direction: in}, {id: dose, direction: in},",
+        "    ports: [{id: in, direction: in},",
+    )
+)
+
+
+def _single_inlet(flowsheet, composition="{A: 0.4, S: 0.6}"):
+    """*flowsheet* with one inlet (no dose stream) of *composition*."""
+    head, tail = flowsheet.split("  - id: S2\n")
+    tail = tail[tail.index("  - id: S3\n") :]
+    head = head.replace("  - {id: G, ports: [{id: out, direction: out}]}\n", "")
+    return head.replace("values: {S: 1.0}", f"values: {composition}") + tail
+
+
+def test_the_screening_starts_a_programme_batch_at_its_programme(tmp_path):
+    """core#304 screens an isothermal batch at its outlet's temperature; a programme's batch
+    (ADR 0074) ends there (340 K) but starts at its first point (300 K), where all is charged:
+    T_p is the programme's start, with ADR 0074's note."""
+    flowsheet = _single_inlet(PROGRAMMED).replace(
+        '    template: liquid\n"""', "    template: liquid\n"
+    ) + ("    state:\n      design:\n        temperature: {value: 340, provenance: assumed}\n")
+    ws = dosed._plant(tmp_path, flowsheet)
+    report = screen(ws.root)
+    (entry,) = report.entries
+    assert entry.process_temperature == pytest.approx(300.0)
+    assert entry.accumulation == 1.0
+    rise = 100000.0 * 2.0 / (150.0 * 5.0)  # 2 kmol A in 5 kmol of liquid
+    assert entry.mtsr == pytest.approx(300.0 + rise, rel=1e-9)
+    assert any("follows its programme: T_p is its start" in n for n in entry.notes)
+
+
+def test_the_screening_starts_a_reflux_batch_at_its_charge_s_bubble_point(tmp_path):
+    """A batch at reflux (ADR 0074) starts at its charge's bubble point at the inlet's
+    pressure, not at the charge's 300 K (core#304's principle: where the model holds it)."""
+    flowsheet = _single_inlet(
+        dosed.FLOWSHEET.replace("reactor: semibatch", "reactor: batch")
+        .replace(
+            "batch: {dosing: [{stream: S2, time: 3600}], provenance: assumed}",
+            "batch: {time: 3600, heat: reflux, provenance: assumed}",
+        )
+        .replace(
+            "    ports: [{id: in, direction: in}, {id: dose, direction: in},",
+            "    ports: [{id: in, direction: in},",
+        )
+    )
+    ws = dosed._plant(tmp_path, flowsheet)
+    materials = (ws.root / "process/materials.yaml").read_text()
+    materials = materials.replace(
+        "  - {id: S, name: S, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,\n"
+        "     liquid_heat_capacity: 150, normal_boiling_point: 400}",
+        "  - {id: S, name: S, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,\n"
+        "     liquid_heat_capacity: 150,\n"
+        "     vapour_pressure: {a: 4.0, b: 1200.0, c: -50.0, provenance: assumed}}",
+    )
+    # only S boils (A and B without volatility data), as in the model's reflux test
+    (ws.root / "process/materials.yaml").write_text(
+        materials.replace(
+            "liquid_heat_capacity: 150, normal_boiling_point: 400}", "liquid_heat_capacity: 150}"
+        )
+    )
+    report = screen(ws.root)
+    (entry,) = report.entries
+    start = _antoine_t(101.325 / 0.6)  # x_S P_S(T) = P
+    assert entry.process_temperature == pytest.approx(start, rel=1e-6)
+    assert any("(reflux): T_p is the charge's bubble point" in n for n in entry.notes)
+    # A with a boiling point only: no bubble point (the model refuses it), the charge's
+    (ws.root / "process/materials.yaml").write_text(materials)
+    (entry,) = screen(ws.root).entries
+    assert entry.process_temperature == pytest.approx(300.0)
+    assert any("its bubble point not known" in n for n in entry.notes)

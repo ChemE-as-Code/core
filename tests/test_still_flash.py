@@ -454,3 +454,39 @@ def test_a_columns_first_cut_takes_the_flash_unrectified():
     assert cut.moles["B"] > plain.cuts[0].moles["B"]
     # and saves the reboiler (R + 1) times what it would boil up for the flash's vapour
     assert result.energy < plain.energy - flash.heat
+
+
+def test_the_flash_and_adr_0075_s_still_terms_start_from_the_flashed_liquid():
+    """ADR 0077 with ADR 0075 (merged in 1.13.0): the sensible rise, the heat losses and the
+    agitator run over the boil-up, which starts from the flashed liquid at its bubble point. So
+    a flashed charge gives them as that liquid charged at its bubble point does; the flash's
+    own cooling is the vapour's latent heat, on the condenser, not a sensible rise."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.process.duties import still_duty
+
+    t_in, p = 365.0, 30.0
+    charge = {"A": 5.0, "B": 5.0, "P": 1.0}
+    extras = {
+        "sensible_heat": True,
+        "heat_loss": {"ua": 500.0, "ambient_temperature": 293.15, "provenance": "assumed"},
+        "agitator_power": {"value": 3.0, "provenance": "assumed"},
+    }
+    comps = _components()
+    spec = _still(flash=True, **extras)
+    flashed = solve_still(spec, charge, None, comps, p, charge_temperature=t_in)
+    fl = flashed.flash
+    assert fl.moles and fl.heat > 0
+    left = {n: v - fl.moles.get(n, 0.0) for n, v in charge.items()}
+    plain = solve_still(_still(**extras), left, None, comps, p, charge_temperature=fl.temperature)
+    assert flashed.temperatures[0] == pytest.approx(fl.temperature, abs=1e-8)
+    assert flashed.sensible_rise == pytest.approx(plain.sensible_rise, rel=1e-6)
+    assert flashed.heat_loss == pytest.approx(plain.heat_loss, rel=1e-6)
+    assert flashed.time == pytest.approx(plain.time, rel=1e-6)
+    duty = still_duty(SimpleNamespace(id="ST", still=spec), flashed)
+    reference = still_duty(SimpleNamespace(id="ST", still=_still(**extras)), plain)
+    for term in ("boil-up", "sensible rise", "heat losses", "agitation"):
+        assert duty.terms_kW[term] == pytest.approx(reference.terms_kW[term], rel=1e-6)
+    # the flash's heat is the vapour's latent heat, apart from these terms
+    latent = sum(v * LATENT[n] for n, v in fl.moles.items())
+    assert fl.heat == pytest.approx(latent, rel=1e-9)

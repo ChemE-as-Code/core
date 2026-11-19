@@ -976,6 +976,39 @@ def test_sublimation_cooling_and_the_condenser_against_hand_calculations(tmp_pat
     ) in basis.assumptions
 
 
+def test_a_dryer_with_a_condenser_that_evaporates_nothing_writes_its_outlets(tmp_path):
+    """core#309 with ADR 0076: a cake already at its residual moisture (0.1 of 500 kg/h)
+    evaporates nothing; the vapour past the condenser and the condensate have no flow, each
+    written at the inlet's volatile composition and the condenser's temperature (the
+    condensate's composition was empty: a ValidationError in propagate). The cooling still
+    cools the product. A cake without the volatiles stays a dryer finding."""
+    fs = DRYER.replace(
+        """values: {X_s: 0.8, X: 0.0033333333333333335,
+                      NaBr: 0.013333333333333334, H2O: 0.18333333333333332}""",
+        "values: {X_s: 0.9, H2O: 0.1}",
+    ).replace("residual_moisture: {value: 0.002,", "residual_moisture: {value: 0.1,")
+    assert "{X_s: 0.9, H2O: 0.1}" in fs and "{value: 0.1," in fs
+    ws = _plant(tmp_path, DRYER_MATERIALS, fs)
+    process = _propagated(ws)
+    for stream in ("S5", "S6"):
+        state = _stream(process, stream).state["design"]
+        assert state.flow.value == 0.0
+        assert state.composition.values == {"H2O": 1.0}
+        assert state.temperature.value == 283.15
+    product = _stream(process, "S4").state["design"]
+    assert product.flow.value == pytest.approx(500.0) and product.temperature.value == 303.15
+    (unit,) = crystallizer_report(ws.root).units
+    sol = unit["solution"]
+    assert sol["evaporated_kg_h"] == 0.0
+    assert sol["condenser"]["duty_kW"] == pytest.approx(0.0, abs=1e-12)
+    assert sol["cooling"]["duty_kW"] != 0.0
+    dry = fs.replace("values: {X_s: 0.9, H2O: 0.1}", "values: {X_s: 1.0}")
+    ws = _plant(tmp_path / "dry", DRYER_MATERIALS, dry)
+    process, _ = load(ws.root)
+    result = run(ws, process, "design", write=True)
+    assert any("none of the volatiles" in f.message for f in result.findings)
+
+
 def test_the_dryer_refuses_what_it_cannot_decide(tmp_path):
     with pytest.raises(ValueError, match="need the dryer's pressure"):
         Dryer(

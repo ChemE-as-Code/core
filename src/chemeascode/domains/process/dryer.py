@@ -696,6 +696,19 @@ def vapour_shape(spec: Any, result: DryerResult) -> dict[str, float]:
     return {n: v for n, v in result.product.items() if n in spec.volatiles}
 
 
+def outlet_shapes(spec: Any, result: DryerResult) -> dict[str, dict[str, float]]:
+    """Outlet port -> the composition (kg/h) ``cheme process propagate`` writes on it when it
+    has no flow (#309): the vapour's (:func:`vapour_shape`), and with a condenser's
+    ``condensate`` outlet (ADR 0076) the same for the condensate and the vapour past it, one of
+    which carries nothing when the condenser condenses all of it or none, or nothing
+    evaporates."""
+    shape = vapour_shape(spec, result)
+    found = {spec.outlets["vapour"]: shape}
+    if "condensate" in spec.outlets:
+        found[spec.outlets["condensate"]] = shape
+    return found
+
+
 def _recipe_hours(process: Any, case: str) -> float | None:
     """The hours of flows one batch of the plant's recipe makes (None without one)."""
     from chemeascode.domains.process.recipe import batch_hours, load_recipe

@@ -313,6 +313,83 @@ def test_a_heat_the_models_heat_up_holds_is_refused_on_a_stream(tmp_path):
     assert q2["value"] == pytest.approx(heat.kJ / (HOURS * 3600.0), rel=1e-5)
 
 
+def test_a_plain_batchs_heat_up_on_a_stream_takes_its_charge_as_its_jacket_time(tmp_path):
+    """core#301 with ADR 0075: a batch without a dose heats up its charge before ``react``
+    (2 kmol/h, not the end's 1 kmol/h of C); the heat written on its stream takes the same
+    content as the jacket time and the recipe's reported heat, its cool-down after the react
+    the end's."""
+    from chemeascode.foundation.workspace import Workspace
+
+    root = tmp_path / "plant"
+    (root / "process").mkdir(parents=True)
+    (root / "plant.yaml").write_text("name: recipe-batch\nstage: concept\nsheets: []\n")
+    (root / "process/materials.yaml").write_text(recipes.BATCH_MATERIALS)
+    flowsheet = (
+        recipes.BATCH_FLOWSHEET.replace("feeds:\n", "feeds:\n" + STEAM, 1)
+        .replace("products:\n", "products:\n" + duties.CW, 1)
+        .replace("    reactor: batch\n", "    reactor: batch\n    energy_port: q\n")
+        .replace(
+            "    ports: [{id: in, direction: in}, {id: out, direction: out}]\n",
+            "    ports: [{id: in, direction: in}, {id: out, direction: out},\n"
+            "            {id: q, direction: out, kind: energy},\n"
+            "            {id: h, direction: in, kind: energy}]\n",
+        )
+        .rstrip("\n")
+        + "\n  - {id: Q1, kind: energy, from: R.q, to: CW.r}"
+        + "\n  - {id: Q2, kind: energy, from: STEAM.s, to: R.h}\n"
+    )
+    (root / "process/flowsheet.yaml").write_text(flowsheet)
+    (root / "process/reactions.yaml").write_text(recipes.BATCH_REACTIONS)
+    hours = 2.0  # a batch of 2 h of the flowsheet's flows of S1
+    recipe = {
+        "schema": "cheme/recipe/v1",
+        "kind": "recipe",
+        "batch_size": {"value": 2 * 44.05 * hours, "unit": "kg", "stream": "S1"}
+        | {"provenance": "assumed"},
+        "hours_per_year": {"value": 8000, "provenance": "assumed"},
+        "unit_procedures": [
+            {
+                "id": "UP1",
+                "unit": "R",
+                "vessel": {
+                    "volume": 1.0,
+                    "metal_heat_capacity": 100.0,
+                    "jacket": {
+                        "u": 400,
+                        "area": 2.0,
+                        "coolant_temperature": 250,
+                        "heating_temperature": 350,
+                        "provenance": "assumed",
+                    },
+                    "provenance": "assumed",
+                },
+                "operations": [
+                    {"id": "charge", "kind": "charge", "duration": recipes._hours(0.5)},
+                    {"id": "heatup", "kind": "heat", "temperatures": [290, 300], "stream": "Q2"},
+                    {"id": "react", "kind": "react", "from": "R"},
+                    {"id": "cooldown", "kind": "cool", "temperatures": [300, 290]},
+                ],
+            }
+        ],
+    }
+    (root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    ws = Workspace(root)
+    process, found = load(root)
+    assert process is not None, [f.format() for f in found]
+    run(ws, process, "design", write=True)
+    result = recipe_report(root)
+    assert not [f for f in result.findings if f.level == "error"], [
+        f.message for f in result.findings
+    ]
+    charge = 2 * 150 * hours  # kJ/K of the charge, as the jacket time takes it
+    heats = {h.operation: h for h in result.heats}
+    assert heats["heatup"].content_kJ == pytest.approx(charge * 10, rel=1e-6)
+    q2 = _duty(ws, "Q2")
+    exact = (charge * 10 + 100.0 * 10) / (hours * 3600.0)
+    assert q2["provenance"] == "calculated" and q2["value"] == pytest.approx(exact, rel=1e-5)
+    assert q2["value"] == pytest.approx(heats["heatup"].kJ / (hours * 3600.0), rel=1e-5)
+
+
 # -- a conversion step's vessel metal -------------------------------------------------------------
 
 CONVERSION = """\
