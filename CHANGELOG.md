@@ -10,10 +10,18 @@
   about 0.999 as "growing without bound (beyond 1000 times the feed)" (#307). A fraction below
   1 always keeps a purge, so its recycle is bounded (at most r / (1 - r) times the feed) and is
   solved whatever its size (0.9995: about 1900 times the feed). Only a recycle of the whole
-  filtrate (fraction 1) is checked for growth without bound, now from the change per pass that
-  stops shrinking instead of a fixed 1000 times the feed, and the error says that a component
-  has no way out of the loop. Library results are unchanged (no library crystallizer declares a
-  mother-liquor recycle).
+  filtrate (fraction 1) is checked for growth without bound: every 1000 passes, a component
+  whose growth per pass is steady is carried on at that growth for 2,000,000 more passes, and
+  the loop is refused only when that component's outflow (evaporated, as crystals or in the
+  liquid the cake holds) does not grow with it. The error names that component instead of
+  saying that no crystals form and nothing is purged. A steady growth alone is not refused:
+  with part of the solvent evaporated, the solute builds up at its feed rate for thousands of
+  passes until the liquor saturates, and then converges. KNO3 (100 kg/h in 900 kg/h of water,
+  the cake holding 0.1 kg of liquor per kg of crystals, the whole filtrate returned) is now
+  solved at 0.05 % of the solvent evaporated and 1 kg/kg (51,705 passes, 95.238 kg/h of
+  crystals; refused before) and at 0.1 % and 0.5 kg/kg (21,432 passes, 96.774 kg/h; refused
+  before). Library results are unchanged (no library crystallizer declares a mother-liquor
+  recycle).
 - A crystallizer temperature within the 1e-9 K tolerance below the lowest solubility point gets
   that point's solubility, not the highest temperature's (#308). Library results are unchanged.
 - A dryer whose inlet holds none of its volatiles (not listed, or listed at 0) is a dryer

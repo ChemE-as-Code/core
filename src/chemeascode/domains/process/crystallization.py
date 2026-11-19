@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -90,14 +91,21 @@ SEPARATION_ASSUMPTIONS = (
 #: Relative tolerance of the recycle loop, on the fresh feed's mass flow.
 RECYCLE_TOLERANCE = 1e-10
 MAX_ITERATIONS = 200_000
-#: A recycle of the whole filtrate (fraction 1) grows without bound when a component has no way
-#: out of the loop: the change per pass then stops shrinking. Checked every STALL_WINDOW passes:
-#: a change of at least STALL_RATIO of the one a window earlier, with the recycle larger, is
-#: that growth (a loop still converging at such a rate could not reach the tolerance within
-#: MAX_ITERATIONS). A fraction below 1 always keeps a purge and so a bounded recycle (at most
-#: r / (1 - r) times the fresh feed), whatever its size.
+#: A recycle of the whole filtrate (fraction 1) grows without bound when a component of the
+#: feed cannot leave the loop as fast as it is fed: its outflow (evaporated, as crystals or in
+#: the liquid the cake holds) does not grow as it accumulates. Checked every STALL_WINDOW
+#: passes, for each component whose growth per pass is steady (at least STALL_RATIO of the one
+#: a window earlier): the pass is run again with those components carried on at their current
+#: growth for STALL_PROJECTION more passes (a growth dying away is not carried on); a component
+#: whose outflow then grows by less than STALL_RESPONSE of what it gains is refused. A steady
+#: growth alone is not enough: with the solvent evaporated, the solute builds up at its feed
+#: rate for thousands of passes until the liquor saturates, then crystallizes and converges.
+#: A fraction below 1 always keeps a purge and so a bounded recycle (at most r / (1 - r) times
+#: the fresh feed), whatever its size.
 STALL_WINDOW = 1000
 STALL_RATIO = 0.999
+STALL_PROJECTION = 10 * MAX_ITERATIONS
+STALL_RESPONSE = 1e-7
 #: The salting-out correction with a hydrate: successive substitution on the free solvent.
 SALTING_TOLERANCE = 1e-13
 SALTING_ITERATIONS = 1000
@@ -443,6 +451,59 @@ def _separate(slurry: Slurry, separation: Any) -> tuple[Slurry, Slurry]:
     return rebuilt(cake), rebuilt(filtrate)
 
 
+def _species(slurry: Slurry, form: CrystalForm, minus: Slurry | None = None) -> dict[str, float]:
+    """kg/h of each component (the anhydrous solute and the solvent, dissolved or in the
+    crystals, and each spectator) of *slurry*, less those of *minus* when given."""
+    a = form.solute_fraction
+    found = {
+        "solute": slurry.solute + a * slurry.crystal,
+        "solvent": slurry.solvent + (1.0 - a) * slurry.crystal,
+    } | dict(slurry.spectators)
+    if minus is not None:
+        for name, value in _species(minus, form).items():
+            found[name] = found.get(name, 0.0) - value
+    return found
+
+
+def _without_way_out(
+    feed: Slurry,
+    returned: Slurry,
+    stage: Stage,
+    cake: Slurry,
+    growth: dict[str, float],
+    marks: dict[str, float],
+    form: CrystalForm,
+    run: Callable[[Slurry], tuple[Stage, Slurry]],
+) -> list[str]:
+    """With the whole filtrate returned: the components of the feed that grow steadily and whose
+    outflow does not grow with them (see STALL_WINDOW); none when the loop may still converge.
+    *growth* is each component's growth per pass, *marks* the one a window earlier, *run* one
+    pass of the train (the stage and the cake) on a combined feed."""
+    floor = RECYCLE_TOLERANCE * max(feed.total, 1e-9)
+    steady = [
+        n for n, g in growth.items() if g > floor and g >= STALL_RATIO * marks.get(n, math.inf)
+    ]
+    if not steady:
+        return []
+    # only the steady growth is carried on: a growth that is dying away (the solvent settling
+    # while the solute builds up toward saturation) is not
+    grown = {n: growth[n] for n in steady}
+    step = Slurry(grown.pop("solute", 0.0), grown.pop("solvent", 0.0), spectators=grown).scaled(
+        STALL_PROJECTION
+    )
+    try:
+        ahead, ahead_cake = run(feed + returned + step)
+    except CrystallizationError:
+        return []  # not a state the loop reaches by growing steadily: no verdict
+    now = _species(cake + Slurry(solvent=stage.vapour), form)
+    later = _species(ahead_cake + Slurry(solvent=ahead.vapour), form)
+    return [
+        n
+        for n in steady
+        if later.get(n, 0.0) - now.get(n, 0.0) <= STALL_RESPONSE * STALL_PROJECTION * growth[n]
+    ]
+
+
 @dataclass
 class TrainResult:
     """The solved train: its streams (kg/h), yields, balances and energy."""
@@ -523,8 +584,22 @@ def solve_train(
     cake = filtrate = Slurry()
     residual = 0.0
     iterations = 0
-    # the change and the recycle's total a STALL_WINDOW earlier (recycle of the whole filtrate)
-    mark: tuple[float, float] | None = None
+    # recycle of the whole filtrate: each component's growth per pass a STALL_WINDOW earlier
+    marks: dict[str, float] | None = None
+    previous = returned
+
+    def run(combined: Slurry) -> tuple[Stage, Slurry]:
+        """One pass on *combined* (fresh feed and recycle): the stage and the cake."""
+        found = crystallize(
+            combined,
+            form,
+            solubility=solubility,
+            imposed_yield=imposed_yield,
+            evaporation=evaporation,
+            liquor=liquor,
+        )
+        return found, _separate(found.slurry, separation)[0]
+
     for iterations in range(1, MAX_ITERATIONS + 1):
         stage = crystallize(
             feed + returned,
@@ -539,19 +614,28 @@ def solve_train(
         cake, filtrate = _separate(stage.slurry, separation)
         new = filtrate.scaled(recycle)
         residual = new.distance(returned)
-        returned = new
+        previous, returned = returned, new
         if residual <= tolerance or not recycle:
             break
         if recycle >= 1.0 and iterations % STALL_WINDOW == 0:
-            if mark is not None and residual >= STALL_RATIO * mark[0] and returned.total > mark[1]:
+            growth = _species(returned, form, minus=previous)
+            trapped = (
+                _without_way_out(feed, returned, stage, cake, growth, marks, form, run)
+                if marks is not None
+                else []
+            )
+            if trapped:
+                rates = ", ".join(f"{n} {growth[n]:.3g}" for n in trapped)
                 raise CrystallizationError(
                     f"the recycle grows without bound ({returned.total:.6g} kg/h after "
-                    f"{iterations} passes, growing by about {residual:.3g} kg/h per pass): with "
-                    "the whole filtrate returned (fraction 1) and no purge, a component of the "
-                    "feed has no way out of the loop (neither evaporated nor carried by the "
-                    "crystals or the liquid the cake holds)"
+                    f"{iterations} passes, growing by about {rates} kg/h per pass): with the "
+                    "whole filtrate returned (fraction 1) and no purge, the "
+                    f"{' and '.join(trapped)} of the feed cannot leave the loop as fast as "
+                    f"{'it is' if len(trapped) == 1 else 'they are'} fed: what is evaporated, "
+                    "carried by the crystals or held in the cake's liquid does not grow as "
+                    f"{'it accumulates' if len(trapped) == 1 else 'they accumulate'}"
                 )
-            mark = (residual, returned.total)
+            marks = growth
     else:
         raise CrystallizationError(
             f"the recycle did not converge in {MAX_ITERATIONS} iterations "

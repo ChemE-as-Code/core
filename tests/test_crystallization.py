@@ -37,6 +37,7 @@ from typer.testing import CliRunner
 
 from chemeascode.domains.process.crystallization import (
     CrystallizationError,
+    Liquor,
     Slurry,
     Unsupported,
     crystal_form,
@@ -172,7 +173,9 @@ def test_undersaturated_feed_gives_no_crystals_and_an_endless_recycle_is_refused
     form = crystal_form("KNO3", "H2O", "KNO3")
     result = solve_train(Slurry(100.0, 900.0), form, solubility=0.5)
     assert result.crystals_formed == 0.0 and result.undersaturated
-    with pytest.raises(CrystallizationError, match="without bound"):
+    with pytest.raises(
+        CrystallizationError, match="without bound.*the solute and solvent of the feed cannot leave"
+    ):
         solve_train(
             Slurry(100.0, 900.0),
             form,
@@ -206,6 +209,51 @@ def test_a_high_recycle_with_a_purge_is_solved_not_refused():
     assert cake.crystal == pytest.approx(55.0)
     assert purge.total == pytest.approx(939.5)
     assert purge.solvent == pytest.approx(900.0 - 5.5 / 1.05)
+
+
+def test_a_whole_filtrate_recycle_that_saturates_after_a_long_build_up_is_solved():
+    """#307: with the whole filtrate returned (fraction 1) and 0.2 % of the solvent evaporated,
+    the solute builds up at its feed rate (100 kg/h per pass) for thousands of passes while the
+    solvent settles near 900 / 0.002 kg/h, until the liquor saturates; then crystals form and
+    the loop converges (12,914 passes). A steady growth over a window is not growth without
+    bound. Hand calculation (KNO3 1 kg/kg, the cake holds 0.1 kg of the saturated liquor, half
+    solute, per kg of crystals): solute C + 0.05 C = 100, so C = 95.238 kg/h; vapour 900 -
+    0.05 C = 895.238 kg/h, 0.002 of the solvent fed to the crystallizer (447,619 kg/h); the
+    recycle is the saturated liquor less the cake's: 2 (447,619 - 895.238 - 4.762) kg/h."""
+    form = crystal_form("KNO3", "H2O", "KNO3")
+    result = solve_train(
+        Slurry(100.0, 900.0),
+        form,
+        solubility=1.0,
+        evaporation=_evaporation(solvent_fraction=0.002),
+        separation=_separation(0.1, "per_kg_solid"),
+        recycle=1.0,
+    )
+    s = result.streams
+    crystals = 100.0 / 1.05
+    vapour = 900.0 - 0.05 * crystals
+    assert result.iterations > 3 * 1000
+    assert s["cake"].crystal == pytest.approx(crystals)
+    assert s["vapour"].total == pytest.approx(vapour)
+    assert s["recycle"].total == pytest.approx(2 * (vapour / 0.002 - vapour - 0.05 * crystals))
+    assert s["mother_liquor"].total == 0.0
+
+
+def test_a_whole_filtrate_recycle_names_the_component_that_cannot_leave():
+    """#307: with the cake holding no liquid, a spectator solute has no way out of a recycle of
+    the whole filtrate while the solute leaves as crystals and the solvent as vapour: the
+    refusal names it."""
+    form = crystal_form("KNO3", "H2O", "KNO3")
+    with pytest.raises(CrystallizationError, match=r"the NaCl of the feed cannot leave the loop"):
+        solve_train(
+            Slurry(100.0, 900.0, spectators={"NaCl": 5.0}),
+            form,
+            solubility=0.5,
+            evaporation=_evaporation(solvent_fraction=0.01),
+            separation=_separation(0.0, "per_kg_solid"),
+            recycle=1.0,
+            liquor=Liquor(molar_mass={"NaCl": 58.44}, salting_out={"NaCl": 0.05}),
+        )
 
 
 def test_solubility_points_are_interpolated_never_extrapolated():
