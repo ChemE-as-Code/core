@@ -225,6 +225,34 @@
   fixtures are made from, so seven fixtures are regenerated (CI's `api-fixtures` artifact:
   `control-separation`, `impact`, `repo`, `repo-issues`, `simulation-failed`, `simulation-run`,
   `simulation-stale`; one commit hash each).
+- `cheme process reactor-hazards` no longer understates the MTSR in four cases:
+  - a gas-phase batch is closed, at constant volume as the batch model runs it: its dT_ad
+    takes the ideal-gas cv (`cp - R`) and the internal energy of reaction `dH - dnu R T`, so it
+    matches the model's adiabatic run, about cp/cv (1.4 for a diatomic gas) larger than before
+    (#303);
+  - an isothermal batch is screened at the temperature the model holds it at (its outlet's
+    given or assumed temperature) instead of its charge's (#304);
+  - a conversion, equilibrium or gibbs step whose outlet is given or assumed hotter than its
+    feed is screened from the larger of the fresh feed at its inlet and the outlet's
+    unconverted reactants at the outlet's temperature (without the outlets' composition: the
+    fresh feed at that temperature). An adiabatic step's two states agree, so the converted
+    share's heat is not counted twice. A plug-flow bed stays at its inlet, where its model
+    starts (#305);
+  - a CSTR takes each reaction's accumulation from its own limiting reactant, not the first
+    reactant of the first reaction for all of them, and its MTSR is the largest
+    `T_p + X_ac dT_ad` of one counted reaction (#306). The `X_ac` reported is that
+    reaction's; where no counted reaction is exothermic, the largest of a counted reaction,
+    not the 0 of one whose reactants the feed lacks.
+
+  Library entries (`process-library` main, branch against the 1.12.0 + #254 pin; no class or
+  finding changes, no batch or CSTR entry changes): ammonia-1 R101 MTSR 910.5 -> 1098.4 K
+  (T_p 893.2 -> 1083.2 K) and R501 1163.9 -> 1171.7 K; cumene-1 R101 588.8 -> 603.3 K;
+  ethylene-1 H101 343.6 -> 1113.2 K and H103 344.5 -> 1113.2 K (endothermic: the MTSR is the
+  furnace outlet's temperature); hydrogen-1 R102 893.2 -> 1143.2 K (endothermic);
+  methylamines-1 R101 689.9 -> 714.7 K; sulfuric-acid-1 R204 705.27 -> 705.35 K. Reported
+  `X_ac`: ammonia-1 R501 1 -> 0.70, methylamines-1 R101 1 -> 0.04, sulfuric-acid-1 R204
+  1 -> 0.06, and for the endothermic steps the outlet's unconverted share: ethylene-1 H101
+  1 -> 0.30 and H103 1 -> 0.18, hydrogen-1 R102 1 -> 0.25.
 
 ## 1.12.0 (2026-11-13)
 
