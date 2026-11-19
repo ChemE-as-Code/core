@@ -266,12 +266,18 @@ class _Mixture:
             n: 0.0 if n in self.gone else max(v / total, 1e-30)
             for n, v in zip(self.names, moles, strict=True)
         }
+        # a reactant used up (or overshot by a trial stage) is absent, not a trace, to a law
+        # without (1 - Q/K): its rate stops there, whatever its order in the reactant (#300)
+        used_up = {n for n, v in zip(self.names, moles, strict=True) if v <= 0}
         found = []
         for r in self.reactions:
             law = r.rate
             basis = k_basis(r)
             ln_k = reaction_ln_k(r, self.data, t, basis) if law.reverse == "equilibrium" else None
-            found.append(rate(law, r.stoichiometry, x, t, p, ln_k, self.liquid, basis))
+            at = x
+            if law.reverse != "equilibrium":
+                at = x | {n: 0.0 for n in used_up if r.stoichiometry.get(n, 0.0) < 0}
+            found.append(rate(law, r.stoichiometry, at, t, p, ln_k, self.liquid, basis))
         return found
 
     def multipliers(self, volume: float) -> list[float]:
@@ -1232,7 +1238,7 @@ def _solve_batch(
         """From *state* at *clock* s to *t_end* s or the *target* conversion, *source* kmol/s
         dosed meanwhile and *mixing* kW released as it mixes in (a heat of solution); the
         accepted steps go into the result."""
-        nonlocal heat, peak, cooling, stalled
+        nonlocal heat, peak, cooling, stalled, clipped
 
         derivatives = make_derivatives(source, sensible, mixing)
         active[:] = [derivatives]
@@ -1262,6 +1268,8 @@ def _solve_batch(
                         lo = mid
                 new, _ = _dopri_step(derivatives, state, hi)
                 h = hi
+            # what the clip below adds: a component a step overshot below zero (#300)
+            clipped += sum(-v for v in new[:size] if v < 0)
             new[:-2] = [max(v, 0.0) for v in new[:-2]]
             # what reacted in this step: the change of moles less what was dosed, and what left
             d_moles = [
@@ -1286,9 +1294,12 @@ def _solve_batch(
                     if absorbing:
                         warming += (new[absorb_at] - state[absorb_at]) / h
                     cooling = max(cooling, released / h + warming + mixing)
-            previous = conversion(state, clock)
+            # the step's progress: the largest change of any component, not of the key's
+            # conversion alone, which stops when the key is used up while another reaction
+            # still runs (A -> B -> C, #297)
+            progress = max(abs(b - a) for a, b in zip(state[:size], new[:size], strict=True))
+            progress /= total0
             clock += h
-            progress = abs(conversion(new, clock) - previous)
             state = new
             record(state, clock)
             if t_end is not None and clock >= t_end * (1 - 1e-12):
@@ -1383,6 +1394,7 @@ def _solve_batch(
     peak = 0.0
     cooling = 0.0
     stalled = 0
+    clipped = 0.0  # kmol the step-end clip added
     clock = 0.0
     peak_vent = 0.0
     peak_vent_time = 0.0
@@ -1412,6 +1424,12 @@ def _solve_batch(
     elif batch.time is not None or target is not None:
         t_end = clock + batch.time if batch.time is not None else None
         state, clock = run(state, clock, t_end, target, zero, [], post=True)
+    if clipped > 1e-6 * (total0 + sum(dosed)):
+        # the clip made matter: a rate that kept converting a component no longer there (#300)
+        raise TankError(
+            f"the balance does not close: the integration took {clipped:.4g} kmol of components "
+            "below zero and clipped them, a rate law that converts a used-up reactant"
+        )
     result.outlet = dict(zip(names, state[:size], strict=True))
     change = [b - a - d for a, b, d in zip(n0, state[:size], dosed, strict=True)]
     for k, i in enumerate(vented):  # what formed and left by the vent formed all the same

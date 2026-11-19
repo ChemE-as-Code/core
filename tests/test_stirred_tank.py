@@ -401,6 +401,76 @@ def test_an_adiabatic_gas_batch_conserves_internal_energy():
     assert result.temperature > 500.0  # dH = -60000 kJ/kmol of extent: exothermic
 
 
+def _consecutive(k1, k2, orders=None):
+    """R1 A -> B (first order in A, or *orders*), R2 B -> C (first order in B)."""
+    first = _first_order(k=k1)
+    if orders is not None:
+        first["rate"]["orders"] = orders
+    second = _first_order(k=k2) | {"id": "R2", "stoichiometry": {"B": -1, "C": 1}}
+    second["rate"]["orders"] = {"B": 1}
+    return _reactions(first, second)
+
+
+@pytest.mark.parametrize(("k1", "k2", "time"), [(10.0, 1e-3, 1e4), (1.0, 1e-2, 2000.0)])
+def test_a_consecutive_batch_runs_on_after_its_key_reactant_is_used_up(k1, k2, time):
+    """#297: B -> C runs on after A is gone; the stall test looked at A's conversion only and
+    froze B at the time A ran out, while the batch reported its full time."""
+    result = solve_batch(
+        _consecutive(k1, k2),
+        {"S": 5.0, "A": 1.0},
+        300.0,
+        101.325,
+        _batch(time=time),
+        {},
+        LIQUID,
+        isothermal_at=300.0,
+    )
+    b = k1 / (k2 - k1) * (math.exp(-k1 * time) - math.exp(-k2 * time))
+    assert result.outlet["B"] == pytest.approx(b, rel=1e-5)
+    assert result.extents["R2"] == pytest.approx(1.0 - b, rel=1e-9)
+    assert result.profile[-1][0] == pytest.approx(time)
+    assert not [n for n in result.notes if "converts no further" in n]
+
+
+def test_a_zero_order_reactant_stops_converting_when_it_is_used_up():
+    """#300: a law of zero order in A ran on at k with A gone, and the step-end clip kept the B
+    it formed: 389.65 kmol of B from 1 kmol of A."""
+    result = solve_batch(
+        _consecutive(1.0, 1e-3, orders={"A": 0}),
+        {"S": 5.0, "A": 1.0},
+        300.0,
+        101.325,
+        _batch(time=1e4),
+        {},
+        LIQUID,
+    )
+    assert result.outlet["A"] == 0.0
+    assert result.outlet["B"] + result.outlet["C"] == pytest.approx(1.0, rel=1e-9)
+    assert result.extents["R1"] == pytest.approx(1.0, rel=1e-9)
+    # A runs out at t1 = 1 kmol / (k V), V = 0.6 m3; B forms at k V and decays at k2 meanwhile
+    k2, r, t1 = 1e-3, 0.6, 1.0 / 0.6
+    b = r / k2 * (1 - math.exp(-k2 * t1)) * math.exp(-k2 * (1e4 - t1))
+    assert result.outlet["B"] == pytest.approx(b, rel=1e-5)
+
+
+def test_a_batch_whose_clip_would_make_matter_is_refused(monkeypatch):
+    """#300: a rate that keeps converting a reactant that is gone drives it below zero at every
+    step; the clip would add it back, so the batch refuses instead of reporting the outlet."""
+    import chemeascode.domains.process.stirred_tank as tank
+
+    monkeypatch.setattr(tank, "rate", lambda law, *args, **kw: law.k.k(300.0))
+    with pytest.raises(TankError, match="the balance does not close"):
+        solve_batch(
+            _consecutive(1.0, 1e-3, orders={"A": 0}),
+            {"S": 5.0, "A": 1.0},
+            300.0,
+            101.325,
+            _batch(time=100.0),
+            {},
+            LIQUID,
+        )
+
+
 def test_a_time_batch_that_stops_converting_is_noted_not_refused():
     reversible = _first_order(
         reverse=True,

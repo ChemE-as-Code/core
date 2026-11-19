@@ -4,6 +4,30 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- A batch stopped integrating once its key reactant was used up, although another reaction
+  was still running (core#297). The stall test looked at the key's conversion alone, so in
+  A -> B -> C the B -> C reaction froze when A ran out, while the batch still reported its full
+  time: B came out 100 times too high (4.28e-3 instead of 4.54e-5 kmol with k1 = 10/s,
+  k2 = 1e-3/s, 1e4 s), and the extents, heat released and heat terms were wrong with it. The
+  stall test now looks at every component's change, so the batch, the plain post-reaction and
+  the semi-batch hold after the dosing run to their end while any reaction progresses.
+- A rate law of zero order in a reactant (or one that leaves a reactant out) kept converting
+  after that reactant was used up, and the step-end clip kept what it formed (core#300): 1 kmol
+  of A gave 389.65 kmol of B. `rates.rate` now gives 0 while a reactant is absent (without
+  `reverse: equilibrium`), the stirred tank treats a used-up reactant as absent rather than as
+  its trace, and a batch whose clip would add more than 1e-6 of what was charged and dosed is
+  refused ("the balance does not close"). A law of positive order in every reactant changes
+  only by the trace it gave a used-up reactant.
+  Library (process-library 34c233d, the 18 entries with rate laws, `cheme process reactors`
+  and `cheme process propagate --fill` against the 0e85885 pin): no entry has consecutive
+  reactions that outlive their key or a zero-order reactant, so no published value changes
+  beyond round-off (largest relative change 3e-6, of a 4e-23 accumulation), except in
+  copper-i-chloride-1: the CL2 trace of its recycle loop (mole fraction 1.4e-19 to 2.9e-19 in
+  S4, S6, S7, S7A and S17) is now 0.0, which changes the input fingerprints of those streams,
+  S9 and Q2 (their values unchanged): `propagate --check` reports them stale until refilled.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
