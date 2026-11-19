@@ -11,10 +11,15 @@
   `absorption` heat term and added nothing to the semi-batch's peak cooling duty (#298), and a
   head space that expands (a shrinking liquid, a cooling adiabatic batch) held its
   `expelled_kmol` at zero while it drew gas back, so pad + inflow no longer equalled end +
-  expelled and the "drew back more gas from the vent line" note never fired (#299). Only the
-  amounts are clipped now; the head space's expelled totals and the absorption heat keep their
-  sign. Library results are unchanged: no library entry declares a head space or a heat of
-  absorption (`cheme process reactors` identical to 1.12.0 on the vented batches checked).
+  expelled and the "drew back more gas from the vent line" note never fired (#299). The same
+  clip held an adiabatic batch's vent-condenser duty (`condenser_heat`, the integral) at zero
+  while the condenser was warmer than the batch and warmed the gas: a batch starting at 300 K
+  with its condenser at 330 K reported 1181 kJ instead of the 757 kJ its closed form gives. Only
+  the amounts are clipped now; the vapour's heats, the head space's expelled totals and the
+  absorption heat keep their sign. Library results are unchanged: no library entry declares a
+  head space or a heat of absorption, and `cheme process reactors --json` is identical to the
+  pin's on all 62 entries whose flowsheet has a vent vapour or condenser (process-library
+  01ba8b7).
 
 ## 1.12.0 (2026-11-13)
 

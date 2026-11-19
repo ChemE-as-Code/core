@@ -905,11 +905,16 @@ def _solve_batch(
     absorb = [absorption.get(names[i], 0.0) for i in vented]
     absorbing = any(absorb)
     absorb_at = head_at + 2 * ng
-    # running totals that may go negative, kept out of the integrator's clip at zero: the head
-    # space's expelled gas (an expanding head space draws gas back, ADR 0071) and the heat its
-    # dissolved share released (an endothermic absorption takes heat in)
+    # running totals that may go negative, kept out of the integrator's clip at zero: the
+    # vapour's heats (the vessel's and the condenser's: a condenser warmer than the batch warms
+    # the gas), the head space's expelled gas (an expanding head space draws gas back, ADR 0071)
+    # and the heat its dissolved share released (an endothermic absorption takes heat in)
     signed = frozenset(
-        [*range(head_at + ng, head_at + 2 * ng), *([absorb_at] if absorbing else ())]
+        [
+            *(range(head_at - 2, head_at) if nv else ()),
+            *range(head_at + ng, head_at + 2 * ng),
+            *([absorb_at] if absorbing else ()),
+        ]
     )
     molar_volume = (
         [(mix.liquid.molar_volumes.get(n) or 0.0) for n in names] if mix.liquid is not None else []

@@ -197,6 +197,40 @@ def test_an_adiabatic_vented_batch_with_vapour_follows_its_closed_form():
     assert hot.temperature > result.temperature + 5
 
 
+def test_an_adiabatic_condensers_heat_keeps_its_sign_while_the_batch_is_colder():
+    """The batch above with a condenser at T_c and the same vapour pressure there: nothing
+    condenses, so the condenser only cools (or warms) the gas and its vapour, (c cp + cp_G)
+    (T - T_c) per kmol of G formed, and its duty is (c cp + cp_G) int (T - T_c) dxi over the
+    closed-form T(xi). With T_c = 330 K above the 300 K start the condenser warms the gas at
+    first: a running total clipped at zero there overstated the duty by half (#298, #299)."""
+    tc = 330.0
+    vent = VAPOUR | {"condenser": {"temperature": tc, "provenance": "assumed"}}
+    batch = Batch.model_validate(
+        {"time": 1800, "heat": "adiabatic", "vent": vent, "provenance": "assumed"}
+    )
+    result = solve_batch(
+        _reactions(1e-3),
+        {"S": 5.0, "A": 1.0},
+        300.0,
+        P,
+        batch,
+        {"G": GAS},
+        Liquid(V),
+        CP,
+        vent_phase=_phase("ABS", _constant(30.0), condenser=tc),
+    )
+    assert sum(result.condensate.values()) == pytest.approx(0.0, abs=1e-12)
+    extent = result.extents["R1"]
+    c = (30.0 / P) / (1 - 30.0 / P)
+    kappa = (-HEAT - c * DHVAP) / 150.0
+    a = c / 6.0
+    # int_0^X ln(1 - a x) dx = -(a X + (1 - a X) ln(1 - a X)) / a
+    log_integral = -(a * extent + (1 - a * extent) * math.log(1 - a * extent)) / a
+    above = 300.0 * extent - kappa / c * log_integral - tc * extent
+    expected = (c * 150.0 + 3.5 * R) * above
+    assert result.condenser_heat == pytest.approx(expected, rel=1e-6)
+
+
 def test_a_boiling_content_is_refused():
     with pytest.raises(TankError, match="the content boils"):
         _run(VAPOUR, _phase("S", _constant(150.0)))
