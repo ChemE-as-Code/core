@@ -182,11 +182,40 @@ def test_undersaturated_feed_gives_no_crystals_and_an_endless_recycle_is_refused
         )
 
 
+def test_a_high_recycle_with_a_purge_is_solved_not_refused():
+    """#307: a recycle fraction below 1 always keeps a purge, so its recycle is bounded (at most
+    r / (1 - r) times the feed) however large: at 0.9995 it is about 1900 times the feed, solved,
+    not refused as growing without bound. Hand calculation (KNO3 0.05 kg/kg, the cake holds
+    0.1 kg of the saturated liquor per kg of crystals): with C the crystals and W the solvent of
+    the purge, solvent W + 0.1 C / 1.05 = 900 and solute 0.05 W + C + 0.1 C 0.05 / 1.05 = 100
+    give C = 55 and W = 900 - 5.5 / 1.05, the purge 1.05 W = 939.5 kg/h."""
+    form = crystal_form("KNO3", "H2O", "KNO3")
+    result = solve_train(
+        Slurry(100.0, 900.0),
+        form,
+        solubility=0.05,
+        separation=_separation(0.1, "per_kg_solid"),
+        recycle=0.9995,
+    )
+    purge = result.streams["mother_liquor"]
+    cake = result.streams["cake"]
+    assert result.streams["recycle"].total == pytest.approx(0.9995 / 0.0005 * purge.total)
+    assert result.streams["recycle"].total > 1e3 * 1000.0
+    assert purge.solute == pytest.approx(0.05 * purge.solvent)
+    assert cake.solute + cake.solvent == pytest.approx(0.1 * cake.crystal)
+    assert cake.crystal == pytest.approx(55.0)
+    assert purge.total == pytest.approx(939.5)
+    assert purge.solvent == pytest.approx(900.0 - 5.5 / 1.05)
+
+
 def test_solubility_points_are_interpolated_never_extrapolated():
     spec = Solubility(
         unit="kg/kg_solvent", points=[(273.15, 0.2), (293.15, 0.4)], provenance="given"
     )
     assert solubility_at(spec, 283.15) == pytest.approx(0.3)
+    # #308: within the range's tolerance, the nearest end point's value (both ends)
+    assert solubility_at(spec, 273.15 - 5e-10) == pytest.approx(0.2)
+    assert solubility_at(spec, 293.15 + 5e-10) == pytest.approx(0.4)
     with pytest.raises(Unsupported, match="no extrapolation"):
         solubility_at(spec, 300.0)
     w = Solubility(unit="mass_fraction", value=0.2, provenance="given")

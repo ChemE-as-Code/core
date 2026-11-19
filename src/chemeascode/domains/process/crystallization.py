@@ -90,6 +90,14 @@ SEPARATION_ASSUMPTIONS = (
 #: Relative tolerance of the recycle loop, on the fresh feed's mass flow.
 RECYCLE_TOLERANCE = 1e-10
 MAX_ITERATIONS = 200_000
+#: A recycle of the whole filtrate (fraction 1) grows without bound when a component has no way
+#: out of the loop: the change per pass then stops shrinking. Checked every STALL_WINDOW passes:
+#: a change of at least STALL_RATIO of the one a window earlier, with the recycle larger, is
+#: that growth (a loop still converging at such a rate could not reach the tolerance within
+#: MAX_ITERATIONS). A fraction below 1 always keeps a purge and so a bounded recycle (at most
+#: r / (1 - r) times the fresh feed), whatever its size.
+STALL_WINDOW = 1000
+STALL_RATIO = 0.999
 #: The salting-out correction with a hydrate: successive substitution on the free solvent.
 SALTING_TOLERANCE = 1e-13
 SALTING_ITERATIONS = 1000
@@ -255,6 +263,8 @@ def solubility_at(spec: Any, temperature: float | None) -> float:
                 f"the crystallizer's temperature {temperature:g} K is outside the solubility "
                 f"data ({low:g}-{high:g} K): no extrapolation"
             )
+        # within the tolerance of an end point: that end point's value
+        temperature = min(max(temperature, low), high)
         value = points[-1][1]
         for (t0, v0), (t1, v1) in zip(points, points[1:], strict=False):
             if t0 <= temperature <= t1:
@@ -513,7 +523,9 @@ def solve_train(
     cake = filtrate = Slurry()
     residual = 0.0
     iterations = 0
-    for iterations in range(1, MAX_ITERATIONS + 1):  # noqa: B007 (reported)
+    # the change and the recycle's total a STALL_WINDOW earlier (recycle of the whole filtrate)
+    mark: tuple[float, float] | None = None
+    for iterations in range(1, MAX_ITERATIONS + 1):
         stage = crystallize(
             feed + returned,
             form,
@@ -530,11 +542,16 @@ def solve_train(
         returned = new
         if residual <= tolerance or not recycle:
             break
-        if returned.total > 1e3 * max(feed.total, 1e-9):
-            raise CrystallizationError(
-                "the recycle grows without bound (beyond 1000 times the feed): nothing leaves the "
-                "loop at steady state (no crystals form and no purge)"
-            )
+        if recycle >= 1.0 and iterations % STALL_WINDOW == 0:
+            if mark is not None and residual >= STALL_RATIO * mark[0] and returned.total > mark[1]:
+                raise CrystallizationError(
+                    f"the recycle grows without bound ({returned.total:.6g} kg/h after "
+                    f"{iterations} passes, growing by about {residual:.3g} kg/h per pass): with "
+                    "the whole filtrate returned (fraction 1) and no purge, a component of the "
+                    "feed has no way out of the loop (neither evaporated nor carried by the "
+                    "crystals or the liquid the cake holds)"
+                )
+            mark = (residual, returned.total)
     else:
         raise CrystallizationError(
             f"the recycle did not converge in {MAX_ITERATIONS} iterations "

@@ -4,6 +4,24 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- The crystallizer's recycle no longer refuses a valid steady state at a recycle fraction above
+  about 0.999 as "growing without bound (beyond 1000 times the feed)" (#307). A fraction below
+  1 always keeps a purge, so its recycle is bounded (at most r / (1 - r) times the feed) and is
+  solved whatever its size (0.9995: about 1900 times the feed). Only a recycle of the whole
+  filtrate (fraction 1) is checked for growth without bound, now from the change per pass that
+  stops shrinking instead of a fixed 1000 times the feed, and the error says that a component
+  has no way out of the loop. Library results are unchanged (no library crystallizer declares a
+  mother-liquor recycle).
+- A crystallizer temperature within the 1e-9 K tolerance below the lowest solubility point gets
+  that point's solubility, not the highest temperature's (#308). Library results are unchanged.
+- A dryer whose inlet holds none of its volatiles (not listed, or listed at 0) is a dryer
+  finding ("nothing to dry") in `cheme process propagate` instead of a crash with a pydantic
+  ValidationError (residual moisture 0) or a vapour written with fractions summing to 0 (#309).
+  A dryer that evaporates nothing (the residual moisture equals the inlet's) writes its vapour
+  of no flow with the inlet's volatile composition. Library results are unchanged.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
