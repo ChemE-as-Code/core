@@ -13,7 +13,9 @@
   batches per year were off by C_end/C_charge. It now agrees with the model duty's `heat_up`
   (ADR 0063). A unit procedure with neither a dose nor a react keeps the end's content. Library
   results are unchanged: `cheme process recipe` gives the same JSON on all 13 entries with
-  jacket-timed operations (all semi-batches heated before their dose).
+  jacket-timed operations (all semi-batches whose first `dose` comes before their first `react`,
+  so every heat or cool sits on the same side of it under both rules; two of them cool before
+  the dose, and some cool after the react).
 - Recipe (core#302): a `cool` (as a `heat` already was) whose `temperatures` start and end at
   the same value is refused by `cheme/recipe/v1` (`cheme.recipe-schema`); before, it passed the
   schema and then failed the whole recipe with "the medium cannot cool the content", leaving no
