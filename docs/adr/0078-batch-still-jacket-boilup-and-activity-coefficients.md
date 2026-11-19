@@ -166,9 +166,9 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   minimum-boiling azeotrope: on UNIFAC the residue grows richer in methanol (0.974), where the
   ideal liquid strips it (0.960). The Antoine constants are those of
   `examples/process-solvent-swap` (NIST WebBook).
-- Positive: the library's stills (process-library main, every entry) give the same `process
-  stills --json`, `process recipe --json` and `propagate --check` as core 1.12.0 (with #254):
-  neither field is used there, and an ideal still runs the same bubble point as before.
+- Positive: the library's stills (process-library main, every entry with a flowsheet) give
+  the same `process stills --json`, `process recipe --json` and `propagate --check` as core
+  1.13.0: neither field is used there, and an ideal still runs the same bubble point as before.
 - Negative: UNIFAC is predictive. Its error for a given mixture is not known here, and a
   still on it is not more sourced than its volatility's provenance says. Each solve
   evaluates UNIFAC a few times per bubble point, and the tangent-plane test some tens to a
