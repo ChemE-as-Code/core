@@ -168,6 +168,24 @@ class Cut:
 
 
 @dataclass
+class Flash:
+    """The charge's adiabatic flash to the still's pressure (``still.flash``, ADR 0077): what
+    left as vapour (kmol per hour of flows by component; empty: the charge enters below its
+    bubble point there), to which cut, the charge's temperature as it enters and after the
+    flash (K), its bubble point at that pressure as it enters, and the heat per batch (kJ) the
+    charge's sensible heat gave the vapour: its latent heat, which the boil-up no longer
+    supplies and the condenser condenses."""
+
+    outlet: str
+    pressure: float  # kPa(a)
+    inlet_temperature: float
+    bubble_point: float
+    temperature: float
+    moles: dict[str, float]
+    heat: float = 0.0
+
+
+@dataclass
 class StillResult:
     """A batch still's charge, feed, cuts and residue (kmol per hour of flows: the flowsheet's
     basis), and its time and heat per batch."""
@@ -198,6 +216,8 @@ class StillResult:
     heat_up_time_missing: str = ""
     #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
     column: dict[str, Any] | None = None
+    #: the charge's flash (``still.flash``, ADR 0077); None without the field
+    flash: Flash | None = None
     #: the reflux ratio at each profile point (a column; else empty)
     refluxes: list[float | None] = field(default_factory=list)
     #: (share of all charged and fed distilled, s, K or None, mole fraction of the key)
@@ -711,6 +731,106 @@ class _Run:
         return reach
 
 
+def flash_charge(
+    phase: _Phase,
+    moles: list[float],
+    temperature: float,
+    heat_capacity: list[float],
+) -> tuple[list[float], float, float]:
+    """The still's content *moles* (kmol) entering at *temperature* K, flashed adiabatically
+    and differentially to the phase's pressure (ADR 0077): the vapour leaves as it forms, in
+    equilibrium with the liquid at its bubble point (Raoult's law: ``y_i = x_i P_i(T) / sum_j
+    x_j P_j(T)``, at the bubble pressure the falling pressure passes), and the content's
+    sensible heat (*heat_capacity*, kJ/(kmol K) per component, all of it: the liquid and a
+    phase of its own) evaporates it at the phase's latent heats::
+
+        dN_i/dT = y_i C(N) / lambda(y),    C(N) = sum_i N_i cp_i
+
+    integrated down from *temperature* (Dormand-Prince 5(4) in T) until the liquid's bubble
+    pressure falls to the phase's pressure, where its bubble point is the temperature. Returns
+    the content after the flash, its temperature K and the heat the vapour took, kJ (its latent
+    heat, the sensible heat given). A content at or below its bubble point stays as it is.
+    Raises StillError."""
+    k = len(moles)
+    target = phase.pressure
+    volatile = phase.volatile
+
+    def bubble_pressure(n: list[float], t: float) -> list[float]:
+        x = phase.fractions(n)
+        return [
+            x[i] * vp.kpa(t) if vp is not None and volatile[i] and x[i] > 0 else 0.0
+            for i, vp in enumerate(phase.pressures)
+        ]
+
+    if sum(bubble_pressure(moles, temperature)) <= target:
+        return list(moles), temperature, 0.0
+    lowest = phase.bubble(phase.fractions(moles))  # the end lies above the charge's own
+
+    def f(state: list[float]) -> list[float]:
+        n, t = state[:k], state[k]
+        p = bubble_pressure(n, t)
+        total = sum(p)
+        if total <= 0:
+            raise StillError("the charge's flash leaves nothing volatile")
+        y = [pi / total for pi in p]
+        latent = phase.latent_heat(y)
+        if not latent:
+            raise StillError("the charge's flash needs the heat_of_vaporization of its vapour")
+        capacity = sum(a * c for a, c in zip(n, heat_capacity, strict=True))
+        rate = capacity / latent  # kmol per K the content cools
+        return [*(-yi * rate for yi in y), -1.0, capacity]
+
+    def above(state: list[float]) -> float:
+        """kPa: the liquid's bubble pressure over the still's at the state's temperature."""
+        return sum(bubble_pressure(state[:k], state[k])) - target
+
+    span = temperature - lowest
+    state = [*moles, temperature, 0.0]
+    cooled = 0.0
+    h = span / 100.0
+    for _ in range(MAX_STEPS):
+        h = min(h, span - cooled)
+        if h <= 1e-12 * temperature:
+            break
+        try:
+            new, error = _dopri_step(f, state, h)
+            new[:k] = [max(v, 0.0) for v in new[:k]]
+            above(new)
+        except StillError:
+            if h < 1e-9 * temperature:
+                raise
+            h /= 4.0
+            continue
+        total = sum(state[:k])
+        scale = [max(abs(a), abs(b), 1e-9 * total) for a, b in zip(state[:k], new[:k], strict=True)]
+        scale += [temperature, max(abs(state[k + 1]), abs(new[k + 1]), 1.0)]
+        err = max(abs(e) / s for e, s in zip(error, scale, strict=True))
+        if err > TOLERANCE and h > 1e-9 * temperature:
+            h *= max(0.1, 0.9 * (TOLERANCE / err) ** 0.2)
+            continue
+        if above(new) <= 0:  # the liquid reaches its bubble point in the step
+            lo, hi = 0.0, h
+            for _ in range(80):
+                mid = (lo + hi) / 2
+                trial, _ = _dopri_step(f, state, mid)
+                trial[:k] = [max(v, 0.0) for v in trial[:k]]
+                if above(trial) <= 0:
+                    hi = mid
+                else:
+                    lo = mid
+            new, _ = _dopri_step(f, state, hi)
+            new[:k] = [max(v, 0.0) for v in new[:k]]
+            return new[:k], new[k], new[k + 1]
+        state = new
+        cooled += h
+        grow = 5.0 if err == 0 else min(5.0, 0.9 * (TOLERANCE / err) ** 0.2)
+        h *= max(grow, 1.0)
+    raise StillError(
+        f"the charge's flash from {temperature:.5g} K does not reach its bubble point at "
+        f"{target:.5g} kPa(a)"
+    )
+
+
 def solve_still(
     spec: Any,
     charge: Mapping[str, float],
@@ -719,11 +839,13 @@ def solve_still(
     pressure: float | None,
     hours: float = 1.0,
     nonvolatile: set[str] | frozenset[str] = frozenset(),
+    charge_temperature: float | None = None,
 ) -> StillResult:
     """Still *spec* (a :class:`~.schema.Still`) charged with *charge* (kmol per hour of flows
     by component) and fed *feed* (its ``feed:``), at *pressure* kPa(a) (raoult), *hours* of
     flows per batch; *components* maps an id to its materials.yaml component (vapour_pressure,
-    heat_of_vaporization, molar_mass). Raises StillError."""
+    heat_of_vaporization, molar_mass, and with ``flash`` liquid_heat_capacity); the charge
+    enters at *charge_temperature* K (``flash`` needs it, ADR 0077). Raises StillError."""
     feed = dict(feed or {})
     if spec.feed is not None and sum(feed.values()) <= 0:
         raise StillError("the swap's feed is empty")
@@ -796,7 +918,14 @@ def solve_still(
     feed_share = [v / total_feed for v in z] if total_feed > 0 else [0.0] * k
     result = StillResult(dict(zip(names, n0, strict=True)), {}, {}, [], pressure, hours)
     energy_known = all(h is not None for h in latent)
-    column = _Column(spec.column, phase, names, n0) if spec.column is not None else None
+    # the content the boil-up starts from: the charge, or what is left of it after its flash
+    content0 = list(n0)
+    if getattr(spec, "flash", False):
+        result.flash, content0 = _flashed(
+            spec, phase, names, n0, components, charge_temperature, hours
+        )
+        result.notes.extend(_flash_ranges(result.flash, names, pressures, n0, volatile))
+    column = _Column(spec.column, phase, names, content0) if spec.column is not None else None
 
     def top(moles: list[float]) -> tuple[list[float], float | None, float, Top | None]:
         """The distillate's mole fractions over the still holding *moles*, the still's
@@ -858,15 +987,16 @@ def solve_still(
         return f
 
     # the state: kmol by component (per hour of flows), s of boil-up, kJ per batch
-    state = [*n0, 0.0, 0.0]
-    boiled = 0.0  # kmol per hour of flows boiled up so far
+    state = [*content0, 0.0, 0.0]
+    # kmol per hour of flows boiled up so far (the flash's vapour is distilled too)
+    boiled = sum(n0) - sum(content0)
     fed = [0.0] * k
     removed = [0.0] * k  # distilled into the cuts closed so far
     #: kmol fed (per hour of flows) and their sum times the still's K as they mix in
     mixed_in = {"fed": 0.0, "fed_K": 0.0, "known": True}
     energy_before = 0.0  # kJ per batch taken by the cuts closed so far
     peak = 0.0
-    key = _profile_key(spec, names, phase, n0)
+    key = _profile_key(spec, names, phase, content0)
     ki = names.index(key) if key in names else None
     result.key = key
     seen_ranges: set[str] = set()
@@ -1218,6 +1348,78 @@ def solve_still(
     return result
 
 
+def _flashed(
+    spec: Any,
+    phase: _Phase,
+    names: list[str],
+    charge: list[float],
+    components: Mapping[str, Any],
+    temperature: float | None,
+    hours: float,
+) -> tuple[Flash, list[float]]:
+    """``still.flash`` (ADR 0077): the *charge* (kmol per hour of flows) entering at
+    *temperature* K flashed to the still's pressure as it starts (:func:`flash_charge`), its
+    vapour to the first cut; and the content left. Only the charged components (a swap's
+    feed-only ones are not in the content that flashes) need liquid_heat_capacity and, volatile,
+    heat_of_vaporization; a feed-only one counts 0 kJ/(kmol K) on its 0 kmol. Raises StillError
+    naming what it lacks."""
+    if temperature is None:
+        raise StillError("still.flash needs the charge's temperature (its stream's state)")
+    capacity = [
+        getattr(components.get(n), "liquid_heat_capacity", None) if a > 0 else 0.0
+        for n, a in zip(names, charge, strict=True)
+    ]
+    if lacking := [n for n, c, a in zip(names, capacity, charge, strict=True) if a > 0 and not c]:
+        raise StillError("still.flash needs the liquid_heat_capacity of " + ", ".join(lacking))
+    if lacking := [
+        n
+        for n, h, v, a in zip(names, phase.latent, phase.volatile, charge, strict=True)
+        if a > 0 and v and h is None
+    ]:
+        raise StillError("still.flash needs the heat_of_vaporization of " + ", ".join(lacking))
+    guess = phase.guess
+    bubble = phase.bubble(phase.fractions(charge))
+    left, cooled, heat = flash_charge(phase, charge, temperature, capacity)  # type: ignore[arg-type]
+    if heat <= 0:
+        phase.guess = guess  # no flash: the still solves exactly as without it
+    gone = {n: max(a - b, 0.0) for n, a, b in zip(names, charge, left, strict=True)}
+    found = Flash(
+        spec.ends()[0][0],
+        phase.pressure,
+        temperature,
+        bubble,
+        cooled,
+        {n: v for n, v in gone.items() if v > 0},
+        heat * hours,
+    )
+    return found, left
+
+
+def _flash_ranges(
+    flash: Flash,
+    names: list[str],
+    pressures: list[Any],
+    charge: list[float],
+    volatile: list[bool],
+) -> list[str]:
+    """A note per charged volatile component whose vapour_pressure range leaves out the
+    temperatures the *flash* ran over (its inlet down to its flashed bubble point), as the
+    boil-up notes the still's own: the flash starts hotter than anything the boil-up sees."""
+    if not flash.moles:
+        return []
+    notes = []
+    span = (flash.temperature, flash.inlet_temperature)
+    for n, vp, a, v in zip(names, pressures, charge, volatile, strict=True):
+        if vp is None or not v or a <= 0 or all(vp.covers(t) for t in span):
+            continue
+        low, high = vp.temperature_range or (0.0, 0.0)
+        notes.append(
+            f"the charge's flash from {span[1]:.5g} K to {span[0]:.5g} K is outside the "
+            f"vapour_pressure range of {n} ({low:g}-{high:g} K)"
+        )
+    return notes
+
+
 def _column_summary(
     spec: Any,
     column: _Column,
@@ -1465,15 +1667,26 @@ def solve_node(
     comps = process.components()
     hours, basis = batch_hours(process, case)
     nonvolatile = solid_components(process)
+    charge_temperature = _temperature(process, charge, case)
+    flash = getattr(spec, "flash", False)
     try:
-        result = solve_still(spec, moles, fed, comps, pressure, hours, nonvolatile)
+        result = solve_still(
+            spec,
+            moles,
+            fed,
+            comps,
+            pressure,
+            hours,
+            nonvolatile,
+            charge_temperature=charge_temperature if flash else None,
+        )
     except StillError:
         raise
     except (ValueError, OverflowError, ZeroDivisionError) as failure:
         raise StillError(str(failure)) from failure
     if not basis.startswith("process/recipe.yaml"):
         result.notes.append(f"one batch: {basis}")
-    result.charge_temperature = _temperature(process, charge, case)
+    result.charge_temperature = charge_temperature
     if spec.heat_up:
         _heat_up(result, comps)
         if feed is not None:
@@ -1509,6 +1722,14 @@ def solve_node(
             if (vp := getattr(comps.get(n), "vapour_pressure", None))
             else None
             for n in names
+        }
+    if flash:  # the charge's flash (ADR 0077): its temperature and heats set the outlets
+        inputs["charge_temperature"] = charge_temperature
+        inputs["liquid_heat_capacity"] = {
+            n: getattr(comps.get(n), "liquid_heat_capacity", None) for n in names
+        }
+        inputs["heat_of_vaporization"] = {
+            n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
         }
     if any(e is not None and e.time is not None for _, e in spec.ends()):
         inputs["boilup"] = spec.boilup.model_dump(mode="json", include={"value", "unit"})
@@ -1552,6 +1773,9 @@ def _heat_up(result: StillResult, comps: Mapping[str, Any]) -> None:
         result.heat_up_missing = "the liquid_heat_capacity of " + ", ".join(lacking)
         return
     capacity = sum(v * comps[n].liquid_heat_capacity for n, v in result.charge.items() if v > 0)
+    if result.flash is not None and result.flash.moles:
+        result.heat_up = 0.0  # flashed to its bubble point (ADR 0077): no heat-up
+        return
     if t_in >= bubble:
         result.notes.append(
             f"heat_up: the charge enters at {t_in:.5g} K, at or above its bubble point "
@@ -2200,6 +2424,18 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
             cut["pressure_kPa"] = next(c.pressure for c in result.cuts if c.outlet == given.outlet)
             boil = given.boilup or spec.boilup
             cut["boilup"] = {"value": boil.value, "unit": boil.unit}
+    if result.flash is not None:  # the charge's flash (ADR 0077)
+        fl = result.flash
+        entry["solution"]["flash"] = {
+            "outlet": fl.outlet,
+            "pressure_kPa": fl.pressure,
+            "inlet_temperature_K": fl.inlet_temperature,
+            "bubble_point_K": fl.bubble_point,
+            "temperature_K": fl.temperature,
+            **_amounts(process, fl.moles, h),
+            "heat_kWh_per_batch": fl.heat / 3600.0,
+            "year_average_kW": fl.heat / (h * 3600.0) if h else None,
+        }
     if spec.heat_up_time:  # ADR 0068
         sol = entry["solution"]
         sol["heat_up_time_h"] = (
@@ -2218,6 +2454,9 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         sol["condenser_year_average_duty_kW"] = (
             -sol["year_average_duty_kW"] if sol["year_average_duty_kW"] is not None else None
         )
+        if result.flash is not None and sol["condenser_year_average_duty_kW"] is not None:
+            # the vapour the charge flashes is condensed too (ADR 0077)
+            sol["condenser_year_average_duty_kW"] -= sol["flash"]["year_average_kW"]
         for point, reflux in zip(sol["profile"], result.refluxes, strict=True):
             point["reflux_ratio"] = reflux
         for cut, c in zip(sol["cuts"], result.cuts, strict=True):
@@ -2370,6 +2609,20 @@ def report_text(report: StillReport) -> str:
                     else ""
                 )
             )
+            if (fl := sol.get("flash")) is not None:  # ADR 0077
+                lines.append(
+                    f"  flash at {fl['pressure_kPa']:.5g} kPa(a): the charge "
+                    + (
+                        f"{fl['inlet_temperature_K']:.5g} -> {fl['temperature_K']:.5g} K (its "
+                        f"bubble point {fl['bubble_point_K']:.5g} K), {fl['kmol_per_batch']:.6g} "
+                        f"kmol ({fl['kg_per_batch']:.6g} kg) per batch to cut {fl['outlet']}, "
+                        f"{fl['heat_kWh_per_batch']:.4g} kWh of its own heat; "
+                        f"{comp(fl['mole_fractions'])}"
+                        if fl["kmol_h"] > 0
+                        else f"enters at {fl['inlet_temperature_K']:.5g} K, below its bubble "
+                        f"point {fl['bubble_point_K']:.5g} K: no flash"
+                    )
+                )
             if "heat_up_time_h" in sol:  # ADR 0068
                 lines.append(
                     f"  heat-up {num(sol['heat_up_time_h'], ' h', '.4g')} at the boil-up's heat "
