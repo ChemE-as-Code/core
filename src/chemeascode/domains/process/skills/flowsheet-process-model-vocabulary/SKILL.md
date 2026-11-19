@@ -28,15 +28,20 @@ pyDEXPI, which core uses).
 | What happens | Class |
 |---|---|
 | Material enters or leaves the drawing | `Source`, `Sink` |
-| Streams join or divide | `Mixing`, `Splitting` |
+| Streams join or divide | `Mixing`, `SplittingMaterial` (use this one: core solves only `SplittingMaterial` as a splitter; its parent `Splitting` is neither propagated nor simulated) |
 | Flow is generated | `Pumping`, `Compressing` (under `GeneratingFlow`) |
 | Flow is steered or stopped | `SteeringFlow` and its members |
-| Heat is added or removed | `ExchangingThermalEnergy`, `RemovingThermalEnergy`, `SupplyingThermalEnergy` |
+| Heat is added or removed | `ExchangingThermalEnergy`, `RemovingThermalEnergy` (`Cooling`), `SupplyingThermalEnergy` (`HeatingElectrical`, `HeatingInFurnace`) |
 | Phases or components are separated | `Separating` and its members, among them `SeparatingByPhaseSeparation`, `SeparatingByFlash`, `SeparatingMechanically` (`Filtering`), `SeparatingByPhysicalProcess` (`Absorbing`, `Adsorbing`), `SeparatingByThermalProcess` (`Distilling`, `Evaporating`, `Drying`) |
 | A reaction occurs | `ReactingChemicals` |
 | Material is stored | `StoringMaterial`, `StoringFluids`, `StoringInTank` |
 | Particle size changes | `ReducingParticleSize`, `IncreasingParticleSize` (`Crystallizing`) |
 | Material is burned off | `Flaring`, `Emitting` |
+
+For `cheme process propagate`, a heater must be `HeatingElectrical`, `HeatingInFurnace` or
+`ExchangingThermalEnergy`. A step classed plain `SupplyingThermalEnergy` is not passed through,
+and where its outlet lacks a composition or flow it is reported under
+`cheme.process-propagate-not-solved`.
 
 The classes name what is done, so one class covers many machines. Several carry a method
 enumeration (pumping, compression, heat exchange, reaction process type) for how.

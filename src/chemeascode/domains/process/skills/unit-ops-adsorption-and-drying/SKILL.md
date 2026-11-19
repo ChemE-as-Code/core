@@ -1,6 +1,6 @@
 ---
 name: unit-ops-adsorption-and-drying
-description: Fixed adsorbent beds and driers - why a bed regenerated on line needs a partner, how each regeneration method changes the equipment, cycle time, breakthrough, flow direction and channelling. Use when an adsorber, guard bed or drier is designed or reviewed.
+description: Fixed adsorbent beds and gas/liquid driers - why a bed regenerated on line needs a partner, how each regeneration method changes the equipment, cycle time, breakthrough, flow direction and channelling. Use when an adsorber, guard bed or adsorbent drier is designed or reviewed. For a solids dryer (filter-dryer, vacuum dryer) see the core model named in the skill.
 ---
 
 # Adsorption and drying
@@ -11,6 +11,19 @@ A fixed bed is the one mass-transfer operation not at steady state: the adsorpti
 through the bed and the outlet stays clean only until it arrives (Ray and Das, *Process Equipment
 and Plant Design*, Elsevier 2020, Ch 12). Use for beds and driers of that kind.
 
+A solids dryer (filter-dryer, agitated vacuum dryer) is a different operation: it drives
+volatiles off a wet cake. Core models it as `dryer:` on the flowsheet step (ADR 0057; skills
+`process-design` and `separation-method-selection`). It takes `volatiles`, a
+`residual_moisture` (`mass_fraction` or `per_kg_solid`, the design input), the drying
+`temperature`, `outlets: {product, vapour}`, and optionally `energy:` (cake heat capacity,
+latent heats, vessel heat capacity, efficiency, `port`), a `drying_rate` (kg/(m2 h) over the
+recipe vessel's `heated_area`) or a `drying_time`, and a `cake_density` that sizes the vessel.
+`cheme process propagate` solves it, and `cheme process crystallizers` reports the duty. A
+recipe `dry` operation `from:` the step takes its time, and `cheme.recipe-basis` names the batch
+size that makes the rate with the filter and dryer times in the cycle (1.12.0). The model has no
+drying curve or sorption isotherm. Do not put a `recovery:` beside a `dryer:`
+(`cheme.process-recovery`).
+
 ## Required inputs and missing inputs
 
 Adsorbate and adsorbent, phase (gas or liquid), allowed outlet concentration, whether the bed is
@@ -19,9 +32,15 @@ anything missing.
 
 ## Workflow and tools
 
-For a concept, BFD or sourced inventory, represent adsorption as a `component_separator` with
-specified recoveries and their `basis_source` (see `separation-method-selection`): a sourced
-split, labelled as stated, not predicted. When a predicted basis is needed, write
+For a concept, BFD or sourced inventory, give the adsorber or drier step a `recovery:` in
+`process/flowsheet.yaml` (ADR 0070): `recovery: {outlets: {PORT: {COMPONENT: fraction of its
+inlet flow}}, provenance, source}`. Leave out one outlet, which takes the rest. `cheme process
+propagate` then writes the outlets' flows and compositions as calculated. Their temperatures
+and pressures stay as given, there is no duty, and a design spec upstream reaches past the bed.
+`cheme.process-recovery` checks the declaration. The split is specified, not predicted: cite
+its source (see `separation-method-selection`). In a DWSIM run (`process-simulation`) the same
+split is a `component_separator` in `process/simulation.yaml` (`recoveries`, `basis_source`,
+`operating_basis`). When a predicted basis is needed, write
 `process/adsorption.yaml` (`cheme schema process-adsorption`) and run `cheme process adsorption`:
 
 - a TSA with `performance: calculated`: core's equilibrium cycle from sourced isotherms (each
@@ -29,8 +48,11 @@ split, labelled as stated, not predicted. When a predicted basis is needed, writ
   calculation is refused, never extrapolated), a measured mass transfer zone, the bed, the cycle
   and the purge. It reports breakthrough time against the adsorption step, recoveries, product
   impurity, the regeneration heat and the purge it needs, and adsorbent replacement. Copy the
-  recoveries it reports into the `component_separator`: the model basis then shows the split as
-  calculated (`adsorption-equilibrium`), still outside the simulation;
+  recoveries it reports into the flowsheet `recovery:` (so propagate carries them) and, where
+  the plant is simulated, into `specs.<id>.recoveries` of `process/simulation.yaml`. Only the
+  simulation.yaml split is compared (`adsorption-split` warning if it differs). When it agrees
+  and the inputs are sourced, the model basis is `adsorption-equilibrium`, calculated but not
+  simulated. A flowsheet `recovery:` alone is not compared, and the basis stays a stated split;
 - a PSA (or a vendor TSA) with `performance: external`: the cited model's recoveries and
   utilities with its operating range. Core checks the range, the balance and the
   specification, not the performance. Core has no PSA cycle model.

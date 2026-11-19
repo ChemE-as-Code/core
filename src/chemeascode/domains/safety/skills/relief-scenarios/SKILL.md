@@ -11,7 +11,7 @@ A relief device exists to answer a named cause. If nobody can name the cause, th
 neither a set pressure nor a size, so "which case is this device for?" is the most useful question
 about one. Use this skill to put that question, to check that the drawn arrangement is credible for
 the claimed cause, and to see which exemptions are claimed. How a device is connected and where it
-discharges is a drawing matter (`pid-draft`); sizing is a relief study. Layer argument and cause list
+discharges is a drawing matter (`pid-design-pressure-relief`; drawing it: `pid-edit`/`pid-draft`); sizing is a relief study. Layer argument and cause list
 follow CCPS, *Guidelines for Engineering Design for Process Safety* (AIChE), section 2.1.2 and
 chapter 14; the list is the set of common causes, not a complete enumeration (CCPS attributes
 the full list to standards outside this source).
@@ -26,7 +26,8 @@ holds each; do not estimate it. Optional relief data on a P&ID cannot be relied 
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this. Walk the plant and, per device, ask
+Engineering guidance only; core has no relief sizing (the reactor screening's gas figures are
+inputs to the question, not answers). Walk the plant and, per device, ask
 which of these causes it is for and what in the documents makes that credible:
 
 - External fire: wetted wall heats and boils the contents where a pool fire could reach; gas-filled
@@ -52,7 +53,16 @@ which of these causes it is for and what in the documents makes that credible:
   (14.2.2.5, 3.8.7). Cooling or reflux failure removes the condensing duty from a column or
   refrigeration loop; utility failure (instrument air, steam, cooling water, inert gas) reaches
   whatever the utility served.
-- Runaway reaction: kinetics and calorimetry decide the size and the drawing cannot (14.2.4.1). The
+- Runaway reaction: kinetics and calorimetry decide the size and the drawing cannot (14.2.4.1).
+  Where a batch or semi-batch reactor with a `batch.vent` is modelled, `cheme process
+  reactor-hazards` gives screening figures to ask about: the gas release at the MTSR and, for a
+  semi-batch, its largest over the batch (`gas_release.largest_over_batch`), and the boil-up
+  where the content boils at the MTSR (`gas_release.boil_up`), each compared with
+  `hazard.vent_capacity` (`cheme.reactor-hazard-vent`), plus the dissolved gases a cooling
+  failure can release (`dissolved_release`, `cheme.reactor-hazard-dissolved`). Ask whether the
+  vent or relief was sized for at least these figures. They are not a relief sizing: the vent
+  condenser is not credited, the pressure with the vent blocked is not screened, and two-phase
+  flow, tempered or gassy behaviour and the relief rate need a DIERS-type study. The
   drawing does show whether the case was addressed: relief to a knockout or catch tank, quench or
   inhibitor injection, feed trip, remote depressuring (4.4.1.2). Say which you can see.
 - Vacuum: draining or pumping out without a vent path, or condensing a vapour space (14.2.2.9).
@@ -130,4 +140,5 @@ certifies that protection is adequate.
   2.6.5, 3.8.7, 4.3.1, 4.4.1, 4.4.2, chapter 14 (14.2.1 to 14.2.4, 14.3.6, 14.5.2), 15.1.7. Mechanism
   statements are retained as general method; the two-thirds figure and all section-cited
   exemptions need review before operational use.
-- Skills `process-safety`, `safeguard-crediting`, `hazop-equipment-causes`, `pid-draft`.
+- Skills `process-safety`, `safeguard-crediting`, `hazop-equipment-causes`,
+  `pid-design-pressure-relief`, `reactions` (thermal screening).

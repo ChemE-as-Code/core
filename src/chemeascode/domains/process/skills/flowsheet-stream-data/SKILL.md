@@ -22,6 +22,12 @@ nobody knows is `assumed` in the YAML, with the reason in `DESIGN.md`.
 A stream carries at minimum flow, temperature, pressure, phase and composition. In core each value
 has its provenance (given, assumed, calculated). `cheme process streams` prints the table with a
 provenance letter per value and the balance of every block; `--case` selects a case.
+A wastewater model run by `cheme process simulate` (QSDsan, ADR 0065/0066) adds measured-basis
+quantities in their own units (mg COD/L, mg N/L, mg P/L, mg TSS/L, m3/day) under each stream's
+`calculated` values. The viewer's stream table and `cheme process streams --json`
+(`calculated_columns`) show them as columns of their own; the text table puts them in its one
+`calculated` column. A volumetric flow there is not the mass flow the block balances use, and
+these quantities are not checked by `cheme.process-balance`.
 
 Beyond that, engineering guidance only; core has no calculation for the following.
 
@@ -33,7 +39,10 @@ Beyond that, engineering guidance only; core has no calculation for the followin
 - **Recycles.** Solved by iteration, not inspection; nested recycles are normal. Flows inside a
   loop can be far larger than the fresh feed suggests, so a unit sized from the feed alone is
   undersized. A loop broken to make the arithmetic tractable should be said to be broken.
-  `cheme process simulate` solves recycles (skill `process-simulation`).
+  `cheme process propagate --fill` closes material-balance loops torn at `tears:` and solves
+  feeds and splitter (purge) fractions for `specs:` targets (ADR 0060/0070). `cheme process
+  simulate` solves them with the energy balance (skills `process-design`,
+  `process-simulation`).
 - **Checking.** Use checksums per unit and a second engineer; assume an unchecked balance contains
   a mistake (Moran Ch 8).
 - **Line size at first pass** from superficial velocity (volumetric flow over internal area) and
