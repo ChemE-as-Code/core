@@ -253,6 +253,32 @@
   `X_ac`: ammonia-1 R501 1 -> 0.70, methylamines-1 R101 1 -> 0.04, sulfuric-acid-1 R204
   1 -> 0.06, and for the endothermic steps the outlet's unconverted share: ethylene-1 H101
   1 -> 0.30 and H103 1 -> 0.18, hydrogen-1 R102 1 -> 0.25.
+- Project-worker `cheme process simulate` (QSDsan): a value JSON writes in exponent form
+  (`1e-05`, `2e+16`, trace effluent concentrations) is written as a YAML float (`1.0e-05`)
+  instead of refusing the whole `--fill` and `--check` ("cannot be written without changing
+  other YAML values") (#316).
+- A stale calculated value whose name is also a state field (QSDsan's wastewater `flow` in
+  m3/day) is named `calculated.flow` in the stale names (`cheme.process-calculated-stale`, the
+  stream table's `stale`), so it no longer marks stale, blanks in the PFD stream table or leaves
+  out of the DEXPI export the stream's given `flow`, and a stale state `flow` no longer marks the
+  calculated one (#317).
+- `cheme serve` fingerprints declared simulation inputs over 5 MB as the CLI does, instead of
+  treating them as missing and showing every simulated value and the run stale while
+  `simulate --check` reports it current (#318). A project worker's inputs (a long QSDsan
+  influent series) are fingerprinted unread since the shared worker path; this covers the other
+  simulators' declared inputs, in `/api/simulation` and the stream tables.
+- Project-worker `cheme process simulate` (QSDsan) reports the findings the worker returns
+  (`cheme.process-worker`, at their level), so `--check` prints a worker warning and exits 1 on
+  it (#319).
+- Project-worker `--fill` locks `process/simulation-run.lock` with an operating-system lock, released
+  when the process ends however it ends: a lock file left by a killed run no longer refuses every
+  later fill; a publication still running is refused by name (#320).
+
+Library effect: no published number changes. `props.py` and `build.py` are generator modules, so
+every BFD/PFD sheet (the 136 of the library's 68 flowsheets and the examples) needs
+`cheme process build` once; only `generator_sha256` changes. No library flowsheet has a
+calculated value named like a state field, and `processes/wwtp-a2o`, the only QSDsan entry,
+publishes no QSDsan values yet.
 
 ## 1.12.0 (2026-11-13)
 

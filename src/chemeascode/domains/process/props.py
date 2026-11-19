@@ -51,7 +51,7 @@ from typing import Any
 from chemeascode.domains.process import property_packages as packages
 from chemeascode.domains.process.model import Process
 from chemeascode.domains.process.property_packages import AIR, EOS, KIJ, Choice, Package
-from chemeascode.domains.process.schema import ApplicationRange, PropertyMethod
+from chemeascode.domains.process.schema import ApplicationRange, PropertyMethod, State
 from chemeascode.foundation.units import to_kelvin, to_kpa_abs
 
 #: CAS numbers the release-1 method is validated for (package ``air-pr-chemsep``).
@@ -409,20 +409,31 @@ def fingerprint(
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
 
 
+#: The fields of a stream state besides ``calculated``: :func:`stale` names them as they are.
+STATE_FIELDS = tuple(name for name in State.model_fields if name != "calculated")
+
+
+def calculated_name(name: str) -> str:
+    """How :func:`stale` names the ``calculated`` value *name*: as it is, or
+    ``calculated.<name>`` when a state field has the same name (the wastewater ``flow`` in
+    m3/day besides the state's ``flow``), so that neither is read as the other."""
+    return f"calculated.{name}" if name in STATE_FIELDS else name
+
+
 def stale(process: Process, stream: Any, case: str) -> list[str]:
     """Names of *stream*'s calculated values in *case* whose fingerprint no longer matches,
     including the values written by ``cheme process propagate`` and ``cheme process simulate``
-    (state and duty)."""
+    (state and duty). A state field is named as it is, a ``state.calculated`` value by
+    :func:`calculated_name`."""
     from chemeascode.domains.process import propagate
     from chemeascode.domains.process.simulation import translate
 
     state = stream.state.get(case)
     if state is None:
         return []
-    marked = {name: q.fingerprint for name, q in state.calculated.items() if q.fingerprint}
-    simulated = {
-        k: marked.pop(k) for k, q in state.calculated.items() if k in marked and translate.ours(q)
-    }
+    cells = {calculated_name(name): q for name, q in state.calculated.items()}
+    marked = {name: q.fingerprint for name, q in cells.items() if q.fingerprint}
+    simulated = {k: marked.pop(k) for k, q in cells.items() if k in marked and translate.ours(q)}
     if state.phase is not None and state.phase.fingerprint:
         marked["phase"] = state.phase.fingerprint
     found = propagate.stale_fields(process, stream, case)

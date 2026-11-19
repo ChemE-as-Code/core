@@ -1124,7 +1124,7 @@ def _calculated(process: Process, stream: StreamDef) -> dict[str, list[Any]]:
     Stale values (``cheme.process-calculated-stale``) are not exported: a line
     ``stale, not exported (<case>): <names>`` says which were left out.
     """
-    from chemeascode.domains.process.props import stale
+    from chemeascode.domains.process.props import calculated_name, stale
 
     fs = process.flowsheet
     out: dict[str, list[Any]] = {"density": [], "specificEnthalpy": [], "phases": [], "lines": []}
@@ -1137,7 +1137,7 @@ def _calculated(process: Process, stream: StreamDef) -> dict[str, list[Any]]:
         if molar_mass is not None and ("molar_mass" in old or molar_mass.value <= 0):
             molar_mass = None
         for name, q in state.calculated.items():
-            if name in old:
+            if calculated_name(name) in old:
                 continue
             source = f"; source: {q.source}" if q.source else ""
             mapped = _CALCULATED_PROPERTIES.get(name)
