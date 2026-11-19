@@ -34,6 +34,20 @@
   `adsorption` and `assay` commands, missing CLI flags and unit defaults in REFERENCE.md. No
   behaviour changes.
 
+### Fixed
+
+- `cheme process propagate`: the tear values' fingerprint (`recycle.loop_inputs`) includes the
+  recipe's batch size, and the given and assumed values its stream's rate depends on, when a
+  still upstream of a tear has an end at a time with a boil-up that takes the recipe's hours of
+  flows per batch (ADR 0068). A recipe-only change now makes such a tear stale in
+  `stale_fields` and `cheme validate` (core#295). Every other tear keeps its fingerprint. Library:
+  no loop in the library has such a still upstream of a tear, so no entry changes
+  (`cheme process propagate --check` gives the same findings on the 9 entries with tears).
+- `cheme process propagate`: a tear named twice reports its loop problems (a first guess that
+  cannot be converted, a loop that does not close) at the entry that is iterated, the first, not
+  at the duplicate left out (core#296). Only the finding's line changes; no library entry names
+  a tear twice.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
