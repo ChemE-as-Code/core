@@ -33,7 +33,11 @@ UNITS = {
     "meter": ("length", 1.0),
     "kilometer": ("length", 1000.0),
     "square meter": ("area", 1.0),
+    # land occupation (m2*a) and radioactivity (kBq): bw2io's names for m2*year and kBq
+    "square meter-year": ("land-occupation", 1.0),
     "cubic meter": ("volume", 1.0),
+    "kilo Becquerel": ("radioactivity", 1.0),
+    "Becquerel": ("radioactivity", 0.001),
     "unit": ("count", 1.0),
     "ton kilometer": ("transport", 1.0),
 }

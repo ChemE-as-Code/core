@@ -18,8 +18,9 @@ properties written to `process/flowsheet.yaml` come from that command's validate
 
 - The component: a name or a CAS number. A CAS number is unambiguous; prefer it. For a
   binary property, both components, and their SMILES when HANNA is asked.
-- The property names (`cheme chemistry props --help` lists them, or
-  `chemeascode.domains.chemistry.properties.SOURCE_ORDER`).
+- The property names: the keys of `chemeascode.domains.chemistry.properties.SOURCE_ORDER` (an
+  unknown `-p` makes `cheme chemistry props` print the known names and exit 2; `--help` does
+  not list them).
 - The temperature and pressure with units, for temperature-dependent properties.
 - For predictions, the base URL of a running GRAPPA or HANNA service. Without it they are not
   asked. The services run from an LLM4ChemE checkout (`docker compose up -d grappa-api
@@ -70,6 +71,18 @@ Every result names its `source` (PubChem, NIST, OSHA, Thermo, GRAPPA, HANNA, Der
 `units` as the source gives them, and `metadata` with the source URL, the method or the inputs
 of a derived value. Record the source next to each value you write to a file, e.g. as a comment
 in `process/materials.yaml` or in the evidence of a review.
+
+Into `process/materials.yaml` components: `temperature_fusion` (K) goes to `melting_point`
+(the vent and still condenser freezing check, ADR 0071). `temperature_boil` (K) goes to
+`normal_boiling_point`. `molecular_weight` (g/mol) goes to `molar_mass` (kg/kmol, same
+number). `antoine_parameters` goes to `vapour_pressure: {a: A, b: B, c: C, temperature_range:
+[temp_min_K, temp_max_K], provenance, source}`; the NIST form log10, bar, K is the schema
+default (still Raoult's law, ADR 0068; bubble-point MTT, ADR 0069; vent vapour, ADR 0062).
+Where NIST has no Antoine set it falls back to GRAPPA: a prediction, already in that form, with
+no temperature range. `heat_of_vaporization` or `enthalpy_vaporization_average` (kJ/mol) is
+multiplied by 1000 to give `heat_of_vaporization` in kJ/kmol; note its temperature basis (the
+schema wants it near the still's temperature or the normal boiling point). Henry constants
+(`vent.vapour.henry`) are not available here: source them.
 
 ## Required human judgments
 

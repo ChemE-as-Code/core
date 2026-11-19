@@ -220,6 +220,23 @@ kinetic data) join `cheme migrate`'s inputs when their v2 arrives.
 
 ## Model and solver adapter contract
 
+New project-worker results use `cheme/adapter-result/v2` ([ADR 0072](../adr/0072-shared-project-worker-execution-and-results.md)).
+They retain the existing result shape and add `execution`, `outcome`, `trajectories` and dynamic
+`status: completed`. Execution success, numerical convergence, integration completion and an
+independent steady-state assessment are separate. V1 below retains its previous meaning for
+DWSIM/IDAES, propagation and properties; old records remain readable. A legacy QSDsan
+`integration_completed` flag never establishes numerical convergence or steady state.
+The enclosing run collection remains v1 and each result declares its own schema version.
+
+The typed `cheme/worker-request/v1` includes case/run/mode, declared byte-preserved assets,
+bounded adapter configuration, mappings, timeout and assigned evidence destination.
+Machine paths and credentials stay outside engineering YAML. Registered adapters choose
+measured or molecular publication; cells include a structured tool/adapter/model producer.
+Only its own derived outputs are excluded from the contract-2 fingerprint. Old records may
+need a rerun to become current, but remain intact. Full exchange, trajectory and compatibility
+rules: [Project-worker adapters](project-workers.md). New worker result/status and finding-ID
+changes are recorded as breaking for the next major release under ADR 0032.
+
 An adapter (DWSIM; property and propagation calculations; later IDAES/Pyomo or Cantera where
 they fill a demonstrated gap) takes the flowsheet, a case and its specs, and returns one
 adapter result per case (`AdapterResult`, `foundation/schemas/run.py`; `cheme schema
@@ -251,7 +268,11 @@ findings: [...]
 | Properties | `cheme process props --json` | `thermo`, its version, the EOS | null (one flash per stream) | the streams refused or missing inputs |
 | QSDsan (ADR 0065) | `simulate --fill`: case record and `process/simulation-runs/<id>/` | QSDsan version and worker-supplied method | null | core publishes validated measurements and retains prior evidence |
 
-The project worker receives the case, declared inputs, timeout and an evidence directory. Its response is an AdapterResult. Core publishes each stream's quantities in `state.<case>.calculated` and fingerprints the model inputs. `GET /api/streams`, the stream CLI and the PFD stream inspector share these values. See [ADR 0065](../adr/0065-qsdsan-a2o-process-worker.md) and [ADR 0066](../adr/0066-wastewater-stream-table.md).
+The QSDsan project worker uses the measured publication mapping: quantities in
+`state.<case>.calculated` retain their original units. `GET /api/streams`, the stream CLI and
+the PFD stream inspector share these values. Other project adapters can select molecular state
+publication. See [ADR 0065](../adr/0065-qsdsan-a2o-process-worker.md),
+[ADR 0066](../adr/0066-wastewater-stream-table.md) and the v2 rules above.
 
 The DWSIM entry keeps the keys it had (`simulator`, `converged`, `property_package`); an entry
 written before `status` and `simulator.method` existed reads the same, `status` following

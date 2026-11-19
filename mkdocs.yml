@@ -125,6 +125,7 @@ nav:
       - Serve API: reference/serve-api.md
   - Framework:
       - Architecture: framework/architecture.md
+      - Project-worker adapters: framework/project-workers.md
       - Engineering contract: framework/contract.md
       - Calculation maturity: framework/maturity.md
       - Electrochemical cells: framework/electrochemical-cells.md
@@ -211,5 +212,7 @@ nav:
       - "0069 Thermal screening beyond the largest reaction": adr/0069-thermal-screening-beyond-the-largest-reaction.md
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
       - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
+      - "0072 Shared project-worker execution and results": adr/0072-shared-project-worker-execution-and-results.md
+      - "0077 Batch still: the charge's flash": adr/0077-batch-still-flashes-a-charge-above-its-bubble-point.md
       - "0078 Batch still: jacket boil-up and activity coefficients": adr/0078-batch-still-jacket-boilup-and-activity-coefficients.md
       - Template: adr/template.md

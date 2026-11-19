@@ -35,8 +35,9 @@ is fully determined by their streams, by the DEXPI class:
   its fraction of every component's inlet flow, the one outlet left out the rest
   (:mod:`.separator`).
 
-Other separators (without ``recovery:``), and reactors without conversions, are only checked
-(``cheme validate`` balances them), never solved.
+Other separators (without ``recovery:``), and reactors with none of their models
+(conversions, ``selectivity:``, equilibrium, Gibbs, a fixed bed, a stirred tank or a batch), are
+only checked (``cheme validate`` balances them), never solved.
 
 - recycle loops torn at the streams the flowsheet names in ``tears:``: the sweep is repeated
   from a guess of each tear stream until what the loop gives back matches it within the
@@ -579,7 +580,7 @@ def _swept(
         shapes: dict[str, dict[str, float]] = {}
         try:
             if node.dryer is not None:
-                from chemeascode.domains.process.dryer import DryerError
+                from chemeascode.domains.process.dryer import DryerError, vapour_shape
                 from chemeascode.domains.process.dryer import node_outlets as dried
                 from chemeascode.domains.process.dryer import solve_node as dry
 
@@ -588,6 +589,7 @@ def _swept(
                 except DryerError as failure:
                     raise CrystallizationError(str(failure)) from failure
                 ports = dried(node.dryer, solved)
+                shapes = {node.dryer.outlets["vapour"]: vapour_shape(node.dryer, solved)}
             elif node.crystallizer is not None:
                 result, extra = solve_node(work, node, ins if len(ins) > 1 else inlet, case)
                 solutions[node.id] = (result, dict(extra))

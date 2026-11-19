@@ -128,6 +128,8 @@ cheme process props --fill                    # phase, density, enthalpy (extra 
 cheme process methods                         # which thermodynamic models phase/simulate run, substitutes
 cheme process phase A B --model Peng-Robinson # kij coverage per pair; with -T/-P a flash (extra props)
 cheme process extract [UNIT] [--systems]      # LLE extraction stages, process/extraction.yaml (extra props)
+cheme process adsorption [--case C]           # TSA cycle / external adsorber basis, process/adsorption.yaml
+cheme process assay [--fill | --check]        # petroleum assay pseudocomponents, process/assays.yaml (extra props)
 cheme process layout --view pfd --pin         # keep the generated positions in flowsheet.yaml
 cheme layout build [--check]                  # layout/plant-model.yaml: 3D parts, nozzles, envelopes
 cheme layout cables [--write]                 # cable schedule: from, to, size, trays, length
@@ -1091,20 +1093,25 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `heat_of_vaporization`; the lower of the worst moment's content and that after the cooling
   failure; dissolved gases left out; JSON `bubble_point`).
 - **Reactor choice**: **`cheme process reactor-choice NODE --product P [--key K] [--tanks N]
-  [--svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
+  [--case C] [--svg FILE] [--region-svg FILE] [--json | --csv]`** compares an ideal PFR, one CSTR and N CSTRs in series for a
   step's reactions: yield and selectivity of P against the key's conversion over a range of
   space times, the largest yield of each, and the PFR's instantaneous selectivity
   (`domains/process/reactor_choice.py`; the SVG in light and dark); `--region-svg FILE` adds
   the candidate attainable region (`domains/process/attainable_region.py`).
 - **Reactor uncertainty**: **`cheme process reactor-uncertainty NODE [--samples 200] [--seed 1]
-  [--case C] [--json]`** samples the `uncertainty` of a step's reaction data (`rate.uncertainty`
-  of A and Ea, and that of `heat_of_reaction`, `equilibrium_constant` and `conversion`) by Monte
-  Carlo through the step's own reactor model (a fixed bed, a stirred tank or batch, a conversion
-  reactor; equilibrium and Gibbs reactors are not sampled) and prints the conversion of the key
-  (the first fed reactant), the outlet and the highest temperature as declared, with their mean
-  and 5th, 50th and 95th percentile; draws that do not solve are counted and named
+  [--case C] [--json]`** samples by Monte Carlo the `uncertainty` of what the step's own
+  reactor model reads: a rate law's A and Ea (`rate.uncertainty`), K where a rate is
+  reversible, `heat_of_reaction` for a liquid adiabatic tank or batch, `conversion` for a
+  conversion reactor, and for a `selectivity:` step the key's conversion and the selectivities
+  from `selectivity.uncertainty` (evaluated as propagate does). Fixed beds, stirred tanks and
+  batches, conversion and selectivity reactors are sampled; equilibrium and Gibbs reactors are
+  not. Other uncertainties are listed as not used, with the reason. It prints the conversion of
+  the key (the first fed reactant, or a selectivity's own key), the outlet flows and, for a
+  bed, tank or batch, the outlet and highest temperatures, as declared and as the mean and the
+  5th, 50th and 95th percentiles. Draws that do not solve are counted and named
   (`domains/process/reactor_uncertainty.py`). Nothing is written. Exit 2 when the step cannot
-  be sampled (not one inlet, no reaction with an uncertainty, not solvable as declared).
+  be sampled (for example not one inlet where the model takes one, not solvable as declared)
+  or nothing it uses is uncertain.
 - **Selectivity as a design input**: a conversion reactor step may give `selectivity: {key,
   conversion, products: {id: S}}` (kmol formed per kmol of the key converted); `process
   propagate` solves the extents of its parallel and series reactions
@@ -1462,6 +1469,23 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
     vacuum ramp that ends below the charge still times the metal's heat-up.
+  - `still.flash: true` (raoult, ADR 0077): a charge that enters above its bubble point at the
+    still's pressure (the first cut's without a feed) first flashes adiabatically and
+    differentially to it. The vapour leaves as it forms, at the liquid's bubble point, and the
+    content's sensible heat (`liquid_heat_capacity` of every charged component; a swap's
+    feed-only one needs none) evaporates it (`heat_of_vaporization` of every charged volatile
+    one): `dN_i/dT = y_i C / lambda(y)`, down to where the flashed liquid
+    boils at the still's pressure. The vapour joins the first cut through the condenser (with a
+    column, not rectified). The boil-up, its time and its duty start from the flashed liquid,
+    so the boil-up no longer evaporates that vapour. An end at a share distilled counts it, the
+    charge's heat-up (`heat_up`) is 0, and the condenser's duty (`condenser_port`) adds a
+    `flash` term. The flash takes no time and leaves out the vessel's metal. It needs the
+    charge's temperature. `process stills` gives `flash` (its cut, pressure, inlet temperature,
+    bubble point, end temperature, vapour, `heat_kWh_per_batch`, `year_average_kW`). A charge
+    below its bubble point solves as without the field. A flash that runs outside a charged
+    volatile component's `vapour_pressure` range gives a note, as the boil-up does. Without the
+    field a hotter charge is not flashed, as before (with `heat_up`, a note); a swap's feed above
+    the still's temperature keeps its note with the field on (the feed is not flashed).
   - An end at a temperature (or any end) stops where the integrator found it (core#198: a
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
@@ -1600,7 +1624,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   current, power or on/off schedule, the reservoir (volume, composition, anolyte model by id,
   optional CO2 degassing), dosing on a pH trigger or continuous, bleed, make-up water, the
   stated pH threshold (a design criterion) and the horizon.
-  **`cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG]`** integrates
+  **`cheme process duty [IDS] [--json] [--plot DIR] [--compare ID,ID --co KG [--tolerance
+  0.001]]`** (`--tolerance`: the relative tolerance on the delivered product) integrates
   them (Dormand-Prince 5(4) with events): the voltage, Faradaic efficiency and water
   dissociation efficiency at each instant from the measured series (never extrapolated: the
   transient stops at the first exit from the measured range and the time outside is summed)
@@ -1656,18 +1681,21 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
 - **`cheme process streams [--case C] [--md | --csv | --json]`** prints the stream table
   (value, unit and provenance per property, calculated values, stale ones marked) and the
   balances.
-- **`cheme process propagate --fill | --check`** derives missing compositions and flows
+- **`cheme process propagate --fill | --check [--case C] [--json]`** derives missing compositions and flows
   through steps whose streams determine them: pass-through classes (compressing, pumping,
   cooling, heating, filtering, transporting, flow control; heat exchanging with one stream in
   and one out) keep composition and flow, mixers combine, splitters keep the composition and
   split by `split: {outlet port: fraction}` (else the one missing outlet flow is the mass
-  balance remainder), and a conversion reactor (a step naming `reactions:`, each with a
-  conversion) converts its fraction of each key component's inlet flow; a crystallizer or a
-  filter (`crystallizer:`, `solid_separation:`, below) fills its outlets; a batch,
-  semi-batch, still, crystallizer or conversion step writes its duty on its energy stream
-  (`energy_port:`, ADR 0059, below) and a given duty is compared (`cheme.process-duty`); a
-  component separator (`recovery:`, below) splits each component of its inlets by its given
-  fractions. Other separators, and reactors without conversions, are only checked, never
+  balance remainder), and a reactor solves by its model: conversions (a step naming
+  `reactions:`, each with a conversion, converts its fraction of each key component's inlet
+  flow), a `selectivity:`, `reactor: equilibrium` or `gibbs`, a fixed bed (`pfr`), `cstr`,
+  `batch` or `semibatch` (above). A crystallizer, filter, dryer or batch still
+  (`crystallizer:`, `solid_separation:`, `dryer:`, `still:`, below) fills its outlets. A
+  batch, semi-batch, still, crystallizer or conversion step writes its duty on its energy
+  stream (`energy_port:`, ADR 0059, below), and a given duty is compared
+  (`cheme.process-duty`). A component separator (`recovery:`, below) splits each component of
+  its inlets by its given fractions, and `specs:` adjust feeds and splits to stream targets
+  (below). Other separators, and reactors with none of these models, are only checked, never
   solved. Values are
   `calculated` with source and input fingerprint, never overwrite given or assumed ones, and
   are reported stale when an upstream value changes. Run it before `props --fill`. `--json`
@@ -1782,8 +1810,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     `examples/process-design-spec` is a loop reactor with a component separator whose fresh
     feed and purge are solved for a product rate and an inert level, against their closed form
     (`tests/test_design_spec.py`).
-- **`cheme process props --fill | --check | --coverage`** (extra `props`) calculates phase,
-  vapour fraction, molar mass, density and enthalpy, only inside the validated range of the
+- **`cheme process props --fill | --check | --coverage [--case C] [--json]`** (extra `props`)
+  calculates phase, vapour fraction, molar mass, density, enthalpy and exergy (chemical plus
+  physical, dead state 298.15 K and 101.325 kPa; only with a package that calculates enthalpy,
+  where every component has a tabulated chemical exergy and the dead state lies inside the
+  package's range and is not two-phase), only inside the validated range of the
   process's property package (`property_method.package` in `materials.yaml`, else the package
   covering the most streams; `--coverage` lists it and, per stream, whether it is covered or
   why not, writing nothing). Package `air-pr-chemsep`: N2, O2 and Ar; 77 to 315 K; vapour 100
@@ -1816,9 +1847,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   refused a stream and names the refused streams on its summary line. `--json` prints the run
   as an adapter result (solver `thermo` with its version and EOS; `not-converged` with the
   refused or uncalculable streams in `messages`; `iterations` null, one flash per stream).
-- **`cheme process simulate --fill | --check [--save x.dwxmz]`** solves the flowsheet in
-  DWSIM. `process/simulation.yaml` gives the property package and what each step needs beyond
-  its streams (every value with its provenance):
+- **`cheme process simulate --fill | --check [--case C] [--save x.dwxmz]`** runs the simulator
+  `process/simulation.yaml` selects: DWSIM (default), the optional IDAES backend (`simulator:
+  idaes`) or a registered project-worker adapter such as QSDsan (below). `--save` is DWSIM
+  only. For DWSIM, `process/simulation.yaml` gives the property package and what each step
+  needs beyond its streams (every value with its provenance):
 
   ```yaml
   schema: cheme/simulation/v1
@@ -1857,6 +1890,29 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (IPOPT). See [docs/framework/idaes.md](docs/framework/idaes.md) and
   `examples/process-hda-idaes`.
 
+  `simulator: qsdsan` runs a project-defined dynamic model through the shared worker interface
+  (ADRs 0065 and 0072). The `qsdsan` block declares `model`, `worker` (a Python module among
+  `files`), `input` and `files`. It also accepts `mode`, `mappings`, bounded adapter `options`
+  and `timeout_s` (default 300 seconds, at most 3600). Use slash-separated project-relative
+  paths. QSDsan solver settings stay in its input.
+  Both modes execute trusted project code. `CHEME_QSDSAN_PYTHON` overrides the optional
+  `CHEME_WORKER_PYTHON` fallback. The module receives JSON request and response file paths.
+
+  `--check` runs against disposable staged inputs. `--fill` records accepted results in
+  `process/simulation-run.json`, publishes the measured quantities in
+  `state.<case>.calculated` in their original units and archives evidence under
+  `process/simulation-runs/<id>/`. Validation reports `cheme.process-sim-run-stale` when
+  declared sources change. Worker errors use `cheme.process-worker`. Rejected fills retain
+  separate diagnostics under `process/simulation-attempts/` and keep accepted results intact.
+  `--save` is DWSIM-only.
+
+  The API exposes worker capabilities, structured cell producers, evidence and original units.
+  New worker results use `cheme/adapter-result/v2` with `execution`, `outcome` and optional
+  `trajectories`. `status: completed` means the requested dynamic interval completed.
+  Steady-state assessment has its own outcome and evidence. Older records remain readable.
+  See the [worker author guide](docs/framework/project-workers.md) for the request contract,
+  publication rules and migration requirements.
+
   `--fill` also records the run in `process/simulation-run.json` (generated, committed with the
   flowsheet; schema `cheme/simulation-run/v1`, one entry per case): simulator and version,
   property package, when, the model fingerprint and the input files' commit and fingerprints,
@@ -1892,14 +1948,18 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   bubble points at 101.3 kPa(a) against measured VLE data, on DWSIM 9.0.5,
   `methods[].simulation.application_range`, checked by `cheme maturity`).
 - **`cheme process phase COMPONENT... (--model EOS | --liquid M --vapor V) [--z x,y]
-  [--temperature T --pressure P] [--accept-zero A:B] [--check] [--json]`** (extra `props`)
+  [--temperature T [--temperature-unit K] --pressure P [--pressure-unit bar(a)]]
+  [--two-liquids] [--accept-zero A:B] [--check] [--json]`** (extra `props`)
   reports per binary pair whether the model's interaction parameter is `sourced` (with its
   source: thermo's ChemSep PR, NRTL and Wilson tables, the fetched ChemSep SRK file, thermo's
   UNIFAC group parameters), `missing` (the calculation uses zero) or `accepted_zero`
-  (`--accept-zero`); with a temperature and pressure it also runs the flash. `--check` exits 1
+  (`--accept-zero`); with a temperature and pressure it also runs the flash (pressure
+  absolute, default unit bar(a); `--two-liquids` allows a second liquid as a stated
+  assumption). `--check` exits 1
   when a pair is missing. Python: `thermodynamics.coverage.interaction_parameter_coverage`.
-- **`cheme process electrolyte --temperature T --pressure P (--molality M | --mass-fraction W |
-  --species Na+=M,Cl-=M) [--system NaCl-H2O] [--json]`** (extras `cantera` and `props`) runs a
+- **`cheme process electrolyte --temperature T --pressure P [--temperature-unit K]
+  [--pressure-unit bar(a)] (--molality M | --mass-fraction W | --species Na+=M,Cl-=M)
+  [--system NaCl-H2O] [--json]`** (extras `cantera` and `props`) runs a
   qualified aqueous electrolyte system of the versioned contract
   `domains/process/thermodynamics/electrolytes.yml` (ADR 0027): today NaCl-H2O, through Pitzer's
   equations in Cantera's `HMW-electrolyte` phase with the Silvester and Pitzer (1977) parameters,
@@ -1908,7 +1968,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   over the solution (a_w times the IAPWS-95 saturation pressure), the relative apparent molar
   enthalpy phi_L of NaCl (heats of dilution), the species, element and charge closure, and the
   provenance (solver version, parameter source, tolerances, benchmark). The claim:
-  273.15-373.15 K, up to 1000 kPa(a) and 6 mol/kg, phi_L from 313.15 K, one liquid phase;
+  273.15-373.15 K, up to 1000 kPa(a) (`--pressure 10`, the default unit being bar(a)) and
+  6 mol/kg, phi_L from 313.15 K, one liquid phase;
   `tests/test_electrolytes.py` checks it against Hamer and Wu (1972) and Pitzer, Peiper and
   Busey (1984) within 2 % in gamma+-, 0.01 in phi and 0.03 RT in phi_L. Anything else is refused
   with exit code 3 and a rule id (`cheme.process-electrolyte-range`, `-unsupported` for another
@@ -1965,6 +2026,32 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   (never taken as zero), a temperature outside the parameters' range. Isothermal, no energy
   balance; solvent regeneration is a separate unit; the flowsheet keeps a component separator
   citing the result. Writes nothing. Python: `separations.extraction`.
+- **`cheme process adsorption [--case C] [--json]`** evaluates each adsorber of
+  `process/adsorption.yaml` (schema `cheme/adsorption/v1`, `cheme schema process-adsorption`,
+  ADR 0024). For `technique: tsa, performance: calculated` it runs core's equilibrium TSA cycle
+  from sourced isotherms (Langmuir, dual- and multi-site Langmuir, Sips, Toth, extended Langmuir
+  or Sips): breakthrough, recoveries and product impurity, regeneration heat and purge, and
+  adsorbent replacement. `performance: external` checks an external model's results against its
+  operating range, the balance and the specification. It also checks whether the
+  `component_separator` split in the simulation follows from the result within
+  `split_tolerance`; if so, and its inputs are sourced, the model basis reports
+  `adsorption-equilibrium` (predictive, not simulated) or `external-performance`. An isotherm
+  outside its measured range is refused (`cheme.adsorption-isotherm-range`), and so is a
+  calculated PSA (`cheme.adsorption-unsupported`). Writes nothing. `--case` defaults to every
+  case. Exit 1 on a warning or error, 2 for an unknown case.
+- **`cheme process assay [IDS] [--fill [--prune] | --check] [--pressure P [--temperature T]]
+  [--json]`** (extra `props`) characterises the petroleum assays of `process/assays.yaml`
+  (`cheme schema process-assays`, ADR 0026) into pseudocomponents: Riazi-Daubert, Lee-Kesler and
+  Lastovka-Shaw, with D86 converted to TBP by API 3A1.1. It prints their identities and the
+  characterisation fingerprint. An insufficient assay, or one outside the correlations' range,
+  is refused. `--pressure` (kPa(a), unlike `phase` and `electrolyte`) adds the bubble and dew
+  temperatures; with `--temperature` (K) it runs a Peng-Robinson flash (kij = 0); for each it
+  says why the result lies outside the benchmarked claim. `--fill` records the
+  characterisations in `process/assay-characterization.json`, and `--prune` drops entries for
+  removed assays. `--check` reports a stale record (`cheme.assay-record-stale`, warning) or a
+  missing one (`cheme.assay-record-missing`, info). Exit 1 on an error (with `--check`, also on
+  a warning), 2 on a wrong call. See [docs/framework/assay.md](docs/framework/assay.md). The
+  pure-component routes (`phase`, `simulate`) do not take pseudocomponents.
 - **`cheme process energy [--case C] [--json]`** prints the energy balances of blocks and steps
   (stream `calculated.enthalpy` times molar flow against the energy streams crossing them,
   `cheme.process-energy-balance`, checked by `validate` in every case with stream states; a
@@ -2481,9 +2568,3 @@ The same text is in `NOTICE`. Which licence applies where:
   in the repository. `cheme init` adds no `LICENSE` file for the plant content, and neither does
   the ChemE-as-Code/project-template repository generated from it.
 - pyDEXPI and the other dependencies keep their own licenses.
-
-### Project-defined QSDsan simulations
-
-Set `simulator: qsdsan` in `process/simulation.yaml`. Its `qsdsan` block declares `model`, `worker` (Python module), `input`, `files` and optionally `timeout_s` (default 300). Use slash-separated project-relative paths. Both modes execute trusted project code using the interpreter named by `CHEME_QSDSAN_PYTHON`. The module receives two JSON file paths, request and response. See the [worker contract](docs/adr/0065-qsdsan-a2o-process-worker.md).
-
-`cheme process simulate --fill` publishes quantities under each stream's `state.<case>.calculated`. The record points to `process/simulation-runs/<id>/`. Inspect the original numerical evidence there. `--check` runs against staged inputs. Validation reports `cheme.process-sim-run-stale` when declared sources change. Invalid input or unsuccessful execution produces `cheme.process-qsdsan`; an unavailable model input can also produce `cheme.process-sim-input-missing`. The API exposes optional `calculated_columns`, `spec.molecular`, `spec.model`, `spec.qsdsan` (the declared worker inputs), `run.evidence` and `run.integration_completed`.

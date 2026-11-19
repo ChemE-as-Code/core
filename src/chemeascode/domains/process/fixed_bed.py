@@ -439,15 +439,22 @@ _E = (
 )
 
 
-def _dopri_step(f: Any, y: list[float], h: float) -> tuple[list[float], list[float]]:
-    """One Dormand-Prince step of size *h*: the new state and the error estimate."""
+def _dopri_step(
+    f: Any, y: list[float], h: float, signed: frozenset[int] = frozenset()
+) -> tuple[list[float], list[float]]:
+    """One Dormand-Prince step of size *h*: the new state and the error estimate. Each stage
+    point holds the amounts (all but the last two entries, temperature and pressure) at zero or
+    above, except the entries in *signed* (running totals that may go negative)."""
     k: list[list[float]] = []
     for stage in range(7):
         point = [
             yi + h * sum(a * k[s][i] for s, a in enumerate(_A[stage])) for i, yi in enumerate(y)
         ]
         if stage:
-            point = [max(v, 0.0) if i < len(y) - 2 else v for i, v in enumerate(point)]
+            point = [
+                max(v, 0.0) if i < len(y) - 2 and i not in signed else v
+                for i, v in enumerate(point)
+            ]
         k.append(f(point if stage else y))
     new = [yi + h * sum(b * k[s][i] for s, b in enumerate(_B)) for i, yi in enumerate(y)]
     error = [h * sum(e * k[s][i] for s, e in enumerate(_E)) for i in range(len(y))]

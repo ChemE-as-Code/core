@@ -426,6 +426,41 @@ def test_an_initial_guess_that_cannot_be_converted_is_a_warning(plant):
     assert ("S5", "flow") not in found.values
 
 
+def test_a_tear_named_twice_reports_its_loop_problems_at_the_entry_iterated(plant):
+    """The first S5 is iterated and the second left out (named twice): the guess that cannot
+    be converted is the first's, and the finding points at it, not at the bare duplicate
+    (core#296)."""
+
+    def change(d):
+        _unfilled(d)
+        d["tears"] = [
+            {
+                "stream": "S5",
+                "initial": {
+                    "flow": 50,
+                    "unit": "Nm3/h",  # the flowsheet has no units.normal_conditions
+                    "basis": "mole_fraction",
+                    "composition": {"NC4": 0.3, "IC4": 0.6, "C3": 0.1},
+                },
+            },
+            {"stream": "S5"},
+        ]
+
+    _edit(plant, change)
+    process, _ = load(plant)
+    found = derive(process, "design")
+    assert [(i, sid) for i, _, sid, _ in found.recycle.declared] == [(1, "S5")]
+    ((index, sid, message),) = found.recycle.problems
+    assert (index, sid) == (0, "S5") and "cannot be converted to kg/h" in message
+    done = _cli("process", "propagate", "--check")
+    lines = plant.joinpath("process/flowsheet.yaml").read_text().splitlines()
+    first = next(n for n, line in enumerate(lines, 1) if "- stream: S5" in line)
+    (line,) = [
+        ln for ln in done.stdout.splitlines() if "process-recycle" in ln and "converted" in ln
+    ]
+    assert line.startswith(f"process/flowsheet.yaml:{first}:"), (first, line)
+
+
 def _second_loop(d) -> None:
     """A second loop beside the purge loop, which cannot close: its product S9 is assumed at
     150 kg/h from a fresh feed of 100 kg/h, so the remainder recycled is negative."""
@@ -755,3 +790,134 @@ def test_a_screening_energy_port_or_drawing_edit_leaves_the_tears_current(
     assert loop_inputs(process, "design", ["S5"]) == before
     done = _cli("process", "propagate", "--check")
     assert "calculated-stale" not in done.stdout, done.stdout
+
+
+# -- a still in the loop that takes its hours of flows from the recipe (core#295) ----------------
+
+STILL_LOOP = """\
+schema: cheme/process/v1
+kind: flowsheet
+units: {flow: kg/h}
+tears: [{stream: S5}]
+convergence: {method: wegstein, max_iterations: 50, tolerance: {abs: 1.0e-6, rel: 1.0e-9}}
+feeds:
+  - {id: F, ports: [{id: out, direction: out}]}
+products:
+  - {id: D, ports: [{id: in, direction: in}]}
+  - {id: R, ports: [{id: in, direction: in}]}
+blocks:
+  - id: M
+    class: Mixing
+    ports:
+      - {id: feed, direction: in}
+      - {id: recycle, direction: in}
+      - {id: out, direction: out}
+  - id: S
+    class: Distilling
+    still:
+      volatility: {model: raoult, provenance: given, source: NIST WebBook}
+      nonvolatile: [P]
+      pressure: 101.325
+      boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}
+      end: {time: 3600}
+      outlets: {distillate: top, residue: bottom}
+      provenance: assumed
+    ports:
+      - {id: in, direction: in}
+      - {id: top, direction: out}
+      - {id: bottom, direction: out}
+  - id: X
+    class: SplittingMaterial
+    split: {recycle: 0.5}
+    ports:
+      - {id: in, direction: in}
+      - {id: recycle, direction: out}
+      - {id: product, direction: out}
+streams:
+  - id: S1
+    from: F.out
+    to: M.feed
+    template: liquid
+    state:
+      design:
+        temperature: {value: 300, provenance: given}
+        pressure: {value: 101.325, provenance: given}
+        flow: {value: 10000, provenance: given}
+        composition: {basis: mole_fraction, values: {A: 0.8, P: 0.2}, provenance: given}
+  - id: S2
+    from: M.out
+    to: S.in
+    template: liquid
+  - id: S3
+    from: S.top
+    to: X.in
+    template: liquid
+  - id: S4
+    from: S.bottom
+    to: R.in
+    template: liquid
+  - id: S5
+    from: X.recycle
+    to: M.recycle
+    template: liquid
+  - id: S6
+    from: X.product
+    to: D.in
+    template: liquid
+"""
+
+
+def _still_loop(root: Path, batch: float) -> Path:
+    from tests import test_batch_still as still
+
+    recipe = json.loads(json.dumps(still.RECIPE))
+    recipe["batch_size"] = {"value": batch, "unit": "kg", "stream": "S1", "provenance": "assumed"}
+    recipe["unit_procedures"][0]["operations"] = recipe["unit_procedures"][0]["operations"][:1]
+    still._plant(root, flowsheet=STILL_LOOP, recipe=recipe)
+    return root / "plant"
+
+
+def test_a_recipe_change_makes_a_loop_with_a_timed_still_stale(tmp_path, monkeypatch):
+    """The still's end at a time boils up 20 kmol/h for an hour of the batch: its distillate
+    per hour of flows is the recipe's batch's share, so the recycle S5 depends on the batch
+    size, and a recipe-only change makes the tear stale (core#295)."""
+    from chemeascode.domains.process.propagate import stale_fields
+
+    root = _still_loop(tmp_path, 5000.0)
+    monkeypatch.chdir(root)
+    done = _cli("process", "propagate", "--fill")
+    assert done.exit_code == 0, done.stdout
+    process, _ = load(root)
+    before = loop_inputs(process, "design", ["S5"])
+    s5 = next(s for s in process.flowsheet.streams if s.id == "S5")
+    flow = s5.state["design"].flow
+    assert flow is not None and flow.provenance == "calculated"
+    assert stale_fields(process, s5, "design") == []
+    path = root / "process/recipe.yaml"
+    path.write_text(path.read_text().replace("value: 5000.0", "value: 7500.0"))
+    process, _ = load(root)
+    assert loop_inputs(process, "design", ["S5"]) != before
+    found = derive(process, "design")
+    assert found.values[("S5", "flow")].value != pytest.approx(flow.value, rel=1e-3)
+    s5 = next(s for s in process.flowsheet.streams if s.id == "S5")
+    assert stale_fields(process, s5, "design") == ["composition", "flow"]
+    # refilled, it is current again
+    assert _cli("process", "propagate", "--fill").exit_code == 0
+    process, _ = load(root)
+    s5 = next(s for s in process.flowsheet.streams if s.id == "S5")
+    assert stale_fields(process, s5, "design") == []
+
+
+def test_a_recipe_change_leaves_a_loop_that_does_not_use_its_hours_current(plant):
+    """Without a node whose outlets take the recipe's hours of flows, the recipe is not one of
+    the loop's inputs: the tears' fingerprint is that of 1.12.0."""
+    process, _ = load(plant)
+    before = loop_inputs(process, "design", ["S5"])
+    from tests import test_batch_still as still
+
+    recipe = json.loads(json.dumps(still.RECIPE))
+    recipe["unit_procedures"][0]["unit"] = "R1"
+    recipe["unit_procedures"][0]["operations"] = recipe["unit_procedures"][0]["operations"][:1]
+    (plant / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    process, _ = load(plant)
+    assert loop_inputs(process, "design", ["S5"]) == before

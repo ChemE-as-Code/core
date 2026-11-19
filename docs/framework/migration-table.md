@@ -1,5 +1,19 @@
 # Migration table
 
+## Project-worker extraction (ADR 0072)
+
+These internal modules changed after core #254; there is no import alias. Public commands
+and existing QSDsan configuration/interpreter selection remain available. New worker results
+use their explicit v2 schema; see the changelog for the public output migration.
+
+| Previous implementation | Current owner |
+|---|---|
+| `integrations/qsdsan.py` execution | `integrations/workers.py` local transport and typed execution outcome |
+| `domains/process/simulation/qsdsan.py` orchestration/publication | `worker_run.py`, `worker_publication.py`, `worker_evidence.py` in the same package |
+| QSDsan solver-name and legacy outcome handling | `domains/process/simulation/qsdsan.py` adapter only |
+
+## Earlier restructuring
+
 **Final status.** This table covers every module, package, skill and template directory of the
 package before the restructuring: old location, new location, and the session that moved it.
 **F2** is the restructuring session; **R** is the final review session, which moved the schemas;

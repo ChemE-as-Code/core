@@ -146,9 +146,11 @@ solvent swap (`still:` on the step, below) gets its cuts and residue. A step wit
 re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
 procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
 dryer. A separator with a known split (a sieve dryer, a decanter, a scrubber) gives
-`recovery:` (below) and gets its outlets from it. Other separators, and
-reactors without conversions, are never solved (`cheme.process-propagate-not-solved` lists
-their streams lacking values): give those values yourself. Derived values are `calculated` with source `cheme process propagate: ...`
+`recovery:` (below) and gets its outlets from it. A reactor solves by its model (conversions,
+a `selectivity:`, `reactor: equilibrium`, `gibbs`, `pfr`, `cstr`, `batch` or `semibatch`; skill
+`reactions`). Other separators, and reactors with none of these models, are never solved
+(`cheme.process-propagate-not-solved` lists their streams lacking values): give those values
+yourself. Derived values are `calculated` with source `cheme process propagate: ...`
 and a fingerprint; never edit them by hand (give the value as `assumed` instead, which propagate
 never overwrites), and rerun `--fill` when `validate` reports them stale. A component balance
 that becomes evaluable and fails is a design finding: correct the assumed values, and record it
@@ -179,7 +181,8 @@ convergence: {method: wegstein, max_iterations: 100, tolerance: {abs: 0.001, rel
   bounds the residual, so the converged loop is within tolerance / (1 - gain) of its steady
   state. Record the tears and the tolerance in `DESIGN.md`.
 - Nothing that depends on a loop that does not converge is written. Raise
-  `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`.
+  `max_iterations`, give a better guess, or use `method: substitution` with `damping: 0.5`
+  (without active `specs:`; with them, below).
 
 **Feeds for a target: design specifications (ADR 0070).** Never scale feeds by hand or by
 script to a product rate, a charge ratio or a purity, and never tune a make-up to a loop by
@@ -200,8 +203,9 @@ specs:
     source: "D-004"
 ```
 
-- Vary a feed stream's flow (remove its given or assumed `flow`; `initial` is the first guess)
-  or a splitter outlet left out of its `split:` (`vary: {node, port, initial}`). Put every feed
+- Vary a feed stream's flow (remove its given or assumed `flow`, and that of every feed listed
+  in `with:`; `initial` is the first guess), or a splitter outlet left out of its `split:`
+  (`vary: {node, port, initial}`). Put every feed
   that follows the varied one at a fixed ratio in `with:`. A feed that follows another stream
   (caustic per kmol of vented HCl) needs its own spec (`quantity: ratio`), or it stays at its
   hand value and the balance flags it.
@@ -218,6 +222,11 @@ specs:
   flow}}, provenance, source}`, one outlet left out for the rest, instead of ASSUMED outlet
   values from a script, so that a spec upstream reaches past it (`cheme.process-recovery`
   checks it).
+- With specs active in the case, propagate solves the specs and the tears together by
+  Newton's method with Broyden's update. `convergence.method` and `damping` are then not used,
+  only `max_iterations` and `tolerance`. If they do not converge, give better `initial` values
+  for the specs and tears, or bounds (`low`/`high`). Worked example: `examples/process-design-spec`
+  in the cheme-as-code repository.
 
 **Duties from the models (ADR 0059).** Do not copy a reactor's, still's or crystallizer's duty
 from a report into its energy stream by hand. Leave the stream's `duty` out and let `cheme
@@ -232,13 +241,16 @@ reactor heated up by steam and cooled by brine, or a still with condensers, and 
 goes to or comes from another block or step (a furnace heating a cracker's coil). Declare a
 liquid step's heat of reaction on the liquid basis. Direction matters: a cooling stream runs from the step to
 the utility, a heating stream from the utility to the step; the duty is positive. A duty you
-keep `assumed` (a heat the model leaves out, such as a heat of absorption) is compared, and
+keep `assumed` (a heat the model leaves out) is compared, and
 `cheme.process-duty` names both values when they differ: record the difference in
 `DESIGN.md`. Before typing such a stream, use the model's own terms (ADR 0063): a dosed
 liquid's or gas's heat of dilution or absorption goes in the dose's `heat_of_solution: {values:
 {ID: kJ/kmol}, provenance, source}` (negative: released; with it, write the heats of the
 reactions consuming a dissolved gas on the dissolved basis, not as a gas, or the absorption
-counts twice); the charge's heat-up in `batch.heat_up: true` or `still.heat_up: true` (to the
+counts twice); a formed gas's heat of absorption into the liquid in
+`batch.vent.heat_of_absorption: {values: {ID: kJ/kmol}, provenance, source}` (ADR 0071, skill
+`reactions`), which the duty counts as its `absorption` term (a degassing gas's desorption goes
+into the `vent vapour` term); the charge's heat-up in `batch.heat_up: true` or `still.heat_up: true` (to the
 bubble point, and a swap's feed to the still's temperature); the vessel's steel in the recipe's
 `vessel.metal_heat_capacity` (kJ/K, mass x cp), which also lengthens the jacket's heat and cool
 times and adds `vessel metal` to the duty of each model in that vessel that changes the
@@ -255,7 +267,7 @@ never type the reflux's share of the reboiler as a stream of its own. A batch's 
 still's: a partial condenser on the vent gas, its duty written on the stream at its own
 `vent.condenser.energy_port` (never the jacket's `energy_port`), and the vent's `vapour` adds a
 `vent vapour` term (and `condensate return` when it returns to the vessel) to the batch's own
-duty, beside a dose's `solution` and the `charge heat-up`.
+duty, beside a dose's `solution` and the `charge heat-up`, and the vent's `absorption`.
 
 **Batch distillation and solvent swaps.** Give the still step (class `Distilling`) a
 `still:` instead of typing the distillate and the residue:
@@ -264,8 +276,8 @@ duty, beside a dose's `solution` and the `charge heat-up`.
 still:
   volatility: {model: raoult, provenance: given, source: NIST WebBook}   # or constant + alpha
   nonvolatile: [PRODUCT]
-  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kg/h, kW, 1/h, kW/K
-  feed: {stream: S12, mode: constant_level}        # a solvent swap; or portions: 4, down_to: 0.5
+  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kmol/s, kg/h, kW, 1/h, m3/h (raoult), kW/K
+  feed: {stream: S12, mode: constant_level}        # a solvent swap; or mode: portions, portions: 4, down_to: 0.5
   end: {residue: {key: OLD_SOLVENT, mole_fraction: 0.005}}  # or distilled, time, temperature
   outlets: {distillate: top, residue: bottom}      # or cuts: [{outlet, end}], outlets: {residue}
   provenance: assumed
@@ -282,16 +294,34 @@ still:
 - A suspended solid, a salt or an immiscible non-volatile liquid goes in `separate_phase:`, not
   `nonvolatile:`: it then does not dilute the liquid in Raoult's law (ADR 0068). `nonvolatile`
   is a dissolved solute. Do not declare a component `nonvolatile` only because a template lists
-  it at 0: a component the charge does not hold needs no vapour pressure.
+  it at 0: a component the charge does not hold needs no vapour pressure. With
+  `separate_phase`, a residue end's `mole_fraction` (and the profile's key fraction) is the
+  key's share of the liquid, not of the whole pot: review every residue end of a still you add
+  it to. The residue key must be a component of the liquid. A component in `separate_phase` is
+  non-volatile and must not have an `alpha`.
 - A vacuum ramp or a pump-limited forerun is a sequence of `cuts:`, each with its own
   `pressure:` and `boilup:` (`unit: m3/h` is the vapour's volume at the still, a vacuum pump's
   capacity). A cut ending at a `temperature` per pressure step replaces a residue key set by
-  hand.
-- `heat_up_time: true` gives the heat-up of the charge and the vessel's metal a time at the
-  still's own boil-up's heat input (not a pump-limited forerun's), added to the recipe's
-  `distil` from the still: do not also write a hand `heat` operation for it. A jacket that
-  heats at another rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a
-  `heat` with `temperatures` has no batch content on a still).
+  hand. `still.boilup` stays required. Where every cut has its own boil-up and there is no
+  feed, it is not used or checked: give the forerun's value with a source saying so.
+- `heat_up_time: true` (volatility `raoult` only) times the still's heat terms besides the
+  boil-up at the still's own boil-up's heat input (not a pump-limited forerun's) and adds that
+  time to the recipe's `distil` from the still. Its terms are the charge's (and a swap's
+  feed's) heat-up, which needs `heat_up: true` too, and the vessel's metal, which needs the
+  recipe's `vessel.metal_heat_capacity`. Without `heat_up` only the metal's rise above the
+  still's first bubble point is timed (none if the still ends colder, as in a vacuum ramp);
+  with neither, the time is 0 and nothing warns. Check `heat_up_time_h` in `cheme process
+  stills`. Do not also write a hand `heat` operation for it. A jacket that heats at another
+  rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a `heat` with
+  `temperatures` has no batch content on a still).
+- A charge that enters hotter than its bubble point at the still's pressure (charged hot from a
+  reactor, then evacuated) takes `flash: true` (ADR 0077). It flashes to that pressure first,
+  its vapour goes to the first cut, and the boil-up and its duty are credited. Do not type the
+  flash by hand in a script or as an extra duty. It needs the charge's temperature and the
+  charged components' `liquid_heat_capacity`; `cheme process stills` reports the flash. The
+  charge's note "the charge enters at ... (its flash is not modelled)" means the field is off.
+  A swap's feed that enters above the still's temperature keeps its own note with the field
+  on: the feed is not flashed.
 - A jacket whose driving force falls as the pot heats is `boilup: {value: UA, unit: kW/K,
   medium_temperature: K}` (ADR 0078): the heat input `UA (T_medium - T)` at the still's bubble
   point. Take UA from the jacket's U and its wetted area, with their source; the area is
@@ -312,10 +342,30 @@ still:
   `calculated` or `assumed` and say so in `DESIGN.md`; a component without UNIFAC groups, or
   a pair of groups without UNIFAC parameters, is refused, never taken as ideal. The still holds
   one liquid: a liquid that splits into two (water with a hydrocarbon, a heteroazeotrope) is
-  refused; its distillation needs a specified split or `process simulate`, recorded in
-  `DESIGN.md` (`separate_phase` keeps its component from boiling). There is no reaction in a
+  refused (`separate_phase` keeps its component from boiling). There is no reaction in a
   still: a reaction during the distillation is a reactor step before it, or a hand estimate in
   `DESIGN.md`.
+- A liquid that splits, or one UNIFAC does not cover, needs `process simulate`, or a
+  specified split as `recovery: {outlets: {port: {component: share}}, provenance, source}` on
+  the step in place of `still:` (ADR 0070; propagate writes its outlets' flows and compositions,
+  `cheme.process-recovery` checks it). Never type its outlets as ASSUMED values. Record the
+  split's source in `DESIGN.md`. Without `still:`, `cheme process stills` no longer reports the
+  step and propagate writes no boil-up duty: give the `distil` time and the duty yourself.
+- An end the still cannot reach before it boils dry (a `distilled` share, a `time`, a `purity`
+  or a `temperature` beyond what the volatile content left can give), or a boil-up that only
+  crawls towards its end, is refused (ADR 0068): 'the still boils dry before its end' (with
+  the volatile kmol left), or 'the still's boil-up stalls before its end'. `cheme process
+  stills` reports it as `cheme.process-still-unsolved` (error), `cheme process propagate` as
+  `cheme.process-propagate-still` (warning). End the cut earlier, or at a reachable key, share
+  or temperature. Never change volatility data or the charge to make the end reachable. A
+  temperature or residue end past the dry point is caught only by the pace check, after up to
+  10^6 steps, so check the end against the charge's volatile content first.
+- Give each component the distillate carries a `melting_point` (K) in `materials.yaml`.
+  `cheme.process-condenser-freezing` (warning, ADR 0071) flags a still's condenser (the stream
+  at `still.condenser_port`, or a `column:`'s one outgoing energy stream) whose coolant
+  utility's `supply_temperature` is below the melting point of a component at 1 mol% or more
+  in the distillate; it checks only components with a `melting_point`. Raise the coolant
+  temperature or record the decision in `DESIGN.md`.
 
 **Batch rectification (a column on the still, ADR 0061).** Purify a product in the still with
 its column instead of a specified split of the still's distillate:

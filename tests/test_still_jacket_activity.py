@@ -515,3 +515,67 @@ def test_a_jacket_still_that_crawls_on_a_trace_stalls_on_its_pace(tmp_path, monk
         solve_node(process, node, inlets_of(process, node), "design")
     assert "crawls near empty" in str(failure.value)
     assert "jacket's medium" not in str(failure.value)
+
+
+# -- with the charge's flash (ADR 0077) --------------------------------------------------------
+
+
+def test_a_jacket_boils_up_from_where_the_charge_flashed():
+    """A charge of benzene over P entering at 380 K, above its bubble point at 1 atm, flashes
+    first (ADR 0077); the jacket then boils up from the flashed liquid's bubble point. The end at
+    half the charge distilled counts the flash's vapour, so the jacket's time is the quadrature
+    of lambda / (UA (T_m - T)) from what the flash took to 50 kmol."""
+    hours = 2.0
+    comps = dict(COMPONENTS)
+    comps["P"] = Component.model_validate(
+        {"id": "P", "name": "product", "molar_mass": 128.17, "liquid_heat_capacity": 200}
+    )
+    spec = _raoult(boilup=JACKET, end={"distilled": 0.5}, flash=True)
+    charge = {"A": 60.0, "P": 40.0}
+    result = solve_still(spec, charge, None, comps, P_ATM, hours, charge_temperature=380.0)
+    flashed = result.flash.moles["A"]
+    assert 0.0 < flashed < 50.0 and set(result.flash.moles) == {"A"}
+    latent = 30720.0
+    ua, medium = JACKET["value"], JACKET["medium_temperature"]
+
+    def temperature(s):
+        x = (60.0 - s) / (100.0 - s)
+        return _boiling(BENZENE, P_ATM / x)
+
+    assert result.flash.temperature == pytest.approx(temperature(flashed), abs=1e-6)
+    assert result.temperatures[0] == pytest.approx(result.flash.temperature, abs=1e-6)
+    n = 2000
+    width = (50.0 - flashed) / n
+    total = 0.0
+    for i in range(n + 1):
+        weight = 1 if i in (0, n) else 4 if i % 2 else 2
+        total += weight * latent / (ua * (medium - temperature(flashed + i * width)))
+    assert result.time == pytest.approx(hours * total * width / 3, rel=1e-6)
+    assert result.cuts[0].moles["A"] == pytest.approx(50.0, rel=1e-9)
+
+
+def test_a_non_ideal_charge_flashes_on_its_activity_coefficients():
+    """Methanol 0.3 in toluene at 1 atm entering 5 K above its UNIFAC bubble point (well below
+    the ideal liquid's): with activity unifac it flashes, to the UNIFAC bubble point of the
+    liquid it leaves; as an ideal liquid it is below its bubble point and does not flash."""
+    comps = {
+        n: c.model_copy(update={"liquid_heat_capacity": cp})
+        for (n, c), cp in zip(PAIR.items(), (81.1, 157.0), strict=True)
+    }
+    t_in = _unifac_bubble(0.3)[0] + 5.0
+    charge = {"M": 30.0, "T": 70.0}
+    end = {"distilled": 0.3}
+    spec = _pair_still("unifac", end).model_copy(update={"flash": True})
+    result = solve_still(spec, charge, None, comps, P_ATM, charge_temperature=t_in)
+    flash = result.flash
+    assert flash.moles["M"] > 0.0 and flash.temperature < t_in
+    left = {n: charge[n] - flash.moles.get(n, 0.0) for n in charge}
+    x_left = left["M"] / sum(left.values())
+    assert flash.temperature == pytest.approx(_unifac_bubble(x_left)[0], abs=1e-6)
+    for n, v in charge.items():
+        assert sum(c.moles[n] for c in result.cuts) + result.residue[n] == pytest.approx(
+            v, rel=1e-12
+        )
+    ideal = _pair_still(None, end).model_copy(update={"flash": True})
+    plain = solve_still(ideal, charge, None, comps, P_ATM, charge_temperature=t_in)
+    assert plain.flash.moles == {}

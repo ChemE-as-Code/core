@@ -18,9 +18,19 @@ tendency, available steam pressure and cooling temperature. Ask for what is miss
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this. An evaporation step can be modelled
-as a `heater` and `flash` (`separation-method-selection`, downstream representation: predictive,
-tested; evaporator rating left out). `cheme process energy` balances the duty.
+Mostly engineering guidance; evaporator rating, effects and recompression are not calculated.
+Core's calculations for evaporation: a continuous evaporator as a `heater` and `flash` in
+`process/simulation.yaml` (`separation-method-selection`, downstream representation: predictive,
+tested; evaporator rating left out), its duty balanced by `cheme process energy`; an evaporative
+crystallizer as `crystallizer:` with `evaporation:` (one of `flow`, `feed_fraction`,
+`solvent_fraction`, `concentration`), a `vapour` outlet and `energy.latent_heat`, its filter as
+`separation:`, solved by `cheme process propagate` and reported by `cheme process crystallizers`
+(yield, balances, duty); a batch concentration or solvent swap as `still:` on the step
+(Rayleigh, `cheme process stills`; `unit-ops-distillation`), with `separate_phase: [ids]` for
+crystals or salt out of solution, a cut's own `pressure` and `boilup` for a vacuum ramp,
+`heat_up_time: true` for the heat-up (ADR 0068), and the components' `melting_point` and a
+`condenser_port` energy stream to a coolant utility with a `supply_temperature`, so that
+`cheme.process-condenser-freezing` checks its condenser's coolant (ADR 0071).
 
 The body comes with auxiliaries: a vapour-liquid separator (entrainment contaminates condensate
 and fouls the condensing surface); a condenser, surface or direct contact; a vacuum system where
@@ -49,7 +59,7 @@ recompression is the alternative to more effects.
 
 Questions for a design: no separator; a vacuum unit with no vacuum system or non-condensable path;
 no feed preheater; a forced-circulation heater above the liquid level; crystallising service with
-no salt removal; effect vapour not going to the next effect's heating side.
+no salt removal (no `separation:` on the `crystallizer:` and no following `solid_separation:`); effect vapour not going to the next effect's heating side.
 
 ## Outputs and provenance
 

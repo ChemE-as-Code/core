@@ -216,10 +216,21 @@ def translation(process: Process, case: str) -> Translation | None:
     return cache[case]
 
 
-def prime(process: Process) -> None:
+def prime(process: Process, worker_fingerprints: dict[str, str] | None = None) -> None:
     """Translate every case of *process* now, while ``process.root`` holds its simulation file
     (a copy that is removed after loading, as ``cheme serve`` loads a revision); only when a
     stream holds values simulate wrote, the only ones :func:`stale_fields` translates for."""
+    if worker_fingerprints is not None:
+        from .backends import BACKENDS
+
+        sim, _, _ = load(process.root)
+        if sim is not None and BACKENDS[sim.simulator].worker is not None:
+            # Read-only snapshots need hashes of native assets, never their executable content.
+            process.__dict__["_translations"] = {
+                c.id: BACKENDS[sim.simulator].prepare(process, sim, c.id, worker_fingerprints)
+                for c in process.flowsheet.cases
+            }
+            return
     for case in (c.id for c in process.flowsheet.cases):
         if any(
             ours(getattr(s.state.get(case), n, None))

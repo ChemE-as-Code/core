@@ -130,7 +130,15 @@ with units, fallback, notes and the test that solves each arrangement):
   spectator once, 0 stated); a pure-water value alone is an error, never used silently. A
   reslurry wash is a crystallizer fed by the cake and the wash water (two inlets; the crystals
   dissolve to saturation), its own `separation:` or a following `solid_separation:` the
-  re-filtration. Never write a precipitation or a wash loss as a conversion reaction;
+  re-filtration. Never write a precipitation or a wash loss as a conversion reaction; in a
+  batch plant, a batch still as `still:` on the flowsheet step (Rayleigh, Raoult's law or a
+  constant alpha; cuts, solvent swaps, a vacuum ramp of cuts at their own pressure, components
+  in a phase of their own (solids, salts, an immiscible non-volatile liquid) in
+  `separate_phase`; `cheme process propagate` fills it and `cheme process stills` reports it;
+  skills `process-design`, `unit-ops-distillation`). It is one stage and cannot see an
+  azeotrope. Add `still.column` for batch rectification, which is a shortcut (Diwekar's FUG at
+  each point of the batch, no holdup, conservative). The coverage table below has no
+  batch-still row;
 - **specified, solids**: a filter or centrifuge as `solid_separation:` (solid recovery and cake
   liquid; with `filtration:` and a specific cake resistance, Ruth's filtration time for the
   recipe), and a filter-dryer or vacuum dryer as `dryer:` (the volatiles dried to a
@@ -143,9 +151,15 @@ with units, fallback, notes and the test that solves each arrangement):
   `heated_area` the filter and dry times take. At most one batch or semi-batch step per
   vessel; a step is never both a `still:` and a `dryer:`;
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
-- **specified split**: a `component_separator` with given recoveries (`basis: specified`, a
-  `basis_source` and an `operating_basis`); its convergence closes balances, it predicts
-  nothing;
+- **specified split**: the split is given, not predicted. In the flowsheet, `recovery:
+  {outlets: {port: {component: share of its inlet flow}}, provenance, source}` on the
+  separating step (one outlet left out for the rest, ADR 0070; never beside another model such
+  as `still:`, `crystallizer:` or `dryer:`): `cheme process propagate` writes the outlets' flows
+  and compositions (their temperatures and pressures stay as given), so streams downstream and
+  design specifications follow a feed change, and `cheme.process-recovery` checks it. In
+  `process/simulation.yaml` it is a `component_separator` with given recoveries (`basis:
+  specified`, a `basis_source` and an `operating_basis`). In both cases convergence closes
+  balances and predicts nothing;
 - **none**: no core model; keep it conceptual with sourced approximations, or use the
   `fallback` and state what it leaves out.
 
@@ -180,7 +194,7 @@ established capability: say so when reporting it, and do not claim it as validat
 | Evaporation | predictive | tested | `heater`, `flash` |  | evaporator rating |
 | (Steam) stripping | predictive | untested | `distillation_column` |  |  |
 | Absorption | predictive | untested | `distillation_column` |  | rate-based and reactive absorption |
-| Liquid-liquid extraction | predictive | tested | `extraction` (`cheme process extract`) |  | solvent regeneration (a separate unit); in the flowsheet still a `component_separator` (specified split) citing the extraction result; qualified only for a benchmarked LLE system (`--systems`) |
+| Liquid-liquid extraction | predictive | tested | `extraction` (`cheme process extract`) |  | solvent regeneration (a separate unit); in the flowsheet a `recovery:` on the extractor step (or a simulation `component_separator`) built from the extraction result and citing it; qualified only for a benchmarked LLE system (`--systems`) |
 | Membrane separation | specified split | untested | `component_separator` |  | permeance, selectivity, area |
 | Adsorption | specified split | tested | `component_separator` |  | isotherms, breakthrough, PSA/TSA cycle |
 | Crystallization | predictive | tested | `crystallizer` (flowsheet) |  | population balance, kinetics, several crystallizing solutes (other solutes: `spectators:`) |

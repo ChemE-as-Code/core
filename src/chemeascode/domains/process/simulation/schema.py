@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, JsonValue, field_validator, model_validator
 
 from chemeascode.domains.process.schema import Quantity, State, Strict
 from chemeascode.domains.process.simulation import SCHEMA
 from chemeascode.foundation.project_paths import project_name
 from chemeascode.foundation.schema_base import unsupported_schema
+from chemeascode.foundation.schemas.worker import Mappings
 
 #: Unit operations the translation knows, by cheme-as-code name.
 UnitKind = Literal[
@@ -286,11 +287,12 @@ class MethodSelection(Strict):
     )
 
 
-class QSDsanConfiguration(Strict):
-    """Version 1 of the project-worker contract."""
+class WorkerConfiguration(Strict):
+    """Portable inputs; interpreter paths and deployment credentials are not plant data."""
 
     model: str = Field(min_length=1, description="Model identifier shown with calculated values.")
-    worker: str = Field(
+    worker: str | None = Field(
+        default=None,
         pattern=r"^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$",
         description="Python module in the declared files.",
     )
@@ -306,6 +308,9 @@ class QSDsanConfiguration(Strict):
         allow_inf_nan=False,
         description="Maximum worker execution time in seconds.",
     )
+    mode: Literal["steady-state", "dynamic"] = "dynamic"
+    options: dict[str, JsonValue] = Field(default_factory=dict)
+    mappings: Mappings = Field(default_factory=Mappings)
 
     @field_validator("input")
     @classmethod
@@ -322,12 +327,26 @@ class QSDsanConfiguration(Strict):
         return sorted({self.input, *self.files})
 
 
+class QSDsanConfiguration(WorkerConfiguration):
+    """QSDsan local Python worker; legacy configuration remains valid."""
+
+    worker: str = Field(pattern=r"^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$")
+
+    @model_validator(mode="after")
+    def supported(self):
+        if self.mode != "dynamic" or self.options:
+            raise ValueError(
+                "QSDsan supports dynamic mode; solver options belong in its input file"
+            )
+        return self
+
+
 class Simulation(Strict):
     """``process/simulation.yaml``."""
 
     schema_: str = Field(alias="schema", description=f"Always {SCHEMA}.")
     kind: Literal["simulation"]
-    simulator: Literal["dwsim", "idaes", "qsdsan"] = Field(
+    simulator: str = Field(
         default="dwsim",
         description="The simulator that solves the flowsheet: dwsim (the default), "
         "qsdsan (a project-defined dynamic process model), or "
@@ -336,6 +355,7 @@ class Simulation(Strict):
         "recycles; property packages 'IDAES ideal VLE' and 'IDAES Peng-Robinson').",
     )
     qsdsan: QSDsanConfiguration | None = None
+    worker: WorkerConfiguration | None = None
     property_package: str | None = Field(
         default="Peng-Robinson (PR)",
         description="The simulator's property package name: with dwsim one of the packages the "
@@ -383,17 +403,26 @@ class Simulation(Strict):
 
     @model_validator(mode="after")
     def _version(self) -> Simulation:
+        from .backends import BACKENDS
+
         if self.schema_ != SCHEMA:
             raise ValueError(unsupported_schema(self.schema_, SCHEMA))
-        if self.simulator == "qsdsan":
-            if self.qsdsan is None:
-                raise ValueError("simulator: qsdsan requires the qsdsan configuration")
-            other = self.model_fields_set - {"schema_", "kind", "simulator", "qsdsan"}
+        if self.simulator not in BACKENDS:
+            raise ValueError(f"Unsupported simulator: {self.simulator}")
+        backend = BACKENDS[self.simulator]
+        if backend.worker is not None:
+            name = backend.adapter.configuration_name
+            if getattr(self, name) is None:
+                raise ValueError(f"simulator: {self.simulator} requires the {name} configuration")
+            other = self.model_fields_set - {"schema_", "kind", "simulator", name}
             if other:
-                raise ValueError(f"Unsupported fields for qsdsan: {', '.join(sorted(other))}")
+                raise ValueError(
+                    f"Unsupported fields for {self.simulator}: {', '.join(sorted(other))}"
+                )
+            backend.adapter.validate_configuration(getattr(self, name))
             self.property_package = None
         elif self.property_package is None:
             raise ValueError("A molecular simulation requires a property package")
-        elif self.qsdsan is not None:
-            raise ValueError("qsdsan configuration requires simulator: qsdsan")
+        elif self.qsdsan is not None or self.worker is not None:
+            raise ValueError("Worker configuration requires a registered project-worker adapter")
         return self

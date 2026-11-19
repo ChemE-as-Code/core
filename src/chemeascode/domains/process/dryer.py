@@ -69,11 +69,16 @@ def dry_mass(
     mass: dict[str, float], volatiles: list[str], moisture: Any
 ) -> tuple[dict[str, float], dict[str, float]]:
     """(product, vapour) kg/h by component of drying *mass* to *moisture*
-    (:class:`~.schema.ResidualMoisture`); DryerError when the cake is already drier."""
+    (:class:`~.schema.ResidualMoisture`); DryerError when the cake holds no volatiles or is
+    already drier."""
     solid = sum(v for n, v in mass.items() if n not in volatiles)
     wet = sum(v for n, v in mass.items() if n in volatiles)
     if solid <= 0:
         raise DryerError("the inlet holds nothing but volatiles: nothing is left to dry")
+    if wet <= 0:
+        raise DryerError(
+            f"the cake holds none of the volatiles ({', '.join(volatiles)}): nothing to dry"
+        )
     x = moisture.value
     kept = x * solid if moisture.basis == "per_kg_solid" else x / (1 - x) * solid
     if kept > wet * (1 + 1e-12) + 1e-12:
@@ -259,6 +264,14 @@ def solve_node(
 def node_outlets(spec: Any, result: DryerResult) -> dict[str, dict[str, float]]:
     """Outlet port -> kg/h by component."""
     return {spec.outlets["product"]: result.product, spec.outlets["vapour"]: result.vapour}
+
+
+def vapour_shape(spec: Any, result: DryerResult) -> dict[str, float]:
+    """The vapour's composition as kg/h of each volatile (the inlet's volatile composition),
+    also when nothing evaporates (a vapour outlet of no flow)."""
+    if result.evaporated_kg_h > 0:
+        return result.vapour
+    return {n: v for n, v in result.product.items() if n in spec.volatiles}
 
 
 def _recipe_hours(process: Any, case: str) -> float | None:
