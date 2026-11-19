@@ -213,6 +213,10 @@ nav:
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
       - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
       - "0072 Shared project-worker execution and results": adr/0072-shared-project-worker-execution-and-results.md
+      - "0073 Dosing against the jacket, coupled and one-pot vessels": adr/0073-dosing-time-from-the-jacket-coupled-and-one-pot-vessels.md
+      - "0074 Semi-batch kinetics: initiation, solids, temperature, light": adr/0074-semi-batch-kinetics-initiation-solids-temperature-light.md
+      - "0075 The rest of a batch's energy balance": adr/0075-the-rest-of-a-batchs-energy-balance.md
+      - "0076 Crystallizer, wash and dryer follow-ups": adr/0076-crystallizer-wash-and-dryer-follow-ups.md
       - "0077 Batch still: the charge's flash": adr/0077-batch-still-flashes-a-charge-above-its-bubble-point.md
       - "0078 Batch still: jacket boil-up and activity coefficients": adr/0078-batch-still-jacket-boilup-and-activity-coefficients.md
       - Template: adr/template.md

@@ -145,7 +145,19 @@ solvent swap (`still:` on the step, below) gets its cuts and residue. A step wit
 `cheme process crystallizers` reports their balances and duties. A filter-dryer's filter, wash,
 re-filter and dry steps run in one vessel: in `process/recipe.yaml` give them to one unit
 procedure as `units: [...]`, with `filter` and `dry` operations `from:` the filter and the
-dryer. A separator with a known split (a sieve dryer, a decanter, a scrubber) gives
+dryer. A one-pot sequence of batch or semi-batch steps (one dosing, then another, in one
+vessel) is one unit procedure too: the vessel is sized from the largest content and its jacket
+checked for each step (ADR 0073); do not split a pot into vessels for the tool. A later step that
+adds a second portion (a conversion step) takes the warning `cheme.recipe-vessel` when it
+overfills: set `vessel.size_from: steps` (a given `vessel.volume` is checked against it at
+its fill fraction). A `transfer` into the next vessel's dose takes
+`from:` that semi-batch step, not a duration copied from it. For a dosing limited by the
+jacket, set `vessel.jacket.shortest_dosing: true`: `cheme process recipe` reports the shortest
+dosing the cooling allows, which you write into `batch.dosing` (with that source) yourself;
+for vessels coupled by a vent, the pair's (`pair`) into both. A
+vessel whose vent doses another must dose on the generator's schedule
+(`cheme.process-coupled-dosing`); its info says how closely the gas follows the dose. A
+separator with a known split (a sieve dryer, a decanter, a scrubber) gives
 `recovery:` (below) and gets its outlets from it. A reactor solves by its model (conversions,
 a `selectivity:`, `reactor: equilibrium`, `gibbs`, `pfr`, `cstr`, `batch` or `semibatch`; skill
 `reactions`). Other separators, and reactors with none of these models, are never solved
@@ -258,9 +270,20 @@ content's temperature (a batch only with `heat_up`: without it the model holds t
 temperature, and the recipe's heat operation holds the content's and the metal's heat; a still
 at constant volatility models no temperature and gets none). `cheme
 process recipe` reports the heat per batch of each jacket-timed heat-up in a vessel with metal:
-the basis for a heater step without a model; do not also count it in a model with `heat_up`. A charged solid's heat of solution, agitation, a one-stage still's condensers (unless
-`still.condenser_port` names one) and the dryer (its own `energy.port`) are not written: give
-those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
+the basis for a heater step without a model; do not also count it in a model with `heat_up`.
+Name that heater step's energy stream in the operation's `stream:` (ADR 0075) and propagate
+writes the heat-up's or cool-down's duty on it instead of a hand value (not a stream a model's
+duty goes on, nor a heat before the run of a batch or still with `heat_up`, which holds it). More terms of ADR 0075, before typing a stream by hand: a charged solid's heat of
+solution in `batch.heat_of_solution` (as a dose's); the agitator's power in
+`batch.agitator_power` or `still.agitator_power` (kW into the content while the model runs; the
+batch needs the recipe); the warm-up on steam and the reaction on cooling water as two streams
+with `batch.heat_up_port: PORT` beside `energy_port` (do not net them on one stream); a still's
+`sensible_heat: true` and `heat_loss: {ua, ambient_temperature}`; `vessel_metal: true` on a
+conversion step in a vessel with metal. A dryer in a vessel with `metal_heat_capacity` heats
+that metal from the temperature the vessel was left at (a `cool` with `temperatures` in the
+dryer's vessel, timed on its jacket): give the metal there, not also as the dryer's
+`vessel_heat_capacity`. A one-stage still's condensers (unless `still.condenser_port` names
+one) and the dryer (its own `energy.port`) are not written: give those streams yourself. A still with a `column:` writes both its reboiler (its one heat stream
 in, or `energy_port`) and its condenser (its one heat stream out, or `still.condenser_port`):
 never type the reflux's share of the reboiler as a stream of its own. A batch's vent condenser
 (`batch.vent.condenser`, ADR 0062, see the `reactions` skill) is a different condenser from a
@@ -396,9 +419,21 @@ still:
 - `cheme process stills` gives each cut's purity and recovery, the reflux at the start and
   the end, the boil-up time and the duties. A note says when a constant distillate reached its
   `maximum_ratio` (its purity falls from there) or a cut's end was reached at once.
-- The shortcut has no holdup and uses Gilliland's correlation: it gives a leaner distillate
-  than a rigorous column at the same stages and reflux. State the stages and reflux you
-  assumed in `DESIGN.md`, and size the column and condenser elsewhere.
+- The shortcut has no holdup and uses Gilliland's correlation: at a constant relative volatility
+  it gives a leaner distillate than a rigorous column at the same stages and reflux. It takes
+  the still's relative volatility for the whole column, so for a liquid whose relative
+  volatility falls towards the top (methanol-water) it can be purer than the rigorous column (by
+  up to 0.02 in mole fraction against DWSIM, ADR 0061's amendment). It is a bound at the
+  smallest relative volatility along the column over the run: give `volatility: constant` at it
+  for a conservative cut. That is the distillate's at its purest where the relative volatility
+  falls towards the top, but the still's at the end of the cut where it rises (a negative
+  deviation from Raoult's law, the light side of a maximum-boiling azeotrope): there the
+  distillate's makes the cut purer than the column gives. Or check the column with `cheme
+  process simulate`: a feed at the reboiler is refused there, so give the column one stage more
+  and feed the still's saturated liquid to the stage above the reboiler, nearly all of it
+  leaving as bottoms (its distillate is the batch column's within 1.5e-3 in DWSIM). State the
+  stages, reflux and volatility you assumed in `DESIGN.md`, and size the column and condenser
+  elsewhere.
 
 `cheme process simulate --fill` solves the whole flowsheet in DWSIM, separators, exchangers,
 columns and recycles included, from the feeds and the specs in `process/simulation.yaml`; see

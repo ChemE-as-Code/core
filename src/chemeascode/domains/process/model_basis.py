@@ -254,6 +254,10 @@ def _reactor_basis(
             }[model]
             assumptions = list(TANK_ASSUMPTIONS[model])
             assumptions += _heat_assumptions(spec) if model != "cstr" else []
+            if model != "cstr" and spec is not None:
+                from chemeascode.domains.process.batch_kinetics import assumptions as kinetics
+
+                assumptions += kinetics(spec)  # its ADR 0074 terms, where declared
             vent = getattr(spec, "vent", None) if model != "cstr" else None
             if vent is not None and (vent.vapour is not None or vent.henry):
                 from chemeascode.domains.process.vent_vapour import ASSUMPTIONS as VENT
@@ -503,6 +507,20 @@ def _sourced(value: Any) -> bool:
     return value is not None and value.provenance == "given" and bool(value.source.strip())
 
 
+def _lacking(parts: list[tuple[str, Any]], sources: list[str]) -> list[str]:
+    """The names of the declared *parts* (name, value or None) not given with a source; the
+    sources of the others are added to *sources*."""
+    lacking = []
+    for what, part in parts:
+        if part is None:
+            continue
+        if not _sourced(part):
+            lacking.append(what)
+        elif part.source not in sources:
+            sources.append(part.source)
+    return lacking
+
+
 #: What replaces a still's "no heat-up" assumption with ``heat_up`` (ADR 0063).
 STILL_HEAT_UP = (
     "heat_up: the charge heated from its inlet temperature to its bubble point at its "
@@ -563,8 +581,9 @@ def _still_heat_assumptions(process: Process, node: Any, assumptions: tuple[str,
 
     spec = node.still
     metal = vessel_metal(process, node.id)
+    extras = _still_extras(spec)
     flash = [FLASH] if getattr(spec, "flash", False) else []  # ADR 0077
-    if not spec.heat_up and metal is None:
+    if not spec.heat_up and metal is None and not extras:
         return list(assumptions) + flash
     duty = _LATENT
     if spec.heat_up:
@@ -598,8 +617,37 @@ def _still_heat_assumptions(process: Process, node: Any, assumptions: tuple[str,
             text = duty
         elif text.startswith("the reboiler's and the condenser's duty"):
             text = reboiler
+        if spec.sensible_heat:  # ADR 0075
+            text = text.replace(", no sensible heat of the content while it boils", "")
+            text = text.replace(", no sensible heat of the content", "")
+            text = text.replace(", no sensible heat", "")
+        if spec.heat_loss is not None:
+            text = text.replace(", no heat losses", "")
         found.append(text)
-    return found + flash
+    return found + extras + flash
+
+
+def _still_extras(spec: Any) -> list[str]:
+    """What a still's ``sensible_heat``, ``heat_loss`` and ``agitator_power`` add to its
+    assumptions (ADR 0075); none without them."""
+    found = []
+    if spec.sensible_heat:
+        found.append(
+            "sensible_heat: the pot's content heated as its bubble point rises while it boils, "
+            "at its liquid_heat_capacity (the column's holdup, a step between cuts at a new "
+            "pressure and a portion mixing in left out)"
+        )
+    if spec.heat_loss is not None:
+        found.append(
+            "heat_loss: UA (T - T_ambient) over the boil-up's time at the still's temperature "
+            "(not over the heat-up or a hold)"
+        )
+    if spec.agitator_power is not None:
+        found.append(
+            "agitator_power: the agitator's power ends as heat in the content over the "
+            "boil-up's time, taken off the duty"
+        )
+    return found
 
 
 #: What a still's ``flash`` assumes (ADR 0077).
@@ -628,6 +676,16 @@ def _heat_assumptions(batch: Any) -> list[str]:
         found.append(
             "heat_up: the charge heated from its inlet temperature to the batch's at its heat "
             "capacity, counted in the duty (no heating time: the recipe's)"
+        )
+    if batch is not None and batch.heat_of_solution is not None:  # ADR 0075
+        found.append(
+            "batch.heat_of_solution: the charged components dissolve as they are charged, their "
+            "integral heat counted in the duty (not in the peak cooling duty or the screening)"
+        )
+    if batch is not None and batch.agitator_power is not None:
+        found.append(
+            "agitator_power: the agitator's power ends as heat in the content over the model's "
+            "dosing and reaction time (not over the recipe's other operations)"
         )
     return found
 
@@ -745,6 +803,7 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         ASSUMPTIONS,
         LIQUOR_ASSUMPTIONS,
         SEPARATION_ASSUMPTIONS,
+        pure_solvent_only,
     )
 
     outside = "not part of a converged simulation: solved by cheme process propagate"
@@ -753,34 +812,129 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
         from chemeascode.domains.process.dryer import ASSUMPTIONS as DRYER_ASSUMPTIONS
 
         moisture = dryer.residual_moisture
-        sourced = _sourced(moisture)
+        given = _sourced(moisture)
+        sources = [moisture.source] if given else []
+        lacking = _lacking(  # ADR 0076: the parts that set the outlets
+            [
+                ("sublimation", dryer.sublimation),
+                ("cooling", dryer.cooling),
+                ("condenser", dryer.condenser),
+            ],
+            sources,
+        )
+        assumptions = list(DRYER_ASSUMPTIONS)
+        detail = (
+            f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
+            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
+            + ("" if given else " (not given with a source: assumed)")
+        )
+        if dryer.selectivity == "raoult":  # ADR 0076
+            assumptions[1] = (
+                "the volatiles kept are what an open evaporation of an ideal cake liquid at the "
+                "drying temperature leaves (Raoult's law, Antoine vapour pressures)"
+            )
+            detail += "; volatiles kept by their vapour pressures"
+        if dryer.sublimation is not None:
+            assumptions.append(
+                "the vapour leaves saturated with the subliming solids at the dryer's pressure "
+                "(an upper bound of the sublimation loss)"
+            )
+            detail += "; sublimation of " + ", ".join(dryer.sublimation.components)
+        if dryer.condenser is not None:
+            assumptions.append(
+                "the vacuum condenser: an ideal condensate in equilibrium with the gas to the "
+                "pump at its temperature and the dryer's pressure, no leaked air"
+            )
+            detail += f"; vacuum condenser at {dryer.condenser.temperature:g} K"
+        if dryer.cooling is not None:
+            cooled = dryer.cooling.product_temperature
+            detail += "; cooled after drying" + (
+                f", the product to {cooled:g} K" if cooled is not None else ""
+            )
+            assumptions.append(
+                "the cooling after drying: the product and the vessel's metal at constant heat "
+                "capacities"
+            )
+        if dryer.cooling is not None or dryer.condenser is not None:
+            assumptions[3] = "; ".join(  # the temperatures propagate writes (ADR 0076)
+                [
+                    "the product leaves at its discharge temperature"
+                    if dryer.cooling is not None and dryer.cooling.product_temperature is not None
+                    else "the product leaves at the drying temperature",
+                    "the vapour and the condensate leave at the condenser's temperature"
+                    if "condensate" in dryer.outlets
+                    else "the vapour leaves at the drying temperature",
+                    "constant heat capacity of the cake",
+                ]
+            )
+        if lacking:
+            detail += "; not sourced: " + ", ".join(lacking)
         return UnitBasis(
             node.id,
             "separator",
             "residual-moisture",
             False,
-            sourced,
-            detail=f"dryer at {dryer.temperature:g} K: residual moisture {moisture.value:g} "
-            f"({moisture.basis}) of {', '.join(dryer.volatiles)}"
-            + ("" if sourced else " (not given with a source: assumed)"),
-            sources=[moisture.source] if sourced else [],
-            assumptions=list(DRYER_ASSUMPTIONS),
+            given and not lacking,
+            detail=detail,
+            sources=sources,
+            assumptions=assumptions,
             limitations=["specified moisture: no drying curve or sorption isotherm", outside],
         )
     sep = node.solid_separation
     if sep is not None:
-        sourced = _sourced(sep)
+        given = _sourced(sep)
+        sources = [sep.source] if given else []
+        dissolution = sep.wash.dissolution if sep.wash is not None else None
+        solubility = dissolution.solubility if dissolution is not None else None
+        lacking = _lacking(  # ADR 0076: the parts that set the cake and the filtrate
+            [
+                ("second_liquid", sep.second_liquid),
+                ("wash", sep.wash),
+                ("wash.dissolution", dissolution),
+                ("wash.dissolution.solubility", solubility),
+                ("wash.dissolution.solubility.transfer", getattr(solubility, "transfer", None)),
+            ],
+            sources,
+        )
+        assumptions = list(SEPARATION_ASSUMPTIONS)
+        detail = (
+            f"filter or centrifuge: solid recovery {sep.solid_recovery:g}, cake liquid "
+            f"{sep.cake_liquid.value:g} ({sep.cake_liquid.basis})"
+            + ("" if given else " (not given with a source: assumed)")
+        )
+        if sep.second_liquid is not None:  # ADR 0076
+            held = sep.second_liquid.cake_liquid
+            detail += (
+                f"; second liquid {', '.join(sep.second_liquid.components)}, cake liquid "
+                f"{held.value:g} ({held.basis})"
+            )
+            assumptions[-1] = (
+                "two liquids: each divides with its own composition between cake and filtrate, "
+                "the second at its own cake liquid"
+            )
+        if sep.wash is not None:
+            detail += f"; displacement wash, efficiency {sep.wash.efficiency:g}"
+            assumptions[-1] = (
+                "a displacement wash: the unwashed cake's liquor stays by R = (1 - E)^n (n the "
+                "mass wash ratio), the washed cake holds its cake liquid, the rest of it wash"
+            )
+            if sep.wash.dissolution is not None:
+                detail += f" dissolving {sep.wash.dissolution.crystal}"
+                assumptions.append(
+                    "the wash leaves the cake at its stated approach to the crystals' solubility "
+                    "in it (saturation 1: an upper bound of the loss)"
+                )
+        if lacking:
+            detail += "; not sourced: " + ", ".join(lacking)
         return UnitBasis(
             node.id,
             "separator",
             "solid-split",
             False,
-            sourced,
-            detail=f"filter or centrifuge: solid recovery {sep.solid_recovery:g}, cake liquid "
-            f"{sep.cake_liquid.value:g} ({sep.cake_liquid.basis})"
-            + ("" if sourced else " (not given with a source: assumed)"),
-            sources=[sep.source] if sourced else [],
-            assumptions=list(SEPARATION_ASSUMPTIONS),
+            given and not lacking,
+            detail=detail,
+            sources=sources,
+            assumptions=assumptions,
             limitations=["specified separation: no filtration or centrifuge model", outside],
         )
     spec = node.crystallizer
@@ -804,7 +958,23 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
     if spec.basis == "solubility":
         sol = spec.solubility
         basis, predictive = "solubility-equilibrium", True
-        if sol.points:
+        if sol.transfer is not None:  # ADR 0076
+            ((t0, _),) = sol.points
+            t = spec.temperature
+            detail = (
+                f"saturated mother liquor at {t:g} K, one solubility point at {t0:g} K carried "
+                f"there (van 't Hoff, heat of solution {sol.transfer.heat_of_solution:g} kJ/kmol, "
+                f"{sol.transfer.provenance}): not at the operating conditions"
+            )
+            if not _sourced(sol.transfer):
+                lacking.append("transfer")
+            elif sol.transfer.source not in sources:
+                sources.append(sol.transfer.source)
+            limitations.append(
+                "one solubility point carried to the operating temperature (an ideal solution, a "
+                "constant heat of solution): not measured there"
+            )
+        elif sol.points:
             low, high = sol.points[0][0], sol.points[-1][0]
             t = spec.temperature
             detail = f"saturated mother liquor at {t:g} K, solubility data {low:g}-{high:g} K"
@@ -835,11 +1005,18 @@ def solids_basis(process: Process, node: Any) -> UnitBasis:
             if sol is not None and sol.measured_in == "mother_liquor"
             else "pure-solvent solubility with Setschenow salting-out"
             if salting is not None
+            else "pure-solvent solubility, the second liquid apart"
+            if sol is not None and not pure_solvent_only(spec)
             else "no solubility in the liquor"
         )
         detail += f"; spectators {', '.join(spec.spectators)} ({how})"
-        if sol is not None and sol.measured_in == "pure_solvent" and salting is None:
+        if pure_solvent_only(spec):
             lacking.append("a solubility in the mixed liquor")
+        if sol is not None and sol.liquor is not None:  # ADR 0076
+            detail += "; the solved liquor compared with the data's"
+        if spec.second_liquid is not None:
+            detail += f"; second liquid {', '.join(spec.second_liquid.components)}"
+            lacking += _lacking([("second_liquid", spec.second_liquid)], sources)
         assumptions += LIQUOR_ASSUMPTIONS
         limitations.append(
             "mixed liquor: the solubility data hold at the liquor composition their source "

@@ -130,26 +130,38 @@ with units, fallback, notes and the test that solves each arrangement):
   spectator once, 0 stated); a pure-water value alone is an error, never used silently. A
   reslurry wash is a crystallizer fed by the cake and the wash water (two inlets; the crystals
   dissolve to saturation), its own `separation:` or a following `solid_separation:` the
-  re-filtration. Never write a precipitation or a wash loss as a conversion reaction; in a
-  batch plant, a batch still as `still:` on the flowsheet step (Rayleigh, Raoult's law or a
-  constant alpha; cuts, solvent swaps, a vacuum ramp of cuts at their own pressure, components
-  in a phase of their own (solids, salts, an immiscible non-volatile liquid) in
-  `separate_phase`; `cheme process propagate` fills it and `cheme process stills` reports it;
-  skills `process-design`, `unit-ops-distillation`). It is one stage and cannot see an
-  azeotrope. Add `still.column` for batch rectification, which is a shortcut (Diwekar's FUG at
-  each point of the batch, no holdup, conservative). The coverage table below has no
-  batch-still row;
+  re-filtration. Never write a precipitation or a wash loss as a conversion reaction. One
+  sourced solubility point away from the crystallizer's temperature is carried there only by
+  an explicit `transfer: {heat_of_solution}` (van 't Hoff, ASSUMED unless sourced; reported as
+  not at the operating conditions), never entered as a `value` at another temperature; data
+  measured in a mother liquor state that liquor (`liquor: {mass_fraction, tolerance}`) so that
+  `cheme process crystallizers` warns when the solved liquor drifts from it; an oil apart from
+  the liquor is a `second_liquid:` (ADR 0076). In a batch plant, a batch still as `still:` on
+  the flowsheet step (Rayleigh, Raoult's law or a constant alpha; cuts, solvent swaps, a vacuum
+  ramp of cuts at their own pressure, components in a phase of their own (solids, salts, an
+  immiscible non-volatile liquid) in `separate_phase`; `cheme process propagate` fills it and
+  `cheme process stills` reports it; skills `process-design`, `unit-ops-distillation`). It is
+  one stage and cannot see an azeotrope. Add `still.column` for batch rectification, which is
+  a shortcut (Diwekar's FUG at each point of the batch, no holdup, conservative). The coverage
+  table below has no batch-still row;
 - **specified, solids**: a filter or centrifuge as `solid_separation:` (solid recovery and cake
   liquid; with `filtration:` and a specific cake resistance, Ruth's filtration time for the
   recipe), and a filter-dryer or vacuum dryer as `dryer:` (the volatiles dried to a
   `residual_moisture`; the duty from the cake's heat capacity, the latent heats and the
   vessel; the drying time for the recipe from a `drying_rate` and the vessel's heated area).
+  A displacement wash on the filter is `solid_separation.wash:` (its own inlet port, a wash
+  efficiency, optionally the crystals it dissolves); a dryer may give its `pressure`, keep its
+  volatiles by their vapour pressures (`selectivity: raoult`), lose a subliming product
+  (`sublimation:`), cool the product and the vessel after drying (`cooling:`) and condense its
+  vapour (`condenser:`, a `condensate` outlet) (ADR 0076). Each of these needs its data with a
+  source, or ASSUMED and said so;
   In `process/recipe.yaml`, one unit procedure with `units: [filter, wash, filter, dryer]`
   holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
   (ADR 0057). A precipitation in the reactor that is filtered and dried there lists the batch
   step too (`units: [reactor, filter, dryer]`): its batch sizes the vessel, whose plate and
-  `heated_area` the filter and dry times take. At most one batch or semi-batch step per
-  vessel; a step is never both a `still:` and a `dryer:`;
+  `heated_area` the filter and dry times take. A vessel may hold several batch or semi-batch
+  steps one after the other (ADR 0073: a one-pot sequence is one unit procedure); a step is
+  never both a `still:` and a `dryer:`;
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
 - **specified split**: the split is given, not predicted. In the flowsheet, `recovery:
   {outlets: {port: {component: share of its inlet flow}}, provenance, source}` on the

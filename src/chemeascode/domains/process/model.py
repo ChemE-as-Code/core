@@ -292,6 +292,7 @@ class Process:
         (no reactions; it is no reactor)."""
         return any(
             getattr(self.nodes[other], "crystallizer", None) is not None
+            or bool(_solid_phase_changes(self.nodes[other]))
             for other in self.nodes
             if other == node_id
             or (self.kinds.get(other) in ("block", "step") and self.within(other, node_id))
@@ -691,6 +692,18 @@ def _reactive_balance(
             )
 
 
+def _solid_phase_changes(item: Any) -> list[tuple[str, str, str]]:
+    """(name, solid, dissolved or vapour component) of a cake wash's dissolution and a dryer's
+    sublimation (ADR 0076) in block or step *item*."""
+    sep = getattr(item, "solid_separation", None)
+    dissolution = getattr(getattr(sep, "wash", None), "dissolution", None)
+    found = [("dissolution", dissolution.crystal, dissolution.solute)] if dissolution else []
+    sublimation = getattr(getattr(item, "dryer", None), "sublimation", None)
+    for solid, into in (sublimation.components if sublimation is not None else {}).items():
+        found.append((f"sublimation:{solid}", solid, into))
+    return found
+
+
 def _crystallizations(process: Process, node: str) -> list[Reaction]:
     """One reversible phase change ``<step>:crystallization`` per crystallizer in *node* (the
     solute, and the hydrate's solvent, into the crystal), so that a reactive balance explains a
@@ -700,11 +713,22 @@ def _crystallizations(process: Process, node: str) -> list[Reaction]:
 
     found: list[Reaction] = []
     for other, item in process.nodes.items():
-        spec = getattr(item, "crystallizer", None)
-        if spec is None or not (
+        if not (
             other == node
             or (process.kinds.get(other) in ("block", "step") and process.within(other, node))
         ):
+            continue
+        for name, solid, into in _solid_phase_changes(item):  # ADR 0076
+            found.append(
+                Reaction(
+                    id=f"{other}:{name}",
+                    stoichiometry={solid: -1.0, into: 1.0},
+                    reversible=True,
+                    kind="phase-change",
+                )
+            )
+        spec = getattr(item, "crystallizer", None)
+        if spec is None:
             continue
         try:
             form = form_of(process, spec)
@@ -775,8 +799,10 @@ def rules(process: Process, lists: dict[str, Any] | None = None, sheet_ids=()) -
     _reaction_rules(out)
     _reactor_rules(out)
     _catalyst_rules(out)
+    from chemeascode.domains.process.dosing import rules as dosing_rules
     from chemeascode.domains.process.recipe import rules as recipe_rules
 
+    out.findings += dosing_rules(process)
     out.findings += recipe_rules(process)
     _id_rules(out)
     _unit_rules(out)
@@ -1106,6 +1132,7 @@ def _reactor_rules(out: _Out) -> None:
             if model in ("batch", "semibatch"):
                 _dosing_rules(out, item, [key, i], model, reactions)
                 _vent_rules(out, item, [key, i], reactions)
+                _kinetics_rules(out, item, [key, i], reactions)
             for kind, field_name in (("cstr", "tank"), ("batch", "batch")):
                 spec = getattr(item, field_name, None)
                 if model == kind or (kind == "batch" and model == "semibatch"):
@@ -1245,6 +1272,8 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
     process = out.process
     what = f"{at[0][:-1]} {item.id}"
     dosing = item.batch.dosing if item.batch is not None else []
+    if item.batch is not None and item.batch.heat_of_solution is not None:
+        _charge_solution_rules(out, item, at)
     if model == "batch":
         if dosing:
             out.add(
@@ -1285,6 +1314,139 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
             "streams; its other inlet is the charge; liquid-phase reactions",
         )
     _solution_rules(out, item, at, dosing)
+
+
+def _charge_solution_rules(out: _Out, item: Any, at: list[Any]) -> None:
+    """A batch's ``heat_of_solution`` of its charge (ADR 0075): its components declared (error)
+    and carried by the charge (warning: no heat of the others is counted)."""
+    process = out.process
+    declared = process.components()
+    heat = item.batch.heat_of_solution
+    where = [*at, "batch", "heat_of_solution"]
+    what = f"{at[0][:-1]} {item.id}"
+    if unknown := [n for n in heat.values if n not in declared]:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: heat_of_solution of the undeclared component(s) " + ", ".join(unknown),
+            where,
+            [item.id],
+            hint="key batch.heat_of_solution.values by the charged components' ids",
+        )
+    doses, pad = {d.stream for d in item.batch.dosing}, _pad(item)
+    charges = [
+        s
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[1]) is not None
+        and end.node == item.id
+        and s.kind == "material"
+        and s.id not in doses
+        and s.id != pad
+    ]
+    carried = set().union(*(_carried(process, s) for s in charges)) if charges else set()
+    if carried and (absent := [n for n in heat.values if n in declared and n not in carried]):
+        out.add(
+            "warning",
+            "reactor",
+            f"{what}: heat_of_solution of {', '.join(absent)}, which the charge does not carry "
+            "(no heat of it is counted)",
+            where,
+            [item.id],
+            hint="give the heat of solution of the components the charge carries",
+        )
+
+
+def _kinetics_rules(out: _Out, item: Any, at: list[Any], reactions: list[Any]) -> None:
+    """A batch's ADR 0074 terms (errors unless said): an initiation's reactions among the
+    step's, a solid phase and a light absorber declared components (a solid phase not ``phase:
+    solid``: a warning), a surface rate law's solid in ``batch.solids``, a photochemical rate
+    law with ``batch.light`` (a light without one: a warning), reflux and a solid phase or a
+    light on liquid-phase reactions."""
+    batch = item.batch
+    if batch is None:
+        return
+    what = f"{at[0][:-1]} {item.id}"
+    declared = out.process.components()
+    ids = {r.id for r in reactions}
+    found: list[tuple[str, str, list[Any], str]] = []
+    if batch.initiation is not None and (
+        stray := [r for r in batch.initiation.reactions if r not in ids]
+    ):
+        found.append(
+            (
+                "error",
+                "batch.initiation names " + ", ".join(stray) + ", no reaction of the step",
+                ["batch", "initiation", "reactions"],
+                "name the step's reactions it holds back, or leave reactions out (every one)",
+            )
+        )
+    for name in batch.solids:
+        comp = declared.get(name)
+        if comp is None or getattr(comp, "phase", None) != "solid":
+            found.append(
+                (
+                    "error" if comp is None else "warning",
+                    f"batch.solids: {name} is "
+                    + ("no declared component" if comp is None else "not phase: solid"),
+                    ["batch", "solids", name],
+                    "declare it in process/materials.yaml with phase: solid (the solid, a "
+                    "component apart from the dissolved substance)",
+                )
+            )
+    surface = [r for r in reactions if r.rate is not None and r.rate.basis == "surface"]
+    if lacking := sorted({r.rate.solid for r in surface} - set(batch.solids)):
+        found.append(
+            (
+                "error",
+                "a rate per m2 of the surface of " + ", ".join(lacking) + " without it in "
+                "batch.solids",
+                ["batch"],
+                "batch.solids: {id: {density, diameter or specific_area, provenance}}",
+            )
+        )
+    photo = [r.id for r in reactions if r.rate is not None and r.rate.form == "photochemical"]
+    if photo and batch.light is None:
+        found.append(
+            (
+                "error",
+                "the photochemical rate law(s) of " + ", ".join(photo) + " without batch.light",
+                ["batch"],
+                "batch.light: {power W per m3 of the charge, wavelength nm, absorber, "
+                "absorptivity, path_length, provenance}",
+            )
+        )
+    if batch.light is not None:
+        absorber = batch.light.absorber
+        if absorber is not None and absorber not in declared:
+            found.append(
+                (
+                    "error",
+                    f"batch.light.absorber {absorber} is no declared component",
+                    ["batch", "light", "absorber"],
+                    "name a component of process/materials.yaml",
+                )
+            )
+        if not photo:
+            found.append(
+                (
+                    "warning",
+                    "batch.light without a photochemical rate law: it only heats the content",
+                    ["batch", "light"],
+                    "give the light-driven reaction a rate with form: photochemical",
+                )
+            )
+    liquid = all(r.phase == "liquid" for r in reactions)
+    if not liquid and (batch.heat == "reflux" or batch.solids or batch.light is not None):
+        found.append(
+            (
+                "error",
+                "heat: reflux, batch.solids or batch.light on reactions not all liquid-phase",
+                ["batch"],
+                "they are terms of a liquid batch or semi-batch",
+            )
+        )
+    for level, problem, where, hint in found:
+        out.add(level, "reactor", f"{what}: {problem}", [*at, *where], [item.id], hint=hint)
 
 
 def _solution_rules(out: _Out, item: Any, at: list[Any], dosing: list[Any]) -> None:
