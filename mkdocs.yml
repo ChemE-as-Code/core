@@ -211,8 +211,8 @@ nav:
       - "0069 Thermal screening beyond the largest reaction": adr/0069-thermal-screening-beyond-the-largest-reaction.md
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
       - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
-      - "0075 The rest of a batch's energy balance": adr/0075-the-rest-of-a-batchs-energy-balance.md
+      - "0072 Crystallizer, wash and dryer follow-ups": adr/0072-crystallizer-wash-and-dryer-follow-ups.md
       - "0073 Dosing against the jacket, coupled and one-pot vessels": adr/0073-dosing-time-from-the-jacket-coupled-and-one-pot-vessels.md
       - "0074 Semi-batch kinetics: initiation, solids, temperature, light": adr/0074-semi-batch-kinetics-initiation-solids-temperature-light.md
-      - "0072 Crystallizer, wash and dryer follow-ups": adr/0072-crystallizer-wash-and-dryer-follow-ups.md
+      - "0075 The rest of a batch's energy balance": adr/0075-the-rest-of-a-batchs-energy-balance.md
       - Template: adr/template.md
