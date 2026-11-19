@@ -213,4 +213,5 @@ nav:
       - "0070 Design specifications and component separators": adr/0070-design-specifications-and-component-separators.md
       - "0071 Gas-liquid batch: head space, sweep and absorption": adr/0071-gas-liquid-batch-head-space-sweep-and-absorption.md
       - "0072 Shared project-worker execution and results": adr/0072-shared-project-worker-execution-and-results.md
+      - "0077 Batch still: the charge's flash": adr/0077-batch-still-flashes-a-charge-above-its-bubble-point.md
       - Template: adr/template.md

@@ -1440,6 +1440,20 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
     vacuum ramp that ends below the charge still times the metal's heat-up.
+  - `still.flash: true` (raoult, ADR 0077): a charge that enters above its bubble point at the
+    still's pressure (the first cut's without a feed) first flashes adiabatically and
+    differentially to it. The vapour leaves as it forms, at the liquid's bubble point, and the
+    content's sensible heat (`liquid_heat_capacity` of every charged component) evaporates it
+    (`heat_of_vaporization`): `dN_i/dT = y_i C / lambda(y)`, down to where the flashed liquid
+    boils at the still's pressure. The vapour joins the first cut through the condenser (with a
+    column, not rectified). The boil-up, its time and its duty start from the flashed liquid,
+    so the boil-up no longer evaporates that vapour. An end at a share distilled counts it, the
+    charge's heat-up (`heat_up`) is 0, and the condenser's duty (`condenser_port`) adds a
+    `flash` term. The flash takes no time and leaves out the vessel's metal. It needs the
+    charge's temperature. `process stills` gives `flash` (its cut, pressure, inlet temperature,
+    bubble point, end temperature, vapour, `heat_kWh_per_batch`, `year_average_kW`). A charge
+    below its bubble point solves as without the field. Without the field a hotter charge is
+    not flashed, as before (with `heat_up`, a note).
   - An end at a temperature (or any end) stops where the integrator found it (core#198: a
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
