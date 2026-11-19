@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 1.13.0 (2026-11-19)
+
+Minor release for batch processes. Semi-batch reactors time a dose against the jacket's cooling
+and run coupled and one-pot vessels over several batch steps (ADR 0073), and handle an
+initiation, a solid phase with a surface rate, a temperature programme or reflux and a
+photochemical rate (ADR 0074). A batch's energy balance adds a recipe heat on its stream, the
+heat-up apart, a charged solid's heat of solution, agitation, a still's sensible rise and heat
+losses, and a dryer's metal (ADR 0075). Crystallizers, washes and dryers carry a solubility
+point, check the liquor, model a displacement wash, a second liquid, the dryer's selectivity,
+sublimation, cooling and a condenser (ADR 0076). The batch still flashes a charge above its
+bubble point (ADR 0077), and batch rectification is qualified against Diwekar's examples and
+DWSIM (ADR 0061 amended). Simulator workers share one typed execution and result contract
+(ADR 0072; see Breaking for the next major release). Also: the fixes from a bug hunt over the
+batch models. Every BFD/PFD needs `cheme process build` once (only `generator_sha256`
+changes). Library results are unchanged except the new findings listed under Changed.
 
 ### Breaking (next major release, ADR 0072)
 
