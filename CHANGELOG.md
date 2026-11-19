@@ -40,8 +40,10 @@
   flashed liquid's bubble point, and the boil-up, its time and its duty start from there, so
   they are credited. The condenser's duty adds a `flash` term. `cheme process stills` reports
   it (`flash`: cut, pressure, temperatures, vapour, heat per batch and year average). It needs
-  the charge's temperature, `liquid_heat_capacity` and `heat_of_vaporization`; with the field
-  they enter the outlets' fingerprint. It is opt-in: a still without it solves, reports and
+  the charge's temperature and the charged components' `liquid_heat_capacity` and
+  `heat_of_vaporization` (a swap's feed-only component needs neither); with the field they
+  enter the outlets' fingerprint. A flash outside a charged component's `vapour_pressure`
+  range gives a note, as the boil-up does. It is opt-in: a still without it solves, reports and
   fingerprints as before, and the process library's results are unchanged.
   methanesulfonyl-chloride-1's ST101 with it gives the entry's own cross-check (321.1 K, 25.0
   kWh a batch). `schema.py` changed, so every BFD/PFD needs `cheme process build` once (only

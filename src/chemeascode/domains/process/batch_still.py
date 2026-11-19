@@ -924,6 +924,7 @@ def solve_still(
         result.flash, content0 = _flashed(
             spec, phase, names, n0, components, charge_temperature, hours
         )
+        result.notes.extend(_flash_ranges(result.flash, names, pressures, n0, volatile))
     column = _Column(spec.column, phase, names, content0) if spec.column is not None else None
 
     def top(moles: list[float]) -> tuple[list[float], float | None, float, Top | None]:
@@ -1358,14 +1359,22 @@ def _flashed(
 ) -> tuple[Flash, list[float]]:
     """``still.flash`` (ADR 0077): the *charge* (kmol per hour of flows) entering at
     *temperature* K flashed to the still's pressure as it starts (:func:`flash_charge`), its
-    vapour to the first cut; and the content left. Raises StillError naming what it lacks."""
+    vapour to the first cut; and the content left. Only the charged components (a swap's
+    feed-only ones are not in the content that flashes) need liquid_heat_capacity and, volatile,
+    heat_of_vaporization; a feed-only one counts 0 kJ/(kmol K) on its 0 kmol. Raises StillError
+    naming what it lacks."""
     if temperature is None:
         raise StillError("still.flash needs the charge's temperature (its stream's state)")
-    capacity = [getattr(components.get(n), "liquid_heat_capacity", None) for n in names]
-    if lacking := [n for n, c in zip(names, capacity, strict=True) if not c]:
+    capacity = [
+        getattr(components.get(n), "liquid_heat_capacity", None) if a > 0 else 0.0
+        for n, a in zip(names, charge, strict=True)
+    ]
+    if lacking := [n for n, c, a in zip(names, capacity, charge, strict=True) if a > 0 and not c]:
         raise StillError("still.flash needs the liquid_heat_capacity of " + ", ".join(lacking))
     if lacking := [
-        n for n, h, v in zip(names, phase.latent, phase.volatile, strict=True) if v and h is None
+        n
+        for n, h, v, a in zip(names, phase.latent, phase.volatile, charge, strict=True)
+        if a > 0 and v and h is None
     ]:
         raise StillError("still.flash needs the heat_of_vaporization of " + ", ".join(lacking))
     guess = phase.guess
@@ -1384,6 +1393,31 @@ def _flashed(
         heat * hours,
     )
     return found, left
+
+
+def _flash_ranges(
+    flash: Flash,
+    names: list[str],
+    pressures: list[Any],
+    charge: list[float],
+    volatile: list[bool],
+) -> list[str]:
+    """A note per charged volatile component whose vapour_pressure range leaves out the
+    temperatures the *flash* ran over (its inlet down to its flashed bubble point), as the
+    boil-up notes the still's own: the flash starts hotter than anything the boil-up sees."""
+    if not flash.moles:
+        return []
+    notes = []
+    span = (flash.temperature, flash.inlet_temperature)
+    for n, vp, a, v in zip(names, pressures, charge, volatile, strict=True):
+        if vp is None or not v or a <= 0 or all(vp.covers(t) for t in span):
+            continue
+        low, high = vp.temperature_range or (0.0, 0.0)
+        notes.append(
+            f"the charge's flash from {span[1]:.5g} K to {span[0]:.5g} K is outside the "
+            f"vapour_pressure range of {n} ({low:g}-{high:g} K)"
+        )
+    return notes
 
 
 def _column_summary(

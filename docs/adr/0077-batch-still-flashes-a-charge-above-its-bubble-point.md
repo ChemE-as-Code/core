@@ -67,8 +67,13 @@ for it (ADR 0062's vent is a batch reactor's).
   started at the bubble point before. The condenser's duty (`condenser_port`, ADR 0061)
   condenses the flash's vapour too: a `flash` term beside `condensation`.
 - **Data.** The flash needs the charge's temperature (its stream's state), every charged
-  component's `liquid_heat_capacity` and every volatile one's `heat_of_vaporization`. Without
-  them the still is not solved (`cheme.process-still-unsolved`, naming what is missing).
+  component's `liquid_heat_capacity` and every charged volatile one's `heat_of_vaporization`.
+  A swap's component that only its feed holds is not in the content that flashes and needs
+  neither (it counts 0 kmol in `C`). Without them the still is not solved
+  (`cheme.process-still-unsolved`, naming what is missing). The flash starts at the hottest
+  temperature in the model, so where it runs outside a charged volatile component's
+  `vapour_pressure` range (its inlet or its end) the still gives a note, as the boil-up does
+  for the still's temperature.
   With the field, the outlets' fingerprint takes the charge's temperature and those heats, so
   a change to any of them makes the outlets stale. Without it, nothing changes.
 - **Report.** `cheme process stills` gives `flash`: the cut it goes to, the pressure, the
@@ -108,5 +113,6 @@ for it (ADR 0062's vent is a batch reactor's).
 - `tests/test_still_flash.py`: one volatile component against the closed form
   `C = C_0 exp(cp_A (T - T_in) / lambda)` and the boil-up credited by exactly the flash's heat.
   A binary against an independent RK4 in T. A charge below its bubble point solves as without
-  the field. The first cut's own pressure. The refusals. The report, propagate's condenser duty
-  and the fingerprint.
+  the field. The first cut's own pressure. The refusals, and a swap whose feed-only component
+  lacks the flash's data. The report (with the note of a flash above benzene's Antoine range),
+  propagate's condenser duty and the fingerprint.

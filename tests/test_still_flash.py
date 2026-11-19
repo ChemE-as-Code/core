@@ -227,6 +227,42 @@ def test_the_flash_is_refused_without_its_data_and_needs_raoult():
     assert _still(flash=True).model_dump(mode="json")["flash"] is True
 
 
+def test_a_swaps_feed_only_component_needs_no_flash_data():
+    """A swap's component that only its feed holds is not in the content that flashes: it needs
+    no liquid_heat_capacity or heat_of_vaporization for the flash (core#332). Below its bubble
+    point the swap solves as without the field; above it the flash takes none of the feed's B."""
+    comps = _components()
+    data = comps["B"].model_dump(exclude_none=True)
+    del data["liquid_heat_capacity"], data["heat_of_vaporization"]
+    comps["B"] = Component.model_validate(data)
+    swap = {
+        "feed": {"mode": "constant_level", "stream": "S9"},
+        "end": {"residue": {"key": "A", "mole_fraction": 0.05}},
+    }
+    charge, feed = {"A": 6.0, "P": 4.0}, {"B": 5.0}
+    plain = solve_still(_still(**swap), charge, feed, comps, 30.0)
+    cold = solve_still(
+        _still(flash=True, **swap), charge, feed, comps, 30.0, charge_temperature=300
+    )
+    assert cold.flash.moles == {} and cold.residue == plain.residue
+    assert cold.cuts[0].moles == plain.cuts[0].moles and cold.notes == plain.notes
+    hot = solve_still(_still(flash=True, **swap), charge, feed, comps, 30.0, charge_temperature=360)
+    assert set(hot.flash.moles) == {"A"} and hot.flash.heat > 0
+    for n in ("A", "B", "P"):
+        total = hot.cuts[0].moles.get(n, 0.0) + hot.residue[n]
+        assert total == pytest.approx(charge.get(n, 0.0) + feed.get(n, 0.0), rel=1e-9)
+    # a charged component still needs its data
+    with pytest.raises(StillError, match="liquid_heat_capacity of B"):
+        solve_still(
+            _still(flash=True, **swap),
+            {"A": 6.0, "B": 1.0, "P": 4.0},
+            feed,
+            comps,
+            30.0,
+            charge_temperature=360,
+        )
+
+
 # -- in a plant: the report, propagate's duties, the fingerprint --------------------------------
 
 MATERIALS = f"""\
@@ -348,6 +384,12 @@ def test_the_report_and_propagate_carry_the_flash(tmp_path):
     # the charge cools as it flashes: no heat-up, and no note that the flash is not modelled
     assert sol["heat_up_kWh_per_batch"] == 0.0
     assert not any("flash is not modelled" in n for n in sol["notes"])
+    # the flash starts at 360 K, above benzene A's Antoine range: a note, as the boil-up gives
+    ranged = [n for n in sol["notes"] if n.startswith("the charge's flash from 360 K")]
+    assert ranged == [
+        f"the charge's flash from 360 K to {fl['temperature_K']:.5g} K is outside the "
+        "vapour_pressure range of A (287.7-354.07 K)"
+    ]
     assert FLASH in unit["assumptions"]
     text = report_text(report)
     assert "flash at 30 kPa(a): the charge 360 -> " in text and "to cut top" in text
