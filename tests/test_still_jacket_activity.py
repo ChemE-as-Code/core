@@ -579,3 +579,291 @@ def test_a_non_ideal_charge_flashes_on_its_activity_coefficients():
     ideal = _pair_still(None, end).model_copy(update={"flash": True})
     plain = solve_still(ideal, charge, None, comps, P_ATM, charge_temperature=t_in)
     assert plain.flash.moles == {}
+
+
+# -- with ADR 0075's still terms and ADR 0068's ends (core 1.13.0) ------------------------------
+
+LOSS = {"ua": 500.0, "ambient_temperature": 293.15, "provenance": "assumed"}
+AGITATOR = {"value": 3.0, "provenance": "assumed"}
+
+
+def _cp_components():
+    comps = dict(COMPONENTS)
+    comps["P"] = Component.model_validate(
+        {"id": "P", "name": "product", "molar_mass": 128.17, "liquid_heat_capacity": 200}
+    )
+    return comps
+
+
+def _benzene_path(s):
+    """K and dT/ds of the benzene over P still (60:40 kmol) with s kmol boiled up: x P_A(T)
+    = P, Antoine inverted and its slope by the chain rule."""
+    x = (60.0 - s) / (100.0 - s)
+    level = math.log10(P_ATM / x / 100.0)
+    t = BENZENE.b / (BENZENE.a - level) - BENZENE.c
+    dt_dx = -BENZENE.b / ((BENZENE.a - level) ** 2 * x * math.log(10.0))
+    return t, dt_dx * -40.0 / (100.0 - s) ** 2
+
+
+def test_a_jackets_sensible_rise_and_losses_take_its_own_time():
+    """ADR 0075 on a jacket's boil-up (ADR 0078): the sensible rise and the heat losses are
+    computed beside the integration, so the cuts and the boil-up's time are the jacket's
+    without them; with heat_up_time each takes the jacket's time at its driving force where it
+    occurs, int dQ / (UA (T_m - T)), so that the boil-up's time and the heat-up time add up to
+    the jacket's whole heat (to first order in the losses). The agitator's heat takes no time.
+    Each against a quadrature along the closed-form path."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.process.duties import still_duty
+
+    hours = 2.0
+    comps = _cp_components()
+    charge = {"A": 60.0, "P": 40.0}
+    extras = {"sensible_heat": True, "heat_loss": LOSS, "agitator_power": AGITATOR}
+    spec = _raoult(boilup=JACKET, end={"distilled": 0.5}, heat_up_time=True, **extras)
+    result = solve_still(spec, charge, None, comps, P_ATM, hours)
+    plain = solve_still(
+        _raoult(boilup=JACKET, end={"distilled": 0.5}), charge, None, comps, P_ATM, hours
+    )
+    assert result.time == pytest.approx(plain.time, rel=1e-12)
+    assert result.residue == pytest.approx(plain.residue, rel=1e-12)
+
+    ua, medium, latent, ambient = 2.0, 450.0, 30720.0, LOSS["ambient_temperature"]
+    n = 2000
+    width = 50.0 / n
+    rise = rise_s = lost = lost_s = 0.0
+    for i in range(n + 1):
+        weight = (1 if i in (0, n) else 4 if i % 2 else 2) * width / 3
+        t, slope = _benzene_path(i * width)
+        heat_capacity = ((60.0 - i * width) * 136.0 + 40.0 * 200.0) * hours  # kJ/K per batch
+        dt_ds = hours * latent / (ua * (medium - t))  # s per kmol boiled up
+        rise += weight * heat_capacity * slope
+        rise_s += weight * heat_capacity * slope / (ua * (medium - t))
+        lost += weight * LOSS["ua"] / 1000.0 * (t - ambient) * dt_ds
+        lost_s += weight * LOSS["ua"] / 1000.0 * (t - ambient) * dt_ds / (ua * (medium - t))
+    assert result.sensible_rise == pytest.approx(rise, rel=1e-6)
+    assert result.heat_loss == pytest.approx(lost, rel=1e-6)
+    assert result.jacket_terms["sensible rise"] == pytest.approx((rise, rise_s), rel=1e-6)
+    assert result.jacket_terms["heat losses"] == pytest.approx((lost, lost_s), rel=1e-6)
+
+    _heat_up_time(None, SimpleNamespace(id="S", still=spec), result, "design")
+    assert result.heat_up_time == pytest.approx(rise_s + lost_s, rel=1e-6)
+    # at the jacket's input as the boil-up starts (the rate #323 took for every term before
+    # core 1.13.0's merge) they would take 27 % less: the driving force falls from 79 to 36 K
+    t0 = result.temperatures[0]
+    assert result.heat_up_time > 1.3 * (rise + lost) / (ua * (medium - t0))
+    duty = still_duty(SimpleNamespace(id="S", still=spec), result)
+    assert duty.terms_kW["agitation"] == pytest.approx(
+        -AGITATOR["value"] * result.time / (hours * 3600.0), rel=1e-12
+    )
+
+
+def test_a_jackets_metal_above_the_first_bubble_point_takes_its_own_time(monkeypatch):
+    """A recipe vessel's metal (ADR 0063) heated with the charge from 300 K to T_0 takes the
+    jacket's log-mean input (ADR 0078), and above T_0, as the jacket boils up, the jacket's own
+    time C_m / UA ln((T_m - T_0) / (T_m - T_end))."""
+    from types import SimpleNamespace
+
+    from chemeascode.domains.process import duties
+
+    comps = _cp_components()
+    spec = _raoult(boilup=JACKET, end={"distilled": 0.5}, heat_up_time=True)
+    result = solve_still(spec, {"A": 60.0, "P": 40.0}, None, comps, P_ATM, 2.0)
+    result.charge_temperature = 300.0
+    t0, t_end = result.temperatures
+    metal = 500.0  # kJ/K
+    real = duties.still_duty
+
+    def with_metal(node, found, process=None, case=None):
+        duty = real(node, found, process, case)
+        duty.inputs["vessel_metal"] = {"heat_capacity": metal, "temperatures": [300.0, t_end]}
+        return duty
+
+    monkeypatch.setattr(duties, "still_duty", with_metal)
+    _heat_up_time(None, SimpleNamespace(id="S", still=spec), result, "design")
+    exact = (
+        metal
+        / 2.0
+        * (math.log((450.0 - 300.0) / (450.0 - t0)) + math.log((450.0 - t0) / (450.0 - t_end)))
+    )
+    assert result.heat_up_time == pytest.approx(exact, rel=1e-9)
+
+
+def test_a_jacket_on_one_cut_times_only_its_share_at_its_driving_force():
+    """A first cut at a constant 150 kW and a second on the jacket: only the second cut's
+    sensible rise is on the jacket's steps; the rest takes the heat input's time."""
+    comps = _cp_components()
+    spec = _raoult(
+        boilup={"value": 150.0, "unit": "kW", "provenance": "assumed"},
+        end=None,
+        cuts=[
+            {"outlet": "c1", "end": {"distilled": 0.25}},
+            {"outlet": "c2", "end": {"distilled": 0.5}, "boilup": JACKET},
+        ],
+        outlets={"residue": "bottom"},
+        sensible_heat=True,
+    )
+    result = solve_still(spec, {"A": 60.0, "P": 40.0}, None, comps, P_ATM)
+    on, seconds = result.jacket_terms["sensible rise"]
+    t_cut = result.cuts[0].temperature
+    t_end = result.temperatures[1]
+    assert 0.0 < on < result.sensible_rise
+    # bounded by the content's heat capacity at the end (10 kmol of A left) and at the second
+    # cut's start (35)
+    low = (10.0 * 136.0 + 40.0 * 200.0) * (t_end - t_cut)
+    high = (35.0 * 136.0 + 40.0 * 200.0) * (t_end - t_cut)
+    assert low < on < high
+    assert on / (2.0 * (450.0 - t_cut)) < seconds < on / (2.0 * (450.0 - t_end))
+
+
+def test_a_jacket_near_its_medium_stalls_on_it_with_adr_0075_s_terms():
+    """The stall near the medium (ADR 0078) and the pace check are not moved by ADR 0075's
+    terms beside the integration."""
+    spec = _raoult(
+        boilup=JACKET | {"medium_temperature": 400.0},
+        end={"residue": {"key": "A", "mole_fraction": 0.05}},
+        sensible_heat=True,
+        heat_loss=LOSS,
+    )
+    with pytest.raises(StillError, match="nears its jacket's medium at 400 K"):
+        solve_still(spec, {"A": 60.0, "P": 40.0}, None, _cp_components(), P_ATM)
+
+
+def test_a_jacket_reports_the_sensible_rise_and_losses_it_counts(tmp_path):
+    """The jacket's assumption no longer says 'no sensible heat' or 'no losses' where ADR
+    0075's terms count them; it does without them."""
+    heated = still.FLOWSHEET.replace(
+        "boilup: {value: 20, unit: kmol/h,",
+        "sensible_heat: true\n"
+        "      heat_loss: {ua: 500, ambient_temperature: 293.15, provenance: assumed}\n"
+        "      boilup: {value: 3, unit: kW/K, medium_temperature: 433.15,",
+    )
+    materials = still.MATERIALS.replace(
+        "molar_mass: 128.17}", "molar_mass: 128.17, liquid_heat_capacity: 200}"
+    )
+    plant = still._plant(tmp_path, flowsheet=heated, materials=materials)
+    (unit,) = still_report(plant.root).units
+    assert unit["problem"] is None
+    (jacket,) = [a for a in unit["assumptions"] if a.startswith("a jacket's boil-up")]
+    assert "no sensible heat" not in jacket and "no losses" not in jacket
+    assert "the sensible rise as T rises and the heat losses in the duty beside it" in jacket
+    (plain,) = still_report(_plant(tmp_path / "plain", activity=False).root).units
+    (jacket,) = [a for a in plain["assumptions"] if a.startswith("a jacket's boil-up")]
+    assert "(no sensible heat as T rises, no losses)" in jacket
+
+
+def test_a_non_ideal_still_takes_adr_0075_s_terms_on_its_own_bubble_point():
+    """UNIFAC with ADR 0075's terms: the outlets and the time are those without them; the
+    sensible rise and the losses follow the UNIFAC bubble point the profile gives (trapezoids
+    over it), some 20 K below the ideal liquid's."""
+    comps = {
+        n: c.model_copy(update={"liquid_heat_capacity": cp})
+        for (n, c), cp in zip(PAIR.items(), (81.1, 157.0), strict=True)
+    }
+    end = {"distilled": 0.3}
+    extras = {"sensible_heat": True, "heat_loss": LOSS, "agitator_power": AGITATOR}
+    charge = {"M": 30.0, "T": 70.0}
+    spec = Still.model_validate(_pair_still("unifac", end).model_dump(mode="json") | extras)
+    result = solve_still(spec, charge, None, comps, P_ATM)
+    plain = solve_still(_pair_still("unifac", end), charge, None, comps, P_ATM)
+    assert result.time == pytest.approx(plain.time, rel=1e-9)
+    assert result.residue == pytest.approx(plain.residue, rel=1e-9)
+    assert result.key == "M"
+
+    def capacity(share, x):
+        total = 100.0 * (1.0 - share)
+        return total * (x * 81.1 + (1.0 - x) * 157.0)
+
+    rise = lost = 0.0
+    for (s0, t_0, k0, x0), (s1, t_1, k1, x1) in zip(
+        result.profile[:-1], result.profile[1:], strict=True
+    ):
+        rise += (capacity(s0, x0) + capacity(s1, x1)) / 2 * (k1 - k0)
+        lost += LOSS["ua"] / 1000.0 * ((k0 + k1) / 2 - LOSS["ambient_temperature"]) * (t_1 - t_0)
+    assert result.sensible_rise == pytest.approx(rise, rel=2e-3)
+    assert result.heat_loss == pytest.approx(lost, rel=2e-3)
+    ideal = solve_still(
+        Still.model_validate(_pair_still(None, end).model_dump(mode="json") | extras),
+        charge,
+        None,
+        comps,
+        P_ATM,
+    )
+    assert ideal.temperatures[0] > result.temperatures[0] + 15.0
+
+
+def test_a_non_ideal_jacket_still_ends_at_its_unifac_temperature():
+    """ADR 0068's end at a temperature on a jacket over a UNIFAC liquid: the cut ends where
+    the residue's UNIFAC bubble point (independent, thermo's from_subgroups) is the end, the
+    jacket starting at UA (T_m - T_0) from the UNIFAC bubble point; the outlets are those of a
+    constant boil-up (Rayleigh's path does not depend on the rate)."""
+    charge = {"M": 30.0, "T": 70.0}
+    end = {"temperature": 350.0}
+    spec = Still.model_validate(
+        _pair_still("unifac", end).model_dump(mode="json") | {"boilup": JACKET}
+    )
+    result = solve_still(spec, charge, None, PAIR, P_ATM, 2.0)
+    residue = result.residue
+    x_end = residue["M"] / sum(residue.values())
+    assert _unifac_bubble(x_end)[0] == pytest.approx(350.0, abs=1e-6)
+    assert result.peak_duty == pytest.approx(2.0 * (450.0 - _unifac_bubble(0.3)[0]), rel=1e-3)
+    constant = solve_still(_pair_still("unifac", end), charge, None, PAIR, P_ATM, 2.0)
+    assert residue == pytest.approx(constant.residue, rel=1e-8)
+
+
+def test_a_non_ideal_purity_end_past_its_floor_is_refused():
+    """ADR 0068's purity floor on a UNIFAC liquid: a cut of methanol 0.3 in toluene can never
+    fall to 5 % methanol (all of it boiled up holds 30 %), so the end is refused as the floor
+    rises past it; one at 70 % ends there."""
+    charge = {"M": 30.0, "T": 70.0}
+    reached = solve_still(
+        _pair_still("unifac", {"purity": {"key": "M", "fraction": 0.7}}), charge, None, PAIR, P_ATM
+    )
+    (cut,) = reached.cuts
+    assert cut.moles["M"] / sum(cut.moles.values()) == pytest.approx(0.7, abs=1e-9)
+    spec = _pair_still("unifac", {"purity": {"key": "M", "fraction": 0.05}})
+    with pytest.raises(StillError, match="boils dry before its end"):
+        solve_still(spec, charge, None, PAIR, P_ATM)
+
+
+def test_a_jackets_time_end_has_no_dry_point_bound_and_ends_on_time():
+    """ADR 0068's dry-point bound of an end at a time: a jacket's s per kmol has no upper
+    bound (its input falls to 0 at the medium), so none is taken; a reachable time ends on
+    time, and one past where the still boils dry (benzene and toluene, nothing non-volatile,
+    toluene boiling at 383.8 K below the medium) is refused as boiling dry."""
+    from tests.test_still_gaps import _raoult as raoult
+
+    spec = raoult(boilup=JACKET, end={"time": 3600.0}, nonvolatile=[])
+    result = solve_still(spec, {"A": 50.0, "B": 50.0}, None, COMPONENTS, P_ATM)
+    assert result.time == pytest.approx(3600.0, rel=1e-9)
+    spec = raoult(boilup=JACKET, end={"time": 1e9}, nonvolatile=[])
+    with pytest.raises(StillError, match="boils dry before its end"):
+        solve_still(spec, {"A": 50.0, "B": 50.0}, None, COMPONENTS, P_ATM)
+
+
+def test_the_still_options_that_need_raoult_take_a_jacket_and_unifac():
+    """The schema's raoult-only fields (ADR 0068, 0075, 0077) accept a jacket over a UNIFAC
+    liquid together; at constant volatility each is refused, the jacket and UNIFAC too."""
+    spec = Still.model_validate(
+        _pair_still("unifac", {"distilled": 0.3}).model_dump(mode="json")
+        | {
+            "boilup": JACKET,
+            "heat_up": True,
+            "heat_up_time": True,
+            "flash": True,
+            "sensible_heat": True,
+            "heat_loss": LOSS,
+            "agitator_power": AGITATOR,
+        }
+    )
+    assert spec.volatility.activity == "unifac" and spec.boilup.unit == "kW/K"
+    constant = {"model": "constant", "alpha": {"A": 2.5}, "provenance": "assumed"}
+    for field, message in (
+        ({"boilup": JACKET}, "kW/K needs volatility raoult"),
+        ({"sensible_heat": True}, "sensible_heat and heat_loss need volatility raoult"),
+        ({"heat_loss": LOSS}, "sensible_heat and heat_loss need volatility raoult"),
+        ({"flash": True}, "flash needs volatility raoult"),
+        ({"volatility": constant | {"activity": "unifac"}}, "activity: with model raoult"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            still._still(**({"volatility": constant} | field))

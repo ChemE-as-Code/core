@@ -542,7 +542,7 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
     duty's (with a column the reboiler's) replaced by what the duty holds, and with activity
     coefficients or a jacket's boil-up (ADR 0078) the liquid's and the boil-up's; as they are
     without any, so such a still reports as before."""
-    from chemeascode.domains.process.batch_still import ACTIVITY_ASSUMPTION, JACKET_ASSUMPTION
+    from chemeascode.domains.process.batch_still import ACTIVITY_ASSUMPTION
 
     found = _still_heat_assumptions(process, node, assumptions)
     spec = node.still
@@ -571,8 +571,35 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
             else "constant boil-up (or a jacket's, where a cut or the still has one)"
         )
         found = [text.replace("constant boil-up", boilup) for text in found]
-        found.append(JACKET_ASSUMPTION)
+        found.append(_jacket_assumption(spec))
     return found
+
+
+def _jacket_assumption(spec: Any) -> str:
+    """:data:`.batch_still.JACKET_ASSUMPTION`, with ADR 0075's ``sensible_heat`` and
+    ``heat_loss`` the terms the duty counts beside the jacket's boil-up (not taken off its
+    vapour) in place of their "no"; as it is without them."""
+    from chemeascode.domains.process.batch_still import JACKET_ASSUMPTION
+
+    left = []
+    counted = []
+    if spec.sensible_heat:
+        counted.append("the sensible rise as T rises")
+    else:
+        left.append("no sensible heat as T rises")
+    if spec.heat_loss is not None:
+        counted.append("the heat losses")
+    else:
+        left.append("no losses")
+    if not counted:
+        return JACKET_ASSUMPTION
+    beside = (
+        " and ".join(counted) + " in the duty beside it (ADR 0075), not taken off the vapour; "
+        "with heat_up_time they take the jacket's time at its driving force where they occur"
+    )
+    return JACKET_ASSUMPTION.replace(
+        "(no sensible heat as T rises, no losses)", "(" + "; ".join([*left, beside]) + ")"
+    )
 
 
 def _still_heat_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:

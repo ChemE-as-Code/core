@@ -12,9 +12,12 @@
   one). The still holds one liquid: a liquid UNIFAC splits into two (a component's activity
   above 1, or Michelsen's tangent-plane test) is refused, and so is a pair of UNIFAC main
   groups without interaction parameters (thermo would take them as 0). Both are opt-in: a
-  still without them solves, reports and fingerprints as before. A reaction in a still is not
-  modelled; the ADR says why. Every BFD/PFD needs `cheme process build` once (only
-  `generator_sha256` changes).
+  still without them solves, reports and fingerprints as before. With 1.13.0's still terms
+  (ADR 0075) on a jacket, `heat_up_time` times the sensible rise and the heat losses, and the
+  vessel's metal above the first bubble point, at the jacket's driving force where they occur,
+  not at its input over the charge's heat-up; the jacket's assumption names the terms the duty
+  counts. A reaction in a still is not modelled; the ADR says why. Every BFD/PFD needs `cheme
+  process build` once (only `generator_sha256` changes).
 
 ## 1.13.0 (2026-11-19)
 

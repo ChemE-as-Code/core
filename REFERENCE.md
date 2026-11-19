@@ -1565,9 +1565,15 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     with that reason, any other stall with the pace's. With `heat_up_time` the heat-up takes the
     jacket's mean input over the charge's heat-up, `UA` times the log-mean of `T_m - T_in` and
     `T_m - T_0`, so the charge and the metal to `T_0` take `C / UA ln((T_m - T_in) / (T_m -
-    T_0))` (the still's jacket, or one jacket on every cut). A time end with it puts
-    `medium_temperature` in the outlets' fingerprint. `process stills` puts the jacket's
-    boil-up in place of the constant one in the assumptions.
+    T_0))` (the still's jacket, or one jacket on every cut). What heats while the jacket boils
+    up takes its own time at its driving force there: ADR 0075's sensible rise and heat losses
+    on its steps `int dQ / (UA (T_m - T))`, and on one jacket throughout the metal above `T_0`
+    `C_m / UA ln((T_m - T_0) / (T_m - T_end))`. Those terms stay beside the integration (ADR
+    0075): the jacket's whole input boils up in the outlets and the boil-up's time, and the
+    boil-up's and the heat-up's times add up to the jacket's whole heat. A time end with it
+    puts `medium_temperature` in the outlets' fingerprint. `process stills` puts the jacket's
+    boil-up in place of the constant one in the assumptions, and with `sensible_heat` or
+    `heat_loss` its assumption names them in the duty beside it.
   - `volatility: {model: raoult, activity: unifac}` (ADR 0078): a non-ideal liquid on modified
     Raoult's law, `y_i P = gamma_i x_i P_i(T)`, with original UNIFAC (thermo's DDBST groups,
     extra `props`) at the still's liquid (without the `separate_phase`) and temperature; the
@@ -1583,7 +1589,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     `process stills` names the model in `detail` and its assumptions (with a column too), and
     the volatility's own provenance decides whether the activity coefficients count as
     sourced. The CAS numbers enter the fingerprint. The
-    latent heat is the components' (no heat of mixing).
+    latent heat is the components' (no heat of mixing), and so is ADR 0075's sensible rise (no
+    excess heat capacity). Every temperature the still takes is the UNIFAC bubble point: the
+    flash's (ADR 0077), an end at a temperature, the heat-up's `T_0` and ADR 0075's terms.
   - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
     `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
     cuts. At a change of pressure the still steps to the new bubble point (a note; the flash or
@@ -1669,7 +1677,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     provenance}` (raoult) the heat lost over the boil-up, `UA int (T - T_amb) dt`
     (`heat losses`, `heat_loss_kWh_per_batch`; not over the heat-up or a hold);
     `still.agitator_power: {value: kW, provenance}` the agitator's heat over the boil-up's time
-    (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does.
+    (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does
+    (on a jacket's boil-up, ADR 0078, at its driving force where they occur).
   - `still.flash: true` (raoult, ADR 0077): a charge that enters above its bubble point at the
     still's pressure (the first cut's without a feed) first flashes adiabatically and
     differentially to it. The vapour leaves as it forms, at the liquid's bubble point, and the

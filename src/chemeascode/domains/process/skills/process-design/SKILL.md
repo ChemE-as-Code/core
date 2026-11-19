@@ -352,7 +352,9 @@ still:
   end. An end at or above the medium's temperature is refused; one the still reaches only
   near it stalls with the reason. With `heat_up_time` the charge's heat-up takes the jacket's
   own time, `C / UA ln((T_m - T_in) / (T_m - T_0))` (the still's jacket, or one jacket on
-  every cut).
+  every cut), and `sensible_heat`, `heat_loss` and the metal above `T_0` take its time at the
+  driving force where they occur; they do not slow the jacket's vapour (ADR 0075: beside the
+  integration), so a cut ended at a time collects as if the jacket's whole input boiled up.
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time

@@ -2180,8 +2180,9 @@ class Still(Strict):
         "boil-up's heat input (a boil-up in kW: its value; a jacket in kW/K: UA times the "
         "log-mean of T_medium - T_in and T_medium - T_0, ADR 0078; else the mean over the cuts "
         "at it; every cut with its own boil-up: the mean over the boil-up, or one jacket on "
-        "every cut: that jacket's), added to the still's time and to the recipe's distil time "
-        "from it (ADR 0068); default: energy only.",
+        "every cut: that jacket's; what heats while a jacket boils up, ADR 0075's sensible rise "
+        "and losses and the metal above T_0, at its driving force there), added to the still's "
+        "time and to the recipe's distil time from it (ADR 0068); default: energy only.",
         exclude_if=lambda value: not value,  # a still's dump stays as it was
     )
     flash: bool = Field(

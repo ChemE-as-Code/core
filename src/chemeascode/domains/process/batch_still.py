@@ -247,6 +247,10 @@ class StillResult:
     sensible_missing: str = ""
     #: with ``heat_loss`` (ADR 0075): kJ per batch lost to the surroundings over the boil-up
     heat_loss: float | None = None
+    #: ADR 0075's ``sensible rise`` and ``heat losses`` over the steps a jacket boils up (ADR
+    #: 0078): term -> (kJ per batch on those steps, s per batch they take at the jacket's
+    #: driving force there, int dQ / (UA (T_m - T))), for ``heat_up_time``
+    jacket_terms: dict[str, tuple[float, float]] = field(default_factory=dict)
     #: the column's stages, reflux and design (:func:`_column_summary`); None: no column
     column: dict[str, Any] | None = None
     #: the charge's flash (``still.flash``, ADR 0077); None without the field
@@ -1056,6 +1060,8 @@ def solve_still(
         result.sensible_missing = "the liquid_heat_capacity of " + ", ".join(gaps)
     loss = getattr(spec, "heat_loss", None)
     gains = {"sensible": 0.0, "loss": 0.0}
+    # on a jacket's steps (ADR 0078): kJ per batch and s per batch at its driving force
+    jacketed = {"sensible rise": [0.0, 0.0], "heat losses": [0.0, 0.0]}
     energy_known = all(h is not None for h in latent)
     # the content the boil-up starts from: the charge, or what is left of it after its flash
     content0 = list(n0)
@@ -1139,7 +1145,10 @@ def solve_still(
     def gain(f: Callable[[list[float]], list[float]], old: list[float], h: float) -> None:
         """One step of *h* kmol boiled up from *old*: the pot's sensible rise, int C dT =
         [C (T - T_0)] - int (T - T_0) sum cp_i dn_i (C the content's heat capacity, T_0 its
-        temperature at the step's start), and the heat lost, UA int (T - T_amb) dt."""
+        temperature at the step's start), and the heat lost, UA int (T - T_amb) dt. On a
+        jacket's step (ADR 0078) also the s each takes at the jacket's driving force where it
+        occurs, int dQ / (UA_j (T_m - T)): the sensible rise's by the same parts with
+        g(T) = ln((T_m - T_0) / (T_m - T)) / UA_j in place of T - T_0."""
         points = []
         try:
             for j in range(SUBSTEPS + 1):
@@ -1151,17 +1160,37 @@ def solve_still(
         if any(t is None for _, t, _ in points):
             return
         t0 = points[0][1]
+        jacket = active["boilup"] if active["boilup"].unit == "kW/K" else None
+        if jacket is not None:
+            ua, medium = jacket.value, jacket.medium_temperature
+
+            def g(t: float) -> float:  # K s/kJ: dg = dT / (UA (T_m - T)), 0 at T_0
+                return math.log((medium - t0) / (medium - t)) / ua
+
         if sensible:
             ends = sum(n * (cp or 0.0) for n, cp in zip(points[-1][0], cps, strict=True))
-            weights = [
-                (t - t0) * sum(d * (cp or 0.0) for d, cp in zip(df[:k], cps, strict=True))
-                for _, t, df in points
+            dc = [
+                sum(d * (cp or 0.0) for d, cp in zip(df[:k], cps, strict=True)) for *_, df in points
             ]
+            weights = [(t - t0) * c for (_, t, _), c in zip(points, dc, strict=True)]
             rise = ends * (points[-1][1] - t0) - _simpson(weights, h)
             gains["sensible"] += rise * hours
+            if jacket is not None:
+                weights = [g(t) * c for (_, t, _), c in zip(points, dc, strict=True)]
+                jacketed["sensible rise"][0] += rise * hours
+                jacketed["sensible rise"][1] += hours * (
+                    ends * g(points[-1][1]) - _simpson(weights, h)
+                )
         if loss is not None:
             weights = [(t - loss.ambient_temperature) * df[k] for _, t, df in points]
-            gains["loss"] += loss.ua / 1000.0 * _simpson(weights, h)
+            lost = loss.ua / 1000.0 * _simpson(weights, h)
+            gains["loss"] += lost
+            if jacket is not None:
+                weights = [
+                    w / (ua * (medium - t)) for w, (_, t, _) in zip(weights, points, strict=True)
+                ]
+                jacketed["heat losses"][0] += lost
+                jacketed["heat losses"][1] += loss.ua / 1000.0 * _simpson(weights, h)
 
     # the state: kmol by component (per hour of flows), s of boil-up, kJ per batch
     state = [*content0, 0.0, 0.0]
@@ -1541,6 +1570,9 @@ def solve_still(
         result.sensible_rise = gains["sensible"]
     if loss is not None:
         result.heat_loss = gains["loss"]
+    if "kW/K" in units:  # ADR 0078: the terms on a jacket's steps, for heat_up_time
+        on = {"sensible rise": sensible, "heat losses": loss is not None}
+        result.jacket_terms = {term: (q, s) for term, (q, s) in jacketed.items() if on[term]}
     if column is not None:
         result.column = _column_summary(spec.column, column, refluxes, tops, result)
     if len(result.profile) > PROFILE_POINTS:
@@ -2077,7 +2109,11 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
     is not known. A term that gives heat back takes no time. The metal (``C_m``, kJ/K) heats
     with the charge from its start to the still's first bubble point ``T_0``, then over the
     boil-up as far as the still ends above ``T_0``: ``C_m [(T_0 - T_start) + max(T_end - T_0,
-    0)]``; one that ends colder (a vacuum ramp) gives no time back."""
+    0)]``; one that ends colder (a vacuum ramp) gives no time back. What heats while a jacket
+    boils up takes the jacket's own time at its driving force there (ADR 0078 with ADR 0075):
+    the sensible rise and the heat losses on its steps ``int dQ / (UA (T_m - T))``
+    (:attr:`StillResult.jacket_terms`), and on one jacket throughout the metal above ``T_0``
+    ``C_m / UA ln((T_m - T_0) / (T_m - T_end))``."""
     from chemeascode.domains.process.duties import still_duty
 
     rate = _heat_input(node.still, result)  # kW
@@ -2088,17 +2124,40 @@ def _heat_up_time(process: Any, node: Any, result: StillResult, case: str) -> No
     if duty.heat_kW is None:
         result.heat_up_time_missing = "; ".join(duty.missing) or "the still's duty"
         return
-    # kJ per batch: each term on its own, none below zero (a term that gives heat back)
-    extra = sum(
-        max(v, 0.0) for name, v in duty.terms_kW.items() if name not in ("boil-up", "vessel metal")
-    )
-    kj = extra * result.hours * 3600.0
+    # kJ per batch at the heat input, and s at a jacket's own driving force (ADR 0078): each
+    # term on its own, none below zero (a term that gives heat back)
+    kj = seconds = 0.0
+    for name, v in duty.terms_kW.items():
+        if name in ("boil-up", "vessel metal"):
+            continue
+        q = v * result.hours * 3600.0
+        if name in result.jacket_terms:  # its share on a jacket's steps, at the jacket's time
+            on, at_jacket = result.jacket_terms[name]
+            seconds += max((q - on) / rate + at_jacket, 0.0)
+        else:
+            kj += max(q, 0.0)
     metal = duty.inputs.get("vessel_metal")
     if metal is not None and result.temperatures is not None:
         first = result.temperatures[0]  # K: the still's bubble point as its boil-up starts
         start, end = metal["temperatures"]
-        kj += metal["heat_capacity"] * (max(first - start, 0.0) + max(end - first, 0.0))
-    result.heat_up_time = kj / rate
+        kj += metal["heat_capacity"] * max(first - start, 0.0)
+        jacket = _one_jacket(node.still)
+        if jacket is not None and end > first:  # heated as the jacket boils up (ADR 0078)
+            medium = jacket.medium_temperature
+            seconds += (
+                metal["heat_capacity"] / jacket.value * math.log((medium - first) / (medium - end))
+            )
+        else:
+            kj += metal["heat_capacity"] * max(end - first, 0.0)
+    result.heat_up_time = kj / rate + seconds
+
+
+def _one_jacket(spec: Any) -> Any:
+    """The jacket (a boil-up in kW/K, ADR 0078) the still boils up on throughout, the same UA
+    and medium on every boil-up it runs at; None where it runs at any other."""
+    used = spec.boilups()
+    found = {(b.unit, b.value, b.medium_temperature) for b in used}
+    return used[0] if len(found) == 1 and used[0].unit == "kW/K" else None
 
 
 def _heat_input(spec: Any, result: StillResult) -> float | None:

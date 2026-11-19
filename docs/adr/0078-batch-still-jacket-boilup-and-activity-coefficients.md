@@ -48,9 +48,11 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   input over the charge's heat-up: UA times the log-mean of `T_m - T_in` and `T_m - T_0`. The
   charge and the vessel's metal heated to the first bubble point `T_0` then take the jacket's
   own time, `C / UA ln((T_m - T_in) / (T_m - T_0))`, which is the recipe's `heat` time with
-  `temperatures`. The other terms (a swap's feed, the metal above `T_0`) take the same mean
-  rate. With a charge at or above `T_0`, or of unknown temperature, the input is
-  `UA (T_m - T_0)`. Where every cut has its own boil-up (ADR 0068: the mean over the whole
+  `temperatures`. A swap's feed takes the same mean rate. With a charge at or above `T_0`, or
+  of unknown temperature, the input is `UA (T_m - T_0)`. What heats while the jacket boils up
+  takes the jacket's own time at its driving force there: on one jacket throughout, the
+  vessel's metal above `T_0`, `C_m / UA ln((T_m - T_0) / (T_m - T_end))`; and ADR 0075's
+  terms (below). Where every cut has its own boil-up (ADR 0068: the mean over the whole
   boil-up stands in) and they are one jacket, the same UA and medium on each, that jacket
   heats the charge and the log-mean holds as on the still. Cuts at different jackets, or a
   jacket on some only, keep ADR 0068's mean: there is no one jacket to take a log-mean of.
@@ -86,6 +88,37 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   not describe the vapour. It can follow as `activity: nrtl` with its pairs, once a plant has
   them. Constant coefficients (option 3) do not follow a still's composition, which changes
   from the charge to the residue.
+- **With the rest of core 1.13.0** (ADR 0068, 0075, 0077), where the jacket or UNIFAC meets
+  another of the still's features:
+  - ADR 0075's `sensible_heat` and `heat_loss` stay beside the integration, as ADR 0075
+    decided for every boil-up: the jacket's whole input `UA (T_m - T)` boils up in the
+    outlets and the boil-up's time, and the duty counts the sensible rise and the losses on
+    top. With `heat_up_time` each takes the jacket's own time where it occurs, `int dQ / (UA
+    (T_m - T))` over the steps the jacket boils up. The sensible rise takes it by the same
+    parts as its heat, `[C g] - int g sum_i cp_i dN_i` with `g = ln((T_m - T_0) / (T_m - T)) /
+    UA` over each step. Before the merge every term took the jacket's input over the charge's
+    heat-up, but the driving force falls as the pot heats: 79 K at `T_0` and 36 K at the end
+    for the benzene still below. Its sensible rise and losses (500 W/K to 293.15 K) take
+    18019 s at the jacket's own driving force; the input at `T_0` times them at 13195 s, 27 %
+    short. So the boil-up's time and the heat-up time add up to the jacket's whole heat
+    (latent, sensible and lost), to first order in the losses. A share on a cut at another
+    boil-up takes that boil-up's heat input, as before. The agitator's heat (`-P t` over the
+    jacket's boil-up time) gives heat back and takes no time. The jacket's assumption names
+    the terms it counts in place of "no sensible heat" and "no losses".
+  - With UNIFAC every temperature the still takes is the UNIFAC bubble point: ADR 0077's
+    flash (its start, the bubble pressure it flashes down to and its end), ADR 0068's end at a
+    temperature, the heat-up's `T_0` and ADR 0075's terms. The sensible rise takes the
+    components' `liquid_heat_capacity` (no excess heat capacity), as the latent heat takes no
+    heat of mixing.
+  - ADR 0068's ends: an end at a time on a jacket takes no dry-point bound (the jacket's s per
+    kmol has none, its input falling to 0 at the medium), so a time past where the still boils
+    dry is refused as boiling dry when it does; a purity end's floor does not depend on the
+    boil-up or the liquid model.
+  - The pace check (`_Run`) and the stall near the medium see only the integration, so ADR
+    0075's terms do not move them.
+  - The schema's raoult-only fields (`heat_up`, `heat_up_time`, `flash`, `sensible_heat`,
+    `heat_loss`, an end at a temperature) take a jacket and UNIFAC together; at constant
+    volatility each is refused, the jacket and UNIFAC too.
 - **No reaction in a still** (option 2). The still keeps refusing a step that is also a
   reactor (`cheme.process-still`). The model cannot decide a reaction cleanly for three
   reasons:
@@ -142,10 +175,14 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   few hundred times per point of the profile (methanol-toluene: 0.34 s against 0.02 s ideal
   without the test, about 1.6 times that with it).
 - Negative: the jacket's UA and medium are constant. The wetted area does not fall as the pot
-  empties, so a still that empties below its jacket boils up too fast towards the end. The
-  sensible heat of the content as T rises is not taken from the jacket.
+  empties, so a still that empties below its jacket boils up too fast towards the end. ADR
+  0075's sensible rise and losses are not taken off the jacket's vapour (they are beside the
+  integration): a cut ended at a time collects as if all of the jacket's input boiled up. With
+  `heat_up_time` their time is the jacket's at its driving force, so the whole time is right
+  to first order; without it they are in the duty only.
 - Not covered (core#182): NRTL or measured activity coefficients in a still, the wetted area
-  over the boil-up, a reaction in a still (above), a charge above its bubble point (#279).
+  over the boil-up, a reaction in a still (above). A charge above its bubble point is ADR
+  0077's flash, on the jacket and on UNIFAC alike.
 
 ## Evidence
 
@@ -154,5 +191,6 @@ reaction: (1) rate laws in the still's balance, `dN/ds = -y + R dt/ds`; (2) none
   `seconds_per_mole`, `_jacket_heat_input`, `ACTIVITY_ASSUMPTION`, `JACKET_ASSUMPTION`, the
   rules), `schema.py` (`Volatility.activity`, `Boilup.medium_temperature`),
   `integrations/thermo.py` (`unifac_gammas`), `model_basis.py` (`_still_assumptions`).
-- `tests/test_still_jacket_activity.py`.
-- Follows ADR 0055, 0061, 0063 and 0068.
+- `tests/test_still_jacket_activity.py` (the combinations with ADR 0068, 0075 and 0077 at its
+  end).
+- Follows ADR 0055, 0061, 0063 and 0068; meets ADR 0075 and 0077 (core 1.13.0).
