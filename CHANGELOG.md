@@ -4,6 +4,30 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- The Monte Carlo of a study with one product (`cheme assess lca` with `uncertainty:`) failed
+  with a TypeError or KeyError under allocation by `economic`, `energy`, `exergy` or `shares`
+  when the product had no price, energy, exergy or share (core#310), and the whole report
+  stopped with it. One product takes the whole burden whatever the method, as the
+  deterministic allocation already had it. A study that ran before gives the same numbers.
+- Brightway backend: a water flow mapped `elementary:` (counted in kg, as every flowsheet
+  resource and emission) was refused against its biosphere3 flow in m3
+  (`cheme.lca-activity-unit`, core#311), so river, lake, sea, well or cooling water and water
+  emitted to air or water had no impacts. The row is now characterised per kg with the
+  crosswalk's `per_kg` (0.001 m3 per kg).
+- Brightway backend: rows in m2*a (land occupation) and kBq (radioactivity) were refused for
+  any biosphere flow, since `square meter-year`, `kilo Becquerel` and `Becquerel` were unknown
+  units (core#312); they are characterised as under the factors backend.
+- `lca/manifest.json` (and the scenario records' input files) fingerprinted
+  `estimate/mto.csv` and the equipment list only when a construction entry read them, not when
+  only an equipment-leak estimate counted its valves, flanges or seals from them (core#313).
+  They are now fingerprinted whenever the results count from them.
+- Library effect: none. Of the 67 LCA studies of the process library (main 34c233d), none uses
+  the Brightway backend, none has an equipment-leak estimate (they exclude leaks), and the 12
+  with `uncertainty:` give identical outputs on this branch and at 1.12.0 + core#254
+  (`lca_report` and every file `cheme assess lca --write` writes, compared byte for byte).
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
