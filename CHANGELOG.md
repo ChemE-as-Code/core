@@ -21,14 +21,19 @@
     starts (#305);
   - a CSTR takes each reaction's accumulation from its own limiting reactant, not the first
     reactant of the first reaction for all of them, and its MTSR is the largest
-    `T_p + X_ac dT_ad` of one counted reaction (#306).
+    `T_p + X_ac dT_ad` of one counted reaction (#306). The `X_ac` reported is that
+    reaction's; where no counted reaction is exothermic, the largest of a counted reaction,
+    not the 0 of one whose reactants the feed lacks.
 
   Library entries (`process-library` main, branch against the 1.12.0 + #254 pin; no class or
   finding changes, no batch or CSTR entry changes): ammonia-1 R101 MTSR 910.5 -> 1098.4 K
   (T_p 893.2 -> 1083.2 K) and R501 1163.9 -> 1171.7 K; cumene-1 R101 588.8 -> 603.3 K;
   ethylene-1 H101 343.6 -> 1113.2 K and H103 344.5 -> 1113.2 K (endothermic: the MTSR is the
   furnace outlet's temperature); hydrogen-1 R102 893.2 -> 1143.2 K (endothermic);
-  methylamines-1 R101 689.9 -> 714.7 K; sulfuric-acid-1 R204 705.27 -> 705.35 K.
+  methylamines-1 R101 689.9 -> 714.7 K; sulfuric-acid-1 R204 705.27 -> 705.35 K. Reported
+  `X_ac`: ammonia-1 R501 1 -> 0.70, methylamines-1 R101 1 -> 0.04, sulfuric-acid-1 R204
+  1 -> 0.06, and for the endothermic steps the outlet's unconverted share: ethylene-1 H101
+  1 -> 0.30 and H103 1 -> 0.18, hydrogen-1 R102 1 -> 0.25.
 
 ## 1.12.0 (2026-11-13)
 

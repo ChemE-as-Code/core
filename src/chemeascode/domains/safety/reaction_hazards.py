@@ -594,8 +594,11 @@ def screen_node(process: Any, node: str, case: str) -> HazardEntry:
         if best is None or (mtsr_s is not None and (best[5] is None or mtsr_s > best[5])):
             best = (t_state, held, note, rise_s, lacking_s, mtsr_s, rises_s, share)
     t_p, held, note, rise, lacking, mtsr, rises, share = best
-    # the accumulation reported: of the reaction setting the MTSR (no rise known: the largest)
-    setting = max(rises, key=lambda r: (share(r) * max(rises[r], 0.0), rises[r]), default=None)
+    # the accumulation reported: of the exothermic reaction setting the MTSR (none, every one
+    # endothermic or its rise not known: the largest of a counted reaction, not the share of
+    # one the feed cannot run)
+    heating = {r: x for r, x in rises.items() if x > 0}
+    setting = max(heating, key=lambda r: (share(r) * heating[r], heating[r]), default=None)
     accumulation = (
         share(setting) if setting is not None else max([share(r) for r in ids], default=1.0)
     )

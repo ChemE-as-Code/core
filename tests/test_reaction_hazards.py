@@ -433,3 +433,32 @@ def test_a_conversion_step_with_its_outlet_known_is_screened_from_the_hotter_sta
     assert entry.process_temperature == pytest.approx(t_p)
     assert entry.accumulation == pytest.approx(accumulation)
     assert entry.mtsr == pytest.approx(t_p + accumulation * rise)
+
+
+def test_an_endothermic_step_reports_the_accumulation_of_a_reaction_its_feed_runs(tmp_path):
+    # every reaction endothermic, one (R2, on C) the feed cannot run: its 0 K rise is the
+    # largest, but its accumulation is not the outlet's; the reported X_ac is R1's unconverted
+    # half, and the MTSR the outlet's temperature
+    flowsheet = (
+        _outlet_at(CONVERSION, 420.0)
+        .replace(
+            "temperature: {value: 420.0, provenance: given}\n",
+            "temperature: {value: 420.0, provenance: given}\n"
+            "        flow: {value: 5, provenance: given}\n"
+            "        composition: {basis: mole_fraction, values: {A: 0.1, B: 0.1, S: 0.8}, "
+            "provenance: given}\n",
+        )
+        .replace("reactions: [R1]", "reactions: [R1, R2]")
+    )
+    root = _plant(tmp_path, flowsheet, TWO_KEYS_MATERIALS)
+    (root / "process/reactions.yaml").write_text(
+        CONVERSION_REACTIONS.replace("value: -80000", "value: 80000")
+        + "  - {id: R2, stoichiometry: {C: -1, D: 1}, phase: liquid,\n"
+        "     heat_of_reaction: {value: 50000, provenance: assumed},\n"
+        "     conversion: {key: C, value: 0.5, provenance: assumed}}\n"
+    )
+    (entry,) = screen(root).entries
+    assert entry.process_temperature == pytest.approx(420.0)
+    assert entry.mtsr == pytest.approx(420.0)
+    assert entry.per_reaction["R2"]["adiabatic_rise"] == pytest.approx(0.0)
+    assert entry.accumulation == pytest.approx(0.5)
