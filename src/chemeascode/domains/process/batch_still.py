@@ -1227,6 +1227,10 @@ def solve_still(
                         raise StillError(
                             f"the still boils dry before its end ({failure})"
                         ) from failure
+                    if "no longer heats" in str(failure):
+                        # a trial stage past a jacket's medium (ADR 0078): the still nears it,
+                        # whether a stage lands on it or the steps only crawl towards it
+                        raise stalls() from failure
                     raise
                 h /= 4.0
                 continue
