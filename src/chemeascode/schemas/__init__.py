@@ -83,6 +83,7 @@ from chemeascode.foundation.schemas.reviews import ReviewRecord
 from chemeascode.foundation.schemas.run import AdapterResult
 from chemeascode.foundation.schemas.run_record import RunRecord
 from chemeascode.foundation.schemas.status import StatusFile
+from chemeascode.foundation.schemas.worker import Trajectory, WorkerRequest
 
 #: Schema of each engineering list, by the key ``workspace.LIST_FILES`` files it under.
 LIST_SCHEMAS = {
@@ -132,6 +133,8 @@ OTHER_SCHEMAS = {
     "lci_estimate": (LciEstimate, "lca/estimate.yaml"),
     "lca_mapping_profile": (MappingProfile, "lca/mapping-profiles/*.yaml"),
     "adapter-result": (AdapterResult, "process/simulation-run.json cases; --json"),
+    "worker-request": (WorkerRequest, "staged worker request JSON"),
+    "trajectory": (Trajectory, "adapter-result/v2 trajectories"),
     "risk-matrix": (RiskMatrix, "safety/risk-matrix.yaml"),
     "hazop-study": (HazopStudy, "safety/hazop/<id>/study.yaml"),
     "narrative": (Narrative, "process/narrative.md (front matter)"),

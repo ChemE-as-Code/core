@@ -32,8 +32,10 @@ A missing range is asked for or recorded as `assumed` with the reason in `DESIGN
 ## Workflow and tools
 
 Engineering guidance only; core has no calculation for the judgments below. The deterministic
-parts are in `process-design` (build, balances, stream table) and `process-simulation`
-(`cheme process simulate`, which solves recycles in DWSIM).
+parts are in `process-design` (build, balances, stream table; `cheme process propagate
+--fill`, which closes material-balance recycles torn at `tears:` and solves feeds and purges for
+`specs:`, ADR 0060/0070) and `process-simulation` (`cheme process simulate`, which solves
+recycles with their energy balance in DWSIM or IDAES).
 
 1. Start from the design envelope, not from a flowsheet. Permutate the important ranges into a
    handful of design cases (for example high flow with weak feed, low flow with strong feed) and
@@ -42,7 +44,10 @@ parts are in `process-design` (build, balances, stream table) and `process-simul
    A block is a process section until you decide how the step is done.
 3. Close the recycles early. A recycle returns a stream to the feed of a step it already passed,
    so it needs iteration, and its ratio drives the size of the reactor and the separation behind
-   it. A flowsheet whose recycles are not closed cannot be sized (Moran Ch 6, Ch 8).
+   it. A flowsheet whose recycles are not closed cannot be sized (Moran Ch 6, Ch 8). In the
+   YAML, name one tear stream per loop in `tears:`, give the loop an exit for every component,
+   and declare product-rate, charge-ratio or purity targets as `specs:` rather than scaling
+   feeds by hand (skill `process-design`).
 4. Decide pumped or gravity flow, because it changes layout, elevations and equipment (Moran Ch 9).
 5. Add the utilities each step needs; a step with no heating, cooling or power connection is
    incomplete (skill `utility-systems`).

@@ -15,6 +15,11 @@ element balance and that the reactions' extents explain each component's change,
 `cheme process propagate --fill` computes the outlet of a conversion reactor. Use this
 skill whenever a process has a reactor, or a reaction, conversion or catalyst changes.
 
+A biological wastewater reactor (activated sludge, A2/O) is not modelled here: its kinetics are
+the project's QSDsan model, declared in `process/simulation.yaml` and run by `cheme process
+simulate --check/--fill` (ADR 0065, skill `process-simulation`). Leave its flowsheet steps
+without `reactions:` and take its stream quantities from the simulation.
+
 ## Required inputs and missing inputs
 
 - The components with a `formula` each (`materials`, `property-retrieval`): the element balance
@@ -116,16 +121,21 @@ each value taken from the evidence cites its observation in `source`.
      else the inlet's, or `adiabatic`; `catalyst_loading` kg/m3 for rates per kg of catalyst).
      An adiabatic tank's temperature is the steady state nearest the inlet's; a tank can have
      others (ignition), so check the reported temperature against the expected regime.
-   - `batch`: the inlet is the charge (its flow the charge per hour), the outlet its composition
-     at the end: give `batch:` (`time` s, or `target: {key, conversion}`; `heat`;
-     `catalyst_loading`). A target the reactions cannot reach (equilibrium, a reactant used up)
+   - `batch`: the inlet is the charge (besides a `vent.head_space` pad stream, ADR 0071; its
+     flow the charge per hour), the outlet its composition at the end: give `batch:` (`time` s,
+     or `target: {key, conversion}`; `heat`; `catalyst_loading`; `heat_up: true` on an
+     isothermal batch or semi-batch counts the charge's heat-up from its inlet temperature to
+     the batch's in the model's duty, and adds the recipe vessel's `vessel.metal_heat_capacity`
+     as its `vessel metal` term (ADR 0063; default: the model starts at temperature and the
+     recipe's heat operation times it; skill `process-design`). Do not count it in both). A target the reactions cannot reach (equilibrium, a reactant used up)
      is reported, not extrapolated. `process reactors` gives the profile, the heat released per
      kmol of charge and the largest heat release per m3.
    - `semibatch`: a liquid batch with feeds dosed into its charge (an exothermic reagent fed to
      a charge, the usual fine-chemical step): give `batch:` with `dosing: [{stream, time}]` (or
      `profile: [[s, share], ...]` of constant-rate segments, shares adding up to 1; `start` s
      delays a dose). Each dosed `stream` is an inlet of the step, its flow the amount dosed per
-     hour of charge; the step's one other inlet is the charge. `time` or `target` is then the
+     hour of charge; the step's one other inlet is the charge (besides a `vent.head_space` pad
+     stream, ADR 0071). `time` or `target` is then the
      post-reaction after the last dose (neither: the batch ends with the dosing). `process
      reactors` gives the accumulation of the dosed reactant over time and its maximum, the
      cooling-failure temperature at the worst moment (the MTSR of a semi-batch, the dosing
@@ -287,8 +297,10 @@ each value taken from the evidence cites its observation in `source`.
    forms and adds nothing to it), the MTT (the reactor's `hazard.mtt`, else the lowest boiling
    point of what boils in the liquid at the reactor's pressure: the normal boiling point from
    90 to 110 kPa(a), else Clausius-Clapeyron with `heat_of_vaporization`, which you give for
-   a pressurised or vacuum reactor; a vent component, a dosed gas and a dissolved gas (under
-   5 % of the liquid, boiling below the process temperature) are left out with a note, and
+   a pressurised or vacuum reactor; a vent component, a vent's `inerts` and the head space's
+   pad, a dosed gas, a dissolved gas (under 5 % of the liquid, boiling below the process
+   temperature) and a `vent.vapour.henry` gas whatever its share (ADR 0071) are left out with a
+   note (`mtt_left_out`), and
    with nothing else left set `hazard.mtt`; a solvent at reflux sets it, at or below the
    process temperature) and, with `hazard: {td24: K, provenance, source}` from calorimetry,
    Stoessel's criticality class (classes 3 to 5 are warnings); for a cooled bed, the hot spot's
@@ -306,7 +318,9 @@ each value taken from the evidence cites its observation in `source`.
    of it that can still react (a deliberate excess cannot), the dissolved, dosed and vented
    gases held in the liquid a cooling failure can release (`cheme.reactor-hazard-dissolved`,
    info: judge which is toxic and size the scrubber or catch tank for it) and, where the
-   content boils at the MTSR, its boil-up at its bubble point. Where a reaction consumes the
+   content boils at the MTSR, its boil-up at its bubble point (a boil-up that carries a Henry
+   gas takes its `vent.heat_of_absorption` as the latent heat; a vent of inerts only forms no
+   gas at the MTSR, but its boil-up is still reported). Where a reaction consumes the
    product of another (a comproportionation, a consecutive decomposition) the output gives
    the network's dT_ad and MTSR, their largest heat together; say `hazard.potential: network`
    when that is what a cooling failure runs, and keep slow side reactions out with
@@ -363,7 +377,18 @@ each value taken from the evidence cites its observation in `source`.
   temperature is outside a heat capacity's range.
 - `cheme.process-reactor`: a model that cannot be solved as declared (a conversion reactor
   without conversions, an equilibrium without reactions, a Gibbs reactor naming reactions,
-  `approach` without equilibrium; an irreversible reaction at equilibrium is a warning).
+  `approach` without equilibrium; an irreversible reaction at equilibrium is a warning); a
+  vented batch whose `batch.vent.stream` is no outlet or its only one, whose vent components
+  are undeclared (or, warning, formed by no reaction), a dose passing gas through without a
+  vent (ADR 0054); a vent inert undeclared or formed by a reaction, a `head_space` pad that is
+  no inlet of the step or carries more than the inerts (ADR 0071).
+- `cheme process reactor-hazards` findings (exit 1 on a warning): `cheme.reactor-hazard-class`
+  (info for classes 1-2, warning for 3-5), `-mtsr` (warning: no class, MTSR above MTT or TD24),
+  `-sensitivity` (warning: a cooled bed near runaway), `-missing` (info: what the screening
+  lacks, e.g. no TD24), `-reactions` (warning: `hazard.reactions` names a reaction not in the
+  step), `-phase-change` (info), `-vent` (warning without or above `hazard.vent_capacity`, for
+  a semi-batch the larger of the release at the MTSR and over the batch, or where the content
+  boils; info within it), `-dissolved` (info, ADR 0069).
 - `cheme.process-catalyst`: an undeclared catalyst (error); a reactor stream outside the
   catalyst's temperature or pressure window, a poison in a feed, or a rate measured on another
   catalyst (warnings). `cheme.catalyst-*`: the catalysts file itself (densities, voidage,
