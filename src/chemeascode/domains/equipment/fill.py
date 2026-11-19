@@ -2377,17 +2377,19 @@ def _real_gas(
                 dh = (h2s - h1) / eta if p2 >= p else (h2s - h1) * eta
                 h2 = h1 + dh
             else:  # polytropic: small isentropic steps, each at the polytropic efficiency
-                h, tp, pp = h1, t, p
+                h, pp = h1, p
+                s = context.call("polytropic step", adapter.entropy, Inputs(t, p, x))
                 step = stage_ratio ** (1.0 / POLYTROPIC_STEPS)
                 for _ in range(POLYTROPIC_STEPS):
-                    s = context.call("polytropic step", adapter.entropy, Inputs(tp, pp, x))
                     hs = context.call("polytropic step", adapter.flash_ps, pp * step, s, x).enthalpy
                     dh = (hs - h) / eta if step >= 1 else (hs - h) * eta
                     h += dh
                     pp *= step
-                    tp = _t_of(context, adapter, pp, h, x)
+                    # the entropy of the (P, H) state itself: a pure component inside its
+                    # two-phase region is not fixed by its temperature and pressure
+                    s = float(_ph_state(context, adapter, pp, h, x).S())
                 h2 = h
-            t2 = _t_of(context, adapter, p2, h2, x)
+            t2 = float(_ph_state(context, adapter, p2, h2, x).T)
             cool = 0.0
             if i < n - 1:
                 h_ic = context.call("intercooled", adapter.flash, Inputs(t_ic, p2, x)).enthalpy
@@ -2400,7 +2402,9 @@ def _real_gas(
         return refusal
 
 
-def _t_of(context: _Context, adapter: Any, p: float, h: float, x: dict[str, float]) -> float:
+def _ph_state(context: _Context, adapter: Any, p: float, h: float, x: dict[str, float]) -> Any:
+    """thermo's state at *p* kPa(a) and molar enthalpy *h* kJ/kmol, range-checked at its
+    temperature."""
     from chemeascode.domains.process.props import Unsupported
 
     try:
@@ -2408,7 +2412,7 @@ def _t_of(context: _Context, adapter: Any, p: float, h: float, x: dict[str, floa
     except Unsupported as failure:
         raise _Refused(str(failure)) from failure
     context.call("stage outlet", adapter._checked, float(state.T), p, x)
-    return float(state.T)
+    return state
 
 
 def _ideal_gas(

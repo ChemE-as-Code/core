@@ -210,6 +210,67 @@ def test_k_values_of_a_component_absent_from_a_sharp_split(adapter):
     assert kb["N2"] > kb["AR"] > kb["O2"]
 
 
+def test_pure_component_isentropic_expansion_into_its_two_phase_region(adapter):
+    # issue 314: pure nitrogen 120 K, 600 kPa(a) expanded isentropically to 130 kPa(a) ends
+    # inside the dome (saturated vapour at 130 kPa(a) has S -41.17 J/(mol K), the inlet
+    # -42.45); thermo's FlashVL failed there ("flash failed: float division by zero")
+    n2 = {"N2": 1.0}
+    s1 = adapter.entropy(Inputs(120.0, 600.0, n2))
+    got = adapter.flash_ps(130.0, s1, n2)
+    assert got.phase == "two-phase" and got.density is None
+    # the same expansion of the mixture with 1e-4 O2, which FlashVL solves: 79.45 K, VF 0.981
+    trace = {"N2": 0.9999, "O2": 0.0001}
+    mix = adapter.flash_ps(130.0, adapter.entropy(Inputs(120.0, 600.0, trace)), trace)
+    assert got.vapor_fraction == pytest.approx(mix.vapor_fraction, abs=1e-3)
+    assert got.vapor_fraction == pytest.approx(0.9815, abs=1e-4)
+    assert got.enthalpy == pytest.approx(mix.enthalpy, abs=2.0)
+    # the state is the (P, S) flash's own, not a new flash at its T and P: the lever rule
+    # between the saturated liquid and vapour at 130 kPa(a) gives back the vapour fraction
+    tsat = adapter.saturation_temperature(130.0, n2, 1.0)
+    assert tsat == pytest.approx(adapter.saturation_temperature(130.0, n2, 0.0), abs=1e-6)
+    h_v = adapter.flash(Inputs(tsat + 1e-3, 130.0, n2)).enthalpy
+    h_l = adapter.flash(Inputs(tsat - 1e-3, 130.0, n2)).enthalpy
+    lever = (got.enthalpy - h_l) / (h_v - h_l)
+    assert lever == pytest.approx(got.vapor_fraction, abs=1e-3)
+    # (P, H): the enthalpy asked for is the enthalpy returned, at the vapour fraction it fixes
+    h = 0.5 * (h_l + h_v)
+    half = adapter.flash_ph(130.0, h, n2)
+    assert half.phase == "two-phase" and half.enthalpy == pytest.approx(h, abs=1e-6)
+    assert half.vapor_fraction == pytest.approx(0.5, abs=1e-3)
+    # (P, VF) between 0 and 1 (formerly "cannot access local variable 'dew'")
+    assert adapter.saturation_temperature(130.0, n2, 0.5) == pytest.approx(tsat, abs=1e-6)
+    # outside the dome the pure-component flash agrees with FlashVL's
+    s_gas = adapter.entropy(Inputs(300.0, 500.0, n2))
+    gas = adapter.flash_ps(130.0, s_gas, n2)
+    assert gas.phase == "vapor"
+    trace_gas = adapter.flash_ps(130.0, adapter.entropy(Inputs(300.0, 500.0, trace)), trace)
+    assert gas.enthalpy == pytest.approx(trace_gas.enthalpy, abs=5.0)
+
+
+def test_component_ids_sharing_a_cas_number_add_up(plant):
+    # issue 315: two ids of nitrogen (one CAS number) at 0.395 each are 0.79 nitrogen, not
+    # 0.395 (thermo does not normalise: M was 17.79 kg/kmol, 0.395 x 28.01 + 0.21 x 32.00)
+    materials = plant.root / "process/materials.yaml"
+    materials.write_text(
+        materials.read_text().replace(
+            "  - {id: O2,",
+            "  - {id: N2B, name: Nitrogen (second id), cas: 7727-37-9, molar_mass: 28.014}\n"
+            "  - {id: O2,",
+        )
+    )
+    process, _ = load(plant.root)
+    adapter = Adapter(process)
+    split = adapter.flash(Inputs(300.0, 500.0, {"N2": 0.395, "N2B": 0.395, "O2": 0.21}))
+    whole = adapter.flash(Inputs(300.0, 500.0, {"N2": 0.79, "O2": 0.21}))
+    assert split.molar_mass == pytest.approx(0.79 * 28.0134 + 0.21 * 31.9988, rel=1e-4)
+    assert split == whole
+    from chemeascode.domains.process.exergy import stream_exergy
+
+    assert stream_exergy(adapter, Inputs(300.0, 500.0, {"N2": 0.395, "N2B": 0.395, "O2": 0.21}))[
+        0
+    ] == pytest.approx(stream_exergy(adapter, Inputs(300.0, 500.0, {"N2": 0.79, "O2": 0.21}))[0])
+
+
 def test_claimed_range_is_what_the_references_cover():
     covered_T = [p["T"] for group in REFS.values() for p in group.get("points", []) if "T" in p]
     covered_P = [p["P"] for group in REFS.values() for p in group.get("points", [])]
