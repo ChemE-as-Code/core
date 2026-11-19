@@ -4,6 +4,21 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- Recipe (core#301): a heat or cool operation with `temperatures` before the first `dose` or
+  `react` now takes the charge's heat capacity and wetted area; before, only a unit procedure
+  with a `dose` did, so a plain `reactor: batch` heated up its end content (after the reaction,
+  and after a vent took gas off), and its heat-up time, `heats[].content_kJ`, cycle time and
+  batches per year were off by C_end/C_charge. It now agrees with the model duty's `heat_up`
+  (ADR 0063). A unit procedure with neither a dose nor a react keeps the end's content. Library
+  results are unchanged: `cheme process recipe` gives the same JSON on all 13 entries with
+  jacket-timed operations (all semi-batches heated before their dose).
+- Recipe (core#302): a `cool` (as a `heat` already was) whose `temperatures` start and end at
+  the same value is refused by `cheme/recipe/v1` (`cheme.recipe-schema`); before, it passed the
+  schema and then failed the whole recipe with "the medium cannot cool the content", leaving no
+  cycle time. No library entry has one.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
