@@ -17,6 +17,12 @@ the dried product and the vapour:
   10.95 omega (1 - Tr)^0.456``; Poling, Prausnitz and O'Connell 2001, eq. 7-9.4) and the
   vessel's heat capacity heated once per batch (with ``process/recipe.yaml``: the batch's hours
   of flows): ``Q = (m cp (T - T_in) + sum W_i lambda_i + C_v (T - T_in) / h_batch) / eta``;
+  in a recipe vessel with ``metal_heat_capacity`` (instead of ``vessel_heat_capacity``, ADR
+  0075) the metal is heated from the temperature the vessel was left at, the end of the last
+  operation with ``temperatures`` before the drying (a cool-down before the discharge), else
+  from the wet cake's; a recipe ``heat`` or ``cool`` with ``temperatures`` before the ``dry``
+  in the dryer's vessel brings the wet cake to its end temperature (its heat is the recipe
+  operation's), and the dryer heats the cake from there;
 - **drying time** (a recipe's ``dry`` ``from:`` the step): the vapour of one batch over the
   constant ``drying_rate`` (kg/(m2 h)) times the heated area of the recipe's vessel, or the
   given ``drying_time``;
@@ -169,24 +175,53 @@ def energy_balance(
     missing: list[str],
     inlet_temperature: float | None,
     batch_hours: float | None,
+    metal: tuple[float, float | None, str] | None = None,
+    cake: tuple[float, str] | None = None,
 ) -> dict[str, Any]:
-    """The dryer's duty (kW, heat supplied) with its terms, or what is missing."""
+    """The dryer's duty (kW, heat supplied) with its terms, or what is missing. *metal*: the
+    recipe vessel's (:func:`.recipe.dryer_metal`, ADR 0075), heated from the temperature the
+    vessel was left at (else the wet cake's) instead of ``vessel_heat_capacity``. *cake*: (K,
+    the operation) the recipe heated or cooled the wet cake to before the drying
+    (:func:`.recipe.dryer_cake`): the wet cake is heated from there, that operation's heat
+    being its own."""
     data = spec.energy
     missing = list(missing)
     t_in = data.inlet_temperature or inlet_temperature
     if t_in is None:
         missing.append("the wet cake's temperature (energy.inlet_temperature or the inlet's)")
-    if data.vessel_heat_capacity is not None and not batch_hours:
+    if (data.vessel_heat_capacity is not None or metal is not None) and not batch_hours:
         missing.append("the batch (process/recipe.yaml) for the vessel's heat per batch")
+    if metal is not None and data.vessel_heat_capacity is not None:
+        missing.append(
+            "one vessel metal: energy.vessel_heat_capacity or the recipe vessel's "
+            f"metal_heat_capacity ({metal[2]}), not both"
+        )
     if missing:
         return {"duty_kW": None, "duty_kJ_h": None, "missing": missing}
     assert t_in is not None
     dt = spec.temperature - t_in
-    sensible = inlet_kg_h * data.heat_capacity * dt
+    sensible = inlet_kg_h * data.heat_capacity * (spec.temperature - (cake or (t_in,))[0])
     evaporation = sum(kg * latent[n][0] for n, kg in vapour.items() if kg)
     vessel = (data.vessel_heat_capacity or 0.0) * dt / batch_hours if batch_hours else 0.0
+    start = t_in
+    if metal is not None and batch_hours:
+        start = metal[1] if metal[1] is not None else t_in
+        vessel = metal[0] * (spec.temperature - start) / batch_hours
     total = (sensible + evaporation + vessel) / data.efficiency
-    return {
+    extra = (
+        {
+            "vessel_metal": {
+                "procedure": metal[2],
+                "heat_capacity_kJ_K": metal[0],
+                "start_temperature_K": start,
+            }
+        }
+        if metal is not None
+        else {}
+    )
+    if cake is not None:
+        extra["recipe_heat"] = {"operation": cake[1], "cake_temperature_K": cake[0]}
+    return extra | {
         "duty_kW": total / 3600.0,
         "duty_kJ_h": total,
         "sensible_kJ_h": sensible,
@@ -197,8 +232,19 @@ def energy_balance(
         "temperature_K": spec.temperature,
         "missing": [],
         "basis": "the wet cake heated at a constant heat capacity to the drying temperature, "
-        "the volatiles evaporated at it, the vessel heated once per batch, over the "
-        "efficiency; the vapour's superheat and the heats of desorption not included",
+        "the volatiles evaporated at it, the vessel heated once per batch"
+        + (
+            f" (the recipe vessel's metal from {start:.5g} K, the temperature it was left at)"
+            if metal is not None
+            else ""
+        )
+        + (
+            f" (the wet cake from {cake[0]:.5g} K, the end of the recipe's {cake[1]})"
+            if cake is not None
+            else ""
+        )
+        + ", over the efficiency; the vapour's superheat and the heats of desorption not "
+        "included",
     }
 
 
@@ -236,6 +282,8 @@ def solve_node(
     if spec.energy is not None:
         latent, missing = latent_heats(process, spec, vapour)
         result.latent_heat = latent
+        from chemeascode.domains.process.recipe import dryer_cake, dryer_metal
+
         result.energy = energy_balance(
             spec,
             result.inlet_kg_h,
@@ -244,6 +292,8 @@ def solve_node(
             missing,
             _temperature_of(process, inlet, case),
             batch_hours,
+            dryer_metal(process, node.id),
+            dryer_cake(process, node.id),
         )
     moisture = spec.residual_moisture
     extra = {

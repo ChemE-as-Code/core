@@ -1245,6 +1245,8 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
     process = out.process
     what = f"{at[0][:-1]} {item.id}"
     dosing = item.batch.dosing if item.batch is not None else []
+    if item.batch is not None and item.batch.heat_of_solution is not None:
+        _charge_solution_rules(out, item, at)
     if model == "batch":
         if dosing:
             out.add(
@@ -1285,6 +1287,46 @@ def _dosing_rules(out: _Out, item: Any, at: list[Any], model: str, reactions: li
             "streams; its other inlet is the charge; liquid-phase reactions",
         )
     _solution_rules(out, item, at, dosing)
+
+
+def _charge_solution_rules(out: _Out, item: Any, at: list[Any]) -> None:
+    """A batch's ``heat_of_solution`` of its charge (ADR 0075): its components declared (error)
+    and carried by the charge (warning: no heat of the others is counted)."""
+    process = out.process
+    declared = process.components()
+    heat = item.batch.heat_of_solution
+    where = [*at, "batch", "heat_of_solution"]
+    what = f"{at[0][:-1]} {item.id}"
+    if unknown := [n for n in heat.values if n not in declared]:
+        out.add(
+            "error",
+            "reactor",
+            f"{what}: heat_of_solution of the undeclared component(s) " + ", ".join(unknown),
+            where,
+            [item.id],
+            hint="key batch.heat_of_solution.values by the charged components' ids",
+        )
+    doses, pad = {d.stream for d in item.batch.dosing}, _pad(item)
+    charges = [
+        s
+        for s in process.flowsheet.streams
+        if (end := process.ends(s)[1]) is not None
+        and end.node == item.id
+        and s.kind == "material"
+        and s.id not in doses
+        and s.id != pad
+    ]
+    carried = set().union(*(_carried(process, s) for s in charges)) if charges else set()
+    if carried and (absent := [n for n in heat.values if n in declared and n not in carried]):
+        out.add(
+            "warning",
+            "reactor",
+            f"{what}: heat_of_solution of {', '.join(absent)}, which the charge does not carry "
+            "(no heat of it is counted)",
+            where,
+            [item.id],
+            hint="give the heat of solution of the components the charge carries",
+        )
 
 
 def _solution_rules(out: _Out, item: Any, at: list[Any], dosing: list[Any]) -> None:

@@ -41,6 +41,7 @@ from chemeascode.domains.process.duties import (
     duty_model,
     report_entry,
     report_lines,
+    split_heat_up,
     vent_condenser_duty,
 )
 from chemeascode.domains.process.model import Process, balance_of, stream_flows
@@ -368,9 +369,13 @@ def reactor_entry(process: Process, node: str, case: str, with_bed: bool = True)
             if vent is not None:
                 tank_entry |= vent_entry(solved_tank, vent.stream)
             if item.reactor in ("batch", "semibatch"):
-                model_duty = report_entry(
-                    process, item, case, batch_duty(item, solved_tank, process, case)
-                )
+                whole = batch_duty(item, solved_tank, process, case)
+                heating = None
+                if item.batch.heat_up_port is not None:  # its own stream (ADR 0075)
+                    whole, heating = split_heat_up(whole)
+                model_duty = report_entry(process, item, case, whole)
+                if heating is not None:
+                    model_duty["heat_up"] = report_entry(process, item, case, heating, heat_up=True)
                 if vent is not None and vent.condenser is not None:
                     # the vent condenser's duty on its own stream (ADR 0062)
                     tank_entry["vent"]["condenser_duty"] = report_entry(
@@ -534,6 +539,8 @@ def reactor_text(report: ReactorReport) -> str:
                 )
         if r.get("model_duty"):
             lines += report_lines(r["model_duty"])
+            if r["model_duty"].get("heat_up"):  # on its own stream (ADR 0075)
+                lines += report_lines(r["model_duty"]["heat_up"])
         if r["missing"]:
             lines.append("  missing: " + "; ".join(dict.fromkeys(r["missing"])))
     if not report.reactors:
