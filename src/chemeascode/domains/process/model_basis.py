@@ -527,8 +527,9 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
 
     spec = node.still
     metal = vessel_metal(process, node.id)
+    flash = [FLASH] if getattr(spec, "flash", False) else []  # ADR 0077
     if not spec.heat_up and metal is None:
-        return list(assumptions)
+        return list(assumptions) + flash
     duty = _LATENT
     if spec.heat_up:
         duty += " and the heat-up"
@@ -562,8 +563,17 @@ def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]
         elif text.startswith("the reboiler's and the condenser's duty"):
             text = reboiler
         found.append(text)
-    return found
+    return found + flash
 
+
+#: What a still's ``flash`` assumes (ADR 0077).
+FLASH = (
+    "flash: a charge above its bubble point at the still's pressure flashes adiabatically and "
+    "differentially to it first (the vapour leaving as it forms, in equilibrium with the "
+    "liquid at its bubble point, on the content's sensible heat at constant "
+    "liquid_heat_capacity; the vessel's metal not in it), its vapour to the first cut without "
+    "the column's separation, in no time; the boil-up starts from the flashed liquid"
+)
 
 _LATENT = "the duty is the vapour's latent heat (heat_of_vaporization near the still's temperature)"
 
