@@ -4,6 +4,35 @@
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
 
+### Fixed
+
+- The thermo adapter solves a pure component inside its two-phase region (#314). A (P, S),
+  (P, H) or (P, vapour fraction between 0 and 1) flash of a single component failed in thermo's
+  FlashVL (division by zero, unbound locals) and was refused, so an expander or compressor
+  datasheet of a pure fluid that condenses took the ideal-gas route (pure nitrogen 600 to
+  130 kPa(a) from 120 K: 42.4 kJ/kg and 70.96 K, below saturation, instead of 40.8 kJ/kg and
+  79.45 K at vapour fraction 0.98). Those flashes of a single component now go to thermo's
+  pure-component flasher on the same constants and Peng-Robinson parameters; temperature-pressure
+  flashes and saturation points stay on FlashVL. `Adapter.flash_ps` and `flash_ph` return the
+  state their flash found instead of a new flash at its temperature and pressure (which for a
+  pure component on its saturation line does not fix the vapour fraction), and the polytropic
+  steps of `cheme datasheets fill` take each step's entropy from its (P, H) state, not from a
+  flash at its temperature and pressure (with the two-phase flash alone, the nitrogen expander
+  above at polytropic efficiency 0.95 would have given 231.7 kW instead of about 39 kW).
+- Component ids that share a CAS number add up in the thermo adapter and in the stream exergy
+  instead of the last one overwriting the others (#315): the mole fractions passed to thermo
+  summed to less than 1 and thermo does not normalise them (two nitrogen ids at 0.395 each with
+  oxygen 0.21: M 17.79 instead of 28.85 kg/kmol, written by `cheme process props --fill`).
+- Library effect of #314 and #315: none. Branch against the pinned CLI on the library's
+  `origin/main`, `cheme process props --check` of the eight entries with component ids that
+  share a CAS number (carbon-tetrabromide-1, copper-i-chloride-1, kraft-pulp-1,
+  methyltriphenylphosphonium-bromide-1, n-bromosuccinimide-1, p-toluenesulfonyl-chloride-1,
+  sodium-azide-1, sodium-cyanide-1) gives identical output: each pair is a dissolved and a solid
+  id (or, in kraft-pulp-1, never in one stream), and a stream holding the solid is refused (no
+  solid phase). `cheme datasheets fill` of the entries with compressor or expander datasheets
+  (asu-1, ammonia-1, co2-electrolysis-bpm-1, lng-terminal-1, set to draft) writes identical
+  datasheets: their machine powers are given from the simulation or a sizing script.
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,
