@@ -15,7 +15,7 @@ from chemeascode.domains.process.model_basis import model_bases
 from chemeascode.domains.process.propagate import run
 from chemeascode.domains.process.reactors import reactor_report
 from chemeascode.domains.process.schema import Batch, Tank
-from chemeascode.domains.process.stirred_tank import TankError, solve_batch, solve_cstr
+from chemeascode.domains.process.stirred_tank import Dose, TankError, solve_batch, solve_cstr
 from chemeascode.foundation.workspace import Workspace
 
 K = 0.002  # 1/s, first order
@@ -459,6 +459,7 @@ def test_a_batch_whose_clip_would_make_matter_is_refused(monkeypatch):
     import chemeascode.domains.process.stirred_tank as tank
 
     monkeypatch.setattr(tank, "rate", lambda law, *args, **kw: law.k.k(300.0))
+    monkeypatch.setattr(tank._Mixture, "batch_rates", _unlimited)
     with pytest.raises(TankError, match="the balance does not close"):
         solve_batch(
             _consecutive(1.0, 1e-3, orders={"A": 0}),
@@ -469,6 +470,98 @@ def test_a_batch_whose_clip_would_make_matter_is_refused(monkeypatch):
             {},
             LIQUID,
         )
+
+
+def _unlimited(mix, moles, t, p, multipliers, source):
+    """The batch's rates without the supply limit of a used-up reactant."""
+    return mix.rates(moles, t, p), []
+
+
+def _dosed_pair(k, orders):
+    """R1 A + B -> C of *orders*: B first order, A zero order or left out."""
+    law = _first_order(k=k) | {"stoichiometry": {"A": -1, "B": -1, "C": 1}}
+    law["rate"]["orders"] = orders
+    return _reactions(law)
+
+
+def _dose_a(reactions):
+    """S 5 and B 2 kmol charged, A 1 kmol dosed evenly over 3600 s, then held 600 s."""
+    return solve_batch(
+        reactions,
+        {"S": 5.0, "B": 2.0},
+        300.0,
+        101.325,
+        _batch(dosing=[{"stream": "D", "time": 3600.0}], time=600.0),
+        {},
+        LIQUID,
+        isothermal_at=300.0,
+        doses=[Dose({"A": 1.0}, 300.0, [(0.0, 3600.0, 1.0)])],
+    )
+
+
+@pytest.mark.parametrize("orders", [{"B": 1}, {"A": 0, "B": 1}])
+@pytest.mark.parametrize(
+    ("k", "extent"), [(1e-4, 2.0 * (1.0 - math.exp(-0.42))), (1e-3, 1.0), (1.0, 1.0)]
+)
+def test_a_dosed_reactant_the_law_does_not_slow_reacts_as_fast_as_it_is_dosed(
+    monkeypatch, orders, k, extent
+):
+    """#300 review: with k n_B above the dose rate, A reacts as fast as it comes, so the extent
+    is what was dosed. Its rate switched between k n_B and 0 at n_A = 0 at every step, which
+    held the step size at its floor: the dosing never ended. With k = 1e-4 A accumulates, and
+    n_B = 2 exp(-k t) to the end."""
+    import chemeascode.domains.process.stirred_tank as tank
+
+    step, calls = tank._dopri_step, [0]
+
+    def counted(*args, **kw):
+        calls[0] += 1
+        if calls[0] > 20000:
+            raise RuntimeError("the integration crawls")
+        return step(*args, **kw)
+
+    monkeypatch.setattr(tank, "_dopri_step", counted)
+    result = _dose_a(_dosed_pair(k, orders))
+    assert result.extents["R1"] == pytest.approx(extent, rel=1e-6)
+    assert result.outlet["B"] == pytest.approx(2.0 - extent, rel=1e-6)
+    assert result.outlet["A"] == pytest.approx(1.0 - extent, abs=1e-7)
+    assert result.profile[-1][0] == pytest.approx(4200.0)
+
+
+def test_a_zero_order_consumer_of_an_intermediate_runs_as_fast_as_it_forms():
+    """#300 review: R2 B -> C of zero order in B consumes B as fast as R1 A -> B forms it. Its
+    rate switched between k2 and 0 at n_B = 0, which held the step at 1e-12 s; the stall test
+    then ended the batch at 3e-11 s with A unconverted, while reporting its full 1000 s."""
+    second = _first_order(k=1.0) | {"id": "R2", "stoichiometry": {"B": -1, "C": 1}}
+    second["rate"]["orders"] = {"B": 0}
+    result = solve_batch(
+        _reactions(_first_order(k=1e-3), second),
+        {"S": 5.0, "A": 1.0},
+        300.0,
+        101.325,
+        _batch(time=1000.0),
+        {},
+        LIQUID,
+        isothermal_at=300.0,
+    )
+    a = math.exp(-1.0)
+    assert result.outlet["A"] == pytest.approx(a, rel=1e-6)
+    assert result.outlet["B"] == 0.0
+    assert result.outlet["C"] == pytest.approx(1.0 - a, rel=1e-6)
+    assert result.extents["R2"] == pytest.approx(1.0 - a, rel=1e-6)
+    assert result.profile[-1][0] == pytest.approx(1000.0)
+    assert not [n for n in result.notes if "converts no further" in n]
+
+
+def test_a_rate_that_switches_at_every_step_is_refused_not_crawled(monkeypatch):
+    """#300 review: a rate that jumps where the step size cannot follow (here the dosed reactant
+    without the supply limit) is refused once the steps keep being taken at the floor, rather
+    than crawling on for ever."""
+    import chemeascode.domains.process.stirred_tank as tank
+
+    monkeypatch.setattr(tank._Mixture, "batch_rates", _unlimited)
+    with pytest.raises(TankError, match="cannot pass"):
+        _dose_a(_dosed_pair(1.0, {"A": 0, "B": 1}))
 
 
 def test_a_time_batch_that_stops_converting_is_noted_not_refused():
