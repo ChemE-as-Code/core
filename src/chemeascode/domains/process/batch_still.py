@@ -96,6 +96,20 @@ ASSUMPTIONS = (
     "a swap's feed mixes in at once; constant level holds the content's moles, not its volume",
 )
 
+#: With ``volatility.activity`` (ADR 0078), in place of the ideal liquid.
+ACTIVITY_ASSUMPTION = (
+    "a non-ideal liquid: modified Raoult's law, y_i P = gamma_i x_i P_i(T), the activity "
+    "coefficients from original UNIFAC (thermo, DDBST groups) at the still's liquid and "
+    "temperature, Antoine vapour pressures, an ideal vapour; the latent heat without the heat "
+    "of mixing"
+)
+#: With a boil-up in kW/K (ADR 0078).
+JACKET_ASSUMPTION = (
+    "a jacket's boil-up: the heat input UA (T_medium - T) at the still's bubble point T, all "
+    "of it boiling up (no sensible heat as T rises, no losses); UA and the medium's "
+    "temperature constant (the wetted area does not fall as the still empties)"
+)
+
 #: What the model takes for granted with a column (``still.column``, ADR 0061).
 COLUMN_ASSUMPTIONS = (
     "Diwekar's batch shortcut: at each point the column is a continuous one fed with the "
@@ -216,8 +230,13 @@ class _Phase:
     """How the still's vapour follows from its content: the components, the volatile ones and
     their data."""
 
-    def __init__(self, names, volatile, model, alpha, pressures, pressure, latent, liquid=None):
+    def __init__(
+        self, names, volatile, model, alpha, pressures, pressure, latent, liquid=None, activity=None
+    ):
         self.names = names
+        #: (K, the liquid's mole fractions) -> activity coefficient per component (ADR 0078);
+        #: None: an ideal liquid
+        self.activity = activity
         self.volatile = volatile  # bool per component
         #: bool per component: in the liquid (False: a phase of its own, ADR 0068)
         self.liquid = liquid if liquid is not None else [True] * len(names)
@@ -227,6 +246,7 @@ class _Phase:
         self.pressure = pressure  # kPa
         self.latent = latent  # kJ/kmol per component, None where not known
         self.guess = 350.0
+        self.gamma: list[float] | None = None  # at the last bubble point (an activity model)
 
     def fractions(self, moles: list[float]) -> list[float]:
         """The liquid's mole fractions of the still holding *moles*: a component in a phase of
@@ -240,9 +260,36 @@ class _Phase:
         return [n / total if inside else 0.0 for n, inside in zip(moles, self.liquid, strict=True)]
 
     def bubble(self, x: list[float]) -> float:
-        """K: the still's bubble point, sum x_i P_i(T) = P: bracketed from the last one, then
-        Newton on ln(sum x_i P_i / P), bisecting where a step leaves the bracket."""
+        """K: the still's bubble point, sum gamma_i x_i P_i(T) = P (gamma_i 1: an ideal liquid).
+        With an activity model (ADR 0078) the coefficients are taken at the last temperature
+        and the bubble point solved again until it moves by less than 1e-11 of itself (UNIFAC's
+        coefficients vary slowly with T); the gammas of that last solve are kept
+        (``self.gamma``) for the vapour."""
+        if self.activity is None:
+            self.gamma = None
+            return self._bubble(x, None)
+        t = self.guess
+        for _ in range(100):
+            gamma = self.activity(t, x)
+            new = self._bubble(x, gamma)
+            done = abs(new - t) < 1e-11 * new
+            t = new
+            if done:
+                break
+        else:
+            raise StillError(
+                "the bubble point with the activity coefficients does not converge (UNIFAC)"
+            )
+        self.gamma = gamma
+        return t
+
+    def _bubble(self, x: list[float], gamma: list[float] | None) -> float:
+        """K: sum gamma_i x_i P_i(T) = P at fixed *gamma* (None: 1): bracketed from the last
+        one, then Newton on ln(sum gamma_i x_i P_i / P), bisecting where a step leaves the
+        bracket."""
         pressures = self.pressures
+        if gamma is not None:
+            x = [xi * g for xi, g in zip(x, gamma, strict=True)]
 
         def g(t: float) -> tuple[float, float]:
             """sum x_i P_i(T) (kPa) and its slope (kPa/K)."""
@@ -304,8 +351,9 @@ class _Phase:
             s = sum(w)
             return [wi / s for wi in w], None
         t = self.bubble(x)
+        gamma = self.gamma or [1.0] * len(x)
         p = [
-            x[i] * vp.kpa(t) if vp is not None and self.volatile[i] else 0.0
+            gamma[i] * x[i] * vp.kpa(t) if vp is not None and self.volatile[i] else 0.0
             for i, vp in enumerate(self.pressures)
         ]
         s = sum(p)
@@ -318,8 +366,9 @@ class _Phase:
         if self.model == "constant":
             return [a if v else 0.0 for a, v in zip(self.alpha, self.volatile, strict=True)], None
         t = self.bubble(self.fractions(moles))
+        gamma = self.gamma or [1.0] * len(self.names)
         return [
-            vp.kpa(t) / self.pressure if vp is not None and self.volatile[i] else 0.0
+            gamma[i] * vp.kpa(t) / self.pressure if vp is not None and self.volatile[i] else 0.0
             for i, vp in enumerate(self.pressures)
         ], t
 
@@ -769,8 +818,13 @@ def solve_still(
         for n, v in zip(names, volatile, strict=True)
     ]
     units = {b.unit for b in _boilups(spec)}  # the boil-ups used (ADR 0068)
-    if "kW" in units and (gaps := [n for n, h in zip(names, latent, strict=True) if h is None]):
-        raise StillError("a boil-up in kW needs the heat_of_vaporization of " + ", ".join(gaps))
+    for unit in ("kW", "kW/K"):
+        if unit in units and (gaps := [n for n, h in zip(names, latent, strict=True) if h is None]):
+            raise StillError(
+                f"a boil-up in {unit} needs the heat_of_vaporization of " + ", ".join(gaps)
+            )
+    if "kW/K" in units and model != "raoult":
+        raise StillError("a boil-up in kW/K needs volatility raoult (the still's temperature)")
     if "m3/h" in units and model != "raoult":
         raise StillError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
     mw = [getattr(components.get(n), "molar_mass", None) for n in names]
@@ -788,6 +842,7 @@ def solve_still(
         pressure,
         latent,
         liquid,
+        _activity(spec, names, liquid, components),
     )
     active = {"boilup": spec.boilup}  # the boil-up of the cut being collected
     if spec.feed is None and stages:
@@ -821,6 +876,15 @@ def solve_still(
             return hours / rate
         if unit == "kg/h":
             return hours * 3600.0 * sum(yi * (m or 0.0) for yi, m in zip(y, mw, strict=True)) / rate
+        if unit == "kW/K":  # a jacket: UA (T_medium - T), ADR 0078
+            medium = active["boilup"].medium_temperature
+            if t is None or t >= medium:
+                raise StillError(
+                    f"the jacket's medium at {medium:g} K no longer heats the still at "
+                    f"{t or 0.0:.5g} K: end the still below the medium's temperature, or give a "
+                    "hotter medium"
+                )
+            rate = rate * (medium - t)
         return hours * (phase.latent_heat(y) or 0.0) / rate  # kW
 
     def most_seconds_per_mole() -> float:
@@ -835,6 +899,8 @@ def solve_still(
                 else column.ratio
             )
             boiled_per_mole = ratio + 1.0 if ratio is not None else math.inf
+        if active["boilup"].unit == "kW/K":
+            return math.inf  # a jacket's heat input falls to 0 as the still nears its medium
         worst = 0.0
         for i, v in enumerate(volatile):
             if v:
@@ -927,6 +993,15 @@ def solve_still(
 
         def stalls() -> StillError:
             left = sum(n for n, v in zip(state[:k], volatile, strict=True) if v)
+            medium = getattr(active["boilup"], "medium_temperature", None)
+            now = result.profile[-1][2]
+            if medium is not None and now is not None:  # a jacket's (ADR 0078)
+                return StillError(
+                    f"the still's boil-up stalls before its end: at {now:.5g} K it nears its "
+                    f"jacket's medium at {medium:g} K, and the heat input UA (T_medium - T) "
+                    f"falls towards 0 with {left:.4g} kmol of volatile content left; end the "
+                    "cut below the medium's temperature, or give a hotter medium"
+                )
             return StillError(
                 f"the still's boil-up stalls before its end: after {steps} steps "
                 f"{left:.4g} kmol of volatile content is left (of {total0 + total_feed:.4g} "
@@ -1276,6 +1351,41 @@ def _profile_key(spec: Any, names: list[str], phase: _Phase, n0: list[float]) ->
     return names[max(range(len(names)), key=lambda i: ratios[i])]
 
 
+def _activity(
+    spec: Any, names: list[str], liquid: list[bool], components: Mapping[str, Any]
+) -> Callable[[float, list[float]], list[float]] | None:
+    """The activity coefficients of the still's liquid (``volatility.activity``, ADR 0078): a
+    function of K and the liquid's mole fractions by component (a component in a phase of its
+    own: 0, its coefficient 1), or None (an ideal liquid). UNIFAC needs the CAS number of each
+    component of the liquid, the dissolved non-volatile ones too. Raises StillError."""
+    if getattr(spec.volatility, "activity", None) != "unifac":
+        return None
+    inside = [i for i, flag in enumerate(liquid) if flag]
+    lacking = [names[i] for i in inside if not getattr(components.get(names[i]), "cas", None)]
+    if lacking:
+        raise StillError(
+            "volatility.activity unifac needs the CAS number of each component of the liquid: "
+            "none of " + ", ".join(lacking) + " (give cas in materials.yaml, or list a "
+            "suspended one in separate_phase)"
+        )
+    from chemeascode.integrations.thermo import unifac_gammas
+
+    try:
+        model = unifac_gammas([components[names[i]].cas for i in inside])
+    except ValueError as failure:
+        raise StillError(f"volatility.activity unifac: {failure}") from failure
+    k = len(names)
+
+    def gammas(t: float, x: list[float]) -> list[float]:
+        found = model(t, [x[i] for i in inside])
+        out = [1.0] * k
+        for i, g in zip(inside, found, strict=True):
+            out[i] = g
+        return out
+
+    return gammas
+
+
 def _stages(spec: Any, pressure: float | None) -> list[tuple[str, Any, float | None, Any]]:
     """(outlet port, end, kPa(a), boil-up) of each cut in turn: a cut's own pressure and
     boil-up (ADR 0068), else the still's (*pressure*) and its ``boilup``."""
@@ -1502,6 +1612,8 @@ def solve_node(
         "molar_mass": {n: getattr(comps.get(n), "molar_mass", None) for n in names},
         "nonvolatile": sorted(nonvolatile & set(names)),
     }
+    if getattr(spec.volatility, "activity", None) is not None:  # ADR 0078
+        inputs["cas"] = {n: getattr(comps.get(n), "cas", None) for n in names}
     if spec.volatility.model == "raoult":
         inputs["pressure"] = pressure
         inputs["vapour_pressure"] = {
@@ -1511,17 +1623,17 @@ def solve_node(
             for n in names
         }
     if any(e is not None and e.time is not None for _, e in spec.ends()):
-        inputs["boilup"] = spec.boilup.model_dump(mode="json", include={"value", "unit"})
+        rate = {"value", "unit", "medium_temperature"}  # the medium: a jacket's (ADR 0078)
+        inputs["boilup"] = spec.boilup.model_dump(mode="json", include=rate)
         own = {c.outlet: c.boilup for c in spec.cuts if getattr(c, "boilup", None) is not None}
         if own:  # a cut's own boil-up (ADR 0068)
             inputs["cut_boilups"] = {
-                port: b.model_dump(mode="json", include={"value", "unit"})
-                for port, b in own.items()
+                port: b.model_dump(mode="json", include=rate) for port, b in own.items()
             }
         units = {b.unit for b in _timed_boilups(spec)}  # the ones the outlets depend on
         if units - {"1/h"}:
             inputs["hours"] = hours
-        if "kW" in units:
+        if units & {"kW", "kW/K"}:
             inputs["heat_of_vaporization"] = {
                 n: getattr(comps.get(n), "heat_of_vaporization", None) for n in names
             }
@@ -1636,6 +1748,8 @@ def _heat_input(spec: Any, result: StillResult) -> float | None:
         return result.duty  # the still's own boil-up is not used
     if spec.boilup.unit == "kW":
         return spec.boilup.value
+    if spec.boilup.unit == "kW/K":
+        return _jacket_heat_input(spec.boilup, result)
     if own:
         energy = seconds = 0.0
         before = 0.0
@@ -1649,6 +1763,26 @@ def _heat_input(spec: Any, result: StillResult) -> float | None:
         if seconds > 0:
             return energy / seconds
     return result.duty
+
+
+def _jacket_heat_input(boilup: Any, result: StillResult) -> float | None:
+    """kW: a jacket's mean heat input over the charge's heat-up (ADR 0078), ``UA`` times the
+    log-mean of the medium's driving force from the charge's temperature to the still's first
+    bubble point ``T_0``, so that the charge and the metal heated to ``T_0`` take the jacket's
+    ``C / UA ln((T_m - T_in) / (T_m - T_0))``; ``UA (T_m - T_0)`` for a charge at or above
+    ``T_0`` or of unknown temperature. None without ``T_0`` or with a medium not above it."""
+    if result.temperatures is None:
+        return None
+    first = result.temperatures[0]
+    medium = boilup.medium_temperature
+    at_boil = medium - first
+    if at_boil <= 0:
+        return None
+    t_in = result.charge_temperature
+    if t_in is None or t_in >= first:
+        return boilup.value * at_boil
+    at_charge = medium - t_in
+    return boilup.value * (at_charge - at_boil) / math.log(at_charge / at_boil)
 
 
 #: Fields of a still's data that are text about it, not inputs of its outlets.
@@ -1969,6 +2103,18 @@ def rules(process: Any) -> list[Finding]:
                 node.id,
                 hint,
             )
+        if getattr(spec.volatility, "activity", None) == "unifac":  # ADR 0078
+            liquid = sorted(n for n in known if n not in apart)
+            if no_cas := [n for n in liquid if not getattr(comps.get(n), "cas", None)]:
+                add(
+                    "error",
+                    f"{node.id}: volatility.activity unifac needs the CAS number of each "
+                    f"component of the still's liquid; none of {', '.join(no_cas)}",
+                    [*loc, "volatility", "activity"],
+                    node.id,
+                    "give cas in process/materials.yaml (UNIFAC takes its groups from it), list a "
+                    "suspended component in separate_phase, or leave activity out (ideal liquid)",
+                )
         if unknown := [n for n in maybe if not has(n)]:
             # core#214: only a component the charge holds needs it; the template's may be at 0
             add(
@@ -1979,7 +2125,7 @@ def rules(process: Any) -> list[Finding]:
                 node.id,
                 "run cheme process propagate: the still asks it of a component its charge holds",
             )
-        in_kw = any(b.unit == "kW" for b in _boilups(spec))
+        in_kw = any(b.unit in ("kW", "kW/K") for b in _boilups(spec))
         latent = [
             n for n in volatile if getattr(comps.get(n), "heat_of_vaporization", None) is None
         ]
@@ -2199,7 +2345,9 @@ def unit_entry(process: Any, node: Any, case: str) -> dict[str, Any]:
         if (given := own.get(cut["outlet"])) is not None:
             cut["pressure_kPa"] = next(c.pressure for c in result.cuts if c.outlet == given.outlet)
             boil = given.boilup or spec.boilup
-            cut["boilup"] = {"value": boil.value, "unit": boil.unit}
+            cut["boilup"] = boil.model_dump(
+                mode="json", include={"value", "unit", "medium_temperature"}
+            )
     if spec.heat_up_time:  # ADR 0068
         sol = entry["solution"]
         sol["heat_up_time_h"] = (

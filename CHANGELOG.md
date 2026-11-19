@@ -3,6 +3,14 @@
 ## Unreleased
 
 - Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Batch still (ADR 0078, core#182): a jacket's boil-up, `boilup: {value: UA, unit: kW/K,
+  medium_temperature: K}`, whose heat input `UA (T_m - T)` falls as the pot heats (with
+  `heat_up_time`, the charge's heat-up takes the jacket's own time); and a non-ideal liquid,
+  `volatility: {model: raoult, activity: unifac}`, on modified Raoult's law with UNIFAC from
+  the components' CAS numbers (extra `props`; `cheme.process-still` names a component without
+  one). Both are opt-in: a still without them solves, reports and fingerprints as before. A
+  reaction in a still is not modelled; the ADR says why. Every BFD/PFD needs `cheme process
+  build` once (only `generator_sha256` changes).
 
 ## 1.12.0 (2026-11-13)
 

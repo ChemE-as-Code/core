@@ -521,8 +521,30 @@ SWAP_HEAT_UP = (
 def _still_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:
     """A still's *assumptions* (:data:`.batch_still.ASSUMPTIONS`, or ``COLUMN_ASSUMPTIONS`` with
     a column), with ``heat_up`` or a recipe vessel's metal (ADR 0063) the heat-up's and the
-    duty's (with a column the reboiler's) replaced by what the duty holds; as they are without
-    either, so such a still reports as before."""
+    duty's (with a column the reboiler's) replaced by what the duty holds, and with activity
+    coefficients or a jacket's boil-up (ADR 0078) the liquid's and the boil-up's; as they are
+    without any, so such a still reports as before."""
+    from chemeascode.domains.process.batch_still import ACTIVITY_ASSUMPTION, JACKET_ASSUMPTION
+
+    found = _still_heat_assumptions(process, node, assumptions)
+    spec = node.still
+    if getattr(spec.volatility, "activity", None) is not None:
+        found = [
+            ACTIVITY_ASSUMPTION if text.startswith("an ideal liquid (Raoult") else text
+            for text in found
+        ]
+        if spec.column is not None:
+            found.append(
+                "the activity coefficients at the still's liquid for the whole column (no "
+                "azeotrope inside the column)"
+            )
+    if any(b.unit == "kW/K" for b in spec.boilups()):
+        found.append(JACKET_ASSUMPTION)
+    return found
+
+
+def _still_heat_assumptions(process: Process, node: Any, assumptions: tuple[str, ...]) -> list[str]:
+    """:func:`_still_assumptions`' heat-up and duty texts (ADR 0063)."""
     from chemeascode.domains.process.recipe import vessel_metal
 
     spec = node.still
@@ -613,9 +635,16 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
         else:
             lacking.append("relative volatilities")
     else:
+        activity = getattr(vol, "activity", None)  # ADR 0078
         detail = "Raoult's law, Antoine vapour pressures"
+        if activity == "unifac":
+            detail = "modified Raoult's law, UNIFAC activity coefficients, Antoine vapour pressures"
         if not _sourced(vol):
-            lacking.append("ideal liquid (volatility assumed)")
+            lacking.append(
+                "ideal liquid (volatility assumed)"
+                if activity is None
+                else "activity coefficients (volatility assumed)"
+            )
         comps = process.components()
         stays = set(spec.nonvolatile) | set(spec.separate_phase) | solid_components(process)
         for name in sorted(_present(process, inlets_of(process, node)) - stays):
@@ -626,6 +655,8 @@ def still_basis(process: Process, node: Any) -> UnitBasis:
             else:
                 lacking.append(f"vapour pressure of {name}")
     detail += f"; boil-up {spec.boilup.value:g} {spec.boilup.unit}"
+    if getattr(spec.boilup, "medium_temperature", None) is not None:  # a jacket (ADR 0078)
+        detail += f" (jacket, medium at {spec.boilup.medium_temperature:g} K)"
     column = spec.column
     if column is not None:
         stages = (

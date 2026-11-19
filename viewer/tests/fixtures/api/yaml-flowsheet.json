@@ -1060,7 +1060,7 @@
       },
       "Boilup": {
         "additionalProperties": false,
-        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's\ntemperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR\n0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
+        "description": "A batch still's boil-up: a vapour rate of one still (kmol/h, kmol/s, kg/h), its heat\ninput (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol of vapour\nper hour per kmol of the charge) or a vapour volume (m3/h at the still's temperature and\npressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR 0068), each\nconstant; or a jacket's (kW/K: its UA, with the heating medium's ``medium_temperature``,\nADR 0078): the heat input ``UA (T_medium - T)`` falls as the still's temperature T rises.\nWith a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
         "properties": {
           "value": {
             "exclusiveMinimum": 0,
@@ -1074,10 +1074,25 @@
               "kg/h",
               "kW",
               "1/h",
-              "m3/h"
+              "m3/h",
+              "kW/K"
             ],
             "title": "Unit",
             "type": "string"
+          },
+          "medium_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kW/K: K of the jacket's heating medium (taken as constant).",
+            "title": "Medium Temperature"
           },
           "provenance": {
             "enum": [
@@ -5129,6 +5144,20 @@
             "description": "constant: component -> relative volatility (positive).",
             "title": "Alpha",
             "type": "object"
+          },
+          "activity": {
+            "anyOf": [
+              {
+                "const": "unifac",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "raoult: the liquid's activity coefficients, y_i P = gamma_i x_i P_i(T) (modified Raoult's law, ADR 0078): unifac (original UNIFAC from the components' CAS numbers, thermo, extra props); default: an ideal liquid (gamma 1).",
+            "title": "Activity"
           },
           "provenance": {
             "enum": [

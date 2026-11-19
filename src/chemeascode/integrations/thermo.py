@@ -253,6 +253,42 @@ def unifac_activity_coefficients(
     return [float(g) for g in model.gammas()]
 
 
+def unifac_gammas(cas: list[str]) -> Any:
+    """UNIFAC (original, DDBST group assignments, ``thermo``) of the components *cas* (CAS
+    numbers), set up once: a function of the temperature K and the mole fractions (in the
+    order of *cas*, summing to 1, zeros allowed: infinite dilution) that returns the activity
+    coefficients. For a batch still's many evaluations (ADR 0078): thermo's ``to_T_xs`` on the
+    groups found once. Raises ValueError without thermo or naming a component without UNIFAC
+    groups."""
+    try:
+        from thermo.unifac import UFIP, UFSG, UNIFAC, UNIFAC_group_assignment_DDBST
+    except ImportError as failure:
+        raise ValueError(
+            "activity coefficients need thermo: pip install 'cheme-as-code[props]'"
+        ) from failure
+    groups = []
+    for number in cas:
+        found = _unifac_groups(number, UNIFAC_group_assignment_DDBST)
+        if not found:
+            raise ValueError(f"no UNIFAC groups for CAS {number}")
+        groups.append(dict(found))
+    if len(cas) == 1:
+        return lambda temperature, fractions: [1.0]
+    base = UNIFAC.from_subgroups(
+        T=298.15,
+        xs=[1.0 / len(cas)] * len(cas),
+        chemgroups=groups,
+        subgroups=UFSG,
+        interaction_data=UFIP,
+        version=0,
+    )
+
+    def gammas(temperature: float, fractions: list[float]) -> list[float]:
+        return [float(g) for g in base.to_T_xs(temperature, list(fractions)).gammas()]
+
+    return gammas
+
+
 @functools.cache
 def _unifac_groups(cas: str, lookup: Any) -> tuple[tuple[int, int], ...]:
     """The DDBST UNIFAC groups of *cas*, looked up once per process."""

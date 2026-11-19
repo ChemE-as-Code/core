@@ -1358,7 +1358,25 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
     / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol), 1/h (kmol of vapour
     per hour per kmol of charge) or m3/h (raoult, ADR 0068: the vapour's volume at the still's
-    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity).
+    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity),
+    or a jacket's, `{value: UA, unit: kW/K, medium_temperature: K}` (raoult, ADR 0078): the heat
+    input `UA (T_m - T)` at the still's bubble point T, `V = UA (T_m - T) / lambda(y)`, falling
+    as the pot heats (UA and the medium constant: the wetted area does not fall as it empties).
+    An end at or above the medium's temperature is refused when read; a still that reaches its
+    end only near the medium stalls with that reason. With `heat_up_time` the heat-up takes the
+    jacket's mean input over the charge's heat-up, `UA` times the log-mean of `T_m - T_in` and
+    `T_m - T_0`, so the charge and the metal to `T_0` take `C / UA ln((T_m - T_in) / (T_m -
+    T_0))`. A time end with it puts `medium_temperature` in the outlets' fingerprint.
+  - `volatility: {model: raoult, activity: unifac}` (ADR 0078): a non-ideal liquid on modified
+    Raoult's law, `y_i P = gamma_i x_i P_i(T)`, with original UNIFAC (thermo's DDBST groups,
+    extra `props`) at the still's liquid (without the `separate_phase`) and temperature; the
+    bubble point is solved again at the coefficients of the last one until it settles to 1e-11.
+    Each component of the liquid, dissolved non-volatiles and solids too, needs its `cas` in
+    `materials.yaml` (`cheme.process-still`, error); one without UNIFAC groups is refused. A
+    column takes the K-values `gamma_i P_i / P` at the still for the whole column. `process
+    stills` names the model in `detail`, and the volatility's own provenance decides whether
+    the activity coefficients count as sourced. The CAS numbers enter the fingerprint. The
+    latent heat is the components' (no heat of mixing).
   - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
     `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
     cuts. At a change of pressure the still steps to the new bubble point (a note; the flash or
@@ -1437,11 +1455,15 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
     (core#214); a component only an inlet's template lists (before propagate) is an info.
-  - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
-    boils (and the heat-up without `heat_up`), losses, constant level by volume. `process
+  - Not modelled: activity models besides UNIFAC (no NRTL or measured coefficients in the
+    still), the content's sensible rise while it boils (and the heat-up without `heat_up`),
+    losses, constant level by volume, a reaction in the still (ADR 0078 says why). `process
     simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
-    and the constant-level swap's closed form (`tests/test_batch_still.py`).
+    and the constant-level swap's closed form (`tests/test_batch_still.py`); the jacket against
+    the quadrature of `lambda / (UA (T_m - T))` over the path, and UNIFAC against Rayleigh's
+    integral on an independent modified-Raoult bubble point of methanol-toluene
+    (`tests/test_still_jacket_activity.py`).
   - **Batch rectification** (ADR 0061): `column: {stages: N, reflux: constant, ratio: R}` puts
     a column of N theoretical stages (the still included) with a total condenser on the still,
     on Diwekar's batch shortcut: at each point of the path the distillate follows from

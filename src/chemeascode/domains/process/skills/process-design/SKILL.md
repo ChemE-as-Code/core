@@ -264,7 +264,7 @@ duty, beside a dose's `solution` and the `charge heat-up`.
 still:
   volatility: {model: raoult, provenance: given, source: NIST WebBook}   # or constant + alpha
   nonvolatile: [PRODUCT]
-  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kg/h, kW, 1/h
+  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kg/h, kW, 1/h, kW/K
   feed: {stream: S12, mode: constant_level}        # a solvent swap; or portions: 4, down_to: 0.5
   end: {residue: {key: OLD_SOLVENT, mole_fraction: 0.005}}  # or distilled, time, temperature
   outlets: {distillate: top, residue: bottom}      # or cuts: [{outlet, end}], outlets: {residue}
@@ -292,13 +292,25 @@ still:
   `distil` from the still: do not also write a hand `heat` operation for it. A jacket that
   heats at another rate is a hand `duration` on a `heat` operation, with `heat_up_time` off (a
   `heat` with `temperatures` has no batch content on a still).
+- A jacket whose driving force falls as the pot heats is `boilup: {value: UA, unit: kW/K,
+  medium_temperature: K}` (ADR 0078): the heat input `UA (T_medium - T)` at the still's bubble
+  point. Take UA from the jacket's U and its wetted area, with their source; the area is
+  constant over the boil-up, so a pot that empties below its jacket boils up too fast at the
+  end. An end at or above the medium's temperature is refused; one the still reaches only
+  near it stalls with the reason. With `heat_up_time` the charge's heat-up takes the jacket's
+  own time, `C / UA ln((T_m - T_in) / (T_m - T_0))`.
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
   `from:` the still.
 - Without `column:` the model is one stage: it strips and swaps solvents but does not purify
-  a product. An azeotrope (non-ideal liquid) needs a specified split or `process simulate`;
-  record that in `DESIGN.md`.
+  a product.
+- A non-ideal liquid (an azeotrope, a polar solute in a hydrocarbon) is `volatility: {model:
+  raoult, activity: unifac}` (ADR 0078): modified Raoult's law with UNIFAC from each liquid
+  component's `cas` (extra `props`). UNIFAC is predictive: keep the volatility's provenance
+  `calculated` or `assumed` and say so in `DESIGN.md`; a component without UNIFAC groups is
+  refused, never taken as ideal. There is no reaction in a still: a reaction during the
+  distillation is a reactor step before it, or a hand estimate in `DESIGN.md`.
 
 **Batch rectification (a column on the still, ADR 0061).** Purify a product in the still with
 its column instead of a specified split of the still's distillate:

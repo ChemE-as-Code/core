@@ -1379,6 +1379,13 @@ class Volatility(Strict):
         description="constant: component -> relative volatility (positive).",
         exclude_if=lambda value: not value,
     )
+    activity: Literal["unifac"] | None = Field(
+        default=None,
+        description="raoult: the liquid's activity coefficients, y_i P = gamma_i x_i P_i(T) "
+        "(modified Raoult's law, ADR 0078): unifac (original UNIFAC from the components' CAS "
+        "numbers, thermo, extra props); default: an ideal liquid (gamma 1).",
+        exclude_if=lambda value: value is None,  # a still's fingerprint stays as it was
+    )
     provenance: Provenance
     source: str = ""
 
@@ -1386,6 +1393,11 @@ class Volatility(Strict):
     def _form(self) -> Volatility:
         if (self.model == "constant") != bool(self.alpha):
             raise ValueError("alpha: with model constant, and only then")
+        if self.activity is not None and self.model != "raoult":
+            raise ValueError(
+                "activity: with model raoult (the activity coefficients' vapour "
+                "pressures), not constant"
+            )
         if any(v <= 0 for v in self.alpha.values()):
             raise ValueError(
                 "alpha: relative volatilities are positive (a non-volatile "
@@ -1395,16 +1407,32 @@ class Volatility(Strict):
 
 
 class Boilup(Strict):
-    """A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),
-    its heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol
-    of vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's
-    temperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR
-    0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061)."""
+    """A batch still's boil-up: a vapour rate of one still (kmol/h, kmol/s, kg/h), its heat
+    input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol of vapour
+    per hour per kmol of the charge) or a vapour volume (m3/h at the still's temperature and
+    pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR 0068), each
+    constant; or a jacket's (kW/K: its UA, with the heating medium's ``medium_temperature``,
+    ADR 0078): the heat input ``UA (T_medium - T)`` falls as the still's temperature T rises.
+    With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061)."""
 
     value: float = Field(gt=0)
-    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h", "m3/h"]
+    unit: Literal["kmol/h", "kmol/s", "kg/h", "kW", "1/h", "m3/h", "kW/K"]
+    medium_temperature: float | None = Field(
+        default=None,
+        gt=0,
+        description="kW/K: K of the jacket's heating medium (taken as constant).",
+        exclude_if=lambda value: value is None,  # a boil-up's dump stays as it was
+    )
     provenance: Provenance
     source: str = ""
+
+    @model_validator(mode="after")
+    def _jacket(self) -> Boilup:
+        if (self.unit == "kW/K") != (self.medium_temperature is not None):
+            raise ValueError(
+                "boilup: medium_temperature with unit kW/K (a jacket's UA), and only then"
+            )
+        return self
 
 
 class ResidueEnd(Strict):
@@ -1656,6 +1684,17 @@ class Still(Strict):
             raise ValueError("a cut's pressure needs volatility raoult")
         if not raoult and any(b.unit == "m3/h" for b in self.boilups()):
             raise ValueError("a boil-up in m3/h needs volatility raoult (the vapour's temperature)")
+        if not raoult and any(b.unit == "kW/K" for b in self.boilups()):
+            raise ValueError("a boil-up in kW/K needs volatility raoult (the still's temperature)")
+        own = {c.outlet: c.boilup for c in self.cuts if c.boilup is not None}
+        for port, end in self.ends():
+            medium = (own.get(port) or self.boilup).medium_temperature
+            hot = end.temperature if end is not None else None
+            if medium is not None and hot is not None and hot >= medium:
+                raise ValueError(
+                    f"an end at {hot:g} K at or above the jacket's medium at {medium:g} K: the "
+                    "jacket never heats the still there"
+                )
         if set(self.separate_phase) & set(self.volatility.alpha):
             raise ValueError("separate_phase: a component in a phase of its own is non-volatile")
         ports = [c.outlet for c in self.cuts]
