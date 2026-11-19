@@ -4,11 +4,14 @@ fixed beds, the parametric sensitivity of the hot spot (``cheme process reactor-
 
 Per reactor (a block or step that names reactions or a reactor model), from its inlet stream:
 
-- ``T_p``, the process temperature: an isothermal batch's held temperature (its outlet's given
-  or assumed one, as the batch model holds it from the start), else a batch's charge
-  temperature; a CSTR's solved temperature; a plug-flow bed's inlet temperature (the bed model
-  starts there); else (conversion, equilibrium, gibbs) the inlet's, or the outlet's given or
-  assumed temperature where hotter and its MTSR larger (below);
+- ``T_p``, the process temperature: a batch whose temperature moves (ADR 0074) at its start,
+  the first point of its ``program`` (its outlet's temperature is the programme's end) or, at
+  ``heat: reflux``, its charge's bubble point at the inlet's pressure, its solids left out (the
+  charge's temperature where that is not known); an isothermal batch's held temperature (its
+  outlet's given or assumed one, as the batch model holds it from the start), else a batch's
+  charge temperature; a CSTR's solved temperature; a plug-flow bed's inlet temperature (the
+  bed model starts there); else (conversion, equilibrium, gibbs) the inlet's, or the outlet's
+  given or assumed temperature where hotter and its MTSR larger (below);
 - ``dT_ad``, the adiabatic rise: the largest heat of one reaction run to completion of its
   limiting reactant, over the heat capacity of the feed (a liquid's ``liquid_heat_capacity``,
   a gas's ideal-gas cp; ``heat_of_reaction``, else the ideal-gas data's). A gas-phase batch is

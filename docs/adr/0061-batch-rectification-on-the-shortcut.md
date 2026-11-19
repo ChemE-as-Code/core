@@ -206,7 +206,7 @@ cheme-as-code takes option 3, in `domains/process/batch_still.py`.
 ## Amendment (2026-11-13): qualification against published examples and DWSIM (core#195)
 
 The qualification this record deferred, done in `tests/test_batch_rectification.py`. Nothing in
-the model, the schema or the commands changes (no new ADR; 0076 was left unused). The papers
+the model, the schema or the commands changes (the qualification took no ADR number). The papers
 are the authors' copies on https://www.vri-custom.org/pdfs/ (paper94, paper59); only single
 facts of their worked examples (stages, reflux, charge, relative volatilities, reported
 amounts and compositions) are used, with their table in the tests.

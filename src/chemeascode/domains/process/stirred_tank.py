@@ -1568,7 +1568,7 @@ def _solve_batch(
             head: list[float] = []
             qv = 0.0
             if ng:
-                head, qv, extra = head_space_rates(state, dn, leaving, gain, cap)
+                head, qv, extra = head_space_rates(state, dn, leaving, gain, cap, regime.slope)
             elif nv:
                 s, v, qv, qc = vapour_rates(moles, t, gas_flows_of(leaving))
                 for k, i in enumerate(volatile):
@@ -1583,13 +1583,20 @@ def _solve_batch(
         return derivatives
 
     def head_space_rates(
-        state: list[float], dn: list[float], leaving: list[float], gain: float, cap: float
+        state: list[float],
+        dn: list[float],
+        leaving: list[float],
+        gain: float,
+        cap: float,
+        slope: float = 0.0,
     ) -> tuple[list[float], float, list[float]]:
         """ADR 0071: the head space's gas, of the non-condensables formed and passing through
         into it, expels ``F = In - dH/dt`` of its own composition, which carries the vapour;
         ``dH/dt`` depends on the vapour the gas takes off the liquid (``F`` times it per kmol),
         linearly, so ``F = (In - D_a) / (1 + D_b)``. A head space that expands (``F`` below 0)
-        draws back the gas of the vent line, without vapour. *dn* (the liquid's change) takes
+        draws back the gas of the vent line, without vapour. The content's temperature moves
+        by its heat (adiabatic) or by a programme's *slope* K/s (ADR 0074), which expands or
+        contracts the held gas and moves the vapour's share. *dn* (the liquid's change) takes
         the vapour off in place; returns the head space's and the vent's rates, the vapour's
         kW into the content and the vapour's rates."""
         moles, t = state[:size], state[-2]
@@ -1609,7 +1616,7 @@ def _solve_batch(
         dn_b = [0.0] * size
         for k, i in enumerate(volatile):
             dn_b[i] = -loss[k]
-        d_a = head_rate(moles, t, dn, gain / cap if adiabatic else 0.0)
+        d_a = head_rate(moles, t, dn, gain / cap if adiabatic else slope)
         d_b = head_rate(moles, t, dn_b, -q1 / cap if adiabatic else 0.0)
         entering = sum(inflow.values())
         flow = (entering - d_a) / (1.0 + d_b)
@@ -1787,6 +1794,14 @@ def _solve_batch(
             # time so far) must be nothing as well
             ahead = max(t_end - clock - h if t_end is not None else 0.0, clock + h)
             idle = progress < 1e-12 and progress * ahead / h < 1e-9
+            # nor while a programme still moves the temperature or a lamp still shines into
+            # the content (ADR 0074): the outlet's temperature and the heat terms run on to
+            # the end, however still the moles
+            if idle and (
+                regime.slope
+                or (mix.light is not None and regime.lit and mix.absorbed(new[:size])[1])
+            ):
+                idle = False
             clock += h
             state = new
             record(state, clock)

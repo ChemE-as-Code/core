@@ -341,6 +341,31 @@ def test_a_temperature_programme_moves_the_rate_and_takes_the_content_s_heat():
         _solve(_first_order(k, ea), batch, {"A": 1.0, "S": 4.0}, isothermal_at=300.0)
 
 
+@pytest.mark.parametrize("end", [7200.0, 28800.0])
+def test_a_programme_runs_on_after_a_reactant_is_used_up(end):
+    """Zero order, A used up long before a single ramp 300 to 340 K ends: the moles stop, the
+    programme does not. The batch ends at the programme's end, 340 K, and its content takes
+    ``C (340 - 300)``; not held where the conversion stalled (#297's stall, ADR 0074)."""
+    law = _reactions({"form": "power_law", "k": {"A": 1.0}, "orders": {}})
+    batch = _batch(
+        time=end, program={"points": [(0.0, 300.0), (end, 340.0)], "provenance": "assumed"}
+    )
+    result = _solve(law, batch, {"A": 1.0, "S": 4.0})
+    assert result.outlet["A"] == pytest.approx(0.0, abs=1e-12)
+    assert result.temperature == pytest.approx(340.0, rel=1e-12)
+    assert result.temperatures["end_K"] == pytest.approx(340.0, rel=1e-12)
+    assert result.temperatures["max_K"] == pytest.approx(340.0, rel=1e-12)
+    assert result.heat_terms["content"] == pytest.approx(5 * 150.0 * 40.0, rel=1e-9)
+    assert not any("converts no further" in n for n in result.notes)
+    # held at the end of the programme, the post-reaction still stops when nothing moves
+    held = _batch(
+        time=4 * end, program={"points": [(0.0, 300.0), (end, 340.0)], "provenance": "assumed"}
+    )
+    still = _solve(law, held, {"A": 1.0, "S": 4.0})
+    assert still.temperature == pytest.approx(340.0, rel=1e-12)
+    assert still.heat_terms["content"] == pytest.approx(5 * 150.0 * 40.0, rel=1e-9)
+
+
 def test_a_semibatch_doses_at_one_temperature_and_holds_at_another():
     """The doses warm to the temperature they meet: dosed at 300 K into 300 K, nothing; the
     programme then heats the content to 320 K for the post-reaction."""
@@ -475,6 +500,19 @@ def test_beer_lambert_absorption_by_the_absorber():
     thick = thin | {"absorptivity": 1e5}
     deep = _solve(_photo(phi), _batch(time=end, light=thick), {"A": 1.0, "S": 4.0})
     assert deep.outlet["A"] == pytest.approx(1.0 - phi * q0 * end, rel=1e-9)
+
+
+def test_a_lamp_shines_on_after_its_reactant_is_used_up():
+    """No absorber named: the content takes all the light, whatever it holds. A used up early,
+    the lamp still shines on until the batch ends: its heat ``-P t`` and its photons ``q_0 t``
+    over the whole batch, not cut where the conversion stalled."""
+    phi, watts_m3, nm, end = 0.5, 2000.0, 400.0, 1e9
+    light = {"power": watts_m3, "wavelength": nm, "provenance": "assumed"}
+    result = _solve(_photo(phi), _batch(time=end, light=light), {"A": 1.0, "S": 4.0})
+    q0 = photon_flux(watts_m3 * 0.5, nm)
+    assert result.outlet["A"] == pytest.approx(0.0, abs=1e-12)
+    assert result.heat_terms["light"] == pytest.approx(-watts_m3 * 0.5 / 1000.0 * end, rel=1e-9)
+    assert result.light["photons_absorbed_kmol_h"] == pytest.approx(q0 * end, rel=1e-9)
 
 
 def test_a_photochemical_rate_needs_its_light():

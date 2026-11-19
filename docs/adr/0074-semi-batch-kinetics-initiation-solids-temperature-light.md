@@ -78,7 +78,13 @@ solves exactly as before: same break points, same arithmetic.
   adiabatic batch's. The recipe's jacket check of a programme takes its lowest temperature over
   the batch, where the jacket removes least. A given outlet temperature other than the
   programme's end, or any at reflux, is refused; reflux refuses a vent's vapour and head space
-  (the gas over a boiling liquid is its vapour) and `heat_up`.
+  (the gas over a boiling liquid is its vapour) and `heat_up`. A head space (ADR 0071) follows
+  a programme's slope as an adiabatic batch's warming: its held gas `(1 - Y) P V / (R T)`
+  expands or contracts and its vapour's share `Y(T)` moves, so a cooling programme draws gas
+  back from the vent line (core#299). The post-reaction's stall (core#297: 51 steps that change
+  no component) does not end a segment whose programme still moves the temperature or whose
+  lamp still shines into the content: the outlet's temperature, the `content` and `light` terms
+  and the photons absorbed run on to the batch's end.
 - **Light.** `rate.form: photochemical` is `r = Phi(T) prod(c_i^a_i) q_a`: `k` the quantum yield
   (the amount reacting per amount of photons absorbed; above 1 for a chain), `q_a` the photons
   the liquid absorbs per m3 from `batch.light: {power, wavelength, absorber, absorptivity,

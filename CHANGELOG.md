@@ -166,7 +166,10 @@
   holds it at the content's bubble point; their duty adds the content's sensible heat
   (`content`) and takes the doses, the dosed gas passing through (`vent gas`) and a returned
   condensate (`condensate return`) at the temperature each met; the recipe's jacket check takes
-  a programme's lowest temperature. `rate.form: photochemical` (the quantum yield times the
+  a programme's lowest temperature. A vent's head space follows a programme's temperature (its
+  gas expands or contracts, its vapour's share moves; a cooling one draws gas back, #299), and
+  the post-reaction runs a programme and a lit lamp on to the batch's end after a reactant is
+  used up (core#297's stall waits for them). `rate.form: photochemical` (the quantum yield times the
   photons absorbed) with `light: {power, wavelength, absorber, absorptivity, path_length, on}`
   (Beer-Lambert, CODATA 2022 constants; the light's heat in the duty's `light` term; `process
   reactors` gives no outlet rate for it, the light being the tank's). A vent's peak rate takes
