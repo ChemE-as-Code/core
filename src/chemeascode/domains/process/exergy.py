@@ -83,7 +83,9 @@ def stream_exergy(adapter, inputs, phase: str | None = None) -> tuple[float | No
     if dead.phase == "two-phase":
         raise Unsupported("property-unsupported", "two-phase at the dead state")
     comps = adapter.process.components()
-    by_cas = {comps[n].cas: x for n, x in inputs.fractions.items()}
+    by_cas: dict[str, float] = {}
+    for name, x in inputs.fractions.items():  # ids that share a CAS number add up
+        by_cas[comps[name].cas] = by_cas.get(comps[name].cas, 0.0) + x
     value, missing = chemical(by_cas, "gas" if dead.phase == "vapor" else "liquid")
     if value is None:
         return None, missing
