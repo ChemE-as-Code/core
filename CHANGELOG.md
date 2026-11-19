@@ -34,7 +34,10 @@
   datasheets: their machine powers are given from the simulation or a sizing script.
   `props.py` is a process generator module, so `generator_fingerprint()` changes: every
   BFD/PFD needs `cheme process build` once (only `generator_sha256` changes; the examples are
-  rebuilt).
+  rebuilt). The rebuilt examples change the commit hashes of the test repos the viewer's API
+  fixtures are made from, so seven fixtures are regenerated (CI's `api-fixtures` artifact:
+  `control-separation`, `impact`, `repo`, `repo-issues`, `simulation-failed`, `simulation-run`,
+  `simulation-stale`; one commit hash each).
 
 ## 1.12.0 (2026-11-13)
 
