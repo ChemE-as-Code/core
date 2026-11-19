@@ -31,6 +31,7 @@ from chemeascode.domains.process.crystallization import (
 )
 from chemeascode.domains.process.dryer import (
     DryerError,
+    condense_vapour,
     dry_mass,
     flash,
     kept_by,
@@ -40,6 +41,7 @@ from chemeascode.domains.process.dryer import (
 from chemeascode.domains.process.model import balances, load, rules, stream_flows
 from chemeascode.domains.process.model_basis import model_bases
 from chemeascode.domains.process.propagate import run
+from chemeascode.domains.process.recipe import recipe_report
 from chemeascode.domains.process.schema import (
     Crystallizer,
     Dryer,
@@ -410,6 +412,45 @@ def test_a_washed_filter_propagates_balances_and_reports(tmp_path):
     assert any("R = (1 - E)^n" in a for a in basis.assumptions)
 
 
+def test_a_filter_is_not_sourced_while_its_wash_is_assumed(tmp_path):
+    given = PRECIPITATION.replace(
+        "      outlets: {cake: cake, filtrate: filtrate, wash_filtrate: washings}\n"
+        "      provenance: assumed\n",
+        "      outlets: {cake: cake, filtrate: filtrate, wash_filtrate: washings}\n"
+        "      provenance: given\n      source: vendor test\n",
+    )
+    ws = _plant(tmp_path, MATERIALS, given)
+    process = _propagated(ws)
+    (basis,) = [u for u in model_bases(process) if u.id == "F1"]
+    assert basis.sourced is False and basis.sources == ["vendor test"]
+    assert basis.detail.endswith(
+        "; not sourced: wash, wash.dissolution, wash.dissolution.solubility"
+    )
+    assert "solid_separation F1: basis solid-split (specified, not sourced)" in report_text(
+        crystallizer_report(ws.root)
+    )
+    # every part given with a source: sourced, with each source
+    sourced = (
+        given.replace(
+            "        efficiency: 0.6\n        provenance: assumed\n",
+            "        efficiency: 0.6\n        provenance: given\n        source: wash test\n",
+        )
+        .replace(
+            "solubility: {unit: kg/kg_solvent, value: 0.01, provenance: assumed}",
+            'solubility: {unit: kg/kg_solvent, value: 0.01, provenance: given, source: "sol"}',
+        )
+        .replace(
+            "          saturation: 0.5\n          provenance: assumed\n",
+            "          saturation: 0.5\n          provenance: given\n          source: wash test\n",
+        )
+    )
+    ws = _plant(tmp_path / "sourced", MATERIALS, sourced)
+    process = _propagated(ws)
+    (basis,) = [u for u in model_bases(process) if u.id == "F1"]
+    assert basis.sourced is True and "not sourced" not in basis.detail
+    assert basis.sources == ["vendor test", "wash test", "sol"]
+
+
 def test_a_wash_without_its_port_or_with_a_wrong_dissolution_is_refused(tmp_path):
     flowsheet = PRECIPITATION.replace("        port: wash\n", "        port: other\n")
     ws = _plant(tmp_path, MATERIALS, flowsheet)
@@ -447,6 +488,81 @@ def test_the_wash_time_is_the_final_filtration_rate():
     assert wash_hours(filtration, 100.0, 0.1, 1.0) == pytest.approx(
         2 * (ruth - medium) + medium, rel=1e-12
     )
+
+
+def _filtered(tmp_path, wash_kg_h):
+    """The PRECIPITATION plant with a filtration on F1 (1000 kg/m3 for every component) and a
+    recipe of one filter step from F1 in a vessel of fill 0.5, HOURS of flows a batch."""
+    materials = MATERIALS
+    for mm in ("177.985", "18.015", "102.894", "39.997"):
+        materials = materials.replace(
+            f"molar_mass: {mm}", f"molar_mass: {mm}, liquid_molar_volume: {float(mm) / 1000:g}"
+        )
+    flowsheet = PRECIPITATION.replace(
+        "      provenance: assumed\n      wash:\n",
+        "      provenance: assumed\n"
+        "      filtration: {specific_cake_resistance: 1.0e+10, medium_resistance: 1.0e+10,\n"
+        "                   pressure_difference: 100, viscosity: 1.0, filtrate_density: 1000,\n"
+        "                   area: 1.0, provenance: assumed}\n"
+        "      wash:\n",
+    ).replace(
+        "flow: {value: 60, provenance: given}", f"flow: {{value: {wash_kg_h}, provenance: given}}"
+    )
+    assert "filtration:" in flowsheet and f"value: {wash_kg_h}," in flowsheet
+    ws = _plant(tmp_path, materials, flowsheet)
+    process = _propagated(ws)
+    recipe = {
+        "schema": "cheme/recipe/v1",
+        "kind": "recipe",
+        "batch_size": {
+            "value": sum(_mass(process, "S4").values()) * HOURS,
+            "unit": "kg",
+            "stream": "S4",
+            "provenance": "assumed",
+        },
+        "hours_per_year": {"value": 8000, "provenance": "assumed"},
+        "unit_procedures": [
+            {
+                "id": "ISO",
+                "unit": "F1",
+                "vessel": {"fill_fraction": 0.5, "provenance": "assumed"},
+                "operations": [{"id": "filter", "kind": "filter", "from": "F1"}],
+            }
+        ],
+    }
+    (ws.root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    return process, recipe_report(ws.root)
+
+
+def test_a_washed_filter_is_timed_and_sized_on_its_unwashed_cake(tmp_path):
+    process, report = _filtered(tmp_path, 60)
+    slurry, cake = _mass(process, "S2"), _mass(process, "S4")
+    # Ruth's filtration builds the cake of the slurry's crystals, before the wash dissolves
+    # 0.3 kg/h of them; the wash passes that cake at the final rate
+    crystals = slurry["NBS_S"] * HOURS
+    assert cake["NBS_S"] * HOURS == pytest.approx(crystals - 0.3 * HOURS, rel=1e-6)
+    filtration = N(
+        viscosity=1.0,
+        pressure_difference=100.0,
+        specific_cake_resistance=1e10,
+        medium_resistance=1e10,
+    )
+    filtrate = sum(_mass(process, "S3").values()) * HOURS / 1000
+    washings = sum(_mass(process, "S6").values()) * HOURS / 1000
+    (step,) = [s for s in report.steps if s.kind == "filter"]
+    assert step.end - step.start == pytest.approx(
+        ruth_hours(filtration, crystals, filtrate, 1.0)
+        + wash_hours(filtration, crystals, washings, 1.0),
+        rel=1e-6,  # the streams as propagate wrote them
+    )
+    # the vessel holds the slurry (1000 kg/h), the wash only once its filtrate has drained
+    (vessel,) = report.vessels
+    assert vessel.working_volume == pytest.approx(1000 * HOURS / 1000, rel=1e-6)
+    # a wash larger than the slurry: the unwashed cake (0.3 kg of liquor per kg) with the wash
+    process, report = _filtered(tmp_path / "large", 2000)
+    unwashed = _mass(process, "S2")["NBS_S"] * 1.3
+    (vessel,) = report.vessels
+    assert vessel.working_volume == pytest.approx((unwashed + 2000) * HOURS / 1000, rel=1e-6)
 
 
 # -- a second liquid phase -------------------------------------------------------------------------
@@ -510,6 +626,62 @@ def test_a_second_liquid_is_not_in_the_mother_liquor():
             solubility={**sol, "salting_out": {**salting, "coefficients": {"NaCl": 0, "OIL": 0}}},
             second_liquid=second,
         )
+    # the liquor the data were measured in holds the dissolved spectators, not the oil (its
+    # solved fraction would always be 0, outside any tolerance)
+    measured = {
+        "unit": "kg/kg_liquor",
+        "value": 0.05,
+        "measured_in": "mother_liquor",
+        "provenance": "assumed",
+    }
+    liquor = {"tolerance": 0.1, "provenance": "assumed"}
+    with pytest.raises(ValueError, match="dissolved spectators, not the second liquid's"):
+        Crystallizer(
+            **base,
+            solubility={
+                **measured,
+                "liquor": {**liquor, "mass_fraction": {"NaCl": 0.1, "OIL": 0.05}},
+            },
+            second_liquid=second,
+        )
+    spec = Crystallizer(
+        **base,
+        solubility={**measured, "liquor": {**liquor, "mass_fraction": {"NaCl": 0.1}}},
+        second_liquid=second,
+    )
+    assert spec.solubility.liquor.mass_fraction == {"NaCl": 0.1}
+
+
+def test_a_second_liquid_alone_takes_a_pure_solvent_solubility(tmp_path):
+    # the only spectators form the second liquid: the mother liquor is solute and solvent, so
+    # the pure solvent's point (carried by its transfer) holds there, as without spectators
+    oil = PRECIPITATION.replace(
+        ', salting_out: {coefficients: {NABR: 0, NAOH: 0}, provenance: assumed, source: "test: '
+        'no correction"}',
+        "",
+    ).replace(
+        "      spectators: [NABR, NAOH]\n",
+        "      spectators: [NABR, NAOH]\n"
+        "      second_liquid: {components: [NABR, NAOH], provenance: assumed}\n",
+    )
+    assert oil.count("second_liquid") == 1 and "salting_out" not in oil
+    ws = _plant(tmp_path, MATERIALS, oil)
+    process = _propagated(ws)
+    assert _mass(process, "S2")["NBS_S"] == pytest.approx(50 - S_278 * 918, rel=1e-5)
+    report = crystallizer_report(ws.root)
+    assert not [f for f in report.findings if f.level == "error"]
+    (basis,) = [u for u in model_bases(process) if u.id == "CR"]
+    assert "pure-solvent solubility, the second liquid apart" in basis.detail
+    assert "a solubility in the mixed liquor" not in basis.detail
+    # the second liquid sets the liquor: assumed, it leaves the basis not sourced
+    assert basis.sourced is False
+    assert basis.detail.endswith("; not sourced: transfer, second_liquid")
+    # a dissolved spectator beside the oil still needs a solubility in the liquor
+    mixed = oil.replace("components: [NABR, NAOH], provenance", "components: [NAOH], provenance")
+    ws = _plant(tmp_path / "mixed", MATERIALS, mixed)
+    process, _ = load(ws.root)
+    (refused,) = [f for f in rules(process) if "is the pure solvent's" in f.message]
+    assert refused.level == "error" and refused.message.endswith("the spectators NABR")
 
 
 # -- the dryer: selective drying, sublimation, cooling and the vacuum condenser -------------------
@@ -535,6 +707,26 @@ def test_selective_drying_by_raoult_against_a_hand_calculation():
         kept_by({"A": 10.0, "B": 10.0}, {"A": 100.0, "B": 0.0}, 5.0)
 
 
+def test_selective_drying_of_a_volatile_far_less_volatile_than_the_main_one():
+    # B 100x less volatile: keeping 10 kg of it needs n_B / n_B0 = f^0.01 = 0.1, f = 1e-100,
+    # far below a bisection on f over [0, 1] (2^-200); keeping 1 kg needs f = 1e-200
+    for kept, b in ((10.0, 0.1), (1.0, 0.01)):
+        share = kept_by({"A": 10.0, "B": 100.0}, {"A": 100.0, "B": 1.0}, kept)
+        assert share["B"] == pytest.approx(b, rel=1e-9)
+        assert 10.0 * share["A"] + 100.0 * share["B"] == pytest.approx(kept, rel=1e-9)
+    # nothing left: both shares go to (practically) nothing
+    share = kept_by({"A": 10.0, "B": 100.0}, {"A": 100.0, "B": 1.0}, 0.0)
+    assert 10.0 * share["A"] + 100.0 * share["B"] == pytest.approx(0.0, abs=1e-9)
+    # the product holds the 1 % specified, not more
+    product, _ = dry_mass(
+        {"P": 1000.0, "A": 10.0, "B": 100.0},
+        ["A", "B"],
+        N(value=0.01, basis="mass_fraction"),
+        {"A": 100.0, "B": 1.0},
+    )
+    assert (product["A"] + product["B"]) / sum(product.values()) == pytest.approx(0.01, rel=1e-9)
+
+
 def test_the_condenser_flash_against_a_hand_calculation():
     # z 0.5 / 0.5, K 2 and 0.5: 0.5 / (1 + b) = 0.25 / (1 - 0.5 b), b = 0.5; the gas holds
     # 2 x 0.5 x 0.5 / 1.5 x 2 = 0.6667 of A and 0.5 x 0.5 x 0.5 / 0.75 x 2 = 0.3333 of B
@@ -543,6 +735,39 @@ def test_the_condenser_flash_against_a_hand_calculation():
     # below the bubble point all condenses, above the dew point nothing
     assert flash({"A": 1.0}, {"A": 0.9}) == {"A": 0.0}
     assert flash({"A": 1.0, "B": 1.0}, {"A": 3.0, "B": 2.5}) == {"A": 1.0, "B": 1.0}
+
+
+class _Curve:
+    def __init__(self, kpa):
+        self.value = kpa
+
+    def covers(self, temperature):
+        return True
+
+    def kpa(self, temperature):
+        return self.value
+
+
+def test_a_partial_condenser_cools_all_of_the_vapour_as_liquid():
+    # A 10 kg/h (200 kmol/h at 0.05) and B 10 kg/h (333.3 kmol/h at 0.03), K 5/20 = 0.25 and
+    # 50/20 = 2.5: between bubble and dew point, so part of it passes to the pump. The duty is
+    # the latent heat of what condenses and all 20 kg/h cooled 50 K as liquid at 2 kJ/(kg K)
+    # (what passes re-evaporated at the same latent heat), not the condensate's cooling alone
+    comps = {
+        "A": N(vapour_pressure=_Curve(5.0), molar_mass=0.05),
+        "B": N(vapour_pressure=_Curve(50.0), molar_mass=0.03),
+    }
+    spec = N(condenser=N(temperature=280.0, heat_capacity=2.0), pressure=20.0, temperature=330.0)
+    latent = {"A": (800.0, "given"), "B": (900.0, "given")}
+    found = condense_vapour(N(components=lambda: comps), spec, {"A": 10.0, "B": 10.0}, latent)
+    condensed, gas = found["condensate_kg_h"], found["gas_kg_h"]
+    assert 0 < sum(condensed.values()) < 20.0 and 0 < sum(gas.values()) < 20.0
+    for n in ("A", "B"):
+        assert condensed[n] + gas[n] == pytest.approx(10.0, rel=1e-12)
+    assert found["cooling_kJ_h"] == pytest.approx(20.0 * 2.0 * 50.0, rel=1e-12)
+    assert found["duty_kJ_h"] == pytest.approx(
+        condensed["A"] * 800.0 + condensed["B"] * 900.0 + 2000.0, rel=1e-12
+    )
 
 
 DRYER_MATERIALS = """\
@@ -739,6 +964,16 @@ def test_sublimation_cooling_and_the_condenser_against_hand_calculations(tmp_pat
     assert "sublimed" in text and "cooling" in text and "condenser at 283.15 K, 10 kPa(a)" in text
     (basis,) = model_bases(process)
     assert "sublimation of X_s" in basis.detail and "vacuum condenser" in basis.detail
+    # the parts that set the outlets are assumed: not sourced, and the basis states the
+    # temperatures propagate writes
+    assert basis.sourced is False
+    assert basis.detail.endswith("; not sourced: sublimation, cooling, condenser")
+    assert "cooled after drying, the product to 303.15 K" in basis.detail
+    assert not any("product and vapour leave at the drying" in a for a in basis.assumptions)
+    assert (
+        "the product leaves at its discharge temperature; the vapour and the condensate leave "
+        "at the condenser's temperature; constant heat capacity of the cake"
+    ) in basis.assumptions
 
 
 def test_the_dryer_refuses_what_it_cannot_decide(tmp_path):

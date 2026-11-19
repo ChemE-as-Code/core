@@ -1424,8 +1424,12 @@ class Crystallizer(Strict):
                 + " (0 where it has no effect), no others"
             )
         liquor = self.solubility.liquor if self.solubility is not None else None
-        if liquor is not None and set(liquor.mass_fraction) - set(self.spectators):
-            raise ValueError("solubility.liquor.mass_fraction: spectators of the crystallizer")
+        if liquor is not None and set(liquor.mass_fraction) - (set(self.spectators) - oil):
+            raise ValueError(
+                "solubility.liquor.mass_fraction: "
+                + ("dissolved spectators, not the second liquid's" if oil else "spectators")
+                + " of the crystallizer"
+            )
         return self
 
 
@@ -1533,10 +1537,13 @@ class DryerCondenser(Strict):
     dryer's ``pressure``, cooled to ``temperature``, where an ideal condensate is in
     equilibrium with what passes to the vacuum pump (Raoult's law, each vapour's Antoine
     ``vapour_pressure``). Its duty is the vapour's latent heat (the dryer's) of what condenses
-    and the condensate's cooling at ``heat_capacity``; a sublimate passes it uncounted."""
+    and all of the vapour cooled as liquid at ``heat_capacity`` (what passes re-evaporated at
+    the same latent heat, as a vent condenser's); a sublimate passes it uncounted."""
 
     temperature: float = Field(gt=0, description="K: the condensate and the gas leave at it.")
-    heat_capacity: float = Field(gt=0, description="kJ/(kg K) of the condensate, constant")
+    heat_capacity: float = Field(
+        gt=0, description="kJ/(kg K) of the vapour cooled as liquid (condensate), constant"
+    )
     port: str | None = Field(
         default=None, description="The energy outlet port of the condenser: its duty is compared."
     )

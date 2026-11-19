@@ -976,12 +976,20 @@ def liquor_of(process: Any, spec: Any) -> Liquor | None:
     )
 
 
+def dissolved_spectators(spec: Any) -> list[str]:
+    """The crystallizer's spectators in its mother liquor: all but the second liquid's (ADR
+    0072)."""
+    oil = set(spec.second_liquid.components) if spec.second_liquid is not None else set()
+    return [n for n in spec.spectators if n not in oil]
+
+
 def pure_solvent_only(spec: Any) -> bool:
-    """Whether the crystallizer's solubility is a pure-solvent value although it declares
-    spectators (refused: no silent pure-solvent value in a mixed liquor)."""
+    """Whether the crystallizer's solubility is a pure-solvent value although its mother liquor
+    holds spectators (refused: no silent pure-solvent value in a mixed liquor); a second
+    liquid's spectators are not in it."""
     sol = spec.solubility
     return bool(
-        spec.spectators
+        dissolved_spectators(spec)
         and sol is not None
         and sol.measured_in == "pure_solvent"
         and sol.salting_out is None
@@ -1021,10 +1029,11 @@ def solve_node(process: Any, node: Any, inlet: Any, case: str) -> tuple[TrainRes
     inlets = _inlets(inlet)
     feed = node_feed(process, spec, inlets, case)
     liquor = liquor_of(process, spec)
-    if feed.others > 0 and pure_solvent_only(spec):
+    held = [n for n in dissolved_spectators(spec) if feed.spectators.get(n)]
+    if held and pure_solvent_only(spec):
         raise Unsupported(
             f"the solubility of {spec.solute} is the pure solvent's, the liquor holds "
-            + ", ".join(n for n, v in feed.spectators.items() if v)
+            + ", ".join(held)
             + ": no pure-solvent value in a mixed liquor (give data measured_in: mother_liquor "
             "or salting_out: coefficients)"
         )
@@ -1141,7 +1150,8 @@ def filter_node(
     process: Any, node: Any, inlet: Any, case: str
 ) -> tuple[dict[str, dict[str, float]], dict, dict[str, Any] | None]:
     """:func:`separate_node`, and what a ``wash:`` did (:func:`wash_cake`, with the mother
-    liquor's own ``filtrate``; None without a wash)."""
+    liquor's own ``filtrate`` and the ``unwashed_cake`` it was filtered from; None without a
+    wash)."""
     from chemeascode.domains.process.solids import solid_components
 
     spec = node.solid_separation
@@ -1181,6 +1191,7 @@ def filter_node(
     washed, filtered, summary = wash_cake(
         cake, wash, solids, washing, washing.cake_liquid or spec.cake_liquid, solubility
     )
+    summary["unwashed_cake"] = cake
     summary["filtrate"] = filtrate
     summary["wash_filtrate"] = filtered
     if dissolution is not None and dissolution.solubility.transfer is not None:
@@ -1320,7 +1331,7 @@ def rules(process: Any) -> list[Finding]:
                     "error",
                     "crystallizer",
                     f"{node.id}: the solubility of {spec.solute} is the pure solvent's, but the "
-                    f"mother liquor holds the spectators {', '.join(spec.spectators)}",
+                    f"mother liquor holds the spectators {', '.join(dissolved_spectators(spec))}",
                     [*loc, "solubility"],
                     [node.id],
                     "give solubility data measured in that liquor (measured_in: mother_liquor) "

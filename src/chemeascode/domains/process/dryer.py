@@ -122,15 +122,22 @@ def dry_mass(
 def kept_by(wet: dict[str, float], pressures: dict[str, float], kept: float) -> dict[str, float]:
     """The share of each volatile in *wet* (kg) that an open (Rayleigh) evaporation of an ideal
     liquid at constant temperature leaves when *kept* kg of them remain: ``n_i / n_i0 = f^(P_i
-    / P_max)`` (*pressures* kPa), ``f`` by bisection. DryerError when the volatiles that do not
-    evaporate (no vapour pressure there) are more than *kept*."""
+    / P_max)`` (*pressures* kPa), by bisection on the least volatile's share ``g = f^(P_min /
+    P_max)`` (``f`` itself can be far below the smallest step of a bisection when ``P_min`` is
+    small). DryerError when the volatiles that do not evaporate (no vapour pressure there) are
+    more than *kept*, or when the shares found do not leave *kept*."""
     top = max((pressures[n] for n in wet), default=0.0)
     if top <= 0:
         raise DryerError("no volatile has a vapour pressure at the drying temperature")
-    alpha = {n: pressures[n] / top for n in wet}
+    least = min(pressures[n] for n in wet if pressures[n] > 0)
+    power = {n: pressures[n] / least for n in wet}
 
-    def left(f: float) -> float:
-        return sum(v * f ** alpha[n] if alpha[n] > 0 else v for n, v in wet.items())
+    def shares(g: float) -> dict[str, float]:
+        return {n: g ** power[n] if power[n] > 0 else 1.0 for n in wet}
+
+    def left(g: float) -> float:
+        kept_share = shares(g)
+        return sum(v * kept_share[n] for n, v in wet.items())
 
     if left(0.0) > kept * (1 + 1e-12) + 1e-12:
         raise DryerError(
@@ -146,8 +153,13 @@ def kept_by(wet: dict[str, float], pressures: dict[str, float], kept: float) -> 
             high = mid
         else:
             low = mid
-    f = (low + high) / 2
-    return {n: f ** alpha[n] if alpha[n] > 0 else 1.0 for n in wet}
+    g = (low + high) / 2
+    if abs(left(g) - kept) > 1e-9 * kept + 1e-12 * sum(wet.values()):
+        raise DryerError(
+            f"the open evaporation leaves {left(g):.6g} kg/h of volatiles, not the residual "
+            f"moisture's {kept:.6g} kg/h: the bisection did not reach it"
+        )
+    return shares(g)
 
 
 def flash(vapour: dict[str, float], k: dict[str, float]) -> dict[str, float]:
