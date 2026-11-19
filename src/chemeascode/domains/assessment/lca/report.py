@@ -1774,9 +1774,9 @@ def manifest(report: LcaReport) -> dict[str, Any]:
     scope = report.scope
     inv = report.inventory
     inputs = {}
-    construction = {e.takeoff for e in scope.construction} if scope is not None else set()
-    unread = {MTO_CSV} if "mto" not in construction else set()
-    if "equipment" not in construction:
+    counted = _counted_from(scope) if scope is not None else set()
+    unread = {MTO_CSV} if "mto" not in counted else set()
+    if "equipment" not in counted:
         unread.add(LIST_FILES["equipment"])
     for path in (
         *(p for p in REPORT_INPUTS if p not in unread),
@@ -1938,6 +1938,16 @@ def _numbers(dumper: yaml.SafeDumper, data: list) -> yaml.Node:
 _DatasetDumper.add_representer(list, _numbers)
 
 
+def _counted_from(scope: LcaFile) -> set[str]:
+    """What the results count from (``mto``: the take-off, ``equipment``: the equipment list):
+    the construction entries' ``takeoff`` and the equipment-leak estimates' ``count_from``."""
+    kinds = {entry.takeoff for entry in scope.construction}
+    for estimate in scope.emission_estimates:
+        if estimate.method == "equipment-leaks":
+            kinds.update(estimate.count_from)
+    return kinds
+
+
 def _construction_inputs(
     root: Path, scope: LcaFile
 ) -> tuple[list | None, list | None, list[Finding]]:
@@ -1945,11 +1955,7 @@ def _construction_inputs(
     estimates count (None: absent), and the problems reading them. The equipment list is read
     whenever it is valid: the completeness of the emission estimates looks for combustion units
     and tanks in it."""
-    kinds = {entry.takeoff for entry in scope.construction}
-    if any(
-        e.method == "equipment-leaks" and "mto" in e.count_from for e in scope.emission_estimates
-    ):
-        kinds.add("mto")
+    kinds = _counted_from(scope)
     takeoff = equipment = None
     found: list[Finding] = []
     if "mto" in kinds and (root / MTO_CSV).is_file():
