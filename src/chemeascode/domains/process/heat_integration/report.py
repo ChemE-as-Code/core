@@ -281,7 +281,7 @@ def pinch_report(
             )
         )
         return report
-    if not entry.get("converged"):
+    if not record.numerically_converged(entry):
         report.findings.append(
             _finding(
                 "error",

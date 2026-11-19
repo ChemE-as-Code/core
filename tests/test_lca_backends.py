@@ -1060,3 +1060,107 @@ def test_lca_map_edit_keeps_the_file_and_checks_itself() -> None:
     assert yaml.safe_load(new)["flows"] == [
         {"key": "feed:A", "activity": activity, "source": "D-6"}
     ]
+
+
+# -- Brightway units (without a project: unit_scores stubbed) ------------------------------------
+
+_GWP = ("IPCC 2021", "climate change", "GWP 100a")
+
+
+def _characterise(monkeypatch, row, background, unit: str, score: float):
+    """characterise_brightway of the one *row* whose background Brightway finds per *unit*,
+    with *score* kg CO2-eq per that unit; the flow references it asked for, the result."""
+    from chemeascode.domains.assessment.lca.allocation import AllocatedRow
+    from chemeascode.domains.assessment.lca.impacts import characterise_brightway
+    from chemeascode.domains.assessment.lca.inventory import Inventory
+    from chemeascode.domains.assessment.lca.schemas import Background, Brightway
+
+    asked: dict = {}
+
+    def unit_scores(project, methods, activities, flows):
+        asked.update(flows)
+        return brightway.Scores(
+            method_units={_GWP: "kg CO2-eq"}, found={0: (unit, {_GWP: score})}, labels={0: "x"}
+        )
+
+    monkeypatch.setattr(brightway, "unit_scores", unit_scores)
+    key, quantity, row_unit, cas = row
+    inventory = Inventory(
+        case="design",
+        functional_unit="1 t PROD",
+        method="none",
+        rows=[
+            AllocatedRow(
+                key, key, "in", "resource", 1.0, "kg/h", quantity, row_unit, "given", cas=cas
+            )
+        ],
+        backgrounds={key: Background(source="test", **background)},
+    )
+    config = Brightway(
+        project="p", biosphere="biosphere3", categories=[{"id": "gwp", "method": list(_GWP)}]
+    )
+    return asked, characterise_brightway(inventory, config)
+
+
+def test_brightway_water_in_kg_is_converted_to_the_crosswalk_m3(monkeypatch) -> None:
+    """#311: water mapped elementary is counted in kg; biosphere3 counts it in m3 (per_kg 0.001
+    in the crosswalk), so 2 kg is 0.002 m3, not a unit error."""
+    elementary = {"compartment": "resource", "subcompartment": "in-water", "flow": "water-river"}
+    asked, (_, impacts, findings) = _characterise(
+        monkeypatch,
+        ("resource:H2O", 2.0, "kg", "7732-18-5"),
+        {"elementary": elementary},
+        "cubic meter",
+        5.0,
+    )
+    assert asked[0].uuid == "8c75e7ab-8ab8-41e4-b394-c166ff5b050d"  # Water, river
+    assert [f.rule for f in findings] == []
+    (impact,) = impacts
+    assert (impact.quantity, impact.unit) == (2.0, "kg")
+    assert impact.factor == pytest.approx(5.0 * 0.001)  # per kg: 0.001 m3
+    assert impact.value == pytest.approx(2.0 * 0.001 * 5.0)
+
+
+def test_brightway_kg_row_against_an_m3_activity_still_refused(monkeypatch) -> None:
+    """The conversion is the crosswalk's, for elementary water only: a kg row mapped to a
+    biosphere flow by name that Brightway counts in m3 stays a unit error."""
+    biosphere = {
+        "database": "biosphere3",
+        "name": "Water, river",
+        "categories": ["natural resource"],
+    }
+    _, (_, impacts, findings) = _characterise(
+        monkeypatch,
+        ("resource:H2O", 2.0, "kg", "7732-18-5"),
+        {"biosphere": biosphere},
+        "cubic meter",
+        5.0,
+    )
+    assert impacts == [] and [f.rule for f in findings] == ["cheme.lca-activity-unit"]
+
+
+@pytest.mark.parametrize(
+    ("row_unit", "bw_unit", "per"),
+    [
+        ("m2*a", "square meter-year", 1.0),
+        ("kBq", "kilo Becquerel", 1.0),
+        ("kBq", "Becquerel", 1000.0),
+    ],
+)
+def test_brightway_land_occupation_and_radioactivity_units(
+    monkeypatch, row_unit: str, bw_unit: str, per: float
+) -> None:
+    """#312: m2*a and kBq rows against biosphere flows Brightway counts in square meter-year
+    and kilo Becquerel (Becquerel: 1000 per kBq) are characterised, not refused."""
+    biosphere = {
+        "database": "biosphere3",
+        "name": "Occupation, industrial area",
+        "categories": ["natural resource", "land"],
+    }
+    _, (_, impacts, findings) = _characterise(
+        monkeypatch, ("resource:land", 3.0, row_unit, None), {"biosphere": biosphere}, bw_unit, 2.0
+    )
+    assert [f.rule for f in findings] == []
+    (impact,) = impacts
+    assert impact.factor == pytest.approx(2.0 * per)
+    assert impact.value == pytest.approx(3.0 * 2.0 * per)

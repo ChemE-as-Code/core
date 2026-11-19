@@ -206,6 +206,22 @@ def test_allocation_shares_move_with_the_coproducts(blocks: Path) -> None:
     assert rho["amount:product:WATER"] < -0.3
 
 
+@pytest.mark.parametrize("method", ["economic", "energy", "exergy", "shares"])
+def test_single_product_needs_no_allocation_property(blocks: Path, method: str) -> None:
+    """#310: one product takes the whole burden whatever the method, also in the Monte Carlo,
+    even when the method's property (price, energy, exergy, share) is not given."""
+    scope = _scope(allocation={"method": method})
+    if method == "shares":
+        scope["allocation"]["shares"] = {"OTHER": 1.0}  # no share of PROD
+    scope["flows"][1]["uncertainty"] = {"gsd2": 1.0}
+    _write(blocks, scope)
+    report = lca_report(blocks)
+    assert report.loaded, [f.format() for f in report.findings]
+    stats = report.uncertainty.statistics[0]
+    assert stats.deterministic == pytest.approx(1470.5)
+    assert stats.median == pytest.approx(1470.5, rel=0.01)
+
+
 # -- elementary emissions -----------------------------------------------------------------------
 
 

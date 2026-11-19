@@ -22,8 +22,14 @@ These live in `process/reactions.yaml` (skill `reactions`); ask for what is miss
 
 Reaction models, extents and duties: skill `reactions` and `cheme process reactors`. Which ideal
 reactor suits the reactions: `cheme process reactor-choice`. Hazards screening: `cheme process
-reactor-hazards`. Catalyst mass and volume: `cheme datasheets fill`. Everything below is
-engineering guidance only; core has no calculation for it.
+reactor-hazards`. Catalyst mass and volume: `cheme datasheets fill`. A batch or semi-batch
+stirred tank's vessel and jacket are checked by `cheme process recipe`: `vessel.fill_fraction`
+(default 0.8) sizes the vessel from the model's largest working volume (or `vessel.volume` gives
+an existing one, `cheme.recipe-vessel` if overfilled), and `vessel.jacket: {u, area,
+coolant_temperature}` is compared with the model's peak duty where the model gives one
+(`cheme.recipe-jacket`: dose more slowly, colder coolant, a coil or external loop, a smaller
+batch). A padded head space is modelled with `batch.vent.head_space` (it needs `vent.inerts`;
+ADR 0071, skill `reactions`). The rest below is engineering guidance only.
 
 What limits the rate selects the design: intrinsic kinetics (volume follows residence time); mass
 transfer (design as mass-transfer equipment); mixing (very fast reactions); heat transfer (a
@@ -34,7 +40,8 @@ Geometries and what each brings:
 
 - Stirred tank: agitator and drive, baffles, jacket or coil, a vapour space for pressure control
   (typically a tenth of the vessel, often a quarter to two fifths; the basis is foaming, gas
-  evolution, entrainment and venting, so ask before calling headspace adequate). Good temperature
+  evolution, entrainment and venting, so ask before calling headspace adequate; core's default
+  fill fraction 0.8 leaves a fifth: set `fill_fraction` from the basis you ask for). Good temperature
   control, lowest conversion per volume; often in series.
 - Tubular: high conversion per volume, good heat transfer, axial gradient, hot spots in exothermic
   service; L/D above about 20.

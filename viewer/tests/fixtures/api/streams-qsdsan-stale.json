@@ -58,6 +58,11 @@
           "basis": null,
           "provenance": "calculated",
           "source": "cheme process simulate: QSDsan contract-demonstration",
+          "producer": {
+            "tool": "cheme process simulate",
+            "adapter": "qsdsan",
+            "model": "contract-demonstration"
+          },
           "stale": true
         },
         "TN": {
@@ -66,6 +71,11 @@
           "basis": null,
           "provenance": "calculated",
           "source": "cheme process simulate: QSDsan contract-demonstration",
+          "producer": {
+            "tool": "cheme process simulate",
+            "adapter": "qsdsan",
+            "model": "contract-demonstration"
+          },
           "stale": true
         }
       },
@@ -102,6 +112,11 @@
           "basis": null,
           "provenance": "calculated",
           "source": "cheme process simulate: QSDsan contract-demonstration",
+          "producer": {
+            "tool": "cheme process simulate",
+            "adapter": "qsdsan",
+            "model": "contract-demonstration"
+          },
           "stale": true
         },
         "TN": {
@@ -110,6 +125,11 @@
           "basis": null,
           "provenance": "calculated",
           "source": "cheme process simulate: QSDsan contract-demonstration",
+          "producer": {
+            "tool": "cheme process simulate",
+            "adapter": "qsdsan",
+            "model": "contract-demonstration"
+          },
           "stale": true
         },
         "NH4": {
@@ -118,6 +138,11 @@
           "basis": null,
           "provenance": "calculated",
           "source": "cheme process simulate: QSDsan contract-demonstration",
+          "producer": {
+            "tool": "cheme process simulate",
+            "adapter": "qsdsan",
+            "model": "contract-demonstration"
+          },
           "stale": true
         }
       },

@@ -148,6 +148,17 @@ def write(path: Path, data: object) -> None:
     print(f"wrote {path.relative_to(VIEWER)}")
 
 
+def stable_solver_floats(data: object) -> object:
+    """Keep 12 significant digits in numerical viewer samples across platforms."""
+    if isinstance(data, float):
+        return float(format(data, ".12g"))
+    if isinstance(data, dict):
+        return {key: stable_solver_floats(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [stable_solver_floats(value) for value in data]
+    return data
+
+
 def client_for(root: Path) -> TestClient:
     return TestClient(create_app(root, None, allowed_hosts=["testserver"]))
 
@@ -164,6 +175,21 @@ def copy_plant(source: Path, target: Path, keep_git: bool = False) -> Path:
     skipped = ["build", "node_modules", ".venv"] + ([] if keep_git else [".git"])
     shutil.copytree(source, target, ignore=shutil.ignore_patterns(*skipped))
     return target
+
+
+def copy_core_example(core: Path, name: str, target: Path) -> Path:
+    """Use the same text bytes for Git commits and worker hashes on every host."""
+    root = copy_plant(core / "examples" / name, target)
+    text_suffixes = {".csv", ".json", ".md", ".py", ".txt", ".xml", ".yaml", ".yml"}
+    for path in root.rglob("*"):
+        if not path.is_file() or (
+            path.suffix not in text_suffixes and path.name not in {".gitattributes", ".gitignore"}
+        ):
+            continue
+        data = path.read_bytes()
+        if b"\r\n" in data:
+            path.write_bytes(data.replace(b"\r\n", b"\n"))
+    return root
 
 
 def asu_plant(path: Path) -> Path:
@@ -359,7 +385,7 @@ def asu_mto_fixture(tmp: Path) -> None:
     for command, name in (("mto", "mto-asu.csv"), ("estimate", "estimate-asu.csv")):
         out = subprocess.run([sys.executable, "-m", "chemeascode", "assess", command, "--csv"], cwd=root, check=True, capture_output=True, text=True)
         path = FIXTURES / "api" / name
-        path.write_text(out.stdout, encoding="utf-8")
+        path.write_text(out.stdout, encoding="utf-8", newline="\n")
         print(f"wrote {path.relative_to(VIEWER)}")
 
 
@@ -372,7 +398,7 @@ def lca_fixture(asu: Path, tmp: Path) -> None:
     write(FIXTURES / "api" / "lca-asu.json", get(client_for(root), "/api/lca"))
     out = subprocess.run([sys.executable, "-m", "chemeascode", "assess", "lca", "--csv"], cwd=root, check=True, capture_output=True, text=True)
     path = FIXTURES / "api" / "lca-asu.csv"
-    path.write_text(out.stdout, encoding="utf-8")
+    path.write_text(out.stdout, encoding="utf-8", newline="\n")
     print(f"wrote {path.relative_to(VIEWER)}")
 
 
@@ -481,7 +507,7 @@ def tea_fixtures(core: Path, asu: Path, tmp: Path) -> None:
     git(root, "commit", "-q", "-m", "ASU TEA")
     write(FIXTURES / "api" / "tea-asu.json", get(client_for(root), "/api/tea"))
 
-    blocks = copy_plant(core / "examples" / "process-blocks", tmp / "blocks-tea")
+    blocks = copy_core_example(core, "process-blocks", tmp / "blocks-tea")
     (blocks / "estimate").mkdir(exist_ok=True)
     (blocks / "estimate" / "tea.yaml").write_text(yaml.safe_dump(BLOCKS_TEA, sort_keys=False), encoding="utf-8")
     git(blocks, "init", "-q", "-b", "main")
@@ -574,7 +600,7 @@ def simulation_run_fixtures(core: Path, tmp: Path) -> None:
     from tests.test_process_simulate import fake  # the stand-in solver of core's tests
 
     def plant(name: str) -> Path:
-        root = copy_plant(core / "examples" / "process-simulation", tmp / name)
+        root = copy_core_example(core, "process-simulation", tmp / name)
         git(root, "init", "-q", "-b", "main")
         git(root, "add", ".")
         git(root, "commit", "-q", "-m", "Simulation example")
@@ -614,7 +640,7 @@ def simulation_run_fixtures(core: Path, tmp: Path) -> None:
 def reactions_fixtures(core: Path, tmp: Path) -> None:
     """`/api/reactions` (and `/api/streams`) of core's `examples/process-ammonia`; and with the
     stoichiometry made unbalanced in the working tree."""
-    root = copy_plant(core / "examples" / "process-ammonia", tmp / "process-ammonia")
+    root = copy_core_example(core, "process-ammonia", tmp / "process-ammonia")
     git(root, "init", "-q", "-b", "main")
     git(root, "add", ".")
     git(root, "commit", "-q", "-m", "Ammonia example")
@@ -628,14 +654,14 @@ def reactions_fixtures(core: Path, tmp: Path) -> None:
         raise SystemExit("process-ammonia: the unbalanced reaction has no finding; update this script")
     write(out / "reactions-ammonia-unbalanced.json", data)
 
-    shift = copy_plant(core / "examples" / "process-shift", tmp / "process-shift")
+    shift = copy_core_example(core, "process-shift", tmp / "process-shift")
     git(shift, "init", "-q", "-b", "main")
     git(shift, "add", ".")
     git(shift, "commit", "-q", "-m", "Shift example")
     data = get(client_for(shift), "/api/reactions")
     if not (data["kinetics"]["catalysts"] and data["reactions"][0]["rate_law"]):
         raise SystemExit("process-shift: no catalyst or rate law served; update this script")
-    write(out / "reactions-shift.json", data)
+    write(out / "reactions-shift.json", stable_solver_floats(data))
 
     # The catalysis results: core's test plants of tests/test_serve_catalysis.py (a CO oxidation
     # mechanism at its reactor's outlet; rates of the shift example's own law, with a file that
@@ -651,7 +677,7 @@ def reactions_fixtures(core: Path, tmp: Path) -> None:
     if not any(r["microkinetics"] and r["microkinetics"]["missing"] is None for r in data["reactions"]):
         raise SystemExit("coox: no microkinetic analysis served; update this script")
     write(out / "reactions-coox.json", data)
-    measured = copy_plant(core / "examples" / "process-shift", tmp / "process-shift-kinetics")
+    measured = copy_core_example(core, "process-shift", tmp / "process-shift-kinetics")
     _kinetic_data(measured)
     git(measured, "init", "-q", "-b", "main")
     git(measured, "add", ".")
@@ -686,7 +712,7 @@ def bed_fixtures(core: Path, tmp: Path) -> None:
     changed (stale) and of a fresh copy whose outer loop does not settle (not converged)."""
     out = FIXTURES / "api"
     for name, bed in SHIFT_BEDS.items():
-        root = copy_plant(core / "examples" / "process-shift", tmp / f"shift-{name}")
+        root = copy_core_example(core, "process-shift", tmp / f"shift-{name}")
         replace_once(root / "process" / "flowsheet.yaml", SHIFT_BED, bed)
         if name == "cooled":
             replace_once(root / "process" / "catalysts.yaml", "temperature: [583.15, 773.15]", "temperature: [583.15, 640]")
@@ -697,7 +723,7 @@ def bed_fixtures(core: Path, tmp: Path) -> None:
         r1 = next(r for r in data["reactors"] if r["node"] == "R1")
         if (r1["bed"] is None) != (name == "failed"):
             raise SystemExit(f"process-shift {name}: bed {r1['bed'] is not None}, missing {r1['missing']}; update this script")
-        write(out / f"reactions-bed-{name}.json", data)
+        write(out / f"reactions-bed-{name}.json", stable_solver_floats(data) if name == "inlet" else data)
 
     sys.path.insert(0, str(core))
     from chemeascode.domains.process.model import load as load_process
@@ -730,7 +756,7 @@ def bed_fixtures(core: Path, tmp: Path) -> None:
     data = get(client_for(root), "/api/simulation")
     if data["run"]["converged"] is not False:
         raise SystemExit("kinetic bed: the drifting loop converged; update this script")
-    write(out / "simulation-bed-failed.json", data)
+    write(out / "simulation-bed-failed.json", stable_solver_floats(data))
 
 
 # The datasheet fixtures' drawings: one of each family and every drawing state.
@@ -843,7 +869,7 @@ def control_fixtures(core: Path, tmp: Path) -> None:
     """`/api/control` and `/api/repo` of core's `examples/process-separation` (a
     narrative, a control philosophy, five loops, two sequences, one trip), committed once in a
     fresh git repository: every file drafted, PIC-104 a deliberate draft with open points."""
-    root = copy_plant(core / "examples" / "process-separation", tmp / "process-separation")
+    root = copy_core_example(core, "process-separation", tmp / "process-separation")
     git(root, "init", "-q", "-b", "main")
     git(root, "add", ".")
     git(root, "commit", "-q", "-m", "Control example")
@@ -888,7 +914,7 @@ def issues_fixtures(core: Path, tmp: Path) -> None:
     `basic`), GitHub replaced by ISSUE_ITEMS; and the 503 when GitHub cannot be read."""
     from chemeascode.integrations import github
 
-    root = copy_plant(core / "examples" / "process-separation", tmp / "process-separation-issues")
+    root = copy_core_example(core, "process-separation", tmp / "process-separation-issues")
     plant = root / "plant.yaml"
     replace_once(plant, "stage: concept\n", "stage: basic\n")
     plant.write_text(
@@ -897,6 +923,7 @@ def issues_fixtures(core: Path, tmp: Path) -> None:
         + f'  label: "{ISSUE_LABEL}"\n'
         + "  forms: {action: 1-action-item.yml, hold: 2-engineering-hold.yml, tq: 3-technical-query.yml, change: 4-design-change.yml}\n",
         encoding="utf-8",
+        newline="\n",
     )
     git(root, "init", "-q", "-b", "main")
     git(root, "add", ".")
@@ -927,7 +954,7 @@ def issues_fixtures(core: Path, tmp: Path) -> None:
 
 
 def process_fixtures(core: Path, tmp: Path) -> None:
-    root = copy_plant(core / "examples" / "process-nested", tmp / "process-nested")
+    root = copy_core_example(core, "process-nested", tmp / "process-nested")
     git(root, "init", "-q", "-b", "main")
     git(root, "add", ".")
     git(root, "commit", "-q", "-m", "Process example")
@@ -967,11 +994,11 @@ def qsdsan_fixtures(core: Path, tmp: Path) -> None:
     from chemeascode.domains.process.simulation.run import run
     from chemeascode.foundation.workspace import Workspace
 
-    root = copy_plant(core / "examples/process-qsdsan", tmp / "water-quality")
+    root = copy_core_example(core, "process-qsdsan", tmp / "water-quality")
     plant, _ = load(root)
     with (
         patch.dict(os.environ, {"CHEME_QSDSAN_PYTHON": sys.executable}),
-        patch("chemeascode.domains.process.simulation.qsdsan.uuid4", return_value=UUID(int=1)),
+        patch("chemeascode.domains.process.simulation.worker_run.uuid4", return_value=UUID(int=1)),
     ):
         outcome = run(Workspace(root), plant, "design", write=True)
     if outcome.findings:
@@ -983,7 +1010,26 @@ def qsdsan_fixtures(core: Path, tmp: Path) -> None:
         if sim["stale"] is not False:
             raise RuntimeError(sim["staleness"])
         sim["run"]["tool"] = "cheme-as-code fixture"
+        sim["run"]["execution"]["elapsed_s"] = 0.1
         write(out / "simulation-qsdsan.json", sim)
+        # Reader compatibility with an imported partial record. Production worker fill
+        # retains partial responses under simulation-attempts and never accepts them here.
+        from chemeascode.domains.process.simulation import record
+
+        record_path = root / record.RUN_FILE
+        accepted = record_path.read_bytes()
+        data = json.loads(accepted)
+        entry = data["cases"]["design"]
+        entry.update(status="not-converged", integration_completed=False, converged=False)
+        entry["outcome"]["integration"].update(achieved_end=0.5, completed=False)
+        entry["messages"] = ["Imported diagnostic record: requested interval was not completed."]
+        entry["streams"] = []
+        entry.pop("evidence", None)
+        entry["execution"]["elapsed_s"] = 0.1
+        entry["tool"] = "cheme-as-code fixture"
+        record_path.write_text(json.dumps(data), encoding="utf-8")
+        write(out / "simulation-worker-partial.json", get(client, "/api/simulation"))
+        record_path.write_bytes(accepted)
         with (root / "results.json").open("a", encoding="utf-8") as f:
             f.write("\n")
         write(out / "streams-qsdsan-stale.json", get(client, "/api/streams"))

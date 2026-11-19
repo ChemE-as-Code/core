@@ -10,15 +10,24 @@ import { isRecord } from "./guards";
 export const SIMULATION_FILE = "process/simulation.yaml";
 export const RUN_FILE = "process/simulation-run.json";
 
-/** What the recorded run says: converged, did not converge, or no run recorded for the case. */
-export type RunState = "converged" | "failed" | "not-run";
+/** The recorded numerical solve or dynamic completion; neither establishes steady state. */
+export type RunState = "converged" | "completed" | "failed" | "not-run";
 
 export function runState(view: Pick<SimulationView, "run">): RunState {
   if (!view.run) return "not-run";
+  if (view.run.outcome) {
+    if (view.run.execution?.state !== "completed") return "failed";
+    if (view.run.outcome.mode === "dynamic") {
+      return view.run.status === "completed" && view.run.outcome.integration?.completed ? "completed" : "failed";
+    }
+    return view.run.outcome.convergence === "converged" && view.run.status === "converged" ? "converged" : "failed";
+  }
+  if (view.run.integration_completed) return "completed";
   return view.run.converged ? "converged" : "failed";
 }
 
 export const RUN_BADGE: Record<RunState, { badge: string; label: string; title: string }> = {
+  completed: { badge: "pass", label: "integration completed", title: "Completed the requested interval; steady state is assessed separately" },
   converged: { badge: "pass", label: "converged", title: "The recorded run converged" },
   failed: { badge: "fail", label: "not converged", title: "The recorded run did not converge: no stream value was written" },
   "not-run": { badge: "", label: "not run", title: "No run recorded for this case" },

@@ -199,9 +199,12 @@ def monte_carlo(inventory, impacts, categories, scope, factors, fu_kg: float) ->
         exchange = next(e for e in dataset.exchanges if e.key == key)
         return exchange.amount * multiplier.get(key, one)
 
-    if method in PROPORTIONAL:
+    products = dataset.products()
+    if [p.key for p in products] == [fu_key]:
+        share = one  # one product: nothing to allocate, whatever the method (as weights())
+    elif method in PROPORTIONAL:
         weights = {}
-        for product in dataset.products():
+        for product in products:
             name = product.key.split(":", 1)[1]
             if method == "shares":
                 weights[name] = np.full(n, scope.allocation.shares[name])

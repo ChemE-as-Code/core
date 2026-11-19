@@ -19,6 +19,8 @@ from chemeascode.domains.process.simulation import SIMULATION_FILE
 from chemeascode.foundation.findings import Finding
 from chemeascode.foundation.yamlsource import _yaml_line
 
+from .qsdsan import QSDsanAdapter
+
 DWSIM = "dwsim"
 IDAES = "idaes"
 QSDSAN = "qsdsan"
@@ -206,24 +208,39 @@ class Backend:
         return {}
 
 
-class QSDsanBackend(Backend):
-    """Project-supplied process model executed using the worker protocol."""
+class ProjectWorkerBackend(Backend):
+    """Bind simulator semantics to shared orchestration, without a transport assumption."""
 
     molecular = False
+
+    def __init__(self, adapter):
+        self.adapter = adapter
+
+    def config(self, sim):
+        return getattr(sim, self.adapter.configuration_name)
 
     def inputs(self, sim):
         from .worker_model import inputs
 
-        return inputs(sim.qsdsan)
+        return inputs(self.config(sim))
 
     def spec(self, sim):
-        return {"molecular": False, "model": sim.qsdsan.model, "qsdsan": sim.qsdsan.model_dump()}
+        config = self.config(sim)
+        return {
+            "molecular": self.adapter.publication == "molecular",
+            "model": config.model,
+            "capabilities": {
+                "modes": list(self.adapter.modes),
+                "publication": self.adapter.publication,
+                "trajectory_formats": ["csv"],
+            },
+            self.adapter.configuration_name: config.model_dump(mode="json"),
+        }
 
-    @staticmethod
-    def worker(*args, **kwargs):
-        from .qsdsan import run
+    def worker(self, *args, **kwargs):
+        from .worker_run import run
 
-        return run(*args, **kwargs)
+        return run(*args, adapter=self.adapter, **kwargs)
 
     def prepare(self, process, sim, case, fingerprints=None):
         from . import worker_model
@@ -232,9 +249,9 @@ class QSDsanBackend(Backend):
         hashes = (
             fingerprints
             if fingerprints is not None
-            else worker_model.hashes(process.root, sim.qsdsan)
+            else worker_model.hashes(process.root, self.config(sim))
         )
-        key = worker_model.fingerprint(process, case, sim.qsdsan, hashes)
+        key = worker_model.fingerprint(process, case, self.config(sim), hashes, self.adapter)
         findings = (
             []
             if key
@@ -250,10 +267,10 @@ class QSDsanBackend(Backend):
         return Translation(fingerprint=key or "", findings=findings)
 
 
-BACKENDS = {DWSIM: Backend(), IDAES: Backend(), QSDSAN: QSDsanBackend()}
+BACKENDS = {DWSIM: Backend(), IDAES: Backend(), QSDSAN: ProjectWorkerBackend(QSDsanAdapter())}
 
 
-def declared_inputs(sim_bytes):
+def declared_inputs(sim_bytes, *, workers_only=False):
     """Extra paths needed to read a saved simulation, including historical revisions."""
     import yaml
     from pydantic import ValidationError
@@ -264,4 +281,5 @@ def declared_inputs(sim_bytes):
         sim = Simulation.model_validate(yaml.safe_load(sim_bytes))
     except (ValueError, ValidationError, yaml.YAMLError):
         return ()
-    return BACKENDS[sim.simulator].inputs(sim)
+    backend = BACKENDS[sim.simulator]
+    return () if workers_only and backend.worker is None else backend.inputs(sim)

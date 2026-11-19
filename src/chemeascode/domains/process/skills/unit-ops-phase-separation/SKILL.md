@@ -20,8 +20,15 @@ tolerates, slugging tendency, solids. Ask what the vessel protects before judgin
 
 ## Workflow and tools
 
-Engineering guidance only; core has no calculation for this beyond `flash` units
-(`process-simulation`) and vessel volume and residence time in `cheme datasheets fill`.
+Engineering guidance for the vessel. Core's calculations: a `flash` unit for vapour-liquid
+equilibrium (`process-simulation`); vessel volume and residence time in `cheme datasheets
+fill`; and, for a decanter, three-phase separator or knockout whose split is known (vendor
+data, a measurement, a DESIGN.md decision), a `recovery:` on the flowsheet block or step (ADR
+0070): `recovery: {outlets: {PORT: {COMPONENT: fraction of its inlet flow}}, provenance,
+source}`, one outlet left out to take the rest. `cheme process propagate` writes the outlets'
+flows and compositions as calculated, and a design spec upstream reaches past it. Temperatures
+and pressures stay as given, and there is no duty. The split is specified, not predicted, and
+`cheme.process-recovery` checks the declaration.
 
 A gas-liquid separator is built from: a primary section with an inlet device, a gravity section
 with retention time, a mist extractor at the gas outlet, and pressure and level control. How many

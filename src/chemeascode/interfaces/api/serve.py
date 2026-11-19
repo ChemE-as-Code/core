@@ -311,6 +311,23 @@ class Snapshot:
         found = self.read_with_id(path)
         return found[0] if found else None
 
+    def raw_fingerprint(self, path: str) -> str | None:
+        """Hash a declared native asset without parsing it or exposing it in API payloads."""
+        if self.commit is None:
+            found = self._working_file(path)
+            if found is None:
+                return None
+            with found.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        else:
+            entry = self._entry(path)
+            if entry is None or entry.blob is None:
+                return None
+            digest = hashlib.sha256(self.repo.cat_blob(entry.blob)).hexdigest()
+        if self.repo.reads is not None:
+            self.repo.reads.add(clean_path(path))
+        return "sha256:" + digest
+
     def read_with_id(self, path: str) -> tuple[bytes, str] | None:
         """The bytes of *path* and their git blob id, or ``None`` when it does not exist."""
         if self.commit is None:
@@ -1640,6 +1657,23 @@ def create_app(
 
     # -- process ---------------------------------------------------------------------
 
+    def _worker_fingerprints(snapshot: Snapshot, sim_bytes: bytes) -> dict[str, str] | None:
+        from chemeascode.domains.process.simulation.backends import declared_inputs
+
+        names = declared_inputs(sim_bytes, workers_only=True)
+        if not names:
+            return None
+        hashes = {}
+        for path in names:
+            _record(path)
+            try:
+                digest = snapshot.raw_fingerprint(path)
+            except (ApiError, OSError):
+                continue  # Missing/refused inputs make the model unavailable, never current.
+            if digest is not None:
+                hashes[path] = digest
+        return hashes
+
     def _process(snapshot: Snapshot) -> Any:
         """``process/*.yaml`` of *snapshot*, loaded as ``cheme process`` loads them (422 when
         the flowsheet does not load), cached by blob ids."""
@@ -1658,7 +1692,12 @@ def create_app(
             found = _small(snapshot, path)
             if found is not None:
                 texts[path] = found
-        if SIMULATION_FILE in texts:
+        worker_hashes = (
+            _worker_fingerprints(snapshot, texts[SIMULATION_FILE][0])
+            if SIMULATION_FILE in texts
+            else None
+        )
+        if SIMULATION_FILE in texts and worker_hashes is None:
             from chemeascode.domains.process.simulation.backends import declared_inputs
 
             for path in declared_inputs(texts[SIMULATION_FILE][0]):
@@ -1679,7 +1718,7 @@ def create_app(
                     target.write_bytes(content)
                 process, findings = load(Path(tmp))
                 if process is not None:  # the staleness of simulated values reads simulation.yaml
-                    prime(process)
+                    prime(process, worker_hashes)
             # reactions.yaml and catalysts.yaml are optional: their errors leave the
             # flowsheet without them
             optional = (REACTIONS_FILE, CATALYSTS_FILE)
@@ -1690,7 +1729,10 @@ def create_app(
                 return None, f"{where}: {first.message if first else 'does not load'}"
             return process, ""
 
-        key = tuple((path, sha) for path, (_, sha) in sorted(texts.items()))
+        key = (
+            tuple((path, sha) for path, (_, sha) in sorted(texts.items())),
+            tuple(sorted((worker_hashes or {}).items())),
+        )
         process, problem = process_cache.get_or_compute(key, compute)
         if process is None:
             raise ApiError(422, problem)
@@ -1758,7 +1800,10 @@ def create_app(
         texts = {}
         from chemeascode.domains.process.simulation.backends import declared_inputs
 
-        for path in declared_inputs(sim_text[0]):
+        # a worker's inputs are fingerprinted without reading them; another simulator's declared
+        # inputs are read whatever their size (only their fingerprint is used, #318)
+        worker_hashes = _worker_fingerprints(snapshot, sim_text[0])
+        for path in () if worker_hashes is not None else declared_inputs(sim_text[0]):
             found = _simulation_input(snapshot, path)
             if found is not None:
                 texts[path] = found
@@ -1788,15 +1833,24 @@ def create_app(
                     f"{SIMULATION_FILE}:{first.line}" if first and first.line else SIMULATION_FILE
                 )
                 return process, None, f"{where}: {first.message if first else 'does not load'}"
-            fingerprints = {
-                p: content_fingerprint(c) for p, (c, _) in texts.items() if p != record.RUN_FILE
-            }
+            fingerprints = (
+                worker_hashes
+                if worker_hashes is not None
+                else {
+                    p: content_fingerprint(c) for p, (c, _) in texts.items() if p != record.RUN_FILE
+                }
+            )
             data = record.parse(texts[record.RUN_FILE][0]) if record.RUN_FILE in texts else None
             view = record.view(process, sim, doc, data, case, fingerprints, problem)
             return process, view, ""
 
         # the process object is cached by its blob ids: holding it keeps its id unique
-        key = (id(process), case, tuple((p, sha) for p, (_, sha) in sorted(texts.items())))
+        key = (
+            id(process),
+            case,
+            tuple((p, sha) for p, (_, sha) in sorted(texts.items())),
+            tuple(sorted((worker_hashes or {}).items())),
+        )
         _, payload, failed = simulation_cache.get_or_compute((key, sim_text[1]), compute)
         if payload is None:
             raise ApiError(422, failed)

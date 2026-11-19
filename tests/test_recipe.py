@@ -359,6 +359,128 @@ def test_heat_up_and_cool_down_times_from_the_jacket(tmp_path):
         )
 
 
+#: a batch (no dose) of 2 kmol/h, half A and half B, reacting fully to 1 kmol/h C: the moles,
+#: so the heat capacity, halve from the charge to the end
+BATCH_MATERIALS = """\
+schema: cheme/process/v1
+kind: materials
+components:
+  - {id: A, name: A, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,
+     liquid_heat_capacity: 150, normal_boiling_point: 400}
+  - {id: B, name: B, formula: C2H4O, molar_mass: 44.05, liquid_molar_volume: 0.1,
+     liquid_heat_capacity: 150, normal_boiling_point: 400}
+  - {id: C, name: C, formula: C4H8O2, molar_mass: 88.1, liquid_molar_volume: 0.1,
+     liquid_heat_capacity: 150, normal_boiling_point: 450}
+templates:
+  - {id: liquid, components: [A, B, C]}
+"""
+
+BATCH_REACTIONS = """\
+schema: cheme/reactions/v1
+kind: reactions
+reactions:
+  - {id: R1, stoichiometry: {A: -1, B: -1, C: 1}, phase: liquid,
+     heat_of_reaction: {value: -100000, provenance: assumed},
+     rate: {form: power_law, basis: volume, driving: concentration, k: {A: 0.01},
+            orders: {A: 1}, provenance: assumed}}
+"""
+
+
+BATCH_FLOWSHEET = (
+    "schema: cheme/process/v1\nkind: flowsheet\nunits: {flow: kmol/h}\nfeeds:\n"
+    "  - {id: F, ports: [{id: out, direction: out}]}\n"
+    "products:\n  - {id: P, ports: [{id: in, direction: in}]}\n"
+    "blocks:\n  - id: R\n    class: ReactingChemicals\n    reactions: [R1]\n"
+    "    reactor: batch\n    batch: {time: 3600, heat: isothermal, provenance: assumed}\n"
+    "    ports: [{id: in, direction: in}, {id: out, direction: out}]\n"
+    "streams:\n"
+    "  - id: S1\n    from: F.out\n    to: R.in\n    template: liquid\n"
+    "    state:\n      design:\n"
+    "        temperature: {value: 300, provenance: given}\n"
+    "        pressure: {value: 101.325, provenance: given}\n"
+    "        flow: {value: 2, provenance: given}\n"
+    "        composition: {basis: mole_fraction, values: {A: 0.5, B: 0.5}, provenance: given}\n"
+    "  - id: S3\n    from: R.out\n    to: P.in\n    template: liquid\n"
+)
+
+
+def test_a_batch_heats_up_its_charge_before_the_reaction(tmp_path):
+    """core#301: a batch has no dose; its heat-up before ``react`` takes the charge's heat
+    capacity (2 kmol/h), not the end's (1 kmol/h of C), and its cool-down after it the end's."""
+    root = tmp_path / "plant"
+    (root / "process").mkdir(parents=True)
+    (root / "plant.yaml").write_text("name: recipe-batch\nstage: concept\nsheets: []\n")
+    (root / "process/materials.yaml").write_text(BATCH_MATERIALS)
+    (root / "process/flowsheet.yaml").write_text(BATCH_FLOWSHEET)
+    (root / "process/reactions.yaml").write_text(BATCH_REACTIONS)
+    hours = 2.0  # a batch of 2 h of the flowsheet's flows of S1
+    recipe = {
+        "schema": "cheme/recipe/v1",
+        "kind": "recipe",
+        "batch_size": {"value": 2 * 44.05 * hours, "unit": "kg", "stream": "S1"}
+        | {"provenance": "assumed"},
+        "hours_per_year": {"value": 8000, "provenance": "assumed"},
+        "unit_procedures": [
+            {
+                "id": "UP1",
+                "unit": "R",
+                "vessel": {
+                    "volume": 1.0,
+                    "metal_heat_capacity": 100.0,
+                    "jacket": {
+                        "u": 400,
+                        "area": 2.0,
+                        "coolant_temperature": 250,
+                        "heating_temperature": 350,
+                        "provenance": "assumed",
+                    },
+                    "provenance": "assumed",
+                },
+                "operations": [
+                    {"id": "charge", "kind": "charge", "duration": _hours(0.5)},
+                    {"id": "heatup", "kind": "heat", "temperatures": [290, 300]},
+                    {"id": "react", "kind": "react", "from": "R"},
+                    {"id": "cooldown", "kind": "cool", "temperatures": [300, 290]},
+                ],
+            }
+        ],
+    }
+    (root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
+    ws = Workspace(root)
+    process, found = load(root)
+    assert process is not None, [f.format() for f in found]
+    run(ws, process, "design", write=True)
+    result = recipe_report(root)
+    assert not [f for f in result.findings if f.level == "error"], [
+        f.message for f in result.findings
+    ]
+    ua = 0.4 * 2.0  # kW/K
+
+    def time(capacity, medium, start, end):
+        return (capacity + 100.0) / ua * math.log((medium - start) / (medium - end)) / 3600
+
+    steps = {s.operation: s for s in result.steps}
+    heat, cool = steps["heatup"], steps["cooldown"]
+    charge, end = 2 * 150 * hours, 1 * 150 * hours  # kJ/K
+    assert heat.end - heat.start == pytest.approx(time(charge, 350, 290, 300), rel=1e-6)
+    assert cool.end - cool.start == pytest.approx(time(end, 250, 300, 290), rel=1e-4)
+    heats = {h.operation: h for h in result.heats}
+    assert heats["heatup"].content_kJ == pytest.approx(charge * 10, rel=1e-6)
+    assert heats["cooldown"].content_kJ == pytest.approx(-end * 10, rel=1e-4)
+
+
+@pytest.mark.parametrize("kind", ["heat", "cool"])
+def test_equal_temperatures_are_neither_a_heat_up_nor_a_cool_down(kind):
+    """core#302: a cool from 330 K to 330 K was accepted, then failed the whole recipe with a
+    misleading 'the medium cannot cool'; it is refused by the schema, as a heat is."""
+    from chemeascode.domains.process.recipe import Operation
+
+    with pytest.raises(ValueError, match="rising to heat, falling to cool"):
+        Operation.model_validate({"id": "c", "kind": kind, "temperatures": [330, 330]})
+    falling = [330, 320] if kind == "cool" else [320, 330]
+    assert Operation.model_validate({"id": "c", "kind": kind, "temperatures": falling})
+
+
 def test_no_heat_of_reaction_means_no_jacket_check_said_as_info(tmp_path):
     ws = _plant(tmp_path, _jacketed(coolant=299.0))
     path = ws.root / "process/reactions.yaml"

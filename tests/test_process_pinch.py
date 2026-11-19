@@ -452,6 +452,42 @@ def test_hda_write_records_the_targets(tmp_path, monkeypatch):
     assert results["minimum_utility_demand_kW"]["hot_kW"] > 5464.75  # larger dTmin, more utility
 
 
+@pytest.mark.parametrize("modern", [False, True])
+def test_dynamic_completion_cannot_supply_converged_pinch_targets(tmp_path, monkeypatch, modern):
+    """A legacy true flag or a new completed interval is not a converged thermal solve."""
+    from chemeascode.domains.process.heat_integration.streams import out_from_record
+
+    root = _hda(tmp_path)
+
+    def dynamic(entry):
+        entry["converged"] = True  # Historical worker flag must not override explicit outcomes.
+        entry["integration_completed"] = True
+        if modern:
+            entry.update(
+                schema="cheme/adapter-result/v2",
+                status="completed",
+                execution={"state": "completed", "transport": "test-session"},
+                outcome={
+                    "mode": "dynamic",
+                    "convergence": "not-applicable",
+                    "integration": {
+                        "start": 0,
+                        "requested_end": 1,
+                        "achieved_end": 1,
+                        "time_unit": "h",
+                        "completed": True,
+                    },
+                },
+            )
+        assert out_from_record(entry, {})["converged"] is False
+
+    _edit_run(root, dynamic)
+    shown = _cli(root, monkeypatch, "--dt-min", "10", "--write")
+    assert shown.exit_code != 0
+    assert "cheme.process-pinch-run-not-converged" in shown.output
+    assert not (root / "process/pinch-run.json").exists()
+
+
 def test_hda_reconciliation_finding_refuses_write(tmp_path, monkeypatch):
     """A heat result the extraction does not know (a mixer with a duty) is left over: exit 1
     without --write, 3 with it, and nothing is written."""
