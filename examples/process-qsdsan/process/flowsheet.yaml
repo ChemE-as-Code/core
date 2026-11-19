@@ -1,0 +1,29 @@
+schema: cheme/process/v1
+kind: flowsheet
+title: Measured flow and simulated concentrations
+feeds:
+  - id: IN
+    ports: [{id: out, direction: out}]
+products:
+  - id: OUT
+    ports: [{id: in, direction: in}]
+blocks:
+  - id: WATERLINE
+    class: ProcessStep
+steps:
+  - id: TANK
+    block: WATERLINE
+    class: ProcessStep
+    ports: [{id: in, direction: in}, {id: out, direction: out}]
+streams:
+  - id: FEED
+    from: IN.out
+    to: TANK.in
+    template: water
+    state:
+      design:
+        pressure: {value: 101.325, unit: kPa(a), provenance: given, source: design basis}
+  - id: WATER
+    from: TANK.out
+    to: OUT.in
+    template: water

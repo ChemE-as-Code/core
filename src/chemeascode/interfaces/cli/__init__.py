@@ -544,7 +544,12 @@ def diff(
             new = path.read_bytes() if path.exists() else None
         else:
             new = git_show(workspace.root, new_commit, sheet)
-        if old == new:
+        # XML line endings are not an engineering change (Git may normalize them).
+        if old == new or (
+            old is not None
+            and new is not None
+            and old.replace(b"\r\n", b"\n") == new.replace(b"\r\n", b"\n")
+        ):
             continue
         result = diff_sheet(old, new, sheet, old_rev, new_rev or "working tree")
         results.append(result)

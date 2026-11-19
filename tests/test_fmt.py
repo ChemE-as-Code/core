@@ -69,7 +69,7 @@ def test_format_keeps_the_model_name_and_uri(tmp_path: Path):
         '<Model name="ASU-1" uri="urn:asu-1">',
         1,
     )
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
     assert not format_file(path, check=True).changed
     format_file(path)
     root = etree.parse(str(path)).getroot()

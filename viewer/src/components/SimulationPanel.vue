@@ -19,7 +19,9 @@ const { withRev } = useRev();
 
 const run = computed(() => props.view.run);
 const state = computed(() => runState(props.view));
-const badge = computed(() => RUN_BADGE[state.value]);
+const badge = computed(() => run.value?.integration_completed && state.value === "converged"
+  ? { badge: "pass", label: "integration completed", title: "Completed the requested integration" }
+  : RUN_BADGE[state.value]);
 /** `dwsim 9.0.5.0`: the recorded run's simulator and version, else the spec's simulator. */
 const simulatorText = computed(() => {
   const version = run.value?.simulator.version;
@@ -58,8 +60,8 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
         <span>{{ simulatorText }}</span>
         <RouterLink class="muted file" :to="fileLink(view.file)">{{ view.file }}</RouterLink>
       </dd>
-      <dt>Property package</dt>
-      <dd data-package>{{ view.spec.property_package }}</dd>
+      <dt>{{ view.spec.molecular === false ? "Model / solver" : "Property package" }}</dt>
+      <dd data-package>{{ view.spec.property_package ?? run?.simulator.method ?? view.spec.model }}</dd>
       <dt>Case</dt>
       <dd>
         <select v-if="view.cases.length > 1" :value="view.case ?? ''" aria-label="Simulation case" @change="$emit('setCase', ($event.target as HTMLSelectElement).value)">
@@ -111,6 +113,7 @@ const fileLink = (path: string) => ({ name: "file", params: { path: pathSegments
     <p v-else-if="view.staleness.changed_files.length" class="muted hint" data-changed>
       Changed since the run, the simulator model the same: {{ view.staleness.changed_files.join(", ") }}.
     </p>
+    <p v-if="run?.integration_completed" class="muted">{{ run.messages.join(" ") }}</p>
     <p v-if="state === 'failed'" class="notice error" role="note" data-failed>
       The run did not converge<template v-if="run?.messages.length">: {{ run.messages.join("; ") }}</template>. No stream value was written.
     </p>

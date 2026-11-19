@@ -957,6 +957,38 @@ def process_fixtures(core: Path, tmp: Path) -> None:
     write(out / "diff-bfd.json", get(client_for(rebuilt), "/api/diff?path=process/BFD.xml&old=HEAD"))
 
 
+def qsdsan_fixtures(core: Path, tmp: Path) -> None:
+    """Read a real recorded result at the API boundary using the standard-library worker."""
+    import os
+    from unittest.mock import patch
+    from uuid import UUID
+
+    from chemeascode.domains.process.model import load
+    from chemeascode.domains.process.simulation.run import run
+    from chemeascode.foundation.workspace import Workspace
+
+    root = copy_plant(core / "examples/process-qsdsan", tmp / "water-quality")
+    plant, _ = load(root)
+    with (
+        patch.dict(os.environ, {"CHEME_QSDSAN_PYTHON": sys.executable}),
+        patch("chemeascode.domains.process.simulation.qsdsan.uuid4", return_value=UUID(int=1)),
+    ):
+        outcome = run(Workspace(root), plant, "design", write=True)
+    if outcome.findings:
+        raise RuntimeError(outcome.findings)
+    with client_for(root) as client:
+        out = FIXTURES / "api"
+        write(out / "streams-qsdsan.json", get(client, "/api/streams"))
+        sim = get(client, "/api/simulation")
+        if sim["stale"] is not False:
+            raise RuntimeError(sim["staleness"])
+        sim["run"]["tool"] = "cheme-as-code fixture"
+        write(out / "simulation-qsdsan.json", sim)
+        with (root / "results.json").open("a", encoding="utf-8") as f:
+            f.write("\n")
+        write(out / "streams-qsdsan-stale.json", get(client, "/api/streams"))
+
+
 def main() -> None:
     default_core = Path(chemeascode.__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -971,10 +1003,14 @@ def main() -> None:
     parser.add_argument("--only-issues", action="store_true", help="write only the issues fixtures (core with GET /api/issues)")
     parser.add_argument("--only-tea", action="store_true", help="with --asu: write only the TEA fixtures (tea-asu.json, tea-blocks.json)")
     parser.add_argument("--only-datasheets", action="store_true", help="with --asu-datasheets: write only the datasheet endpoint fixtures")
+    parser.add_argument("--only-qsdsan", action="store_true")
     args = parser.parse_args()
     print(f"chemeascode from {Path(chemeascode.__file__).parent}")
     with tempfile.TemporaryDirectory() as name:
         tmp = Path(name)
+        if args.only_qsdsan:
+            qsdsan_fixtures(args.core.resolve(), tmp)
+            return
         if args.only_reactions:
             reactions_fixtures(args.core.resolve(), tmp)
             return
@@ -1019,6 +1055,7 @@ def main() -> None:
         bed_fixtures(args.core.resolve(), tmp)
         control_fixtures(args.core.resolve(), tmp)
         issues_fixtures(args.core.resolve(), tmp)
+        qsdsan_fixtures(args.core.resolve(), tmp)
 
 
 if __name__ == "__main__":

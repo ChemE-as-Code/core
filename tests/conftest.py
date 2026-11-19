@@ -1,7 +1,9 @@
 import atexit
 import os
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -21,6 +23,23 @@ if Path(os.environ.get("BRIGHTWAY2_DIR", _BRIGHTWAY_PREFIX)).name.startswith(_BR
 
 DATA = Path(__file__).parent / "data"
 REFERENCE = DATA / "reference_pid.xml"
+
+
+def python_command(code: str) -> str:
+    """A Python command for the host shell, including an interpreter path with spaces."""
+    args = [sys.executable, "-c", code]
+    return subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
+
+
+@pytest.fixture
+def symlink_support(tmp_path: Path) -> None:
+    """Only skip when this Windows account lacks the OS's symlink privilege."""
+    try:
+        (tmp_path / "symlink-probe").symlink_to(tmp_path / "missing-target")
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            pytest.skip("Windows symlinks require Developer Mode or the symlink privilege")
+        raise
 
 
 def git(root: Path, *args: str) -> str:

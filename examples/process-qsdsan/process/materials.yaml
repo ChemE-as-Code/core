@@ -1,0 +1,4 @@
+schema: cheme/process/v1
+kind: materials
+components: [{id: carrier, name: Water carrier}]
+templates: [{id: water, components: [carrier]}]

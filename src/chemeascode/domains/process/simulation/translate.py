@@ -32,7 +32,7 @@ from chemeascode.domains.process import FLOWSHEET_FILE
 from chemeascode.domains.process.model import End, Process, stream_flows
 from chemeascode.domains.process.schema import DUTY_UNITS, FLOW_UNITS, Quantity, StreamDef
 from chemeascode.domains.process.simulation import SIMULATION_FILE, SOURCE
-from chemeascode.domains.process.simulation.backends import IDAES, IDAES_PACKAGES
+from chemeascode.domains.process.simulation.backends import BACKENDS, IDAES, IDAES_PACKAGES
 from chemeascode.domains.process.simulation.backends import model_findings as backend_findings
 from chemeascode.domains.process.simulation.schema import (
     KineticCoupling,
@@ -212,7 +212,7 @@ def translation(process: Process, case: str) -> Translation | None:
                 found = translate(process, sim, doc, case)
         except Exception:  # noqa: BLE001 - a model that does not translate is simulate's to report
             found = None
-        cache[case] = found if found is not None and found.model is not None else None
+        cache[case] = found if found is not None and found.fingerprint else None
     return cache[case]
 
 
@@ -225,6 +225,11 @@ def prime(process: Process) -> None:
             ours(getattr(s.state.get(case), n, None))
             for s in process.flowsheet.streams
             for n in WRITTEN
+        ) or any(
+            ours(q)
+            for s in process.flowsheet.streams
+            if (state := s.state.get(case))
+            for q in state.calculated.values()
         ):
             translation(process, case)
 
@@ -442,6 +447,9 @@ def property_package_findings(
     - ``cheme.process-sim-method-unrecorded`` (info, only with *require_selection*, for
       maturity checks): no ``method_selection`` is recorded.
     """
+    if not BACKENDS[sim.simulator].molecular:
+        return []  # ASM components are not molecular thermodynamic property packages.
+
     from chemeascode.domains.process.thermodynamics.methods import (
         method_for_package,
         simulation_packages,
@@ -638,6 +646,8 @@ def translate(process: Process, sim: Simulation, sim_doc: Any, case: str) -> Tra
     """The simulator model of *case*, or the findings why it cannot be made."""
     fs = process.flowsheet
     out = Translation()
+    if not BACKENDS[sim.simulator].molecular:
+        return BACKENDS[sim.simulator].prepare(process, sim, case)
     out.findings += property_package_findings(sim, sim_doc)
     refused = any(f.level == "error" for f in out.findings)
 

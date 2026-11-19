@@ -107,7 +107,7 @@ from chemeascode.domains.process.schema import (
     Tolerance,
 )
 from chemeascode.foundation.findings import Finding
-from chemeascode.foundation.units import to_kelvin
+from chemeascode.foundation.units import same_unit, to_kelvin
 from chemeascode.foundation.units import to_kpa_abs as to_kpa_abs  # kept importable here
 
 #: kJ/(kmol K)
@@ -2068,7 +2068,7 @@ def _unit_rules(out: _Out) -> None:
         for case, state in s.state.items():
             for name, q in state.calculated.items():
                 want = CALCULATED_UNITS.get(name)
-                if want is None or q.unit is None or q.unit == want:
+                if want is None or q.unit is None or same_unit(q.unit, want):
                     continue
                 out.add(
                     "error",

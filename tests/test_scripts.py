@@ -677,14 +677,18 @@ def test_validate_and_regen_never_change_the_working_tree(generated: Path):
     assert sheet.read_bytes() == committed and not (generated / "stray.txt").exists()
 
 
-def test_regen_in_a_plant_below_the_top_of_the_git_repository(tmp_path: Path, monkeypatch):
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_regen_in_a_plant_below_the_top_of_the_git_repository(tmp_path: Path, monkeypatch, eol):
     top = tmp_path / "mono"
     plant = top / "plant"
     init(plant, "Test plant")
     git(top, "init", "-q", "-b", "main")
     git(top, "config", "user.email", "test@example.org")
     git(top, "config", "user.name", "Test")
-    shutil.copy(EMPTY, plant / "pid" / "P-01.xml")
+    (plant / "pid" / "P-01.xml").write_bytes(
+        EMPTY.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", eol)
+    )
+    git(top, "config", "core.autocrlf", "true")
     git(top, "add", "-A")
     git(top, "commit", "-q", "-m", "empty sheet")
     frame = git(top, "rev-parse", "--short", "HEAD").strip()

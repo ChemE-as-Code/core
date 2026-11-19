@@ -191,6 +191,7 @@ const fullComposition = ref(false);
               <th>Duty</th>
               <th>Composition</th>
               <th>Phase</th>
+              <th v-for="col in table.data.value.calculated_columns" :key="col.key" :title="col.basis" :data-calculated-column="col.key">{{ col.label }}</th>
               <th>Calculated</th>
               <th>Links</th>
             </tr>
@@ -235,8 +236,14 @@ const fullComposition = ref(false);
                   <span v-if="s.phase.stale" class="badge warning">stale</span>
                 </template>
               </td>
+              <td v-for="col in table.data.value.calculated_columns" :key="col.key" :data-calculated="col.key">
+                <ProcessValueCell v-if="s.calculated[col.key]" :value="s.calculated[col.key]!" />
+                <span v-else class="muted">—</span>
+              </td>
               <td>
-                <div v-for="(v, name) in s.calculated" :key="name">{{ name }} <ProcessValueCell :value="v" /></div>
+                <template v-for="(v, name) in s.calculated" :key="name">
+                  <div v-if="!table.data.value.calculated_columns?.some(col => col.key === name)">{{ name }} <ProcessValueCell :value="v" /></div>
+                </template>
               </td>
               <td>
                 <span v-for="l in s.links" :key="l.target + l.ref" class="badge" :class="l.resolved ? 'pass' : 'info'" :title="l.problem ?? 'resolved'">
@@ -245,7 +252,7 @@ const fullComposition = ref(false);
               </td>
             </tr>
             <tr v-if="!streams.length">
-              <td colspan="11" class="muted">No streams.</td>
+              <td :colspan="11 + (table.data.value.calculated_columns?.length ?? 0)" class="muted">No streams.</td>
             </tr>
           </tbody>
         </table>

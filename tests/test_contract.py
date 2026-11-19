@@ -105,7 +105,7 @@ def test_validate_reports_a_stale_simulation_run(plant):
     ]
 
 
-def test_decision_scan_survives_odd_files_and_stays_inside_the_repository(plant, tmp_path):
+def test_decision_scan_survives_odd_files_and_stays_inside_the_repository(plant):
     root = plant.root
     (root / "DESIGN.md").write_text(
         "## D-001 Real\n<!--\n## D-002 Template example\n-->\n```\n## D-003 In code\n```\n"
@@ -114,11 +114,7 @@ def test_decision_scan_survives_odd_files_and_stays_inside_the_repository(plant,
     (root / "notes").mkdir()
     (root / "notes/a.yaml").write_text("x: D-009\ny: ISO X-D-1234\n")
     (root / "notes/b.yaml").write_bytes(b"x: D-010 \xff\n")
-    (root / "dangling.yaml").symlink_to(root / "missing.yaml")
     (root / "folder.yaml").mkdir()
-    outside = tmp_path / "outside.yaml"
-    outside.write_text("x: D-011\n")
-    (root / "outside.yaml").symlink_to(outside)
     for skipped in ("build", ".cache", "nested"):
         (root / skipped).mkdir()
         (root / skipped / "c.yaml").write_text("x: D-012\n")
@@ -126,6 +122,17 @@ def test_decision_scan_survives_odd_files_and_stays_inside_the_repository(plant,
     found = {(f.file, f.ids[0]) for f in decision_findings(plant)}
     assert found == {("notes/a.yaml", "D-009"), ("notes/b.yaml", "D-010")}
     assert decision_findings(plant, targets={(root / "notes/a.yaml").resolve()}) != []
+
+
+@pytest.mark.usefixtures("symlink_support")
+def test_decision_scan_ignores_dangling_and_external_symlinks(plant, tmp_path):
+    root = plant.root
+    (root / "DESIGN.md").write_text("## D-001 Real\n")
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("x: D-011\n")
+    (root / "outside.yaml").symlink_to(outside)
+    (root / "dangling.yaml").symlink_to(root / "missing.yaml")
+    assert decision_findings(plant) == []
 
 
 def test_a_fresh_design_md_without_entries_is_not_checked(plant):

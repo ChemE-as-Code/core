@@ -70,6 +70,26 @@ def _rules(result: fm.FurnaceResult, level: str = "error") -> list[str]:
     return [f.rule for f in result.findings if f.level == level]
 
 
+def test_nasa_data_can_be_read_from_a_unicode_installation(tmp_path, monkeypatch):
+    from importlib.resources import files
+
+    from chemeascode.integrations import cantera
+
+    package = tmp_path / "설치 경로" / "cantera"
+    (package / "data").mkdir(parents=True)
+    for name in cantera.NASA_FILES:
+        (package / "data" / name).write_bytes(files("cantera").joinpath("data", name).read_bytes())
+    reference = cantera.nasa_properties("CO2", 1000.0)
+    metadata = cantera.nasa_species(["CO2", "CaO(s)"])
+    monkeypatch.setattr(cantera, "files", lambda name: package)
+    cantera._nasa.cache_clear()
+    try:
+        assert cantera.nasa_properties("CO2", 1000.0) == reference
+        assert cantera.nasa_species(["CO2", "CaO(s)"]) == metadata
+    finally:
+        cantera._nasa.cache_clear()
+
+
 # -- thermochemistry against independent data ---------------------------------------------------
 
 

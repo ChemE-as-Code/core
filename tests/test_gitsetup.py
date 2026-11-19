@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -37,7 +38,9 @@ def test_git_diff_works_without_cheme_on_path(plant: Path):
     sheet = plant / "pid" / "P-01.xml"
     sheet.write_text(sheet.read_text().replace("<String>T4750</String>", "<String>T4751</String>"))
     env = {k: v for k, v in os.environ.items() if k not in ("PATH", "VIRTUAL_ENV")}
-    env["PATH"] = os.path.dirname(shutil.which("git") or "/usr/bin/git") + ":/usr/bin:/bin"
+    env["PATH"] = os.pathsep.join(
+        [os.path.dirname(shutil.which("git") or "/usr/bin/git"), "/usr/bin", "/bin"]
+    )
     result = subprocess.run(
         ["git", "diff", "--", "pid/P-01.xml"],
         cwd=plant,
@@ -53,7 +56,7 @@ def test_git_diff_works_without_cheme_on_path(plant: Path):
 
 def _fake_cheme(directory: Path) -> Path:
     directory.mkdir(parents=True)
-    script = directory / "cheme"
+    script = directory / ("cheme.exe" if os.name == "nt" else "cheme")
     script.write_text("#!/bin/sh\nexit 0\n")
     script.chmod(0o755)
     return script
@@ -63,16 +66,23 @@ def test_setup_wires_the_running_cheme_not_the_one_on_path(plant: Path, monkeypa
     decoy = _fake_cheme(plant.parent / "decoy")
     running = _fake_cheme(plant.parent / "env" / "bin")
     (plant.parent / "env" / "other").mkdir()
-    monkeypatch.setenv("PATH", f"{decoy.parent}:{os.environ['PATH']}")
-    monkeypatch.setattr(sys, "argv", [str(plant.parent / "env" / "other" / ".." / "bin" / "cheme")])
-    assert cheme_command() == str(running)
+    monkeypatch.setenv("PATH", f"{decoy.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setattr(
+        sys, "argv", [str(plant.parent / "env" / "other" / ".." / "bin" / running.name)]
+    )
+    assert cheme_command() == shlex.quote(running.as_posix())
     setup(plant, hook=True)
-    assert git(plant, "config", "diff.dexpi.textconv").strip() == f"{running} textconv"
+    assert (
+        git(plant, "config", "diff.dexpi.textconv").strip()
+        == f"{shlex.quote(running.as_posix())} textconv"
+    )
     hook = (plant / ".git" / "hooks" / "pre-commit").read_text()
-    assert str(running) in hook and str(decoy) not in hook
+    assert running.as_posix() in hook and decoy.as_posix() not in hook
     # Not started as cheme (pytest, python -m): the one on PATH.
     monkeypatch.setattr(sys, "argv", ["pytest"])
-    assert cheme_command() == str(decoy)
+    command = shlex.split(cheme_command())
+    assert len(command) == 1
+    assert Path(command[0]) == decoy
 
 
 def test_hook_works_for_a_plant_in_a_subdirectory(plant: Path, tmp_path: Path):

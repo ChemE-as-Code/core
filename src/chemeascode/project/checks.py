@@ -59,8 +59,16 @@ def _run_command(
             with contextlib.suppress(ProcessLookupError):
                 if hasattr(os, "killpg"):
                     os.killpg(process.pid, signal.SIGKILL)
-                else:  # Windows: no process groups here
-                    process.kill()
+                else:  # Windows: terminate the shell and its descendants.
+                    subprocess.run(
+                        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                        timeout=10,
+                    )
+                    if process.poll() is None:
+                        process.kill()
             process.communicate()
             raise
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)

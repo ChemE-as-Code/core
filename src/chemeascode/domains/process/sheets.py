@@ -149,10 +149,14 @@ def _run_stale_findings(
     root = workspace.root
     if process is None or not (root / record.RUN_FILE).is_file():
         return []
-    if targets is not None and not any((root / f).resolve() in targets for f in record.RUN_INPUTS):
-        return []
     sim, doc, found = load(root)
     if sim is None:
+        return []
+    from chemeascode.domains.process.simulation.backends import BACKENDS
+
+    if targets is not None and not any(
+        (root / f).resolve() in targets for f in BACKENDS[sim.simulator].inputs(sim)
+    ):
         return []
     cases = {c.id for c in process.flowsheet.cases}
     findings: list[Finding] = []
@@ -161,7 +165,7 @@ def _run_stale_findings(
             model = translate(process, sim, doc, case)
         except Exception:  # noqa: BLE001 - a model that does not translate is simulate's to report
             continue
-        if model.model is not None:
+        if model.model is not None or not BACKENDS[sim.simulator].molecular:
             findings += _record_check(workspace.root, case, model.fingerprint)
     return findings
 

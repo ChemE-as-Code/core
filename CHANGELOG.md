@@ -4,6 +4,62 @@
 
 ### Added
 
+- Run declared QSDsan models with `cheme process simulate` and inspect calculated wastewater stream quantities in their original units.
+- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
+  optional:
+  - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
+    {heat_of_solution}` (van 't Hoff on the solute's mole fraction, an ideal solution),
+    reported as not at the operating conditions (`solubility_transfer`, info
+    `cheme.process-crystallizer-transfer`, an unsourced basis while assumed).
+  - The liquor a `measured_in: mother_liquor` solubility holds at, `solubility.liquor:
+    {mass_fraction, tolerance}`, compared with the solved mother liquor (warning
+    `cheme.process-crystallizer-liquor`).
+  - A displacement wash on a filter, `solid_separation.wash:` (its own inlet port, `R = (1 -
+    E)^n` of the cake's liquor stays, a `wash_filtrate` outlet), with the crystals the wash
+    dissolves up to a stated approach to their solubility (`dissolution:`, balanced as a phase
+    change) and the wash's time in a recipe `filter` (Ruth's and the wash's on the unwashed
+    cake's solid); the recipe vessel of a washed filter holds the slurry or, later, the unwashed
+    cake with the wash, the larger of the two, not their sum.
+  - A second liquid phase, `second_liquid:`: a filter's cake holds it at its own cake liquid, a
+    crystallizer leaves it out of its mother liquor (no `liquor.mass_fraction` of it; with no
+    other spectator a pure-solvent solubility, also a carried one, holds there).
+  - The dryer's `pressure`, `selectivity: raoult` (the volatiles kept by their vapour
+    pressures, found on the least volatile's share, so that a volatile 100 times less volatile
+    than the main one still dries to the residual moisture; a split that misses it is refused),
+    `sublimation:` (the vapour saturated with a subliming product, its heat in the duty),
+    `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
+    flash at the condenser's temperature, its duty, a `condensate` outlet). With `cooling:` or
+    `condenser:`, propagate writes the outlets' temperatures, and their duties are compared with
+    their energy streams (`cheme.process-dryer-duty`).
+  - The model basis: a filter is not sourced while its `wash`, the wash's `dissolution` (and its
+    solubility) or its `second_liquid` is assumed, a dryer while its `sublimation`, `cooling`
+    or `condenser` is, a crystallizer while its `second_liquid` is (`not sourced: ...` in the
+    detail, as a crystallizer's `transfer`); a dryer with `cooling:` or `condenser:` states the
+    outlet temperatures propagate writes.
+  - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
+    library entries with a crystallizer, filter or dryer gave the same results as the base for
+    `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,
+    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative; only the generator code
+    hash that `cheme.generated-version` names changes (schema.py and model.py are generator
+    modules).
+
+## 1.12.0 (2026-11-13)
+
+Minor release for batch processes. The batch still handles components in a phase of their own,
+a cut's own pressure and boil-up, the heat-up time and an end at a temperature, and refuses an
+end it cannot reach before it boils dry (ADR 0068). The thermal screening covers every dose's
+accumulation, the largest gas release over the batch, the content's bubble point as an MTT and
+consecutive reactions (ADR 0069). `cheme process propagate` solves feeds and splits for design
+specifications and solves component separators from their recoveries (ADR 0070). Gas-liquid
+batches get inerts, a head space, an inert sweep, degassing, the heat of absorption and a
+freezing check of the vent condenser (ADR 0071). Also: feos (PC-SAFT) as an optional property
+backend (ADR 0064), and a generator fingerprint that covers the stale-field data (ADR 0067).
+Every BFD/PFD needs `cheme process build` once (only `generator_sha256` changes). Library
+results are unchanged except the vent ratios that `cheme.reactor-hazard-vent` quotes, listed
+under Changed.
+
+### Added
+
 - feos (PC-SAFT) as an optional property backend, extra `saft` (`feos==0.10.5`, ADR 0064), and
   its first property package, `water-methanol-pcsaft-liquid`: liquid density of water,
   methanol and their mixtures (Esper et al. 2023 parameters, Rehner et al. 2023 `k_ij`, the
@@ -118,44 +174,6 @@
   A vent without the new keys solves, propagates and fingerprints as in 1.11.0 (the library's
   fifteen batch entries' streams unchanged); its `reactor-hazards` output changes only as ADR
   0069 above describes.
-- Crystallizer, wash and dryer follow-ups of ADRs 0056 and 0057 (ADR 0072, core#183), each
-  optional:
-  - One solubility point carried to the crystallizer's temperature by `solubility.transfer:
-    {heat_of_solution}` (van 't Hoff on the solute's mole fraction, an ideal solution),
-    reported as not at the operating conditions (`solubility_transfer`, info
-    `cheme.process-crystallizer-transfer`, an unsourced basis while assumed).
-  - The liquor a `measured_in: mother_liquor` solubility holds at, `solubility.liquor:
-    {mass_fraction, tolerance}`, compared with the solved mother liquor (warning
-    `cheme.process-crystallizer-liquor`).
-  - A displacement wash on a filter, `solid_separation.wash:` (its own inlet port, `R = (1 -
-    E)^n` of the cake's liquor stays, a `wash_filtrate` outlet), with the crystals the wash
-    dissolves up to a stated approach to their solubility (`dissolution:`, balanced as a phase
-    change) and the wash's time in a recipe `filter` (Ruth's and the wash's on the unwashed
-    cake's solid); the recipe vessel of a washed filter holds the slurry or, later, the unwashed
-    cake with the wash, the larger of the two, not their sum.
-  - A second liquid phase, `second_liquid:`: a filter's cake holds it at its own cake liquid, a
-    crystallizer leaves it out of its mother liquor (no `liquor.mass_fraction` of it; with no
-    other spectator a pure-solvent solubility, also a carried one, holds there).
-  - The dryer's `pressure`, `selectivity: raoult` (the volatiles kept by their vapour
-    pressures, found on the least volatile's share, so that a volatile 100 times less volatile
-    than the main one still dries to the residual moisture; a split that misses it is refused),
-    `sublimation:` (the vapour saturated with a subliming product, its heat in the duty),
-    `cooling:` (the product and the vessel cooled after drying) and `condenser:` (a
-    flash at the condenser's temperature, its duty, a `condensate` outlet). With `cooling:` or
-    `condenser:`, propagate writes the outlets' temperatures, and their duties are compared with
-    their energy streams (`cheme.process-dryer-duty`).
-  - The model basis: a filter is not sourced while its `wash`, the wash's `dissolution` (and its
-    solubility) or its `second_liquid` is assumed, a dryer while its `sublimation`, `cooling`
-    or `condenser` is, a crystallizer while its `second_liquid` is (`not sourced: ...` in the
-    detail, as a crystallizer's `transfer`); a dryer with `cooling:` or `condenser:` states the
-    outlet temperatures propagate writes.
-  - A flowsheet without the new fields solves, fingerprints and reports as before. The ten
-    library entries with a crystallizer, filter or dryer gave the same results as the base for
-    `process propagate --check`, `crystallizers`, `recipe`, `reactors`, `reactor-hazards`,
-    `stills`, `streams`, `validate` and `maturity`, to 1e-9 relative; only the generator code
-    hash that `cheme.generated-version` names changes (schema.py and model.py are generator
-    modules).
-
 ### Fixed
 
 - An end at a temperature failed with "the still boils dry before its end" for some
@@ -198,6 +216,21 @@
 - The committed example sheets are regenerated: the generator code fingerprint covers
   `props.py`, and `schema.py` (changed by ADRs 0068 to 0071) and `model.py` (changed by ADRs
   0070 and 0071); no drawn output changes.
+- The generator fingerprint (`generator_sha256`) also covers the fields a BFD/PFD can leave
+  blank as stale: what `cheme process propagate` and `cheme process simulate` write and the
+  source their values carry (`propagate.WRITTEN` and `SOURCE`, `simulation.translate.WRITTEN`
+  and `SOURCE`), hashed by value (ADR 0067, core#202). Adding or removing such a field marks
+  the sheets `cheme.generated-version`; editing the code that derives the values or decides
+  whether one is stale (`propagate.py`, `recycle.py`, `duties.py`, `simulation/translate.py`)
+  still does not, so as not to mark every library sheet outdated on each such edit. The
+  fingerprint changes with this release: every BFD/PFD needs `cheme process build` once (only
+  the `generator_sha256` in its provenance comment changes); the core examples and the viewer's
+  API fixtures are regenerated.
+- 1.11.0 said that editing the stream table marks the sheets outdated. That holds for
+  `pfd_sheet.py`, which draws the table (and the finding is `cheme.generated-version`), not for
+  the code above that decides which of its values are stale. `cheme validate` does not catch
+  such a change either, since it rebuilds generated P&IDs, not BFD/PFD sheets; `cheme process
+  build` does, and says "written" for a sheet it changed.
 - The default MTT counts a product a counted reaction forms in the liquid (at least 5 % of it
   once that reaction ran to completion, a vented product with the share the liquid keeps,
   boiling at or above `T_p`; ADR 0069): a fix where the product boils lowest (acetyl chloride's

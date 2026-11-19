@@ -1,0 +1,5 @@
+# Packaged text is fingerprinted and compared with generated LF output.
+# Keep the same bytes in Windows checkouts, wheels, and source archives.
+src/chemeascode/templates/** text=auto eol=lf
+src/chemeascode/**/skills/** text=auto eol=lf
+src/chemeascode/domains/assessment/lca/data/** text=auto eol=lf

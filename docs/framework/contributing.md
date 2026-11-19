@@ -5,6 +5,33 @@ rules keep the package usable from the CLI, the viewer API, agents and downstrea
 alike. Read [architecture.md](architecture.md) for the reasons behind the rules. The repository
 conventions in `AGENTS.md` (Python 3.12+, uv, ruff line length 100, pytest) apply throughout.
 
+## Windows checks
+
+Use the locked environment and UTF-8 when running the suite from PowerShell, including
+from a checkout whose path contains non-ASCII characters:
+
+```powershell
+$env:PYTHONUTF8 = '1'
+uv sync --locked --all-extras
+uv run ruff format --check
+uv run ruff check
+$testTemp = Join-Path $env:USERPROFILE ('ct-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+uv run pytest -n auto --basetemp $testTemp
+```
+
+Use a short, new temporary directory: transcript fixtures encode the project path inside a
+second path and can otherwise exceed the Windows path-length limit. Pytest clears its
+`--basetemp` directory, so never point it at a folder containing work to preserve.
+
+On a memory-constrained machine, set `PYTEST_XDIST_AUTO_NUM_WORKERS` to limit the number of
+workers without excluding tests. Packaged templates, skills and LCA data use LF checkouts
+through `.gitattributes`: their hashes must be identical on every OS. An older Windows
+checkout can retain CRLF copies of untouched files after these attributes change; use a
+fresh checkout to apply the LF rules, preserving any local work first. Tests that specifically
+exercise CRLF files write those bytes explicitly. A Windows account without Developer Mode
+or the symlink privilege cannot run the symlink tests; they report that prerequisite as a
+skip, and must still run on a symlink-capable environment. No path-safety assertion is relaxed.
+
 ## Contribution terms
 
 By submitting a contribution to this repository, you agree to make it available under the public license applicable to that part of the repository. You also grant a non-exclusive, worldwide, perpetual, irrevocable, royalty-free license to use, reproduce, modify, distribute, and sublicense your contribution under other terms. You retain ownership of your contribution.

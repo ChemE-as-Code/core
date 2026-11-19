@@ -61,6 +61,7 @@ from chemeascode.domains.process.fixed_bed import ASSUMPTIONS as BED_ASSUMPTIONS
 from chemeascode.domains.process.fixed_bed import bed_limitations
 from chemeascode.domains.process.model import Process
 from chemeascode.domains.process.simulation import SIMULATION_FILE
+from chemeascode.domains.process.simulation.backends import BACKENDS
 from chemeascode.domains.process.stirred_tank import ASSUMPTIONS as TANK_ASSUMPTIONS
 from chemeascode.foundation.provenance import written_by
 from chemeascode.foundation.yamlsource import _yaml_line
@@ -1003,7 +1004,10 @@ def model_bases(
         excluded = left_out(process, sim)
     found = []
     for key, index, node in _units(process):
-        simulated = sim is not None and node.id not in excluded
+        # This classifier describes molecular simulation models. Wastewater evidence is separate.
+        simulated = (
+            sim is not None and BACKENDS[sim.simulator].molecular and node.id not in excluded
+        )
         reacting = bool(getattr(node, "reactions", None)) or getattr(node, "reactor", None)
         if cells and node.id in cells:
             unit = cells[node.id]
