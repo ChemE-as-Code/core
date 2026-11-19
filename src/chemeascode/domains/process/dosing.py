@@ -52,9 +52,11 @@ TRACE_DEPTH = 10
 
 def dosing_time(node: Any) -> float:
     """s of semi-batch *node*'s dosing: from its first dose's start to its last dose's end (the
-    schedule :func:`stretched` stretches)."""
+    schedule :func:`stretched` stretches), each dose where the model doses it (a dose
+    ``after_initiation`` from the initiation on, ADR 0074: the wait is no dosing)."""
     batch = node.batch
-    return batch.dosing_end() - min((d.start for d in batch.dosing), default=0.0)
+    starts = [a for d in batch.dosing for a, _, _ in batch.segments(d)[:1]]
+    return batch.dosing_end() - min(starts, default=0.0)
 
 
 def stretched(node: Any, factor: float) -> Any:
@@ -78,8 +80,9 @@ def stretched(node: Any, factor: float) -> Any:
 def peak_at(process: Any, node: Any, inlets: list[Any], case: str, hours: float) -> Callable:
     """``Q(s)``: kW to remove at the peak of one batch (*hours* of the flowsheet's flows) of
     isothermal semi-batch *node* with its dosing stretched by ``s`` (its model's peak cooling
-    duty times its content at the end, as the recipe's jacket check takes it); None where the
-    model gives none. Raises TankError when the model does not solve."""
+    duty times its content at the end, plus ``batch.agitator_power`` (ADR 0075), as the
+    recipe's jacket check takes it); None where the model gives none. Raises TankError when
+    the model does not solve."""
     from chemeascode.domains.process.stirred_tank import solve_node, tank_inlet
 
     def peak(factor: float) -> float | None:
@@ -87,7 +90,10 @@ def peak_at(process: Any, node: Any, inlets: list[Any], case: str, hours: float)
         solved, _ = solve_node(process, trial, tank_inlet(trial, inlets), case)
         if solved.peak_cooling_duty is None or not solved.volume:
             return None
-        return solved.peak_cooling_duty * solved.volume * hours
+        found = solved.peak_cooling_duty * solved.volume * hours
+        if node.batch.agitator_power is not None:
+            found += node.batch.agitator_power.value  # its heat is removed too (ADR 0075)
+        return found
 
     return peak
 
@@ -214,10 +220,11 @@ def couplings(process: Any) -> list[Coupling]:
 
 def _window(generator: Any) -> tuple[list[tuple[float, float, float]] | None, str]:
     """The schedule the generator's gas follows: its one dose's segments, else (start, end, 1)
-    of its doses together, or of a batch's time; None (with why) when it is not declared."""
+    of its doses together, or of a batch's time; None (with why) when it is not declared. Each
+    dose where the model doses it (``after_initiation`` from the initiation on, ADR 0074)."""
     batch = generator.batch
     if generator.reactor == "semibatch":
-        segments = [d.segments() for d in batch.dosing]
+        segments = [batch.segments(d) for d in batch.dosing]
         if len(segments) == 1:
             return segments[0], f"{generator.id}'s dosing"
         start = min(a for s in segments for a, _, _ in s)
@@ -241,11 +248,14 @@ def _schedule(segments: list[tuple[float, float, float]]) -> str:
     return ", ".join(f"{a / 3600:.4g}-{b / 3600:.4g} h ({s:.3g})" for a, b, s in segments)
 
 
-def deviation(profile: list[tuple[float, float]], dose: Any) -> tuple[float, float] | None:
+def deviation(
+    profile: list[tuple[float, float]], segments: list[tuple[float, float, float]]
+) -> tuple[float, float] | None:
     """The largest ``|F_g(t) - F_d(t)|`` and its time s: *profile* (time s, kmol left by the
-    generator's vent so far) as shares of its end, against the share *dose* (a Dosing) has fed
-    by then; at the profile's points and the dose's break points (``F_g`` linear between its
-    points, 1 after its end). None when nothing left."""
+    generator's vent so far) as shares of its end, against the share the dose of *segments*
+    ((start s, end s, share) after the charge: ``Batch.segments``) has fed by then; at the
+    profile's points and the dose's break points (``F_g`` linear between its points, 1 after
+    its end). None when nothing left."""
     if not profile or profile[-1][1] <= 0:
         return None
     total = profile[-1][1]
@@ -262,9 +272,9 @@ def deviation(profile: list[tuple[float, float]], dose: Any) -> tuple[float, flo
         return (v0 + share * (v1 - v0)) / total
 
     def fed(t: float) -> float:
-        return sum(s * min(max((t - a) / (b - a), 0.0), 1.0) for a, b, s in dose.segments())
+        return sum(s * min(max((t - a) / (b - a), 0.0), 1.0) for a, b, s in segments)
 
-    points = sorted({*times, *(x for a, b, _ in dose.segments() for x in (a, b))})
+    points = sorted({*times, *(x for a, b, _ in segments for x in (a, b))})
     return max(((abs(generated(t) - fed(t)), t) for t in points), key=lambda p: p[0])
 
 
@@ -347,12 +357,13 @@ def _coupling_rules(process: Any, c: Coupling, add: Callable) -> None:
         "time and profile), and start both together in process/recipe.yaml"
     )
     window, what = _window(c.generator)
-    if window is not None and not _same(dose.segments(), window):
+    dosed = c.absorber.batch.segments(dose)  # where the model doses it (ADR 0074)
+    if window is not None and not _same(dosed, window):
         add(
             "warning",
             "coupled-dosing",
             f"{c.absorber.id} doses {dose.stream}, the vent of {c.generator.id}{through}, over "
-            f"{_schedule(dose.segments())}, but {what} runs {_schedule(window)}: the gas leaves "
+            f"{_schedule(dosed)}, but {what} runs {_schedule(window)}: the gas leaves "
             "on another schedule than it is dosed",
             where,
             ids,
@@ -368,7 +379,7 @@ def _coupling_rules(process: Any, c: Coupling, add: Callable) -> None:
         solved, _ = solve_node(process, c.generator, tank_inlet(c.generator, inlets), case)
     except TankError:
         return  # the generator's own findings say why
-    found = deviation(solved.vent_profile, dose)
+    found = deviation(solved.vent_profile, dosed)
     if found is None:
         return
     gap, at = found

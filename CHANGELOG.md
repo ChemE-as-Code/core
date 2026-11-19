@@ -185,6 +185,35 @@
 - The committed example sheets are regenerated for `model.py` (the new rules' call); only
   `generator_sha256` changes.
 
+### Fixed
+
+Where two of this release's features meet (none of these was in 1.12.0; no library entry uses
+both sides of any, and the library gives the same results):
+
+- The shortest dosing (ADR 0073) counts a batch's `agitator_power` (ADR 0075) in its peak duty,
+  as the jacket check does. It left it out, so the shortest dosing it reported was too short:
+  with 20 kW on a vessel whose jacket removes 302 kW, 0.414 h, where the peak with the
+  agitator is about 322 kW.
+- A dose with `after_initiation` (ADR 0074) is dosed from the initiation on in the shortest
+  dosing: the wait is no dosing time, and the reported shortest dosing is the stretched model's
+  own (with a 0.5 h initiation and a 1 h dose: declared 1 h and shortest 2.068 h, not 1.5 h and
+  3.102 h). The coupled-dosing check (`cheme.process-coupled-dosing`) compares the absorber's
+  and the generator's doses where the model doses them: it warned on an absorber dosed in the
+  generator's shifted window and passed one dosed in the unshifted one.
+- A recipe `heat` or `cool` after the `dry` in a dryer's vessel and the dryer's
+  `cooling.product_temperature` both cooled the dried product, counted twice with no finding:
+  now a `cheme.recipe-vessel` error, and the dryer's cooling lists it as missing.
+- The recipe vessel's metal of a dryer (ADR 0075) with no heat or cool in its procedure is heated
+  from the wet cake's temperature, as documented, not from the dryer's
+  `cooling.vessel_temperature`, which the merge had taken (the cooling does not cool that metal
+  back to it); the dryer's basis text says which start it took.
+- A vessel holding a batch step and a filter with a displacement wash (ADR 0072) takes the
+  filter's content as the slurry or the cake with the wash, the larger, in its intake of the
+  other steps (`cheme.recipe-vessel`, `size_from: steps`), as its own content does, not their
+  sum.
+- The `separation-method-selection` skill no longer says a vessel holds at most one batch or
+  semi-batch step (ADR 0073).
+
 ## 1.12.0 (2026-11-13)
 
 Minor release for batch processes. The batch still handles components in a phase of their own,

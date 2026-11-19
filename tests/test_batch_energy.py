@@ -547,6 +547,63 @@ def test_a_warm_up_before_the_drying_is_the_recipes_and_the_dryer_heats_the_cake
     assert _duty(ws, "Q1")["provenance"] == "assumed"
 
 
+def _dryer_cooling(ws, cooling):
+    """*ws*'s dryer D1 with ``cooling: {cooling}`` (ADR 0072), propagated again."""
+    from chemeascode.foundation.workspace import Workspace
+
+    path = ws.root / "process/flowsheet.yaml"
+    text = path.read_text()
+    outlets = "      outlets: {product: product, vapour: vapour}\n"
+    assert outlets in text
+    path.write_text(text.replace(outlets, f"      cooling: {{{cooling}}}\n" + outlets, 1))
+    process, found = load(ws.root)
+    assert process is not None, [f.format() for f in found]
+    run(Workspace(ws.root), process, "design", write=True)
+    return ws
+
+
+def test_the_recipe_metal_starts_at_the_wet_cakes_temperature_not_the_cooling_vessels(tmp_path):
+    """Without a heat or cool in its procedure the recipe vessel's metal is heated from the wet
+    cake's 278.15 K (ADR 0075), not from the dryer's cooling.vessel_temperature: that cooling
+    cools back only the dryer's own vessel_heat_capacity. The basis names the start taken."""
+    ws = _dryer_cooling(
+        _dryer_plant(tmp_path, cool=False), "vessel_temperature: 320, provenance: assumed"
+    )
+    solution = _dryer_entry(ws)
+    assert solution["vessel_metal"]["start_temperature_K"] == 278.15
+    assert solution["vessel_kJ_h"] == pytest.approx(2000 * 55.0 / dryers.HOURS, rel=1e-5)
+    assert "metal from 278.15 K, the wet cake's: no heat or cool" in solution["basis"]
+    assert "the temperature it was left at" not in solution["basis"]
+    cooled = _dryer_entry(_dryer_plant(tmp_path / "cooled"))
+    assert "metal from 303.15 K, the temperature it was left at" in cooled["basis"]
+
+
+def test_a_recipe_cool_after_the_dry_and_the_dryers_product_cooling_are_refused(tmp_path):
+    """The recipe's cool after the dry (333.15 -> 303.15 K on Q2) and D1's
+    cooling.product_temperature both cool the dried product: an error, and the dryer's
+    cooling lists it as missing, so the product's cool-down is not counted twice (ADR 0075)."""
+    from chemeascode.domains.process.crystallization import crystallizer_report
+
+    cooling = "product_temperature: 303.15, heat_capacity: 1.2, provenance: assumed"
+    ws = _dryer_cooling(_dryer_plant(tmp_path), cooling)
+    messages = [f.message for f in recipe_report(ws.root).findings if f.level == "error"]
+    assert any(
+        "cool after the dry and D1's cooling.product_temperature both cool" in m for m in messages
+    ), messages
+    (entry,) = [u for u in crystallizer_report(ws.root).units if u["node"] == "D1"]
+    found = entry["solution"]["cooling"]
+    assert found["duty_kW"] is None
+    assert any("cooling.product_temperature or the recipe's cool" in m for m in found["missing"])
+    # the dryer's cooling alone, or the recipe's cool with a cooling that leaves the product be
+    alone = _dryer_cooling(_dryer_plant(tmp_path / "alone", cool=False), cooling)
+    assert not [f for f in recipe_report(alone.root).findings if f.level == "error"]
+    (entry,) = [u for u in crystallizer_report(alone.root).units if u["node"] == "D1"]
+    assert entry["solution"]["cooling"]["product_kJ_h"] > 0
+    vessel = "vessel_temperature: 300, provenance: assumed"
+    both = _dryer_cooling(_dryer_plant(tmp_path / "vessel"), vessel)
+    assert not [f for f in recipe_report(both.root).findings if f.level == "error"]
+
+
 # -- a still's sensible rise while it boils and its heat losses -----------------------------------
 
 CP_A, CP_P = 136.0, 200.0  # kJ/(kmol K): the test's benzene-like A and non-volatile P

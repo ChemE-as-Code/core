@@ -120,6 +120,48 @@ def test_the_shortest_dosing_keeps_the_wait_before_the_first_dose(tmp_path):
     assert late.peak_duty == pytest.approx(prompt.peak_duty, rel=1e-3)
 
 
+def _dosed(tmp_path, dosing, coolant=280.0):
+    """test_recipe's plant with R's ``dosing: [...]`` replaced by *dosing* (YAML text)."""
+    ws = plain._plant(tmp_path, _shortest_recipe(coolant))
+    flowsheet = ws.root / "process/flowsheet.yaml"
+    text = flowsheet.read_text()
+    assert "dosing: [{stream: S2, time: 3600}]," in text
+    flowsheet.write_text(text.replace("dosing: [{stream: S2, time: 3600}],", dosing, 1))
+    return recipe_report(ws.root)
+
+
+def test_the_shortest_dosing_counts_the_agitators_heat_as_the_jacket_check_does(tmp_path):
+    """ADR 0075: an agitator's 20 kW adds to the peak the jacket removes. The shortest dosing
+    takes it too, so it is longer, and its peak with the agitator is what the jacket removes."""
+    plain_ = _dosed(tmp_path / "plain", "dosing: [{stream: S2, time: 3600}],", coolant=200.0)
+    stirred = _dosed(
+        tmp_path / "stirred",
+        "dosing: [{stream: S2, time: 3600}], agitator_power: {value: 20, provenance: assumed},",
+        coolant=200.0,
+    )
+    (without,), (vessel,), (limit,) = plain_.dosing, stirred.vessels, stirred.dosing
+    assert vessel.peak_duty == pytest.approx(plain_.vessels[0].peak_duty + 20.0, rel=1e-9)
+    assert limit.shortest > without.shortest * 1.05
+    assert limit.peak_duty <= limit.removable
+    assert limit.peak_duty == pytest.approx(limit.removable, rel=1e-3)
+
+
+def test_a_dose_after_the_initiation_waits_out_of_its_shortest_dosing(tmp_path):
+    """ADR 0074 with ADR 0073: a dose ``after_initiation`` starts when a 0.5 h initiation that
+    holds nothing back ends. The wait is no dosing time and is not stretched: the declared and
+    the shortest dosing are the dose's own, as without the initiation."""
+    prompt = _dosed(tmp_path / "prompt", "dosing: [{stream: S2, time: 3600}],")
+    waiting = _dosed(
+        tmp_path / "waiting",
+        "dosing: [{stream: S2, time: 3600, after_initiation: true}], initiation: {time: 1800, "
+        "factor: 0.0, reactions: [], provenance: assumed},",
+    )
+    (before,), (after,) = prompt.dosing, waiting.dosing
+    assert after.declared == pytest.approx(1.0)
+    assert after.shortest == pytest.approx(before.shortest, rel=1e-9)
+    assert after.peak_duty == pytest.approx(before.peak_duty, rel=1e-9)
+
+
 def test_a_jacket_that_removes_no_heat_has_no_shortest_dosing_without_a_run(tmp_path):
     result = recipe_report(plain._plant(tmp_path, _shortest_recipe(coolant=320.0)).root)
     (limit,) = result.dosing
@@ -496,7 +538,7 @@ def test_a_dose_of_another_vessels_vent_is_checked_against_its_gas(tmp_path):
     inlets = [s for s in process.flowsheet.streams if process.ends(s)[1].node == "R"]
     solved, _ = solve_node(process, node, tank_inlet(node, inlets), "design")
     dose = process.nodes["R2"].batch.dosing[0]
-    gap, when = deviation(solved.vent_profile, dose)
+    gap, when = deviation(solved.vent_profile, dose.segments())
     assert gap == pytest.approx(exact, rel=1e-3)  # at the integrator's points
     assert when == pytest.approx(at, rel=0.05)
     assert f"differ by {exact:.3g} at most (at {when / 3600:.4g} h" in finding.message
@@ -516,8 +558,32 @@ def test_a_dose_on_another_schedule_than_its_generator_is_a_warning(tmp_path):
     assert [f.level for f in _coupling(_coupled(tmp_path / "late", late))] == ["warning", "info"]
 
 
+def test_a_generator_dosing_after_its_initiation_is_compared_where_it_doses(tmp_path):
+    """ADR 0074 with ADR 0073: R's dose ``after_initiation`` (0.5 h) gives its gas off from 0.5
+    to 1.5 h, as the model doses it. An absorber dosed over 0-1 h is on another schedule
+    (warning); one dosed over 0.5-1.5 h is on R's (no warning)."""
+    generator = "batch: {dosing: [{stream: S2, time: 3600}], vent:"
+    assert generator in COUPLED
+    shifted = COUPLED.replace(
+        generator,
+        "batch: {dosing: [{stream: S2, time: 3600, after_initiation: true}], initiation: "
+        "{time: 1800, provenance: assumed}, vent:",
+    )
+    early = _coupling(_coupled(tmp_path / "early", shifted))
+    (warning,) = [f for f in early if f.level == "warning"]
+    assert "over 0-1 h (1), but R's dosing runs 0.5-1.5 h (1)" in warning.message
+    on_time = shifted.replace(
+        "dosing: [{stream: S4, time: 3600}]", "dosing: [{stream: S4, time: 3600, start: 1800}]"
+    )
+    found = _coupling(_coupled(tmp_path / "on-time", on_time))
+    assert [f.level for f in found] == ["info"]
+    gap = float(found[0].message.split("differ by ")[1].split(" ")[0])
+    late = float([f for f in early if f.level == "info"][0].message.split("differ by ")[1][:5])
+    assert gap < 0.1 < late  # the dose that follows the gas, against one 0.5 h ahead of it
+
+
 def test_the_deviation_of_a_profile_from_a_dose():
-    dose = Dosing.model_validate({"stream": "D", "time": 100})
+    dose = Dosing.model_validate({"stream": "D", "time": 100}).segments()
     # a generator that gives its gas off at the dose's rate, and one that gives it all at once
     assert deviation([(0.0, 0.0), (50.0, 0.5), (100.0, 1.0)], dose)[0] == pytest.approx(0.0)
     assert deviation([(0.0, 0.0), (1e-9, 1.0), (100.0, 1.0)], dose)[0] == pytest.approx(1.0)

@@ -295,13 +295,14 @@ def energy_balance(
     sublimed: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """The dryer's duty (kW, heat supplied) with its terms, or what is missing. With
-    ``cooling.vessel_temperature`` the vessel is heated from there; *sublimed* (kg/h by solid)
-    takes its ``sublimation.heat`` (ADR 0072). *metal*: the recipe vessel's
-    (:func:`.recipe.dryer_metal`, ADR 0075), heated from the temperature the vessel was left at
-    (else as the vessel's ``vessel_heat_capacity`` would be) instead of ``vessel_heat_capacity``.
-    *cake*: (K, the operation) the recipe heated or cooled the wet cake to before the drying
-    (:func:`.recipe.dryer_cake`): the wet cake is heated from there, that operation's heat being
-    its own."""
+    ``cooling.vessel_temperature`` the vessel's ``vessel_heat_capacity`` is heated from there;
+    *sublimed* (kg/h by solid) takes its ``sublimation.heat`` (ADR 0072). *metal*: the recipe
+    vessel's (:func:`.recipe.dryer_metal`, ADR 0075) instead of ``vessel_heat_capacity``, heated
+    from the temperature the vessel was left at, else from the wet cake's (never from
+    ``cooling.vessel_temperature``: the dryer's cooling cools back only its own
+    ``vessel_heat_capacity``, not the recipe vessel's metal). *cake*: (K, the operation) the
+    recipe heated or cooled the wet cake to before the drying (:func:`.recipe.dryer_cake`): the
+    wet cake is heated from there, that operation's heat being its own."""
     data = spec.energy
     missing = list(missing)
     t_in = data.inlet_temperature or inlet_temperature
@@ -329,8 +330,11 @@ def energy_balance(
         else 0.0
     )
     start = t_vessel
+    if metal is not None:
+        # ADR 0075: the temperature the vessel was left at, else the wet cake's; not
+        # cooling.vessel_temperature, as the cooling does not cool this metal back to it
+        start = metal[1] if metal[1] is not None else t_in
     if metal is not None and batch_hours:
-        start = metal[1] if metal[1] is not None else t_vessel
         vessel = metal[0] * (spec.temperature - start) / batch_hours
     sublimation = sum(kg * heats[n] for n, kg in (sublimed or {}).items() if kg)
     total = (sensible + evaporation + vessel + sublimation) / data.efficiency
@@ -360,7 +364,12 @@ def energy_balance(
         "basis": "the wet cake heated at a constant heat capacity to the drying temperature, "
         "the volatiles evaporated at it, the vessel heated once per batch"
         + (
-            f" (the recipe vessel's metal from {start:.5g} K, the temperature it was left at)"
+            f" (the recipe vessel's metal from {start:.5g} K, "
+            + (
+                "the temperature it was left at)"
+                if metal[1] is not None
+                else "the wet cake's: no heat or cool with temperatures in its procedure)"
+            )
             if metal is not None
             else ""
         )
@@ -380,11 +389,17 @@ def energy_balance(
 
 
 def cooling_duty(
-    spec: Any, product_kg_h: float, inlet_temperature: float | None, batch_hours: float | None
+    spec: Any,
+    product_kg_h: float,
+    inlet_temperature: float | None,
+    batch_hours: float | None,
+    recipe_cool: str | None = None,
 ) -> dict[str, Any]:
     """The heat (kW, removed) of cooling the product to its discharge temperature and the
     vessel's metal back for the next batch (:class:`~.schema.DryerCooling`, ADR 0072), or what
-    is missing."""
+    is missing. *recipe_cool*: a recipe operation that heats or cools the dried product after
+    the drying (:func:`.recipe.dryer_cooled`): with ``product_temperature`` too the product's
+    cooling would be counted twice, so it is missing (ADR 0075)."""
     data = spec.cooling
     energy = spec.energy
     capacity = energy.vessel_heat_capacity if energy is not None else None
@@ -395,6 +410,11 @@ def cooling_duty(
         missing.append("the vessel's temperature (cooling.vessel_temperature or the cake's)")
     if capacity is not None and not batch_hours:
         missing.append("the batch (process/recipe.yaml) for the vessel's heat per batch")
+    if recipe_cool is not None and data.product_temperature is not None:
+        missing.append(
+            "one cool-down of the product: cooling.product_temperature or the recipe's "
+            f"{recipe_cool} after the dry, not both"
+        )
     t_product = data.product_temperature or spec.temperature
     found: dict[str, Any] = {
         "product_temperature_K": t_product,
@@ -590,7 +610,11 @@ def solve_node(
             sublimed=sublimed,
         )
     if spec.cooling is not None:
-        result.cooling = cooling_duty(spec, sum(product.values()), t_in, batch_hours)
+        from chemeascode.domains.process.recipe import dryer_cooled
+
+        result.cooling = cooling_duty(
+            spec, sum(product.values()), t_in, batch_hours, dryer_cooled(process, node.id)
+        )
     if spec.condenser is not None:
         result.condenser = condense_vapour(process, spec, volatile, latent)
         result.notes += result.condenser.pop("notes", [])

@@ -859,8 +859,10 @@ def _other_steps(
     process: Any, recipe: Recipe, up: UnitProcedure, tanks: list[str], case: str
 ) -> tuple[float, str] | None:
     """(m3, step): the most material one batch brings into a step of *up* that is none of its
-    batch steps *tanks* (its material inlets from their components' liquid molar volumes); None
-    when there is none or no volume is known."""
+    batch steps *tanks* (its material inlets from their components' liquid molar volumes; a
+    filter with a displacement wash holds the slurry or the cake with the wash, never both:
+    :func:`_displaced`, as :func:`_step_contents` takes it); None when there is none or no
+    volume is known."""
     from chemeascode.domains.process.model import stream_flows
 
     try:
@@ -871,14 +873,19 @@ def _other_steps(
     for node in _nodes(process, up):
         if node.id in tanks:
             continue
-        flows = [
-            _volume_flow(process, stream_flows(process, s, case).components)
-            for s in _inlets(process, node.id)
-            if s.kind == "material"
+        inlets = [s for s in _inlets(process, node.id) if s.kind == "material"]
+        volumes = [
+            (s, v)
+            for s in inlets
+            if (v := _volume_flow(process, stream_flows(process, s, case).components)) is not None
         ]
-        known = [v for v in flows if v is not None]
-        if known and (found is None or sum(known) * hours > found[0]):
-            found = (sum(known) * hours, node.id)
+        if not volumes:
+            continue
+        flow = sum(v for _, v in volumes)
+        if getattr(getattr(node, "solid_separation", None), "wash", None) is not None:
+            flow = _displaced(process, node, inlets, volumes, case, flow)
+        if found is None or flow * hours > found[0]:
+            found = (flow * hours, node.id)
     return found
 
 
@@ -1053,6 +1060,25 @@ def dryer_cake(process: Any, node_id: str) -> tuple[float, str] | None:
             at = next((i for i, o in enumerate(ops) if o.kind == "dry"), 0)
         before = [o for o in ops[:at] if o.temperatures is not None]
         return (before[-1].temperatures[1], before[-1].id) if before else None  # type: ignore[index]
+    return None
+
+
+def dryer_cooled(process: Any, node_id: str) -> str | None:
+    """The id of the first ``heat`` or ``cool`` with ``temperatures`` after the ``dry`` in the
+    unit procedure that holds dryer *node_id*, in its order: it heats or cools the dried
+    product, as the dryer's ``cooling.product_temperature`` does (each once: ADR 0075). None
+    without one, or without a ``dry``."""
+    recipe, _, _ = load_recipe(process.root)
+    if recipe is None:
+        return None
+    for up in recipe.unit_procedures:
+        if not any(node.id == node_id for node in _nodes(process, up)):
+            continue
+        ops = up.operations
+        at = next((i for i, o in enumerate(ops) if o.kind == "dry" and o.from_ == node_id), None)
+        if at is None:
+            at = next((i for i, o in enumerate(ops) if o.kind == "dry"), len(ops))
+        return next((o.id for o in ops[at + 1 :] if o.temperatures is not None), None)
     return None
 
 
@@ -1517,6 +1543,22 @@ def evaluate(
                         "ADR 0075), or as the dryer's vessel_heat_capacity",
                         [up.id],
                     )
+            cooling = solids[0].dryer.cooling if solids[0] is not None else None
+            if (
+                cooling is not None
+                and cooling.product_temperature is not None
+                and (after := dryer_cooled(process, solids[0].id)) is not None
+            ):
+                add(
+                    "error",
+                    "vessel",
+                    f"{up.id}: the operation {after} after the dry and {solids[0].id}'s "
+                    "cooling.product_temperature both cool the dried product",
+                    [*at, "operations"],
+                    "cool the product once: with the recipe's cool (on the jacket, with the "
+                    "vessel's metal, ADR 0075), or with the dryer's cooling (ADR 0072)",
+                    [up.id],
+                )
         elif (
             up.vessel is not None
             and not reacts

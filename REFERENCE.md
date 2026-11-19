@@ -1190,9 +1190,13 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `process crystallizers`), and its `metal_heat_capacity` is the dryer's metal,
   heated each batch from the temperature the vessel was left at, the end of the last operation
   with `temperatures` before the `dry` in the procedure's cycle (a cool-down before the
-  discharge), else from the wet cake's (`cheme.recipe-vessel` error when the dryer gives
-  `energy.vessel_heat_capacity` too; `process crystallizers` reports `vessel_metal` with its
-  start temperature). A batch's `agitator_power` adds to the peak duty of the jacket check.
+  discharge), else from the wet cake's, not from the dryer's `cooling.vessel_temperature`
+  (`cheme.recipe-vessel` error when the dryer gives `energy.vessel_heat_capacity` too;
+  `process crystallizers` reports `vessel_metal` with its start temperature). A `heat` or
+  `cool` after the `dry` cools the dried product: with the dryer's `cooling.product_temperature`
+  too it is a `cheme.recipe-vessel` error (the product's cool-down counted twice), and the
+  dryer's cooling lists it as missing. A batch's `agitator_power` adds to the peak duty of the
+  jacket check, and of the shortest dosing's.
 - **Stirred tanks and batches**: `reactor: cstr` (a `tank:` of a volume or residence time,
   `count` tanks in series, isothermal or adiabatic) and `reactor: batch` (a `batch:` time or
   target conversion) solve the reactions' rate laws (`domains/process/stirred_tank.py`), gas or
@@ -1344,7 +1348,9 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   `batch.initiation: {time, factor, reactions, provenance}` holds the `reactions` (default
   every one) at `factor` of their rate (default 0) until `time` s after the charge, an
   induction period; a dose with `after_initiation: true` counts its `start` from it (a feed
-  interlocked on a positive initiation; the recipe's dosing time includes the wait). A
+  interlocked on a positive initiation; the recipe's `dose` operation includes the wait, the
+  shortest dosing does not stretch it or count it as dosing, and `cheme.process-coupled-dosing`
+  compares the dose where the model doses it). A
   semi-batch with an initiation also runs the uninitiated scenario: the initiation never
   comes, the waiting doses never start, until the initiation was due or the last other dose
   ends; `process reactors` gives `initiation` (`time_s`, `factor`, `reactions`,
@@ -1454,7 +1460,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     `metal_heat_capacity` (and no `vessel_heat_capacity`, ADR 0075) the metal is heated from
     the temperature the vessel was left at (the end of the last `heat` or `cool` with
     `temperatures` before the `dry`, a cool-down in the dryer before the discharge), else from
-    the wet cake's: `C_m (T - T_left) / h_batch` (`vessel_metal` in the report). The duty is
+    the wet cake's (not from `cooling.vessel_temperature`): `C_m (T - T_left) / h_batch`
+    (`vessel_metal` in the report). The duty is
     compared with the energy stream at `port` (`cheme.process-dryer-duty`). The product's dry solid is
     everything but the volatiles, so its moisture is the residual moisture.
   - A recipe `dry` operation with `from:` the dryer takes one batch's vapour over

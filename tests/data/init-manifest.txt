@@ -84,7 +84,7 @@ c988a79afb5375b0769a8d910e49da67e676efaec3698e2e19c9f3db524b6a97  .claude/skills
 0c5182a58bbd2d72c52145cbf59327fd3159c46c1595de3e314dde8e4449c0dc  .claude/skills/review/SKILL.md
 1f1037ac20d85f7e78e31ea3059367b56b5321354a923e54541f279668ede746  .claude/skills/route-selection/SKILL.md
 d9a933a159b9d1b93aaa4075fc0fc1afa70164a6aceb1d0657812bb9afd7c3d6  .claude/skills/safeguard-crediting/SKILL.md
-8a99a40a1206f787e8942967210115855bee9a4fd2941ff591c52a453bb23e05  .claude/skills/separation-method-selection/SKILL.md
+7dc3a93a8afbc8fe8999540530b6c1bdc2f3b16220b92e048d1e05ec3711c6b7  .claude/skills/separation-method-selection/SKILL.md
 84194ebd9a1871e7281461cca6336744f21b92c2b46f435194252634c7ca1371  .claude/skills/skid-design/SKILL.md
 dbf6eb70599d14693dc33e8d4a34ff5622f4c9af41d81b0c25fb25fd7bb60999  .claude/skills/structures-access/SKILL.md
 10b081327859fe7013bb83c47c3ab251e9377e79b835c5ce61b7efc82550802c  .claude/skills/tea/SKILL.md

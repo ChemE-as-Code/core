@@ -159,8 +159,9 @@ with units, fallback, notes and the test that solves each arrangement):
   holds a filter-dryer's steps in one vessel, and `filter` and `dry` take `from:` those steps
   (ADR 0057). A precipitation in the reactor that is filtered and dried there lists the batch
   step too (`units: [reactor, filter, dryer]`): its batch sizes the vessel, whose plate and
-  `heated_area` the filter and dry times take. At most one batch or semi-batch step per
-  vessel; a step is never both a `still:` and a `dryer:`;
+  `heated_area` the filter and dry times take. A vessel may hold several batch or semi-batch
+  steps one after the other (ADR 0073: a one-pot sequence is one unit procedure); a step is
+  never both a `still:` and a `dryer:`;
 - **shortcut**: Fenske-Underwood-Gilliland (`shortcut_column`, `separations.shortcut`);
 - **specified split**: the split is given, not predicted. In the flowsheet, `recovery:
   {outlets: {port: {component: share of its inlet flow}}, provenance, source}` on the

@@ -102,7 +102,9 @@ propagates, fingerprints and reports as in 1.12.0.
   `vessel.metal_heat_capacity`, which 1.12.0 ignored for a dryer, is the dryer's metal
   (`recipe.dryer_metal`): `C_m (T - T_left) / h_batch`, `T_left` the end temperature of the
   last operation with `temperatures` before the `dry` in the procedure's cycle (a cool-down
-  before the discharge), else the wet cake's. With the dryer's own `energy.vessel_heat_capacity`
+  before the discharge), else the wet cake's; never the dryer's `cooling.vessel_temperature`
+  (ADR 0072), which is for its own `energy.vessel_heat_capacity`: the dryer's cooling does not
+  cool the recipe vessel's metal back to it. With the dryer's own `energy.vessel_heat_capacity`
   too it is an error (`cheme.recipe-vessel`, and the dryer's energy lists it as missing). A
   `heat` or `cool` with `temperatures` in a dryer's vessel, refused by 1.12.0, takes its time
   from the jacket, `(C + C_m) / (U A) ln(...)`, C the wet cake's (before the `dry`: its mass
@@ -112,8 +114,11 @@ propagates, fingerprints and reports as in 1.12.0.
   or the vessel's heated area. A heat or cool before the `dry` (in the procedure's order: the
   wet cake is new each batch) brings the wet cake to its end temperature: the dryer heats the
   cake from there (`recipe.dryer_cake`, `recipe_heat` in its report), so the cake's heat-up is
-  the operation's (on its stream, or reported) and the dryer's, each part once. A filter's
-  vessel keeps the refusal.
+  the operation's (on its stream, or reported) and the dryer's, each part once. A heat or cool
+  after the `dry` acts on the dried product, as the dryer's `cooling.product_temperature` (ADR
+  0072) does: both together count the product's cool-down twice, so it is an error
+  (`cheme.recipe-vessel`, `recipe.dryer_cooled`) and the dryer's cooling lists it as missing.
+  A filter's vessel keeps the refusal.
 - **Fingerprints.** Every new field is left out of its dump when not given (`exclude_if`).
   `batch.heat_up_port`, `heat_of_solution` and `agitator_power` are in `stirred_tank.duty_only`;
   a still's `sensible_heat`, `heat_loss` and `agitator_power` in `batch_still.STILL_DUTY_ONLY`;

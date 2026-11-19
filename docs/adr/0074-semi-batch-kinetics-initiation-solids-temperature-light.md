@@ -42,7 +42,10 @@ solves exactly as before: same break points, same arithmetic.
 - **Initiation.** `batch.initiation: {time, factor, reactions, provenance, source}` runs the
   named reactions (default every one) at `factor` (default 0) of their rate laws until `time` s
   after the charge. `dosing[].after_initiation: true` counts a dose's `start` from the
-  initiation (`Batch.segments`, `dosing_end`): a feed interlocked on a positive initiation. A
+  initiation (`Batch.segments`, `dosing_end`): a feed interlocked on a positive initiation.
+  ADR 0073's shortest dosing counts such a dose from the initiation on (`dosing.dosing_time`:
+  the wait is no dosing time and is not stretched), and its coupled-dosing check compares the
+  dose's and the generator's schedules where the model doses them. A
   semi-batch with an initiation is run a second time as the **uninitiated scenario**: the
   initiation never comes, the waiting doses never start, until the initiation was due or the
   last other dose ends; its largest accumulation and its worst cooling-failure temperature (the

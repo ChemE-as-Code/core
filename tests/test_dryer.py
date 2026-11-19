@@ -632,17 +632,19 @@ REACTOR_FLOWSHEET = (
 )
 
 
-def _reactor_plant(tmp_path, heated_area):
+def _reactor_plant(tmp_path, heated_area, flowsheet=None, size_from=None):
     recipe = copy.deepcopy(RECIPE)
     up = recipe["unit_procedures"][0]
     up["units"] = ["RX", "F1", "D1"]
     up["vessel"] = {"fill_fraction": 0.5, "heated_area": heated_area, "provenance": "assumed"}
+    if size_from is not None:
+        up["vessel"]["size_from"] = size_from
     up["operations"].insert(0, {"id": "react", "kind": "react", "from": "RX"})
     root = tmp_path / "plant"
     (root / "process").mkdir(parents=True)
     (root / "plant.yaml").write_text("name: dryer-test\nstage: concept\nsheets: []\n")
     (root / "process/materials.yaml").write_text(REACTOR_MATERIALS)
-    (root / "process/flowsheet.yaml").write_text(REACTOR_FLOWSHEET)
+    (root / "process/flowsheet.yaml").write_text(flowsheet or REACTOR_FLOWSHEET)
     (root / "process/reactions.yaml").write_text(REACTOR_REACTIONS)
     (root / "process/recipe.yaml").write_text(yaml.safe_dump(recipe, sort_keys=False))
     ws = Workspace(root)
@@ -650,6 +652,73 @@ def _reactor_plant(tmp_path, heated_area):
     assert process is not None, [f.format() for f in found]
     run(ws, process, "design", write=True)
     return ws
+
+
+def _washed_reactor_flowsheet(wash_kg_h):
+    """REACTOR_FLOWSHEET with a displacement wash (ADR 0072) of *wash_kg_h* water on F1."""
+    replaced = [
+        (
+            "  - {id: L, ports: [{id: in, direction: in}]}\n",
+            "  - {id: L, ports: [{id: in, direction: in}]}\n"
+            "  - {id: WF, ports: [{id: in, direction: in}]}\n",
+        ),
+        (
+            "  - {id: F, ports: [{id: out, direction: out}]}\n",
+            "  - {id: F, ports: [{id: out, direction: out}]}\n"
+            "  - {id: WW, ports: [{id: out, direction: out}]}\n",
+        ),
+        (
+            "      - {id: filtrate, direction: out, delegates: filtrate}\n    solid_separation:",
+            "      - {id: filtrate, direction: out, delegates: filtrate}\n"
+            "      - {id: wash, direction: in}\n      - {id: washings, direction: out}\n"
+            "    solid_separation:",
+        ),
+        (
+            "      outlets: {cake: cake, filtrate: filtrate}\n      provenance: assumed\n"
+            "      filtration:",
+            "      outlets: {cake: cake, filtrate: filtrate, wash_filtrate: washings}\n"
+            "      provenance: assumed\n"
+            "      wash: {port: wash, efficiency: 0.6, provenance: assumed}\n      filtration:",
+        ),
+    ]
+    flowsheet = REACTOR_FLOWSHEET
+    for old, new in replaced:
+        assert old in flowsheet, old
+        flowsheet = flowsheet.replace(old, new, 1)
+    given = "{provenance: given, source: test}"
+    return flowsheet + (
+        "  - id: SW\n    from: WW.out\n    to: F1.wash\n    template: slurry\n    state:\n"
+        "      design:\n"
+        f"        temperature: {{value: 278.15, {given[1:-1]}}}\n"
+        f"        flow: {{value: {wash_kg_h}, {given[1:-1]}}}\n"
+        "        composition: {basis: mass_fraction, values: {H2O: 1.0}, "
+        f"{given[1:-1]}}}\n"
+        "  - id: SWF\n    from: F1.washings\n    to: WF.in\n    template: slurry\n"
+    )
+
+
+def test_a_washed_filter_beside_a_batch_step_holds_the_slurry_or_the_wash_not_both(tmp_path):
+    """units: [RX (batch), F1 with a 300 kg/h displacement wash, D1]: the intake of the steps
+    beside the batch step (ADR 0073) takes F1's content as its own content does (ADR 0072), the
+    larger of the slurry and the cake with the wash, not their sum: no recipe-vessel warning,
+    and size_from: steps sizes the vessel from that."""
+    from chemeascode.domains.process import recipe as recipes
+
+    flowsheet = _washed_reactor_flowsheet(300)
+    for size_from in (None, "steps"):
+        ws = _reactor_plant(tmp_path / str(size_from), 4.0, flowsheet, size_from)
+        process, _ = load(ws.root)
+        recipe, _, _ = recipes.load_recipe(ws.root)
+        up = recipe.unit_procedures[0]
+        content = recipes._step_contents(process, recipe, up, "design")
+        volume, step = recipes._other_steps(process, recipe, up, ["RX"], "design")
+        assert step == "F1" and volume == pytest.approx(content, rel=1e-9)
+        result = recipe_report(ws.root)
+        assert "cheme.recipe-vessel" not in {f.rule for f in result.findings}, [
+            f.format() for f in result.findings
+        ]
+        (vessel,) = result.vessels
+        assert vessel.working_volume == pytest.approx(content, rel=1e-6)
 
 
 def test_a_filter_dryer_after_a_batch_step_in_one_vessel_takes_its_vessel(tmp_path):
