@@ -253,6 +253,56 @@ def unifac_activity_coefficients(
     return [float(g) for g in model.gammas()]
 
 
+def unifac_gammas(cas: list[str]) -> Any:
+    """UNIFAC (original, DDBST group assignments, ``thermo``) of the components *cas* (CAS
+    numbers), set up once: a function of the temperature K and the mole fractions (in the
+    order of *cas*, summing to 1, zeros allowed: infinite dilution) that returns the activity
+    coefficients. For a batch still's many evaluations (ADR 0078): thermo's ``to_T_xs`` on the
+    groups found once. Raises ValueError without thermo, naming a component without UNIFAC
+    groups, or naming a pair of the liquid's main groups without interaction parameters
+    (thermo would take them as 0, part of an ideal liquid)."""
+    try:
+        from thermo.unifac import UFIP, UFMG, UFSG, UNIFAC, UNIFAC_group_assignment_DDBST
+    except ImportError as failure:
+        raise ValueError(
+            "activity coefficients need thermo: pip install 'cheme-as-code[props]'"
+        ) from failure
+    groups = []
+    for number in cas:
+        found = _unifac_groups(number, UNIFAC_group_assignment_DDBST)
+        if not found:
+            raise ValueError(f"no UNIFAC groups for CAS {number}")
+        groups.append(dict(found))
+    if len(cas) == 1:
+        return lambda temperature, fractions: [1.0]
+    owners: dict[int, list[str]] = {}  # main group -> the CAS numbers holding it
+    for number, found in zip(cas, groups, strict=True):
+        for subgroup in found:
+            owners.setdefault(UFSG[subgroup].main_group_id, []).append(number)
+    for first in sorted(owners):
+        for second in sorted(owners):
+            if first != second and second not in UFIP.get(first, {}):
+                names = [UFMG[m][0] if m in UFMG else str(m) for m in (first, second)]
+                raise ValueError(
+                    f"UNIFAC has no interaction parameters between main groups {first} "
+                    f"({names[0]}, of CAS {', '.join(dict.fromkeys(owners[first]))}) and "
+                    f"{second} ({names[1]}, of CAS {', '.join(dict.fromkeys(owners[second]))})"
+                )
+    base = UNIFAC.from_subgroups(
+        T=298.15,
+        xs=[1.0 / len(cas)] * len(cas),
+        chemgroups=groups,
+        subgroups=UFSG,
+        interaction_data=UFIP,
+        version=0,
+    )
+
+    def gammas(temperature: float, fractions: list[float]) -> list[float]:
+        return [float(g) for g in base.to_T_xs(temperature, list(fractions)).gammas()]
+
+    return gammas
+
+
 @functools.cache
 def _unifac_groups(cas: str, lookup: Any) -> tuple[tuple[int, int], ...]:
     """The DDBST UNIFAC groups of *cas*, looked up once per process."""

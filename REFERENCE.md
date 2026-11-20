@@ -1556,7 +1556,42 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `boilup: {value, unit}` is constant: kmol/h, kmol/s or kg/h of vapour, kW of heat (`V = Q
     / lambda(y)`, the components' `heat_of_vaporization` in kJ/kmol), 1/h (kmol of vapour
     per hour per kmol of charge) or m3/h (raoult, ADR 0068: the vapour's volume at the still's
-    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity).
+    temperature and pressure as an ideal gas, `V = Vdot P / (R T)`, a vacuum pump's capacity),
+    or a jacket's, `{value: UA, unit: kW/K, medium_temperature: K}` (raoult, ADR 0078): the heat
+    input `UA (T_m - T)` at the still's bubble point T, `V = UA (T_m - T) / lambda(y)`, falling
+    as the pot heats (UA and the medium constant: the wetted area does not fall as it empties).
+    An end at or above the medium's temperature is refused when read; a still that reaches its
+    end only near the medium (its driving force below 1 % of the one its run started at) stalls
+    with that reason, any other stall with the pace's. With `heat_up_time` the heat-up takes the
+    jacket's mean input over the charge's heat-up, `UA` times the log-mean of `T_m - T_in` and
+    `T_m - T_0`, so the charge and the metal to `T_0` take `C / UA ln((T_m - T_in) / (T_m -
+    T_0))` (the still's jacket, or one jacket on every cut). What heats while the jacket boils
+    up takes its own time at its driving force there: ADR 0075's sensible rise and heat losses
+    on its steps `int dQ / (UA (T_m - T))`, and on one jacket throughout the metal above `T_0`
+    `C_m / UA ln((T_m - T_0) / (T_m - T_end))`. Those terms stay beside the integration (ADR
+    0075): the jacket's whole input boils up in the outlets and the boil-up's time, and the
+    boil-up's and the heat-up's times add up to the jacket's whole heat. A time end with it
+    puts `medium_temperature` in the outlets' fingerprint. `process stills` puts the jacket's
+    boil-up in place of the constant one in the assumptions, and with `sensible_heat` or
+    `heat_loss` its assumption names them in the duty beside it.
+  - `volatility: {model: raoult, activity: unifac}` (ADR 0078): a non-ideal liquid on modified
+    Raoult's law, `y_i P = gamma_i x_i P_i(T)`, with original UNIFAC (thermo's DDBST groups,
+    extra `props`) at the still's liquid (without the `separate_phase`) and temperature; the
+    bubble point is solved again at the coefficients of the last one until it settles to 1e-11.
+    Each component of the liquid, dissolved non-volatiles and solids too, needs its `cas` in
+    `materials.yaml` (`cheme.process-still`, error); one without UNIFAC groups is refused, and
+    so is a liquid with a pair of UNIFAC main groups that has no interaction parameters (thermo
+    would take them as 0). The still holds one liquid: a liquid that splits into two is
+    refused (a heteroazeotrope is not modelled), where a component's activity `gamma_i x_i`
+    exceeds 1 at a bubble point, or Michelsen's tangent-plane test (from a trial liquid of each
+    component nearly pure) finds a second liquid below the tangent plane at a point of the
+    profile. A column takes the K-values `gamma_i P_i / P` at the still for the whole column.
+    `process stills` names the model in `detail` and its assumptions (with a column too), and
+    the volatility's own provenance decides whether the activity coefficients count as
+    sourced. The CAS numbers enter the fingerprint. The
+    latent heat is the components' (no heat of mixing), and so is ADR 0075's sensible rise (no
+    excess heat capacity). Every temperature the still takes is the UNIFAC bubble point: the
+    flash's (ADR 0077), an end at a temperature, the heat-up's `T_0` and ADR 0075's terms.
   - `cuts: [{outlet, end, pressure, boilup}]` (ADR 0068): a cut is collected at its own
     `pressure` kPa(a) (raoult) and `boilup`, else the still's; a vacuum ramp is a sequence of
     cuts. At a change of pressure the still steps to the new bubble point (a note; the flash or
@@ -1624,9 +1659,11 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
   - `still.heat_up_time: true` (raoult, ADR 0068): the duty's terms besides the boil-up (the
     charge's and a swap's feed's heat-up, a recipe vessel's metal) take time at the still's own
     boil-up's heat input, `t = (Q_whole - Q_boil-up) / (Q_boil-up / t_boil)` over the cuts
-    collected at it (a boil-up in kW: its value; a cut's own boil-up, a forerun the vacuum pump
+    collected at it (a boil-up in kW: its value; a jacket in kW/K, ADR 0078: `UA` times the
+    log-mean of `T_m - T_in` and `T_m - T_0`; a cut's own boil-up, a forerun the vacuum pump
     limits, limits the vapour, not the heating; every cut with its own: the mean over the whole
-    boil-up); `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
+    boil-up, or with one jacket, the same `UA` and medium, on every cut: that jacket's log-mean);
+    `process stills` gives `heat_up_time_h` and `time_h` (the boil-up's and the
     heat-up's), and a recipe `distil` `from:` the still takes both. A term that gives heat back
     takes no time; the metal is timed from its start to the still's first bubble point `T_0`
     and on to its end only above `T_0` (`C_m [(T_0 - T_start) + max(T_end - T_0, 0)]`), so a
@@ -1640,7 +1677,8 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     provenance}` (raoult) the heat lost over the boil-up, `UA int (T - T_amb) dt`
     (`heat losses`, `heat_loss_kWh_per_batch`; not over the heat-up or a hold);
     `still.agitator_power: {value: kW, provenance}` the agitator's heat over the boil-up's time
-    (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does.
+    (`agitation`, `-P t`). With `heat_up_time` the positive ones take time as the heat-up does
+    (on a jacket's boil-up, ADR 0078, at its driving force where they occur).
   - `still.flash: true` (raoult, ADR 0077): a charge that enters above its bubble point at the
     still's pressure (the first cut's without a feed) first flashes adiabatically and
     differentially to it. The vapour leaves as it forms, at the liquid's bubble point, and the
@@ -1662,12 +1700,16 @@ included, with `cheme.version-required` and an upgrade hint before any schema er
     re-evaluation of the bubble point there could fall short and report a dry still). Only a
     component the charge or the feed holds at a non-zero amount needs volatility data
     (core#214); a component only an inlet's template lists (before propagate) is an info.
-  - Not modelled: activity coefficients (azeotropes), the content's sensible rise while it
-    boils without `sensible_heat` (and the heat-up without `heat_up`), losses without
-    `heat_loss`, constant level by volume. `process
+  - Not modelled: activity models besides UNIFAC (no NRTL or measured coefficients in the
+    still), the content's sensible rise while it boils without `sensible_heat` (and the heat-up
+    without `heat_up`), losses without `heat_loss`, constant level by volume, a reaction in the
+    still (ADR 0078 says why). `process
     simulate` does not couple it.
     Qualified against Rayleigh's binary closed form, the Rayleigh integral for benzene-toluene
-    and the constant-level swap's closed form (`tests/test_batch_still.py`).
+    and the constant-level swap's closed form (`tests/test_batch_still.py`); the jacket against
+    the quadrature of `lambda / (UA (T_m - T))` over the path, and UNIFAC against Rayleigh's
+    integral on an independent modified-Raoult bubble point of methanol-toluene
+    (`tests/test_still_jacket_activity.py`).
   - **Batch rectification** (ADR 0061): `column: {stages: N, reflux: constant, ratio: R}` puts
     a column of N theoretical stages (the still included) with a total condenser on the still,
     on Diwekar's batch shortcut: at each point of the path the distillate follows from

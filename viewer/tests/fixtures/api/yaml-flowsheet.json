@@ -1187,7 +1187,7 @@
       },
       "Boilup": {
         "additionalProperties": false,
-        "description": "A batch still's boil-up, constant: a vapour rate of one still (kmol/h, kmol/s, kg/h),\nits heat input (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol\nof vapour per hour per kmol of the charge) or a vapour volume (m3/h at the still's\ntemperature and pressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR\n0068). With a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
+        "description": "A batch still's boil-up: a vapour rate of one still (kmol/h, kmol/s, kg/h), its heat\ninput (kW, with the components' heat_of_vaporization), a specific rate (1/h: kmol of vapour\nper hour per kmol of the charge) or a vapour volume (m3/h at the still's temperature and\npressure, an ideal gas: a vacuum pump's capacity; volatility raoult, ADR 0068), each\nconstant; or a jacket's (kW/K: its UA, with the heating medium's ``medium_temperature``,\nADR 0078): the heat input ``UA (T_medium - T)`` falls as the still's temperature T rises.\nWith a ``column`` it is the reboiler's: (R + 1) times the distillate (ADR 0061).",
         "properties": {
           "value": {
             "exclusiveMinimum": 0,
@@ -1201,10 +1201,25 @@
               "kg/h",
               "kW",
               "1/h",
-              "m3/h"
+              "m3/h",
+              "kW/K"
             ],
             "title": "Unit",
             "type": "string"
+          },
+          "medium_temperature": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "kW/K: K of the jacket's heating medium (taken as constant).",
+            "title": "Medium Temperature"
           },
           "provenance": {
             "enum": [
@@ -4903,7 +4918,7 @@
           },
           "heat_up_time": {
             "default": false,
-            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own boil-up's heat input (a boil-up in kW: its value; else the mean over the cuts at it; every cut with its own boil-up: the mean over the boil-up), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
+            "description": "The still's heat terms besides the boil-up (heat_up: the charge's and a swap's feed's; a recipe vessel's metal, ADR 0063) also take time, at the still's own boil-up's heat input (a boil-up in kW: its value; a jacket in kW/K: UA times the log-mean of T_medium - T_in and T_medium - T_0, ADR 0078; else the mean over the cuts at it; every cut with its own boil-up: the mean over the boil-up, or one jacket on every cut: that jacket's; what heats while a jacket boils up, ADR 0075's sensible rise and losses and the metal above T_0, at its driving force there), added to the still's time and to the recipe's distil time from it (ADR 0068); default: energy only.",
             "title": "Heat Up Time",
             "type": "boolean"
           },
@@ -6124,6 +6139,20 @@
             "description": "constant: component -> relative volatility (positive).",
             "title": "Alpha",
             "type": "object"
+          },
+          "activity": {
+            "anyOf": [
+              {
+                "const": "unifac",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "raoult: the liquid's activity coefficients, y_i P = gamma_i x_i P_i(T) (modified Raoult's law, ADR 0078): unifac (original UNIFAC from the components' CAS numbers, thermo, extra props); default: an ideal liquid (gamma 1).",
+            "title": "Activity"
           },
           "provenance": {
             "enum": [

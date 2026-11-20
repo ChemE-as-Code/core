@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Batch still (ADR 0078, core#182): a jacket's boil-up, `boilup: {value: UA, unit: kW/K,
+  medium_temperature: K}`, whose heat input `UA (T_m - T)` falls as the pot heats (with
+  `heat_up_time`, the charge's heat-up takes the jacket's own time); and a non-ideal liquid,
+  `volatility: {model: raoult, activity: unifac}`, on modified Raoult's law with UNIFAC from
+  the components' CAS numbers (extra `props`; `cheme.process-still` names a component without
+  one). The still holds one liquid: a liquid UNIFAC splits into two (a component's activity
+  above 1, or Michelsen's tangent-plane test) is refused, and so is a pair of UNIFAC main
+  groups without interaction parameters (thermo would take them as 0). Both are opt-in: a
+  still without them solves, reports and fingerprints as before. With 1.13.0's still terms
+  (ADR 0075) on a jacket, `heat_up_time` times the sensible rise and the heat losses, and the
+  vessel's metal above the first bubble point, at the jacket's driving force where they occur,
+  not at its input over the charge's heat-up; the jacket's assumption names the terms the duty
+  counts. A reaction in a still is not modelled; the ADR says why. Every BFD/PFD needs `cheme
+  process build` once (only `generator_sha256` changes).
+
 ## 1.13.0 (2026-11-19)
 
 Minor release for batch processes. Semi-batch reactors time a dose against the jacket's cooling

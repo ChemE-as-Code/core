@@ -299,7 +299,7 @@ duty, beside a dose's `solution` and the `charge heat-up`, and the vent's `absor
 still:
   volatility: {model: raoult, provenance: given, source: NIST WebBook}   # or constant + alpha
   nonvolatile: [PRODUCT]
-  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kmol/s, kg/h, kW, 1/h, m3/h (raoult)
+  boilup: {value: 20, unit: kmol/h, provenance: assumed, source: jacket estimate}  # kmol/s, kg/h, kW, 1/h, m3/h (raoult), kW/K
   feed: {stream: S12, mode: constant_level}        # a solvent swap; or mode: portions, portions: 4, down_to: 0.5
   end: {residue: {key: OLD_SOLVENT, mole_fraction: 0.005}}  # or distilled, time, temperature
   outlets: {distillate: top, residue: bottom}      # or cuts: [{outlet, end}], outlets: {residue}
@@ -345,14 +345,34 @@ still:
   charge's note "the charge enters at ... (its flash is not modelled)" means the field is off.
   A swap's feed that enters above the still's temperature keeps its own note with the field
   on: the feed is not flashed.
+- A jacket whose driving force falls as the pot heats is `boilup: {value: UA, unit: kW/K,
+  medium_temperature: K}` (ADR 0078): the heat input `UA (T_medium - T)` at the still's bubble
+  point. Take UA from the jacket's U and its wetted area, with their source; the area is
+  constant over the boil-up, so a pot that empties below its jacket boils up too fast at the
+  end. An end at or above the medium's temperature is refused; one the still reaches only
+  near it stalls with the reason. With `heat_up_time` the charge's heat-up takes the jacket's
+  own time, `C / UA ln((T_m - T_in) / (T_m - T_0))` (the still's jacket, or one jacket on
+  every cut), and `sensible_heat`, `heat_loss` and the metal above `T_0` take its time at the
+  driving force where they occur; they do not slow the jacket's vapour (ADR 0075: beside the
+  integration), so a cut ended at a time collects as if the jacket's whole input boiled up.
 - The feed's flow is the amount fed per hour of charge, as a semi-batch's dose.
 - `cheme process stills` reports the cuts, the residue, the boil-up time and the duty per
   batch. The batch comes from `process/recipe.yaml`, whose `distil` operation takes the time
   `from:` the still.
 - Without `column:` the model is one stage: it strips and swaps solvents but does not purify
-  a product. An azeotrope (non-ideal liquid) needs `process simulate`, or a specified split as
-  `recovery: {outlets: {port: {component: share}}, provenance, source}` on the step in place
-  of `still:` (ADR 0070; propagate writes its outlets' flows and compositions,
+  a product.
+- A non-ideal liquid (an azeotrope, a polar solute in a hydrocarbon) is `volatility: {model:
+  raoult, activity: unifac}` (ADR 0078): modified Raoult's law with UNIFAC from each liquid
+  component's `cas` (extra `props`). UNIFAC is predictive: keep the volatility's provenance
+  `calculated` or `assumed` and say so in `DESIGN.md`; a component without UNIFAC groups, or
+  a pair of groups without UNIFAC parameters, is refused, never taken as ideal. The still holds
+  one liquid: a liquid that splits into two (water with a hydrocarbon, a heteroazeotrope) is
+  refused (`separate_phase` keeps its component from boiling). There is no reaction in a
+  still: a reaction during the distillation is a reactor step before it, or a hand estimate in
+  `DESIGN.md`.
+- A liquid that splits, or one UNIFAC does not cover, needs `process simulate`, or a
+  specified split as `recovery: {outlets: {port: {component: share}}, provenance, source}` on
+  the step in place of `still:` (ADR 0070; propagate writes its outlets' flows and compositions,
   `cheme.process-recovery` checks it). Never type its outlets as ASSUMED values. Record the
   split's source in `DESIGN.md`. Without `still:`, `cheme process stills` no longer reports the
   step and propagate writes no boil-up duty: give the `distil` time and the duty yourself.

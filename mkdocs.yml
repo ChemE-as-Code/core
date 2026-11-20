@@ -218,4 +218,5 @@ nav:
       - "0075 The rest of a batch's energy balance": adr/0075-the-rest-of-a-batchs-energy-balance.md
       - "0076 Crystallizer, wash and dryer follow-ups": adr/0076-crystallizer-wash-and-dryer-follow-ups.md
       - "0077 Batch still: the charge's flash": adr/0077-batch-still-flashes-a-charge-above-its-bubble-point.md
+      - "0078 Batch still: jacket boil-up and activity coefficients": adr/0078-batch-still-jacket-boilup-and-activity-coefficients.md
       - Template: adr/template.md
