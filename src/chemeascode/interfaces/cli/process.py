@@ -70,6 +70,25 @@ def build(
         raise typer.Exit(1)
 
 
+@process_app.command("activated-sludge-review")
+def activated_sludge_review(
+    snapshot: Annotated[Path, typer.Argument(help="JSON snapshot of one biological waterline.")],
+) -> None:
+    """Review HRT, TSS SRT and secondary clarifier loading in a snapshot."""
+    from chemeascode.domains.process.activated_sludge import review
+
+    try:
+        result = review(json.loads(snapshot.read_bytes()))
+    except (OSError, ValueError) as error:
+        typer.echo(
+            f"{snapshot}: error cheme.activated-sludge-input: {error} "
+            "-- supply one readable JSON snapshot object.",
+            err=True,
+        )
+        raise typer.Exit(2) from error
+    typer.echo(json.dumps(result, indent=2, allow_nan=False))
+
+
 @process_app.command("streams")
 def streams(
     case: Annotated[str | None, typer.Option(help="Case id (default: the default case).")] = None,

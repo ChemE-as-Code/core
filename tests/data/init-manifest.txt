@@ -1,5 +1,6 @@
 054bb7e97d56deae124e6819a9c4c649a795cc55958f6ca738f3920b13417ebb  .claude/settings.json
 e2911e77e20866790695999322a50029637107d7ab85e9bc4f30a669c1a2b96a  .claude/skills/NOTICE.md
+ec39389a2534b3243684ff6516017ea87c9009d6ac2198cb6e3260a0a64e3125  .claude/skills/activated-sludge-retention-and-clarifier-loading/SKILL.md
 263621badb5a066205fb217ee32e90f1d6f1a75285857670f15b7a439c33ae7f  .claude/skills/area-classification/SKILL.md
 4bedf27266d050401d755e2c6b25ba1937a33bcfc06eaa099bb338cf190779f0  .claude/skills/control-loops/SKILL.md
 30556d037a4fe8d05cf69d313d1233f99e58138d72edb0fdf1fa5540a0577e08  .claude/skills/control-narrative/SKILL.md

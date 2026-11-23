@@ -1,0 +1,98 @@
+{
+  "name": "A2O",
+  "day": 200.0,
+  "tanks": [
+    {
+      "id": "A1",
+      "zone": "anaerobic",
+      "volume_m3": 1000,
+      "mlss_mg_L": 3525.6659898973285,
+      "sample_stream": "A1_OUT"
+    },
+    {
+      "id": "A2",
+      "zone": "anaerobic",
+      "volume_m3": 1000,
+      "mlss_mg_L": 3500.9024838777955,
+      "sample_stream": "A2_OUT"
+    },
+    {
+      "id": "A3",
+      "zone": "anoxic",
+      "volume_m3": 1000,
+      "mlss_mg_L": 3499.346944378596,
+      "sample_stream": "A3_OUT"
+    },
+    {
+      "id": "A4",
+      "zone": "anoxic",
+      "volume_m3": 1000,
+      "mlss_mg_L": 3498.904968972051,
+      "sample_stream": "A4_OUT"
+    },
+    {
+      "id": "O1",
+      "zone": "aerobic",
+      "volume_m3": 1333,
+      "mlss_mg_L": 3498.7976554110223,
+      "sample_stream": "O1_OUT"
+    },
+    {
+      "id": "O2",
+      "zone": "aerobic",
+      "volume_m3": 1333,
+      "mlss_mg_L": 3497.4584696569696,
+      "sample_stream": "O2_OUT"
+    },
+    {
+      "id": "O3",
+      "zone": "aerobic",
+      "volume_m3": 1333,
+      "mlss_mg_L": 3494.9775877634083,
+      "sample_stream": "TO_CLARIFIER"
+    }
+  ],
+  "clarifier": {
+    "area_m2": 1500,
+    "height_m": 4,
+    "n_layers": 10,
+    "layer_tss_mg_L": [
+      12.885704341587923,
+      18.534807586453823,
+      30.17829625734449,
+      70.90035967154118,
+      373.26664556233794,
+      373.2666455625065,
+      373.2666455626749,
+      373.2666455628431,
+      1776.597340769541,
+      6834.686658747151
+    ]
+  },
+  "streams": {
+    "INFLUENT": {
+      "flow_m3_d": 18446.0,
+      "tss_mg_L": 215.493
+    },
+    "RAS": {
+      "flow_m3_d": 18446.0,
+      "tss_mg_L": 6834.686658747154
+    },
+    "INTERNAL": {
+      "flow_m3_d": 55338.0,
+      "tss_mg_L": 3494.977587763409
+    },
+    "TO_CLARIFIER": {
+      "flow_m3_d": 36892.0,
+      "tss_mg_L": 3494.9775877634083
+    },
+    "EFFLUENT": {
+      "flow_m3_d": 18061.0,
+      "tss_mg_L": 12.885704341587916
+    },
+    "WAS": {
+      "flow_m3_d": 385.0,
+      "tss_mg_L": 6834.68665874715
+    }
+  }
+}

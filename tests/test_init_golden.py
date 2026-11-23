@@ -47,6 +47,7 @@ def test_init_installs_skills_under_dot_claude(tmp_path):
     skills = {n.split("/")[2] for n in names if n.startswith(".claude/skills/")}
     skills.remove("NOTICE.md")
     assert skills == {
+        "activated-sludge-retention-and-clarifier-loading",
         "dexpi-xml",
         "layout-yaml",
         "pipe-routing",
@@ -172,6 +173,7 @@ def test_bundled_skills_live_with_their_owners():
     # <owner>/skills/<name>/
     owners = {name: Path(str(skill)).parents[1].name for name, skill in bundled_skills().items()}
     assert owners == {
+        "activated-sludge-retention-and-clarifier-loading": "process",
         "dexpi-xml": "piping",
         "lists-sync": "piping",
         "pid-draft": "piping",
