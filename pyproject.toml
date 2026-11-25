@@ -30,7 +30,7 @@ png = ["resvg-py>=0.5.0"]
 props = ["thermo==0.6.1", "chemicals==1.5.2", "CoolProp==8.0.0"]
 # `cheme process props` with a PC-SAFT package: feos (pinned: its 0.x API and parameter format
 # change between minor versions, ADR 0064).
-saft = ["feos==0.10.5"]
+saft = ["feos==0.11.0"]
 # foundation.units: conversion between any units through Pint (K, °C and the (a)/(g) pressure
 # units of the process YAML need no extra).
 units = ["pint>=0.24.4"]
@@ -55,7 +55,7 @@ cheme = "chemeascode.interfaces.cli:app"
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-    "ruff==0.17.4",
+    "ruff==0.17.6",
     "fastapi>=0.143.3",
     "uvicorn>=0.54.0",
     "httpx2>=2.13.1",
@@ -63,7 +63,7 @@ dev = [
     "thermo==0.6.1",
     "chemicals==1.5.2",
     "CoolProp==8.0.0",
-    "feos==0.10.5",
+    "feos==0.11.0",
     "pint>=0.24.4",
     "rdkit>=2024.3.5",
     "cantera>=3.2; python_version < '3.15'",
