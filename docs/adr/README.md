@@ -126,3 +126,4 @@ ADRs 0002 to 0018 were written retroactively on 2026-10-25 from the repository's
 | [0076](0076-crystallizer-wash-and-dryer-follow-ups.md) | Crystallizer, wash and dryer follow-ups: a carried solubility point, the liquor checked, a displacement wash, a second liquid, the dryer's selectivity, sublimation, cooling and condenser | Proposed | 2026-11-13 |
 | [0077](0077-batch-still-flashes-a-charge-above-its-bubble-point.md) | Batch still: a charge above its bubble point flashes to the still's pressure first, its vapour to the first cut, the boil-up credited | Proposed | 2026-11-19 |
 | [0078](0078-batch-still-jacket-boilup-and-activity-coefficients.md) | Batch still: a jacket's boil-up and UNIFAC activity coefficients; no reaction in a still | Proposed | 2026-11-19 |
+| [0079](0079-activated-sludge-snapshot-review.md) | Read-only activated-sludge snapshot review with partial inputs | Proposed | 2026-11-19 |

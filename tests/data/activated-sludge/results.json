@@ -1,0 +1,61 @@
+{
+  "A2O": {
+    "biological_volume_m3": 7999,
+    "nominal_bio_hrt_h": 10.407459611839965,
+    "zone_nominal_hrt_h": {
+      "anaerobic": 2.602190176732083,
+      "anoxic": 2.602190176732083,
+      "aerobic": 5.2030792583758
+    },
+    "tank_inventory_kg_TSS": {
+      "A1": 3525.6659898973285,
+      "A2": 3500.9024838777955,
+      "A3": 3499.346944378596,
+      "A4": 3498.904968972051,
+      "O1": 4663.897274662892,
+      "O2": 4662.112140052741,
+      "O3": 4658.805124488623
+    },
+    "bioreactor_inventory_kg_TSS": 28009.63492633003,
+    "clarifier_inventory_kg_TSS": 6142.10984977439,
+    "total_inventory_kg_TSS": 34151.74477610442,
+    "was_loss_kg_TSS_d": 2631.3543636176532,
+    "effluent_loss_kg_TSS_d": 232.72870611341935,
+    "total_loss_kg_TSS_d": 2864.0830697310726,
+    "system_tss_srt_d": 11.924146033694178,
+    "reactor_only_tss_srt_d": 9.779616807329557,
+    "effluent_overflow_m3_m2_d": 12.040666666666667,
+    "plant_influent_per_area_m3_m2_d": 12.297333333333333,
+    "clarifier_feed_per_area_m3_m2_d": 24.594666666666665,
+    "clarifier_feed_kg_TSS_d": 128936.71316776765,
+    "clarifier_solids_loading_kg_TSS_m2_d": 85.95780877851176
+  },
+  "MLE": {
+    "biological_volume_m3": 5999.0,
+    "nominal_bio_hrt_h": 7.8052694351078875,
+    "zone_nominal_hrt_h": {
+      "anoxic": 2.6021901767320843,
+      "aerobic": 5.203079258375802
+    },
+    "tank_inventory_kg_TSS": {
+      "A1": 3285.196232015688,
+      "A2": 3282.5442645477146,
+      "O1": 4369.374374850777,
+      "O2": 4363.746912662608,
+      "O3": 4358.686485378771
+    },
+    "bioreactor_inventory_kg_TSS": 19659.548269455558,
+    "clarifier_inventory_kg_TSS": 4982.085170155582,
+    "total_inventory_kg_TSS": 24641.63343961114,
+    "was_loss_kg_TSS_d": 2461.680447314528,
+    "effluent_loss_kg_TSS_d": 225.7072654118284,
+    "total_loss_kg_TSS_d": 2687.3877127263563,
+    "system_tss_srt_d": 9.169362992514463,
+    "reactor_only_tss_srt_d": 7.315486402038705,
+    "effluent_overflow_m3_m2_d": 12.040666666666661,
+    "plant_influent_per_area_m3_m2_d": 12.297333333333325,
+    "clarifier_feed_per_area_m3_m2_d": 24.59466666666666,
+    "clarifier_feed_kg_TSS_d": 120630.65402745205,
+    "clarifier_solids_loading_kg_TSS_m2_d": 80.42043601830137
+  }
+}
